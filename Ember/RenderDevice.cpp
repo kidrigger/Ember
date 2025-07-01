@@ -1,5 +1,7 @@
 #include "RenderDevice.hpp"
 
+#include <span>
+
 #include "Base/DirectXHeaders.hpp"
 #include "Base/HelperUtils.hpp"
 #include "Base/Runtime.hpp"
@@ -8,8 +10,15 @@
 #pragma comment( lib, "D3DCompiler.lib" )
 #pragma comment( lib, "dxgi.lib" )
 
+void UpdateRenderTargetViews(
+    ComPtr<ID3D12Device> const&              device,
+    ComPtr<IDXGISwapChain4> const&           swapchain,
+    ComPtr<ID3D12DescriptorHeap> const&      rtv_descriptor_heap,
+    UINT const                               rtv_descriptor_size,
+    std::span<ComPtr<ID3D12Resource>> const& backbuffers );
+
 Ember::RenderDevice::RenderDevice(
-    ComPtr<ID3D12Device> const&                   device,
+    ComPtr<ID3D12Device2> const&                  device,
     ComPtr<ID3D12CommandQueue> const&             direct_queue,
     UINT32 const                                  swapchain_width,
     UINT32 const                                  swapchain_height,
@@ -22,7 +31,7 @@ Ember::RenderDevice::RenderDevice(
     std::vector<ComPtr<ID3D12CommandAllocator>>&& command_allocators,
     ComPtr<ID3D12Fence> const&                    fence,
     HANDLE const                                  fence_event,
-    bool                                          is_tearing_supported )
+    bool const                                    is_tearing_supported )
   : m_Device{ device }
   , m_DirectQueue{ direct_queue }
   , m_SwapchainWidth{ swapchain_width }
@@ -208,20 +217,7 @@ Ember::RenderDevice Ember::RenderDevice::Create( HWND window_handle, bool const 
     ERR_ABORT( device->CreateDescriptorHeap( &desc, IID_PPV_ARGS( &rtv_descriptor_heap ) ) );
     rtv_descriptor_size = device->GetDescriptorHandleIncrementSize( D3D12_DESCRIPTOR_HEAP_TYPE_RTV );
 
-    CD3DX12_CPU_DESCRIPTOR_HANDLE rtv_handle{ rtv_descriptor_heap->GetCPUDescriptorHandleForHeapStart() };
-
-    // Fetch all backbuffers, create RTV and write them to the heap.
-    for ( int i = 0; i < NUM_FRAMES; ++i )
-    {
-      // Write the swapchain backbuffer into the array.
-      ERR_ABORT( swapchain->GetBuffer( i, IID_PPV_ARGS( &backbuffers[i] ) ) );
-
-      // Creates the view for the backbuffer and places it at the rtvHandle.
-      device->CreateRenderTargetView( backbuffers[i].Get(), nullptr, rtv_handle );
-
-      // Increment rtvHandle by the size of rtvDescriptor.
-      rtv_handle.Offset( rtv_descriptor_size );
-    }
+    UpdateRenderTargetViews( device, swapchain, rtv_descriptor_heap, rtv_descriptor_size, backbuffers );
   }
 
   // Create Command Allocator
@@ -292,6 +288,34 @@ void Ember::RenderDevice::Destroy()
   }
 }
 
+void Ember::RenderDevice::ResizeSwapchain( uint32_t const width, uint32_t const height )
+{
+  if ( m_SwapchainHeight != height or m_SwapchainWidth != width )
+  {
+    m_SwapchainWidth  = std::max( 1u, width );
+    m_SwapchainHeight = std::max( 1u, height );
+
+    WaitIdle();
+
+    for ( int i = 0; i < NUM_FRAMES; ++i )
+    {
+      m_Backbuffers[i].Reset();
+      // Restart the count from here. Everyone should have waited for this.
+      m_FenceValues[i] = m_FenceValues[m_CurrentBackbufferIndex];
+    }
+
+    DXGI_SWAP_CHAIN_DESC swapchain_desc = {};
+    ERR_ABORT( m_Swapchain->GetDesc( &swapchain_desc ) );
+
+    ERR_ABORT( m_Swapchain->ResizeBuffers(
+        NUM_FRAMES, m_SwapchainWidth, m_SwapchainHeight, swapchain_desc.BufferDesc.Format, swapchain_desc.Flags ) );
+
+    m_CurrentBackbufferIndex = m_Swapchain->GetCurrentBackBufferIndex();
+
+    UpdateRenderTargetViews( m_Device, m_Swapchain, m_RTVDescriptorHeap, m_RTVDescriptorSize, m_Backbuffers );
+  }
+}
+
 void Ember::RenderDevice::WaitIdle()
 {
   auto const wait_on_fence_value = ++m_CurrentFenceValue;
@@ -351,14 +375,14 @@ void Ember::RenderDevice::Present()
 
   ERR_ABORT( m_Swapchain->Present( sync_interval, present_flags ) );
 
-  UINT64 const next_fence_value = ++m_CurrentFenceValue;
+  uint64_t const next_fence_value = ++m_CurrentFenceValue;
   ERR_ABORT( m_DirectQueue->Signal( m_Fence.Get(), next_fence_value ) );
   m_FenceValues[m_CurrentBackbufferIndex] = next_fence_value;
 
   // At the end of the queue, we wait for the next frame.
-  m_CurrentBackbufferIndex = m_Swapchain->GetCurrentBackBufferIndex();
+  m_CurrentBackbufferIndex  = m_Swapchain->GetCurrentBackBufferIndex();
 
-  UINT64 const wait_value  = m_FenceValues[m_CurrentBackbufferIndex];
+  uint64_t const wait_value = m_FenceValues[m_CurrentBackbufferIndex];
   if ( m_Fence->GetCompletedValue() < wait_value )
   {
     // Set the event on fence.
@@ -377,4 +401,28 @@ bool Ember::RenderDevice::IsVsyncEnabled() const
 bool Ember::RenderDevice::IsTearingSupported() const
 {
   return m_VsyncAndTearing & SUPPORT_TEARING_BIT;
+}
+
+void UpdateRenderTargetViews(
+    ComPtr<ID3D12Device> const&              device,
+    ComPtr<IDXGISwapChain4> const&           swapchain,
+    ComPtr<ID3D12DescriptorHeap> const&      rtv_descriptor_heap,
+    UINT const                               rtv_descriptor_size,
+    std::span<ComPtr<ID3D12Resource>> const& backbuffers )
+{
+  size_t const                  backbuffer_count = backbuffers.size();
+
+  CD3DX12_CPU_DESCRIPTOR_HANDLE rtv_handle{ rtv_descriptor_heap->GetCPUDescriptorHandleForHeapStart() };
+  // Fetch all backbuffers, create RTV and write them to the heap.
+  for ( int i = 0; i < backbuffer_count; ++i )
+  {
+    // Write the swapchain backbuffer into the array.
+    ERR_ABORT( swapchain->GetBuffer( i, IID_PPV_ARGS( &backbuffers[i] ) ) );
+
+    // Creates the view for the backbuffer and places it at the rtvHandle.
+    device->CreateRenderTargetView( backbuffers[i].Get(), nullptr, rtv_handle );
+
+    // Increment rtvHandle by the size of rtvDescriptor.
+    rtv_handle.Offset( ( INT )rtv_descriptor_size );
+  }
 }

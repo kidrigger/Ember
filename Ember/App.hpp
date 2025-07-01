@@ -18,13 +18,14 @@ public:
 
   static App& Instance();
 
-  static App  Create( HINSTANCE instance_handle );
-
   void        LoadContent();
   void        Update();
   void        Render();
   void        UnloadContent();
 
+  void        Resize() const;
+
+  static App  Create( HINSTANCE instance_handle );
   void        Destroy();
 };
 

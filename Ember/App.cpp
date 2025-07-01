@@ -77,6 +77,7 @@ LRESULT CALLBACK WndProc( HWND const window_handle, UINT const message, WPARAM c
       break;
     case WM_SIZE:
     {
+      Ember::App::Instance().Resize();
     }
     break;
     case WM_DESTROY:
@@ -190,8 +191,6 @@ Ember::App Ember::App::Create( HINSTANCE const instance_handle )
 
   RenderDevice* render_device = new RenderDevice{ RenderDevice::Create( window_handle, use_warp ) };
 
-  ERR_ABORT( ::ShowWindow( window_handle, SW_SHOW ) );
-
   return App{
     window_handle,
     render_device,
@@ -199,7 +198,9 @@ Ember::App Ember::App::Create( HINSTANCE const instance_handle )
 }
 
 void Ember::App::LoadContent()
-{}
+{
+  ERR_ABORT( ::ShowWindow( m_WindowHandle, SW_SHOW ) );
+}
 
 void Ember::App::Update()
 {}
@@ -236,6 +237,17 @@ void Ember::App::Render()
 
 void Ember::App::UnloadContent()
 {}
+
+void Ember::App::Resize() const
+{
+  RECT rect;
+  ::GetWindowRect( m_WindowHandle, &rect );
+
+  UINT const width  = rect.right - rect.left;
+  UINT const height = rect.bottom - rect.top;
+
+  m_RenderDevice->ResizeSwapchain( width, height );
+}
 
 void Ember::App::Destroy()
 {
