@@ -136,7 +136,7 @@
     <ClCompile Include="Main.cpp" />
   </ItemGroup>
   <ItemGroup>
-    <ClInclude Include="App.h" />
+    <ClInclude Include="App.hpp" />
     <ClInclude Include="RenderDevice.hpp" />
     <ClInclude Include="Base\DirectXHeaders.hpp" />
     <ClInclude Include="Base\HelperUtils.hpp" />

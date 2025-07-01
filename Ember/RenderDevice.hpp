@@ -1,6 +1,7 @@
 #pragma once
 
 #include "Base/DirectXHeaders.hpp"
+#include "Base/HelperUtils.hpp"
 #include "Base/Runtime.hpp"
 
 namespace Ember
@@ -18,6 +19,11 @@ class RenderDevice
   ComPtr<IDXGISwapChain4>             m_Swapchain;
   std::vector<ComPtr<ID3D12Resource>> m_Backbuffers;
 
+  constexpr static UINT32             USE_VSYNC_BIT       = 1 << 0;
+  constexpr static UINT32             SUPPORT_TEARING_BIT = 1 << 1;
+
+  UINT32                              m_VsyncAndTearing{ 0 };
+
   // Views to swapchain images.
   ComPtr<ID3D12DescriptorHeap> m_RTVDescriptorHeap;
   UINT32                       m_RTVDescriptorSize{ 0 };
@@ -31,10 +37,7 @@ class RenderDevice
   ComPtr<ID3D12Fence> m_Fence;
   UINT64              m_CurrentFenceValue{ 0 };
   std::vector<UINT64> m_FenceValues;
-  HANDLE              m_FenceEvent{ nullptr };
-
-  // Meta
-  bool m_IsInitialized{ false };
+  HANDLE              m_FenceEvent{ nullptr }; // Also acts as 'initialized'
 
 public:
   RenderDevice(
@@ -50,12 +53,26 @@ public:
       ComPtr<ID3D12GraphicsCommandList> const&      command_list,
       std::vector<ComPtr<ID3D12CommandAllocator>>&& command_allocators,
       ComPtr<ID3D12Fence> const&                    fence,
-      HANDLE                                        fence_event );
+      HANDLE                                        fence_event,
+      bool                                          is_tearing_supported );
 
   static RenderDevice Create( HWND window_handle, bool use_warp );
   void                Destroy();
 
+  // Wait until the direct queue has finished all commands.
+  void WaitIdle();
+
   ~RenderDevice();
+
+  [[nodiscard]] ID3D12CommandAllocator*    GetCurrentCommandAllocator() const;
+  [[nodiscard]] ID3D12Resource*            GetCurrentBackbuffer() const;
+  [[nodiscard]] ID3D12GraphicsCommandList* GetGraphicsCommandList() const;
+  CD3DX12_CPU_DESCRIPTOR_HANDLE            GetCurrentRTVCpuDescriptorHandle() const;
+  void                                     ExecuteCommandList( ID3D12CommandList* command_list ) const;
+  void                                     Present();
+
+  bool                                     IsVsyncEnabled() const;
+  bool                                     IsTearingSupported() const;
 
   size_t constexpr static NUM_FRAMES = 3;
 };

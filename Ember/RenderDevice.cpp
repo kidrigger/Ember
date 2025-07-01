@@ -21,7 +21,8 @@ Ember::RenderDevice::RenderDevice(
     ComPtr<ID3D12GraphicsCommandList> const&      command_list,
     std::vector<ComPtr<ID3D12CommandAllocator>>&& command_allocators,
     ComPtr<ID3D12Fence> const&                    fence,
-    HANDLE const                                  fence_event )
+    HANDLE const                                  fence_event,
+    bool                                          is_tearing_supported )
   : m_Device{ device }
   , m_DirectQueue{ direct_queue }
   , m_SwapchainWidth{ swapchain_width }
@@ -35,8 +36,13 @@ Ember::RenderDevice::RenderDevice(
   , m_CommandAllocators{ std::move( command_allocators ) }
   , m_Fence{ fence }
   , m_FenceEvent{ fence_event }
-  , m_IsInitialized{ true }
-{}
+{
+  m_FenceValues.resize( NUM_FRAMES, 0 );
+  if ( is_tearing_supported )
+  {
+    m_VsyncAndTearing = m_VsyncAndTearing | SUPPORT_TEARING_BIT;
+  }
+}
 
 Ember::RenderDevice Ember::RenderDevice::Create( HWND window_handle, bool const use_warp )
 {
@@ -271,19 +277,104 @@ Ember::RenderDevice Ember::RenderDevice::Create( HWND window_handle, bool const 
     std::move( command_allocators ),
     fence,
     fence_event,
+    is_tearing_supported,
   };
 }
 
 void Ember::RenderDevice::Destroy()
 {
-  if ( m_IsInitialized )
+  if ( m_FenceEvent )
   {
+    WaitIdle();
+
     ::CloseHandle( m_FenceEvent );
-    m_IsInitialized = false;
+    m_FenceEvent = nullptr;
+  }
+}
+
+void Ember::RenderDevice::WaitIdle()
+{
+  auto const wait_on_fence_value = ++m_CurrentFenceValue;
+
+  // Signal on commandQueue.
+  ERR_ABORT( m_DirectQueue->Signal( m_Fence.Get(), wait_on_fence_value ) );
+
+  // Wait on CPU.
+  // If the fence is less than 'value' we need to wait.
+  if ( m_Fence->GetCompletedValue() < wait_on_fence_value )
+  {
+    // Set the event on fence.
+    ERR_ABORT( m_Fence->SetEventOnCompletion( wait_on_fence_value, m_FenceEvent ) );
+
+    // Wait for the event (with max timeout).
+    ::WaitForSingleObject( m_FenceEvent, INFINITE );
   }
 }
 
 Ember::RenderDevice::~RenderDevice()
 {
-  ASSERT( not m_IsInitialized );
+  ASSERT( not m_FenceEvent );
+}
+
+ID3D12CommandAllocator* Ember::RenderDevice::GetCurrentCommandAllocator() const
+{
+  return m_CommandAllocators[m_CurrentBackbufferIndex].Get();
+}
+
+ID3D12Resource* Ember::RenderDevice::GetCurrentBackbuffer() const
+{
+  return m_Backbuffers[m_CurrentBackbufferIndex].Get();
+}
+
+ID3D12GraphicsCommandList* Ember::RenderDevice::GetGraphicsCommandList() const
+{
+  return m_CommandList.Get();
+}
+
+CD3DX12_CPU_DESCRIPTOR_HANDLE Ember::RenderDevice::GetCurrentRTVCpuDescriptorHandle() const
+{
+  return CD3DX12_CPU_DESCRIPTOR_HANDLE(
+      m_RTVDescriptorHeap->GetCPUDescriptorHandleForHeapStart(), m_CurrentBackbufferIndex, m_RTVDescriptorSize );
+}
+
+void Ember::RenderDevice::ExecuteCommandList( ID3D12CommandList* command_list ) const
+{
+  m_DirectQueue->ExecuteCommandLists( 1, &command_list );
+}
+
+void Ember::RenderDevice::Present()
+{
+  bool const is_vsync_enabled = IsVsyncEnabled();
+  bool const allow_tearing    = IsTearingSupported() and not is_vsync_enabled;
+  UINT const sync_interval    = is_vsync_enabled ? 1 : 0;
+  UINT const present_flags    = allow_tearing ? DXGI_PRESENT_ALLOW_TEARING : 0;
+
+  ERR_ABORT( m_Swapchain->Present( sync_interval, present_flags ) );
+
+  UINT64 const next_fence_value = ++m_CurrentFenceValue;
+  ERR_ABORT( m_DirectQueue->Signal( m_Fence.Get(), next_fence_value ) );
+  m_FenceValues[m_CurrentBackbufferIndex] = next_fence_value;
+
+  // At the end of the queue, we wait for the next frame.
+  m_CurrentBackbufferIndex = m_Swapchain->GetCurrentBackBufferIndex();
+
+  UINT64 const wait_value  = m_FenceValues[m_CurrentBackbufferIndex];
+  if ( m_Fence->GetCompletedValue() < wait_value )
+  {
+    // Set the event on fence.
+    ERR_ABORT( m_Fence->SetEventOnCompletion( wait_value, m_FenceEvent ) );
+
+    // Wait for the event (with max timeout).
+    ::WaitForSingleObject( m_FenceEvent, INFINITE );
+  }
+}
+
+bool Ember::RenderDevice::IsVsyncEnabled() const
+{
+  return m_VsyncAndTearing & USE_VSYNC_BIT;
+}
+
+bool Ember::RenderDevice::IsTearingSupported() const
+{
+  return m_VsyncAndTearing & SUPPORT_TEARING_BIT;
 }

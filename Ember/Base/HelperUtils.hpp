@@ -27,6 +27,6 @@
   while ( false )
 
 #define ASSERT( x ) assert( x )
-#define ASSERT_M( x, MSG ) ASSERT( ( x ) && ( MSG ) )
+#define ASSERT_M( x, MSG ) ASSERT( ( x ) and ( MSG ) )
 
 #define COUNTOF( arr ) _countof( arr )
