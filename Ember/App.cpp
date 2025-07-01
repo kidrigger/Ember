@@ -203,7 +203,26 @@ void Ember::App::LoadContent()
 }
 
 void Ember::App::Update()
-{}
+{
+  LARGE_INTEGER perf_counter, freq;
+  ::QueryPerformanceCounter( &perf_counter ); // Always returns true on Win XP or later.
+  ::QueryPerformanceFrequency( &freq );       // Always returns true on Win XP or later.
+
+  m_DeltaTimeMilliseconds =
+      1000.0f * ( perf_counter.QuadPart - m_PrevQueryPerfCounter.QuadPart ) / ( double )freq.QuadPart;
+  m_DeltaTimeSeconds                      = m_DeltaTimeMilliseconds * 0.001f;
+
+  m_BufferSumMs                          -= m_256FrameAvgBuffer[m_AvgBufferHead];
+  m_BufferSumMs                          += m_DeltaTimeMilliseconds;
+  m_256FrameAvgBuffer[m_AvgBufferHead++]  = m_DeltaTimeMilliseconds;
+  m_AvgBufferHead                        %= 256;
+
+  m_PrevQueryPerfCounter                  = perf_counter;
+
+  swprintf_s( m_SprintfBuffer, L"Ember | frame time: %.2lf ms", m_BufferSumMs / 256.0f );
+
+  SetWindowText( m_WindowHandle, m_SprintfBuffer );
+}
 
 void Ember::App::Render()
 {
