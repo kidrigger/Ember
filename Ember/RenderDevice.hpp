@@ -3,7 +3,13 @@
 #include "Base/DirectXHeaders.hpp"
 #include "Base/HelperUtils.hpp"
 #include "Base/Runtime.hpp"
+#include "BufferManager.h"
+#include "ResourceHandles.h"
 
+namespace Ember
+{
+class BufferManager;
+}
 namespace Ember
 {
 
@@ -11,6 +17,7 @@ class RenderDevice
 {
   // Device and queues.
   ComPtr<ID3D12Device2>      m_Device;
+  ComPtr<D3D12MA::Allocator> m_Allocator;
   ComPtr<ID3D12CommandQueue> m_DirectQueue;
 
   // Swapchain and internal images.
@@ -39,9 +46,13 @@ class RenderDevice
   std::vector<uint64_t> m_FenceValues;
   HANDLE                m_FenceEvent{ nullptr }; // Also acts as 'initialized'
 
+  // Resource Management
+  BufferManager m_BufferManager;
+
 public:
   RenderDevice(
       ComPtr<ID3D12Device2> const&                  device,
+      ComPtr<D3D12MA::Allocator> const&             allocator,
       ComPtr<ID3D12CommandQueue> const&             direct_queue,
       uint32_t                                      swapchain_width,
       uint32_t                                      swapchain_height,
@@ -54,18 +65,20 @@ public:
       std::vector<ComPtr<ID3D12CommandAllocator>>&& command_allocators,
       ComPtr<ID3D12Fence> const&                    fence,
       HANDLE                                        fence_event,
-      bool                                          is_tearing_supported );
+      bool                                          is_tearing_supported,
+      BufferManager&&                               buffer_manager );
 
   static RenderDevice Create( HWND window_handle, bool use_warp );
   void                Destroy();
 
   void                ResizeSwapchain( uint32_t width, uint32_t height );
+  Buffer              CreateUniformBuffer( size_t size );
 
   // Wait until the all queues have finished all commands.
-  void WaitIdle();
+  void               WaitIdle();
+  [[nodiscard]] bool IsInit() const;
 
-  ~RenderDevice();
-
+  // Per Frame getters.
   [[nodiscard]] ID3D12CommandAllocator*       GetCurrentCommandAllocator() const;
   [[nodiscard]] ID3D12Resource*               GetCurrentBackbuffer() const;
   [[nodiscard]] ID3D12GraphicsCommandList*    GetGraphicsCommandList() const;

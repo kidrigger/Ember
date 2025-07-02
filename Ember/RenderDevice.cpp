@@ -5,6 +5,7 @@
 #include "Base/DirectXHeaders.hpp"
 #include "Base/HelperUtils.hpp"
 #include "Base/Runtime.hpp"
+#include "BufferManager.h"
 
 #pragma comment( lib, "d3d12.lib" )
 #pragma comment( lib, "D3DCompiler.lib" )
@@ -14,11 +15,12 @@ void UpdateRenderTargetViews(
     ComPtr<ID3D12Device> const&              device,
     ComPtr<IDXGISwapChain4> const&           swapchain,
     ComPtr<ID3D12DescriptorHeap> const&      rtv_descriptor_heap,
-    UINT const                               rtv_descriptor_size,
+    UINT                                     rtv_descriptor_size,
     std::span<ComPtr<ID3D12Resource>> const& backbuffers );
 
 Ember::RenderDevice::RenderDevice(
     ComPtr<ID3D12Device2> const&                  device,
+    ComPtr<D3D12MA::Allocator> const&             allocator,
     ComPtr<ID3D12CommandQueue> const&             direct_queue,
     UINT32 const                                  swapchain_width,
     UINT32 const                                  swapchain_height,
@@ -31,8 +33,10 @@ Ember::RenderDevice::RenderDevice(
     std::vector<ComPtr<ID3D12CommandAllocator>>&& command_allocators,
     ComPtr<ID3D12Fence> const&                    fence,
     HANDLE const                                  fence_event,
-    bool const                                    is_tearing_supported )
+    bool const                                    is_tearing_supported,
+    BufferManager&&                               buffer_manager )
   : m_Device{ device }
+  , m_Allocator{ allocator }
   , m_DirectQueue{ direct_queue }
   , m_SwapchainWidth{ swapchain_width }
   , m_SwapchainHeight{ swapchain_height }
@@ -45,6 +49,7 @@ Ember::RenderDevice::RenderDevice(
   , m_CommandAllocators{ std::move( command_allocators ) }
   , m_Fence{ fence }
   , m_FenceEvent{ fence_event }
+  , m_BufferManager{ std::move( buffer_manager ) }
 {
   m_FenceValues.resize( NUM_FRAMES, 0 );
   if ( is_tearing_supported )
@@ -160,6 +165,17 @@ Ember::RenderDevice Ember::RenderDevice::Create( HWND window_handle, bool const 
 #endif
   }
 
+  ComPtr<D3D12MA::Allocator> allocator;
+  {
+    D3D12MA::ALLOCATOR_DESC allocator_desc = {
+      .Flags    = D3D12MA::ALLOCATOR_FLAG_NONE,
+      .pDevice  = device.Get(),
+      .pAdapter = adapter.Get(),
+    };
+
+    ERR_ABORT( CreateAllocator( &allocator_desc, allocator.GetAddressOf() ) );
+  }
+
   // Command Queue Creation.
   ComPtr<ID3D12CommandQueue> command_queue;
   {
@@ -259,8 +275,11 @@ Ember::RenderDevice Ember::RenderDevice::Create( HWND window_handle, bool const 
     assert( fence_event && "Failed to create fence event" );
   }
 
+  BufferManager buffer_manager = BufferManager::Create( 1000 );
+
   return RenderDevice{
     device,
+    allocator,
     command_queue,
     width,
     height,
@@ -274,14 +293,17 @@ Ember::RenderDevice Ember::RenderDevice::Create( HWND window_handle, bool const 
     fence,
     fence_event,
     is_tearing_supported,
+    std::move( buffer_manager ),
   };
 }
 
 void Ember::RenderDevice::Destroy()
 {
-  if ( m_FenceEvent )
+  if ( IsInit() )
   {
     WaitIdle();
+
+    m_BufferManager.Destroy();
 
     ::CloseHandle( m_FenceEvent );
     m_FenceEvent = nullptr;
@@ -316,6 +338,11 @@ void Ember::RenderDevice::ResizeSwapchain( uint32_t const width, uint32_t const 
   }
 }
 
+Ember::Buffer Ember::RenderDevice::CreateUniformBuffer( size_t const size )
+{
+  return m_BufferManager.CreateUniformBuffer( m_Allocator.Get(), size );
+}
+
 void Ember::RenderDevice::WaitIdle()
 {
   auto const wait_on_fence_value = ++m_CurrentFenceValue;
@@ -335,9 +362,9 @@ void Ember::RenderDevice::WaitIdle()
   }
 }
 
-Ember::RenderDevice::~RenderDevice()
+bool Ember::RenderDevice::IsInit() const
 {
-  ASSERT( not m_FenceEvent );
+  return m_FenceEvent;
 }
 
 ID3D12CommandAllocator* Ember::RenderDevice::GetCurrentCommandAllocator() const
