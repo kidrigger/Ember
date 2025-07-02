@@ -55,5 +55,8 @@
     <None Include="..\.gitignore">
       <Filter>Resource Files\Config</Filter>
     </None>
+    <None Include="PLAN.md">
+      <Filter>Resource Files</Filter>
+    </None>
   </ItemGroup>
 </Project>

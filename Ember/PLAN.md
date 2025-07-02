@@ -1,0 +1,41 @@
+﻿# Plan for Ember development
+
+- [X] Open a window
+- [X] Setup D3D12 Device Interface
+	- [X] Device
+	- [X] Queues
+	- [X] Swapchain
+	- [X] Presentation
+	- [X] Synchronization Primitives
+- [ ] Setup D3D12 Renderer
+	- [ ] Pipeline Creation
+	- [ ] Render Triangle
+	- [ ] Render Texture
+		- [ ] Load Texture
+		- [ ] Render on Screen
+	- [ ] Camera
+		- [ ] Fixed
+		- [ ] With User Control
+	- [ ] Scene Rendering
+		- [ ] Load glTF2.0 Mesh
+		- [ ] Render Mesh
+		- [ ] Scene Hierarchy
+- [ ] Rendering Features
+	- [ ] Lighting
+		- [ ] Blinn-Phong
+		- [ ] PBR
+			- [ ] Punctual
+			- [ ] Static IBL
+				- [ ] Diffuse Cubemap Convolution.
+				- [ ] Prefilter
+				- [ ] Diffuse 3rd order SH.
+			- [ ] Reflection Probe
+				- [ ] Diffuse 3rd order SH.
+		- [ ] Shadows
+			- [ ] PCSS
+			- [ ] Cascaded Shadow Maps
+			- [ ] Omni-Shadow maps
+			- [ ] Dual-paraboloid
+- [ ] Miscellaneous
+	- [X] Perf Query
+	- [ ] Profiling/Instrumentation

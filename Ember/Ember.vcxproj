@@ -146,6 +146,10 @@
     <None Include="..\.clang-format" />
     <None Include="..\.gitignore" />
     <None Include="..\vcpkg.json" />
+    <None Include="PLAN.md">
+      <SubType>
+      </SubType>
+    </None>
   </ItemGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.targets" />
   <ImportGroup Label="ExtensionTargets">
