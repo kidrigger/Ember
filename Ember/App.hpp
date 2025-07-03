@@ -1,27 +1,23 @@
 #pragma once
 
-#include "Base/Runtime.hpp"
+#include "Util/Runtime.hpp"
 
 namespace Ember
 {
+class PerfCounter;
 class RenderDevice;
 
 class App
 {
   HWND          m_WindowHandle{ nullptr };
   RenderDevice* m_RenderDevice{ nullptr };
-  LARGE_INTEGER m_PrevQueryPerfCounter{};
-  double        m_DeltaTimeSeconds{ 0.0f };
-  double        m_DeltaTimeMilliseconds{ 0.0f };
+  PerfCounter*  m_PerfCounter{ nullptr };
   wchar_t       m_SprintfBuffer[1024]{};
-  double        m_256FrameAvgBuffer[256]{};
-  double        m_BufferSumMs{ 0.0f };
-  int           m_AvgBufferHead{ 0 };
 
   static App*   m_Instance;
 
 public:
-  App( HWND window_handle, RenderDevice* render_device );
+  App( HWND window_handle, RenderDevice* render_device, PerfCounter* perf_counter );
   ~App();
 
   static App& Instance();

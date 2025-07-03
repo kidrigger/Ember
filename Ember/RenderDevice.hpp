@@ -1,17 +1,14 @@
 #pragma once
 
-#include "Base/DirectXHeaders.hpp"
-#include "Base/HelperUtils.hpp"
-#include "Base/Runtime.hpp"
 #include "BufferManager.h"
 #include "ResourceHandles.h"
+#include "Util/DirectXHeaders.hpp"
+#include "Util/HelperUtils.hpp"
+#include "Util/Runtime.hpp"
 
 namespace Ember
 {
 class BufferManager;
-}
-namespace Ember
-{
 
 class RenderDevice
 {
@@ -26,8 +23,8 @@ class RenderDevice
   ComPtr<IDXGISwapChain4>             m_Swapchain;
   std::vector<ComPtr<ID3D12Resource>> m_Backbuffers;
 
-  constexpr static uint32_t           USE_VSYNC_BIT       = 1 << 0;
-  constexpr static uint32_t           SUPPORT_TEARING_BIT = 1 << 1;
+  constexpr static uint32_t           kUseVSyncBit       = 1 << 0;
+  constexpr static uint32_t           kSupportTearingBit = 1 << 1;
 
   uint32_t                            m_VsyncAndTearing{ 0 };
 

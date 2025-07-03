@@ -71,3 +71,4 @@ SpaceInEmptyParentheses: false
 SpacesInConditionalStatement: true
 SpacesInCStyleCastParentheses: false
 AlignArrayOfStructures: Right
+UseTab: Never

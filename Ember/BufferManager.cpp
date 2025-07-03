@@ -1,6 +1,6 @@
 #include "BufferManager.h"
 
-#include "Base/HelperUtils.hpp"
+#include "Util/HelperUtils.hpp"
 
 Ember::BufferManager::BufferManager(
     BufferInner* buffers, uint16_t* generations, uint32_t* ref_count, uint32_t const capacity )
@@ -56,7 +56,7 @@ void Ember::BufferManager::Destroy()
 {
   while ( not m_FreeList.Empty() )
   {
-    void*        alloc = m_FreeList.PopFront();
+    void* alloc = m_FreeList.PopFront();
     new ( alloc ) BufferInner{};
   }
 

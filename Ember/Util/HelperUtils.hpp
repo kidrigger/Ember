@@ -7,6 +7,7 @@
 #define ERR_FAIL_RET( hr )                                                                                             \
   do                                                                                                                   \
   {                                                                                                                    \
+    HRESULT hres = ( hr );                                                                                             \
     if ( auto x = FAILED( hr ) )                                                                                       \
     {                                                                                                                  \
       __debugbreak();                                                                                                  \
@@ -18,7 +19,8 @@
 #define ERR_ABORT( hr )                                                                                                \
   do                                                                                                                   \
   {                                                                                                                    \
-    if ( auto x = FAILED( hr ) )                                                                                       \
+    HRESULT hres = ( hr );                                                                                             \
+    if ( auto x = FAILED( hres ) )                                                                                     \
     {                                                                                                                  \
       __debugbreak();                                                                                                  \
       exit( x );                                                                                                       \

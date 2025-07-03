@@ -1,9 +1,9 @@
 
 #include "App.hpp"
-#include "Base/DirectXHeaders.hpp"
-#include "Base/HelperUtils.hpp"
-#include "Base/Runtime.hpp"
 #include "RenderDevice.hpp"
+#include "Util/DirectXHeaders.hpp"
+#include "Util/HelperUtils.hpp"
+#include "Util/Runtime.hpp"
 
 int CALLBACK wWinMain(
     HINSTANCE const                  instance_handle,

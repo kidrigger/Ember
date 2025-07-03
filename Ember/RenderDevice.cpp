@@ -2,10 +2,10 @@
 
 #include <span>
 
-#include "Base/DirectXHeaders.hpp"
-#include "Base/HelperUtils.hpp"
-#include "Base/Runtime.hpp"
 #include "BufferManager.h"
+#include "Util/DirectXHeaders.hpp"
+#include "Util/HelperUtils.hpp"
+#include "Util/Runtime.hpp"
 
 #pragma comment( lib, "d3d12.lib" )
 #pragma comment( lib, "D3DCompiler.lib" )
@@ -54,7 +54,7 @@ Ember::RenderDevice::RenderDevice(
   m_FenceValues.resize( NUM_FRAMES, 0 );
   if ( is_tearing_supported )
   {
-    m_VsyncAndTearing = m_VsyncAndTearing | SUPPORT_TEARING_BIT;
+    m_VsyncAndTearing = m_VsyncAndTearing | kSupportTearingBit;
   }
 }
 
@@ -152,13 +152,13 @@ Ember::RenderDevice Ember::RenderDevice::Create( HWND window_handle, bool const 
       };
 
       D3D12_INFO_QUEUE_FILTER new_filter = {
-				.DenyList = {
-					.NumSeverities = COUNTOF(severities),
-					.pSeverityList = severities,
-					.NumIDs = COUNTOF(deny_ids),
-					.pIDList = deny_ids,
-				},
-			};
+        .DenyList = {
+          .NumSeverities = COUNTOF(severities),
+          .pSeverityList = severities,
+          .NumIDs = COUNTOF(deny_ids),
+          .pIDList = deny_ids,
+        },
+      };
 
       ERR_ABORT( info_queue->PushStorageFilter( &new_filter ) );
     }
@@ -422,12 +422,12 @@ void Ember::RenderDevice::Present()
 
 bool Ember::RenderDevice::IsVsyncEnabled() const
 {
-  return m_VsyncAndTearing & USE_VSYNC_BIT;
+  return m_VsyncAndTearing & kUseVSyncBit;
 }
 
 bool Ember::RenderDevice::IsTearingSupported() const
 {
-  return m_VsyncAndTearing & SUPPORT_TEARING_BIT;
+  return m_VsyncAndTearing & kSupportTearingBit;
 }
 
 void UpdateRenderTargetViews(

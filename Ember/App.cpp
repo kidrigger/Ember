@@ -1,11 +1,11 @@
 #include "App.hpp"
 
-#include "Base/HelperUtils.hpp"
-
 #include <cstdint>
 #include <utility>
 
 #include "RenderDevice.hpp"
+#include "Util/HelperUtils.hpp"
+#include "Util/PerfCounter.hpp"
 
 Ember::App* Ember::App::m_Instance{ nullptr };
 
@@ -151,8 +151,8 @@ HWND CreateWindow(
   return h_window;
 }
 
-Ember::App::App( HWND const window_handle, RenderDevice* render_device )
-  : m_WindowHandle{ window_handle }, m_RenderDevice{ render_device }
+Ember::App::App( HWND const window_handle, RenderDevice* render_device, PerfCounter* perf_counter )
+  : m_WindowHandle{ window_handle }, m_RenderDevice{ render_device }, m_PerfCounter{ perf_counter }
 {
   ASSERT_M( not m_Instance, "Second instance being created" );
   m_Instance = this;
@@ -190,36 +190,27 @@ Ember::App Ember::App::Create( HINSTANCE const instance_handle )
       CreateWindow( window_class_name, instance_handle, L"Learning DirectX 12", client_width, client_height );
 
   RenderDevice* render_device = new RenderDevice{ RenderDevice::Create( window_handle, use_warp ) };
+  PerfCounter*  perf_counter  = new PerfCounter{};
 
   return App{
     window_handle,
     render_device,
+    perf_counter,
   };
 }
 
 void Ember::App::LoadContent()
 {
   ERR_ABORT( ::ShowWindow( m_WindowHandle, SW_SHOW ) );
+
+  ComPtr<ID3DBlob> shader_blob;
+  ERR_ABORT( D3DReadFileToBlob( L"Triangle.cso", &shader_blob ) );
 }
 
 void Ember::App::Update()
 {
-  LARGE_INTEGER perf_counter, freq;
-  ::QueryPerformanceCounter( &perf_counter ); // Always returns true on Win XP or later.
-  ::QueryPerformanceFrequency( &freq );       // Always returns true on Win XP or later.
-
-  m_DeltaTimeMilliseconds =
-      1000.0f * ( perf_counter.QuadPart - m_PrevQueryPerfCounter.QuadPart ) / ( double )freq.QuadPart;
-  m_DeltaTimeSeconds                      = m_DeltaTimeMilliseconds * 0.001f;
-
-  m_BufferSumMs                          -= m_256FrameAvgBuffer[m_AvgBufferHead];
-  m_BufferSumMs                          += m_DeltaTimeMilliseconds;
-  m_256FrameAvgBuffer[m_AvgBufferHead++]  = m_DeltaTimeMilliseconds;
-  m_AvgBufferHead                        %= 256;
-
-  m_PrevQueryPerfCounter                  = perf_counter;
-
-  swprintf_s( m_SprintfBuffer, L"Ember | frame time: %.2lf ms", m_BufferSumMs / 256.0f );
+  m_PerfCounter->Tick();
+  swprintf_s( m_SprintfBuffer, L"Ember | frame time: %.2lf ms", m_PerfCounter->GetAvgFrameTime() );
 
   SetWindowText( m_WindowHandle, m_SprintfBuffer );
 }
@@ -271,6 +262,10 @@ void Ember::App::Resize() const
 void Ember::App::Destroy()
 {
   m_RenderDevice->Destroy();
+
   delete m_RenderDevice;
+  delete m_PerfCounter;
+
   m_RenderDevice = nullptr;
+  m_PerfCounter  = nullptr;
 }

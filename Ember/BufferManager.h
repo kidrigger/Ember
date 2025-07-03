@@ -1,15 +1,9 @@
 #pragma once
 
-#include <iso646.h>
-
-
-#include "Base/DirectXHeaders.hpp"
-#include "Base/Runtime.hpp"
-
-#include <memory_resource>
-
-#include "FreeList.hpp"
 #include "ResourceHandles.h"
+#include "Util/DirectXHeaders.hpp"
+#include "Util/FreeList.hpp"
+#include "Util/Runtime.hpp"
 
 namespace Ember
 {

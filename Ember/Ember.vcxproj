@@ -113,6 +113,12 @@
       <SubSystem>Windows</SubSystem>
       <GenerateDebugInformation>true</GenerateDebugInformation>
     </Link>
+    <FxCompile>
+      <ShaderModel>6.6</ShaderModel>
+      <EntryPointName>
+      </EntryPointName>
+      <ShaderType>Library</ShaderType>
+    </FxCompile>
   </ItemDefinitionGroup>
   <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='Release|x64'">
     <ClCompile>
@@ -122,30 +128,40 @@
       <SDLCheck>true</SDLCheck>
       <PreprocessorDefinitions>NDEBUG;%(PreprocessorDefinitions)</PreprocessorDefinitions>
       <ConformanceMode>true</ConformanceMode>
+      <LanguageStandard>stdcpp20</LanguageStandard>
     </ClCompile>
     <Link>
-      <SubSystem>Console</SubSystem>
+      <SubSystem>Windows</SubSystem>
       <EnableCOMDATFolding>true</EnableCOMDATFolding>
       <OptimizeReferences>true</OptimizeReferences>
       <GenerateDebugInformation>true</GenerateDebugInformation>
     </Link>
+    <FxCompile>
+      <ShaderModel>6.6</ShaderModel>
+      <SuppressStartupBanner>false</SuppressStartupBanner>
+      <EntryPointName>
+      </EntryPointName>
+      <ShaderType>Library</ShaderType>
+    </FxCompile>
   </ItemDefinitionGroup>
   <ItemGroup>
     <ClCompile Include="App.cpp" />
     <ClCompile Include="BufferManager.cpp" />
-    <ClCompile Include="FreeList.cpp" />
     <ClCompile Include="RenderDevice.cpp" />
     <ClCompile Include="Main.cpp" />
+    <ClCompile Include="Util\FreeList.cpp" />
+    <ClCompile Include="Util\PerfCounter.cpp" />
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="App.hpp" />
     <ClInclude Include="BufferManager.h" />
-    <ClInclude Include="FreeList.hpp" />
     <ClInclude Include="RenderDevice.hpp" />
-    <ClInclude Include="Base\DirectXHeaders.hpp" />
-    <ClInclude Include="Base\HelperUtils.hpp" />
-    <ClInclude Include="Base\Runtime.hpp" />
     <ClInclude Include="ResourceHandles.h" />
+    <ClInclude Include="Util\DirectXHeaders.hpp" />
+    <ClInclude Include="Util\FreeList.hpp" />
+    <ClInclude Include="Util\HelperUtils.hpp" />
+    <ClInclude Include="Util\PerfCounter.hpp" />
+    <ClInclude Include="Util\Runtime.hpp" />
   </ItemGroup>
   <ItemGroup>
     <None Include="..\.clang-format" />
@@ -155,6 +171,12 @@
       <SubType>
       </SubType>
     </None>
+  </ItemGroup>
+  <ItemGroup>
+    <FxCompile Include="Triangle.hlsl">
+      <ShaderType Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'">Vertex</ShaderType>
+      <ShaderType Condition="'$(Configuration)|$(Platform)'=='Release|Win32'">Vertex</ShaderType>
+    </FxCompile>
   </ItemGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.targets" />
   <ImportGroup Label="ExtensionTargets">
