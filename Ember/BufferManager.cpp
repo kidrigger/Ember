@@ -20,7 +20,7 @@ Ember::Buffer Ember::BufferManager::CreateUniformBuffer( D3D12MA::Allocator* all
   BufferInner*   inner = new ( alloc ) BufferInner{};
   uint64_t const index = inner - m_Buffers;
 
-  ASSERT( index <= INDEX_MASK );
+  ASSERT( index <= kIndexMask );
 
   D3D12MA::ALLOCATION_DESC constexpr allocation_desc = {
     .Flags    = D3D12MA::ALLOCATION_FLAG_NONE,
@@ -38,7 +38,7 @@ Ember::Buffer Ember::BufferManager::CreateUniformBuffer( D3D12MA::Allocator* all
       IID_PPV_ARGS( &inner->Buffer ) ) );
 
   m_RefCount[index]     = 1;
-  uint32_t const handle = ( m_Generations[index] << GENERATION_OFFSET ) | ( ( uint32_t )index & INDEX_MASK );
+  uint32_t const handle = ( m_Generations[index] << kGenerationOffset ) | ( ( uint32_t )index & kIndexMask );
 
   return Buffer( handle );
 }

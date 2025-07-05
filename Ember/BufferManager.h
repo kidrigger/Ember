@@ -19,11 +19,11 @@ class BufferManager
   // Mask for the generations in the allocation.
   // From 0 -> 4096.
   // Generation 0 is an 'invalid generation'.
-  uint32_t static constexpr GENERATION_MASK   = 0xFFF00000;
-  uint32_t static constexpr GENERATION_OFFSET = 20;
-  uint32_t static constexpr INDEX_MASK        = 0x000FFFFF;
+  uint32_t static constexpr kGenerationMask   = 0xFFF00000;
+  uint32_t static constexpr kGenerationOffset = 20;
+  uint32_t static constexpr kIndexMask        = 0x000FFFFF;
 
-  static_assert( GENERATION_MASK == ( 0xFFF << GENERATION_OFFSET ) );
+  static_assert( kGenerationMask == ( 0xFFF << kGenerationOffset ) );
 
   FreeList     m_FreeList;
   BufferInner* m_Buffers;
