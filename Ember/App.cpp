@@ -285,19 +285,19 @@ void Ember::App::Render()
   ERR_ABORT( command_allocator->Reset() );
   ERR_ABORT( command_list->Reset( command_allocator, nullptr ) );
 
-  D3D12_VIEWPORT viewport = {
+  D3D12_VIEWPORT const viewport = {
     .TopLeftX = 0,
     .TopLeftY = 0,
-    .Width    = 1280,
-    .Height   = 720,
+    .Width    = static_cast<FLOAT>( m_WindowWidth ),
+    .Height   = static_cast<FLOAT>( m_WindowHeight ),
     .MinDepth = 0,
     .MaxDepth = 1,
   };
-  D3D12_RECT scissor = {
+  D3D12_RECT const scissor = {
     .left   = 0,
     .top    = 0,
-    .right  = 1280,
-    .bottom = 720,
+    .right  = static_cast<LONG>( m_WindowWidth ),
+    .bottom = static_cast<LONG>( m_WindowHeight ),
   };
 
   // Clear Backbuffer
@@ -334,15 +334,15 @@ void Ember::App::Render()
 void Ember::App::UnloadContent()
 {}
 
-void Ember::App::Resize() const
+void Ember::App::Resize()
 {
   RECT rect;
   ::GetWindowRect( m_WindowHandle, &rect );
 
-  UINT const width  = rect.right - rect.left;
-  UINT const height = rect.bottom - rect.top;
+  m_WindowWidth  = rect.right - rect.left;
+  m_WindowHeight = rect.bottom - rect.top;
 
-  m_RenderDevice->ResizeSwapchain( width, height );
+  m_RenderDevice->ResizeSwapchain( m_WindowWidth, m_WindowHeight );
 }
 
 void Ember::App::Destroy()

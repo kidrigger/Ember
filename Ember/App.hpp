@@ -11,6 +11,9 @@ class RenderDevice;
 class App
 {
   HWND          m_WindowHandle{ nullptr };
+  uint32_t      m_WindowWidth{ 1280 };
+  uint32_t      m_WindowHeight{ 720 };
+
   RenderDevice* m_RenderDevice{ nullptr };
   PerfCounter*  m_PerfCounter{ nullptr };
   wchar_t       m_SprintfBuffer[1024]{};
@@ -32,7 +35,7 @@ public:
   void        Render();
   void        UnloadContent();
 
-  void        Resize() const;
+  void        Resize();
 
   static App  Create( HINSTANCE instance_handle );
   void        Destroy();

@@ -8,8 +8,8 @@
 	- [X] Presentation
 	- [X] Synchronization Primitives
 - [ ] Setup D3D12 Renderer
-	- [ ] Pipeline Creation
-	- [ ] Render Triangle
+	- [X] Pipeline Creation
+	- [X] Render Triangle
 	- [ ] Render Texture
 		- [ ] Load Texture
 		- [ ] Render on Screen
