@@ -26,7 +26,6 @@ class App
 
 public:
   App( HWND window_handle, RenderDevice* render_device, PerfCounter* perf_counter );
-  ~App();
 
   static App& Instance();
 

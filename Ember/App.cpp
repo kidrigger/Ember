@@ -158,11 +158,6 @@ Ember::App::App( HWND const window_handle, RenderDevice* render_device, PerfCoun
   m_Instance = this;
 }
 
-Ember::App::~App()
-{
-  ASSERT( not m_RenderDevice );
-}
-
 Ember::App& Ember::App::Instance()
 {
   return *m_Instance;
@@ -230,7 +225,8 @@ void Ember::App::LoadContent()
 
   ComPtr<ID3DBlob> root_signature_blob;
   ComPtr<ID3DBlob> error_blob;
-  ERR_ABORT( D3D12SerializeVersionedRootSignature( &root_signature_desc, &root_signature_blob, &error_blob ) );
+  ERR_ABORT( D3DX12SerializeVersionedRootSignature(
+      &root_signature_desc, feature_data.HighestVersion, &root_signature_blob, &error_blob ) );
 
   ERR_ABORT( device->CreateRootSignature(
       0,

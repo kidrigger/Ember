@@ -1,6 +1,6 @@
 #pragma once
 
-#include "ResourceHandles.h"
+#include "ResourceHandles.hpp"
 #include "Util/DirectXHeaders.hpp"
 #include "Util/FreeList.hpp"
 #include "Util/Runtime.hpp"

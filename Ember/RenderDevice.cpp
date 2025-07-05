@@ -2,7 +2,7 @@
 
 #include <span>
 
-#include "BufferManager.h"
+#include "BufferManager.hpp"
 #include "Util/DirectXHeaders.hpp"
 #include "Util/HelperUtils.hpp"
 #include "Util/Runtime.hpp"
@@ -51,7 +51,7 @@ Ember::RenderDevice::RenderDevice(
   , m_FenceEvent{ fence_event }
   , m_BufferManager{ std::move( buffer_manager ) }
 {
-  m_FenceValues.resize( NUM_FRAMES, 0 );
+  m_FenceValues.resize( kNumFrames, 0 );
   if ( is_tearing_supported )
   {
     m_VsyncAndTearing = m_VsyncAndTearing | kSupportTearingBit;
@@ -209,7 +209,7 @@ Ember::RenderDevice Ember::RenderDevice::Create( HWND window_handle, bool const 
       .Stereo      = FALSE,
       .SampleDesc  = { 1, 0 },
       .BufferUsage = DXGI_USAGE_RENDER_TARGET_OUTPUT,
-      .BufferCount = NUM_FRAMES,
+      .BufferCount = kNumFrames,
       .Scaling     = DXGI_SCALING_STRETCH,
       .SwapEffect  = DXGI_SWAP_EFFECT_FLIP_DISCARD,
       .AlphaMode   = DXGI_ALPHA_MODE_UNSPECIFIED,
@@ -228,11 +228,11 @@ Ember::RenderDevice Ember::RenderDevice::Create( HWND window_handle, bool const 
   // Create DescriptorHeap
   ComPtr<ID3D12DescriptorHeap>        rtv_descriptor_heap;
   UINT                                rtv_descriptor_size;
-  std::vector<ComPtr<ID3D12Resource>> backbuffers( NUM_FRAMES );
+  std::vector<ComPtr<ID3D12Resource>> backbuffers( kNumFrames );
   {
     D3D12_DESCRIPTOR_HEAP_DESC desc = {
       .Type           = D3D12_DESCRIPTOR_HEAP_TYPE_RTV,
-      .NumDescriptors = NUM_FRAMES,
+      .NumDescriptors = kNumFrames,
     };
 
     ERR_ABORT( device->CreateDescriptorHeap( &desc, IID_PPV_ARGS( &rtv_descriptor_heap ) ) );
@@ -242,8 +242,8 @@ Ember::RenderDevice Ember::RenderDevice::Create( HWND window_handle, bool const 
   }
 
   // Create Command Allocator
-  std::vector<ComPtr<ID3D12CommandAllocator>> command_allocators( NUM_FRAMES );
-  for ( int i = 0; i < NUM_FRAMES; ++i )
+  std::vector<ComPtr<ID3D12CommandAllocator>> command_allocators( kNumFrames );
+  for ( int i = 0; i < kNumFrames; ++i )
   {
     ERR_ABORT(
         device->CreateCommandAllocator( D3D12_COMMAND_LIST_TYPE_DIRECT, IID_PPV_ARGS( &command_allocators[i] ) ) );
@@ -324,7 +324,7 @@ void Ember::RenderDevice::ResizeSwapchain( uint32_t const width, uint32_t const 
 
     WaitIdle();
 
-    for ( int i = 0; i < NUM_FRAMES; ++i )
+    for ( int i = 0; i < kNumFrames; ++i )
     {
       m_Backbuffers[i].Reset();
       // Restart the count from here. Everyone should have waited for this.
@@ -335,7 +335,7 @@ void Ember::RenderDevice::ResizeSwapchain( uint32_t const width, uint32_t const 
     ERR_ABORT( m_Swapchain->GetDesc( &swapchain_desc ) );
 
     ERR_ABORT( m_Swapchain->ResizeBuffers(
-        NUM_FRAMES, m_SwapchainWidth, m_SwapchainHeight, swapchain_desc.BufferDesc.Format, swapchain_desc.Flags ) );
+        kNumFrames, m_SwapchainWidth, m_SwapchainHeight, swapchain_desc.BufferDesc.Format, swapchain_desc.Flags ) );
 
     m_CurrentBackbufferIndex = m_Swapchain->GetCurrentBackBufferIndex();
 

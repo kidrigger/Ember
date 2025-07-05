@@ -108,6 +108,9 @@
       <PreprocessorDefinitions>_DEBUG;%(PreprocessorDefinitions)</PreprocessorDefinitions>
       <ConformanceMode>true</ConformanceMode>
       <LanguageStandard>stdcpp20</LanguageStandard>
+      <TreatAngleIncludeAsExternal>true</TreatAngleIncludeAsExternal>
+      <EnableEnhancedInstructionSet>AdvancedVectorExtensions512</EnableEnhancedInstructionSet>
+      <EnableVectorLength>VectorLength512</EnableVectorLength>
     </ClCompile>
     <Link>
       <SubSystem>Windows</SubSystem>
@@ -128,6 +131,9 @@
       <PreprocessorDefinitions>NDEBUG;%(PreprocessorDefinitions)</PreprocessorDefinitions>
       <ConformanceMode>true</ConformanceMode>
       <LanguageStandard>stdcpp20</LanguageStandard>
+      <TreatAngleIncludeAsExternal>true</TreatAngleIncludeAsExternal>
+      <EnableEnhancedInstructionSet>AdvancedVectorExtensions512</EnableEnhancedInstructionSet>
+      <EnableVectorLength>VectorLength512</EnableVectorLength>
     </ClCompile>
     <Link>
       <SubSystem>Windows</SubSystem>
@@ -152,9 +158,9 @@
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="App.hpp" />
-    <ClInclude Include="BufferManager.h" />
+    <ClInclude Include="BufferManager.hpp" />
     <ClInclude Include="RenderDevice.hpp" />
-    <ClInclude Include="ResourceHandles.h" />
+    <ClInclude Include="ResourceHandles.hpp" />
     <ClInclude Include="Util\DirectXHeaders.hpp" />
     <ClInclude Include="Util\FreeList.hpp" />
     <ClInclude Include="Util\HelperUtils.hpp" />

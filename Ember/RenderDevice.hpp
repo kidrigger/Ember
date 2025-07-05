@@ -1,7 +1,7 @@
 #pragma once
 
-#include "BufferManager.h"
-#include "ResourceHandles.h"
+#include "BufferManager.hpp"
+#include "ResourceHandles.hpp"
 #include "Util/DirectXHeaders.hpp"
 #include "Util/HelperUtils.hpp"
 #include "Util/Runtime.hpp"
@@ -12,6 +12,10 @@ class BufferManager;
 
 class RenderDevice
 {
+public:
+  constexpr static size_t kNumFrames = 3;
+
+private:
   // Device and queues.
   ComPtr<ID3D12Device2>      m_Device;
   ComPtr<D3D12MA::Allocator> m_Allocator;
@@ -87,8 +91,6 @@ public:
 
   [[nodiscard]] bool                          IsVsyncEnabled() const;
   [[nodiscard]] bool                          IsTearingSupported() const;
-
-  size_t constexpr static NUM_FRAMES = 3;
 };
 
 } // namespace Ember
