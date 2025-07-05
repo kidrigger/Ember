@@ -23,5 +23,5 @@ double Ember::PerfCounter::GetAvgFrameTime() const
 
 double Ember::PerfCounter::GetDeltaMilliSeconds() const
 {
-  return m_BufferSumMs;
+  return m_FrameTimeMs;
 }

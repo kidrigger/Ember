@@ -22,6 +22,9 @@ class App
   ComPtr<ID3D12RootSignature> m_RootSignature;
   ComPtr<ID3D12PipelineState> m_PipelineState;
 
+  // Model Specific
+  DirectX::XMMATRIX           m_GlobalTransform;
+
   static App*                 m_Instance;
 
 public:

@@ -198,15 +198,17 @@ void Ember::App::LoadContent()
 {
   ERR_ABORT( ::ShowWindow( m_WindowHandle, SW_SHOW ) );
 
+  m_GlobalTransform = DirectX::XMMatrixRotationX( DirectX::XMConvertToRadians( 20.0f ) );
+
   ComPtr<ID3DBlob> vertex_shader_blob;
   ERR_ABORT( D3DReadFileToBlob( L"TriangleVS.cso", &vertex_shader_blob ) );
   ComPtr<ID3DBlob> pixel_shader_blob;
   ERR_ABORT( D3DReadFileToBlob( L"TrianglePS.cso", &pixel_shader_blob ) );
 
-  ComPtr<ID3D12Device2>             device       = m_RenderDevice->GetDevice();
+  ComPtr<ID3D12Device2>             device = m_RenderDevice->GetDevice();
 
-  D3D12_FEATURE_DATA_ROOT_SIGNATURE feature_data = {};
-  feature_data.HighestVersion                    = D3D_ROOT_SIGNATURE_VERSION_1_1;
+  D3D12_FEATURE_DATA_ROOT_SIGNATURE feature_data;
+  feature_data.HighestVersion = D3D_ROOT_SIGNATURE_VERSION_1_1;
   if ( FAILED( device->CheckFeatureSupport( D3D12_FEATURE_ROOT_SIGNATURE, &feature_data, sizeof( feature_data ) ) ) )
   {
     feature_data.HighestVersion = D3D_ROOT_SIGNATURE_VERSION_1_0;
@@ -215,13 +217,15 @@ void Ember::App::LoadContent()
   D3D12_ROOT_SIGNATURE_FLAGS const root_signature_flags =
       D3D12_ROOT_SIGNATURE_FLAG_DENY_MESH_SHADER_ROOT_ACCESS |
       D3D12_ROOT_SIGNATURE_FLAG_DENY_AMPLIFICATION_SHADER_ROOT_ACCESS |
-      D3D12_ROOT_SIGNATURE_FLAG_DENY_VERTEX_SHADER_ROOT_ACCESS |
       D3D12_ROOT_SIGNATURE_FLAG_DENY_GEOMETRY_SHADER_ROOT_ACCESS |
       D3D12_ROOT_SIGNATURE_FLAG_DENY_DOMAIN_SHADER_ROOT_ACCESS |
       D3D12_ROOT_SIGNATURE_FLAG_DENY_HULL_SHADER_ROOT_ACCESS | D3D12_ROOT_SIGNATURE_FLAG_DENY_PIXEL_SHADER_ROOT_ACCESS;
 
+  CD3DX12_ROOT_PARAMETER1 root_parameters[1];
+  root_parameters[0].InitAsConstants( sizeof( DirectX::XMMATRIX ) / 4, 0, 0, D3D12_SHADER_VISIBILITY_VERTEX );
+
   CD3DX12_VERSIONED_ROOT_SIGNATURE_DESC root_signature_desc;
-  root_signature_desc.Init_1_1( 0, nullptr, 0, nullptr, root_signature_flags );
+  root_signature_desc.Init_1_1( COUNTOF( root_parameters ), root_parameters, 0, nullptr, root_signature_flags );
 
   ComPtr<ID3DBlob> root_signature_blob;
   ComPtr<ID3DBlob> error_blob;
@@ -267,9 +271,16 @@ void Ember::App::LoadContent()
 void Ember::App::Update()
 {
   m_PerfCounter->Tick();
-  swprintf_s( m_SprintfBuffer, L"Ember | frame time: %.2lf ms", m_PerfCounter->GetAvgFrameTime() );
+
+  double const avg_delta_ms = m_PerfCounter->GetAvgFrameTime();
+  double const avg_fps      = 1000.0f / avg_delta_ms;
+  swprintf_s( m_SprintfBuffer, L"Ember | frame time: %.2lf ms (%.2lf fps)", avg_delta_ms, avg_fps );
 
   SetWindowText( m_WindowHandle, m_SprintfBuffer );
+
+  double const delta_seconds = m_PerfCounter->GetDeltaMilliSeconds() * 0.001;
+  m_GlobalTransform =
+      XMMatrixMultiply( m_GlobalTransform, DirectX::XMMatrixRotationY( DirectX::XM_2PI * delta_seconds ) );
 }
 
 void Ember::App::Render()
@@ -313,6 +324,8 @@ void Ember::App::Render()
   command_list->RSSetViewports( 1, &viewport );
   command_list->RSSetScissorRects( 1, &scissor );
   command_list->OMSetRenderTargets( 1, &rtv, FALSE, nullptr );
+
+  command_list->SetGraphicsRoot32BitConstants( 0, sizeof( DirectX::XMMATRIX ) / 4, &m_GlobalTransform, 0 );
 
   command_list->DrawInstanced( 3, 1, 0, 0 );
 
