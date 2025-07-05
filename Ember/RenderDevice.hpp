@@ -65,11 +65,13 @@ public:
       bool                                          is_tearing_supported,
       BufferManager&&                               buffer_manager );
 
-  static RenderDevice Create( HWND window_handle, bool use_warp );
-  void                Destroy();
+  ComPtr<ID3D12Device2> GetDevice();
 
-  void                ResizeSwapchain( uint32_t width, uint32_t height );
-  Buffer              CreateUniformBuffer( size_t size );
+  static RenderDevice   Create( HWND window_handle, bool use_warp );
+  void                  Destroy();
+
+  void                  ResizeSwapchain( uint32_t width, uint32_t height );
+  Buffer                CreateUniformBuffer( size_t size );
 
   // Wait until the all queues have finished all commands.
   void               WaitIdle();

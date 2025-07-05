@@ -88,9 +88,15 @@
     <None Include="PLAN.md">
       <Filter>Resource Files</Filter>
     </None>
+    <None Include="Triangle.hlsli">
+      <Filter>Shaders</Filter>
+    </None>
   </ItemGroup>
   <ItemGroup>
-    <FxCompile Include="Triangle.hlsl">
+    <FxCompile Include="TriangleVS.hlsl">
+      <Filter>Shaders</Filter>
+    </FxCompile>
+    <FxCompile Include="TrianglePS.hlsl">
       <Filter>Shaders</Filter>
     </FxCompile>
   </ItemGroup>

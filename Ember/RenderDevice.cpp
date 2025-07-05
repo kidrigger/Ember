@@ -58,6 +58,11 @@ Ember::RenderDevice::RenderDevice(
   }
 }
 
+ComPtr<ID3D12Device2> Ember::RenderDevice::GetDevice()
+{
+  return m_Device;
+}
+
 Ember::RenderDevice Ember::RenderDevice::Create( HWND window_handle, bool const use_warp )
 {
 #if defined( _DEBUG )

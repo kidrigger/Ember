@@ -203,8 +203,69 @@ void Ember::App::LoadContent()
 {
   ERR_ABORT( ::ShowWindow( m_WindowHandle, SW_SHOW ) );
 
-  ComPtr<ID3DBlob> shader_blob;
-  ERR_ABORT( D3DReadFileToBlob( L"Triangle.cso", &shader_blob ) );
+  ComPtr<ID3DBlob> vertex_shader_blob;
+  ERR_ABORT( D3DReadFileToBlob( L"TriangleVS.cso", &vertex_shader_blob ) );
+  ComPtr<ID3DBlob> pixel_shader_blob;
+  ERR_ABORT( D3DReadFileToBlob( L"TrianglePS.cso", &pixel_shader_blob ) );
+
+  ComPtr<ID3D12Device2>             device       = m_RenderDevice->GetDevice();
+
+  D3D12_FEATURE_DATA_ROOT_SIGNATURE feature_data = {};
+  feature_data.HighestVersion                    = D3D_ROOT_SIGNATURE_VERSION_1_1;
+  if ( FAILED( device->CheckFeatureSupport( D3D12_FEATURE_ROOT_SIGNATURE, &feature_data, sizeof( feature_data ) ) ) )
+  {
+    feature_data.HighestVersion = D3D_ROOT_SIGNATURE_VERSION_1_0;
+  }
+
+  D3D12_ROOT_SIGNATURE_FLAGS const root_signature_flags =
+      D3D12_ROOT_SIGNATURE_FLAG_DENY_MESH_SHADER_ROOT_ACCESS |
+      D3D12_ROOT_SIGNATURE_FLAG_DENY_AMPLIFICATION_SHADER_ROOT_ACCESS |
+      D3D12_ROOT_SIGNATURE_FLAG_DENY_VERTEX_SHADER_ROOT_ACCESS |
+      D3D12_ROOT_SIGNATURE_FLAG_DENY_GEOMETRY_SHADER_ROOT_ACCESS |
+      D3D12_ROOT_SIGNATURE_FLAG_DENY_DOMAIN_SHADER_ROOT_ACCESS |
+      D3D12_ROOT_SIGNATURE_FLAG_DENY_HULL_SHADER_ROOT_ACCESS | D3D12_ROOT_SIGNATURE_FLAG_DENY_PIXEL_SHADER_ROOT_ACCESS;
+
+  CD3DX12_VERSIONED_ROOT_SIGNATURE_DESC root_signature_desc;
+  root_signature_desc.Init_1_1( 0, nullptr, 0, nullptr, root_signature_flags );
+
+  ComPtr<ID3DBlob> root_signature_blob;
+  ComPtr<ID3DBlob> error_blob;
+  ERR_ABORT( D3D12SerializeVersionedRootSignature( &root_signature_desc, &root_signature_blob, &error_blob ) );
+
+  ERR_ABORT( device->CreateRootSignature(
+      0,
+      root_signature_blob->GetBufferPointer(),
+      root_signature_blob->GetBufferSize(),
+      IID_PPV_ARGS( &m_RootSignature ) ) );
+
+  D3D12_RT_FORMAT_ARRAY rtv_formats = {
+    .NumRenderTargets = 1,
+  };
+  rtv_formats.RTFormats[0] = DXGI_FORMAT_R8G8B8A8_UNORM;
+
+  struct PipelineStateStream
+  {
+    CD3DX12_PIPELINE_STATE_STREAM_ROOT_SIGNATURE        RootSignature;
+    CD3DX12_PIPELINE_STATE_STREAM_PRIMITIVE_TOPOLOGY    PrimitiveTopologyType;
+    CD3DX12_PIPELINE_STATE_STREAM_VS                    VS;
+    CD3DX12_PIPELINE_STATE_STREAM_PS                    PS;
+    CD3DX12_PIPELINE_STATE_STREAM_RENDER_TARGET_FORMATS RTVFormats;
+  };
+
+  PipelineStateStream pipeline_stream = {
+    .RootSignature         = m_RootSignature.Get(),
+    .PrimitiveTopologyType = D3D12_PRIMITIVE_TOPOLOGY_TYPE_TRIANGLE,
+    .VS                    = CD3DX12_SHADER_BYTECODE( vertex_shader_blob.Get() ),
+    .PS                    = CD3DX12_SHADER_BYTECODE( pixel_shader_blob.Get() ),
+    .RTVFormats            = rtv_formats,
+  };
+
+  D3D12_PIPELINE_STATE_STREAM_DESC const pipeline_state_stream_desc = {
+    .SizeInBytes                   = sizeof pipeline_stream,
+    .pPipelineStateSubobjectStream = &pipeline_stream,
+  };
+
+  ERR_ABORT( device->CreatePipelineState( &pipeline_state_stream_desc, IID_PPV_ARGS( &m_PipelineState ) ) );
 }
 
 void Ember::App::Update()
@@ -224,6 +285,21 @@ void Ember::App::Render()
   ERR_ABORT( command_allocator->Reset() );
   ERR_ABORT( command_list->Reset( command_allocator, nullptr ) );
 
+  D3D12_VIEWPORT viewport = {
+    .TopLeftX = 0,
+    .TopLeftY = 0,
+    .Width    = 1280,
+    .Height   = 720,
+    .MinDepth = 0,
+    .MaxDepth = 1,
+  };
+  D3D12_RECT scissor = {
+    .left   = 0,
+    .top    = 0,
+    .right  = 1280,
+    .bottom = 720,
+  };
+
   // Clear Backbuffer
   CD3DX12_RESOURCE_BARRIER barrier = CD3DX12_RESOURCE_BARRIER::Transition(
       backbuffer, D3D12_RESOURCE_STATE_PRESENT, D3D12_RESOURCE_STATE_RENDER_TARGET );
@@ -233,6 +309,16 @@ void Ember::App::Render()
   FLOAT constexpr cornflower_blue[]       = { 0.4f, 0.6f, 0.9f, 1.0f };
   CD3DX12_CPU_DESCRIPTOR_HANDLE const rtv = m_RenderDevice->GetCurrentRTVCpuDescriptorHandle();
   command_list->ClearRenderTargetView( rtv, cornflower_blue, 0, nullptr );
+
+  command_list->SetPipelineState( m_PipelineState.Get() );
+  command_list->SetGraphicsRootSignature( m_RootSignature.Get() );
+  command_list->IASetPrimitiveTopology( D3D10_PRIMITIVE_TOPOLOGY_TRIANGLELIST );
+
+  command_list->RSSetViewports( 1, &viewport );
+  command_list->RSSetScissorRects( 1, &scissor );
+  command_list->OMSetRenderTargets( 1, &rtv, FALSE, nullptr );
+
+  command_list->DrawInstanced( 3, 1, 0, 0 );
 
   barrier = CD3DX12_RESOURCE_BARRIER::Transition(
       backbuffer, D3D12_RESOURCE_STATE_RENDER_TARGET, D3D12_RESOURCE_STATE_PRESENT );

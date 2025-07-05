@@ -1,5 +1,6 @@
 #pragma once
 
+#include "Util/DirectXHeaders.hpp"
 #include "Util/Runtime.hpp"
 
 namespace Ember
@@ -14,7 +15,11 @@ class App
   PerfCounter*  m_PerfCounter{ nullptr };
   wchar_t       m_SprintfBuffer[1024]{};
 
-  static App*   m_Instance;
+  // Specifics
+  ComPtr<ID3D12RootSignature> m_RootSignature;
+  ComPtr<ID3D12PipelineState> m_PipelineState;
+
+  static App*                 m_Instance;
 
 public:
   App( HWND window_handle, RenderDevice* render_device, PerfCounter* perf_counter );
