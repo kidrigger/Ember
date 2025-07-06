@@ -1,5 +1,6 @@
 #pragma once
 
+#include "DepthBuffer.hpp"
 #include "Util/DirectXHeaders.hpp"
 #include "Util/Runtime.hpp"
 
@@ -22,10 +23,12 @@ class App
   ComPtr<ID3D12RootSignature> m_RootSignature;
   ComPtr<ID3D12PipelineState> m_PipelineState;
 
-  // Model Specific
-  DirectX::XMMATRIX           m_GlobalTransform;
+  DepthBuffer                 m_DepthBuffer;
 
-  static App*                 m_Instance;
+  // Model Specific
+  DirectX::XMMATRIX m_GlobalTransform;
+
+  static App*       m_Instance;
 
 public:
   App( HWND window_handle, RenderDevice* render_device, PerfCounter* perf_counter );

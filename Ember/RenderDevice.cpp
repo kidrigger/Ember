@@ -3,6 +3,7 @@
 #include <span>
 
 #include "BufferManager.hpp"
+#include "DepthBuffer.hpp"
 #include "Util/DirectXHeaders.hpp"
 #include "Util/HelperUtils.hpp"
 #include "Util/Runtime.hpp"
@@ -29,6 +30,7 @@ Ember::RenderDevice::RenderDevice(
     ComPtr<ID3D12DescriptorHeap> const&           rtv_descriptor_heap,
     UINT32 const                                  rtv_descriptor_size,
     UINT32 const                                  current_backbuffer_index,
+    ComPtr<ID3D12DescriptorHeap> const&           dsv_descriptor_heap,
     ComPtr<ID3D12GraphicsCommandList> const&      command_list,
     std::vector<ComPtr<ID3D12CommandAllocator>>&& command_allocators,
     ComPtr<ID3D12Fence> const&                    fence,
@@ -45,6 +47,7 @@ Ember::RenderDevice::RenderDevice(
   , m_RTVDescriptorHeap{ rtv_descriptor_heap }
   , m_RTVDescriptorSize{ rtv_descriptor_size }
   , m_CurrentBackbufferIndex{ current_backbuffer_index }
+  , m_DSVDescriptorHeap{ dsv_descriptor_heap }
   , m_CommandList{ command_list }
   , m_CommandAllocators{ std::move( command_allocators ) }
   , m_Fence{ fence }
@@ -241,6 +244,16 @@ Ember::RenderDevice Ember::RenderDevice::Create( HWND window_handle, bool const 
     UpdateRenderTargetViews( device, swapchain, rtv_descriptor_heap, rtv_descriptor_size, backbuffers );
   }
 
+  ComPtr<ID3D12DescriptorHeap> dsv_descriptor_heap;
+  {
+    D3D12_DESCRIPTOR_HEAP_DESC desc = {
+      .Type           = D3D12_DESCRIPTOR_HEAP_TYPE_DSV,
+      .NumDescriptors = 1,
+    };
+
+    ERR_ABORT( device->CreateDescriptorHeap( &desc, IID_PPV_ARGS( &dsv_descriptor_heap ) ) );
+  }
+
   // Create Command Allocator
   std::vector<ComPtr<ID3D12CommandAllocator>> command_allocators( kNumFrames );
   for ( int i = 0; i < kNumFrames; ++i )
@@ -293,6 +306,7 @@ Ember::RenderDevice Ember::RenderDevice::Create( HWND window_handle, bool const 
     rtv_descriptor_heap,
     rtv_descriptor_size,
     current_backbuffer_index,
+    dsv_descriptor_heap,
     command_list,
     std::move( command_allocators ),
     fence,
@@ -348,6 +362,46 @@ Ember::Buffer Ember::RenderDevice::CreateUniformBuffer( size_t const size )
   return m_BufferManager.CreateUniformBuffer( m_Allocator.Get(), size );
 }
 
+Ember::DepthBuffer Ember::RenderDevice::CreateDepthBuffer( uint32_t const width, uint32_t const height ) const
+{
+  D3D12MA::ALLOCATION_DESC const allocation_desc = {
+    .Flags    = D3D12MA::ALLOCATION_FLAG_COMMITTED,
+    .HeapType = D3D12_HEAP_TYPE_DEFAULT,
+  };
+
+  D3D12_CLEAR_VALUE constexpr clear_value = {
+    .Format       = DXGI_FORMAT_D32_FLOAT,
+    .DepthStencil = { 1.0f, 0 },
+  };
+
+  CD3DX12_RESOURCE_DESC1 const resource_desc = CD3DX12_RESOURCE_DESC1::Tex2D(
+      DXGI_FORMAT_D32_FLOAT, width, height, 1, 0, 1, 0, D3D12_RESOURCE_FLAG_ALLOW_DEPTH_STENCIL );
+
+  ComPtr<ID3D12Resource>      depth_stencil_res;
+  ComPtr<D3D12MA::Allocation> allocation;
+  ERR_ABORT( m_Allocator->CreateResource2(
+      &allocation_desc,
+      &resource_desc,
+      D3D12_RESOURCE_STATE_DEPTH_WRITE,
+      &clear_value,
+      &allocation,
+      IID_PPV_ARGS( &depth_stencil_res ) ) );
+
+  return { std::move( depth_stencil_res ), std::move( allocation ) };
+}
+
+void Ember::RenderDevice::SetDepthBuffer( DepthBuffer const& depth_buffer ) const
+{
+  D3D12_DEPTH_STENCIL_VIEW_DESC const desc = {
+    .Format        = DXGI_FORMAT_D32_FLOAT,
+    .ViewDimension = D3D12_DSV_DIMENSION_TEXTURE2D,
+  };
+
+  auto const dsv_handle = m_DSVDescriptorHeap->GetCPUDescriptorHandleForHeapStart();
+
+  m_Device->CreateDepthStencilView( depth_buffer.GetBuffer(), &desc, dsv_handle );
+}
+
 void Ember::RenderDevice::WaitIdle()
 {
   auto const wait_on_fence_value = ++m_CurrentFenceValue;
@@ -391,6 +445,11 @@ CD3DX12_CPU_DESCRIPTOR_HANDLE Ember::RenderDevice::GetCurrentRTVCpuDescriptorHan
 {
   return CD3DX12_CPU_DESCRIPTOR_HANDLE(
       m_RTVDescriptorHeap->GetCPUDescriptorHandleForHeapStart(), m_CurrentBackbufferIndex, m_RTVDescriptorSize );
+}
+
+CD3DX12_CPU_DESCRIPTOR_HANDLE Ember::RenderDevice::GetCurrentDSVCpuDescriptorHandle() const
+{
+  return CD3DX12_CPU_DESCRIPTOR_HANDLE( m_DSVDescriptorHeap->GetCPUDescriptorHandleForHeapStart() );
 }
 
 void Ember::RenderDevice::ExecuteCommandList( ID3D12CommandList* command_list ) const
@@ -455,6 +514,6 @@ void UpdateRenderTargetViews(
     device->CreateRenderTargetView( backbuffers[i].Get(), nullptr, rtv_handle );
 
     // Increment rtvHandle by the size of rtvDescriptor.
-    rtv_handle.Offset( ( INT )rtv_descriptor_size );
+    rtv_handle.Offset( static_cast<INT>( rtv_descriptor_size ) );
   }
 }

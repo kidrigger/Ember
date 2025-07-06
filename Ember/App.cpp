@@ -198,7 +198,7 @@ void Ember::App::LoadContent()
 {
   ERR_ABORT( ::ShowWindow( m_WindowHandle, SW_SHOW ) );
 
-  m_GlobalTransform = DirectX::XMMatrixRotationX( DirectX::XMConvertToRadians( 20.0f ) );
+  m_GlobalTransform = DirectX::XMMatrixIdentity();
 
   ComPtr<ID3DBlob> vertex_shader_blob;
   ERR_ABORT( D3DReadFileToBlob( L"TriangleVS.cso", &vertex_shader_blob ) );
@@ -243,13 +243,18 @@ void Ember::App::LoadContent()
   };
   rtv_formats.RTFormats[0] = DXGI_FORMAT_R8G8B8A8_UNORM;
 
+  CD3DX12_RASTERIZER_DESC2 rasterizer_desc{ D3D12_DEFAULT };
+  rasterizer_desc.CullMode = D3D12_CULL_MODE_NONE;
+
   struct PipelineStateStream
   {
     CD3DX12_PIPELINE_STATE_STREAM_ROOT_SIGNATURE        RootSignature;
     CD3DX12_PIPELINE_STATE_STREAM_PRIMITIVE_TOPOLOGY    PrimitiveTopologyType;
     CD3DX12_PIPELINE_STATE_STREAM_VS                    VS;
     CD3DX12_PIPELINE_STATE_STREAM_PS                    PS;
+    CD3DX12_PIPELINE_STATE_STREAM_RASTERIZER2           Rasterizer;
     CD3DX12_PIPELINE_STATE_STREAM_RENDER_TARGET_FORMATS RTVFormats;
+    CD3DX12_PIPELINE_STATE_STREAM_DEPTH_STENCIL_FORMAT  DSVFormat;
   };
 
   PipelineStateStream pipeline_stream = {
@@ -257,7 +262,9 @@ void Ember::App::LoadContent()
     .PrimitiveTopologyType = D3D12_PRIMITIVE_TOPOLOGY_TYPE_TRIANGLE,
     .VS                    = CD3DX12_SHADER_BYTECODE( vertex_shader_blob.Get() ),
     .PS                    = CD3DX12_SHADER_BYTECODE( pixel_shader_blob.Get() ),
+    .Rasterizer            = rasterizer_desc,
     .RTVFormats            = rtv_formats,
+    .DSVFormat             = DXGI_FORMAT_D32_FLOAT,
   };
 
   D3D12_PIPELINE_STATE_STREAM_DESC const pipeline_state_stream_desc = {
@@ -266,6 +273,10 @@ void Ember::App::LoadContent()
   };
 
   ERR_ABORT( device->CreatePipelineState( &pipeline_state_stream_desc, IID_PPV_ARGS( &m_PipelineState ) ) );
+
+  m_DepthBuffer = m_RenderDevice->CreateDepthBuffer( m_WindowWidth, m_WindowHeight );
+
+  m_RenderDevice->SetDepthBuffer( m_DepthBuffer );
 }
 
 void Ember::App::Update()
@@ -278,9 +289,9 @@ void Ember::App::Update()
 
   SetWindowText( m_WindowHandle, m_SprintfBuffer );
 
-  double const delta_seconds = m_PerfCounter->GetDeltaMilliSeconds() * 0.001;
+  float const delta_seconds = static_cast<float>( m_PerfCounter->GetDeltaMilliSeconds() ) * 0.001f;
   m_GlobalTransform =
-      XMMatrixMultiply( m_GlobalTransform, DirectX::XMMatrixRotationY( DirectX::XM_2PI * delta_seconds ) );
+      XMMatrixMultiply( m_GlobalTransform, DirectX::XMMatrixRotationY( DirectX::XM_PIDIV2 * delta_seconds ) );
 }
 
 void Ember::App::Render()
@@ -315,7 +326,9 @@ void Ember::App::Render()
 
   FLOAT constexpr cornflower_blue[]       = { 0.4f, 0.6f, 0.9f, 1.0f };
   CD3DX12_CPU_DESCRIPTOR_HANDLE const rtv = m_RenderDevice->GetCurrentRTVCpuDescriptorHandle();
+  CD3DX12_CPU_DESCRIPTOR_HANDLE const dsv = m_RenderDevice->GetCurrentDSVCpuDescriptorHandle();
   command_list->ClearRenderTargetView( rtv, cornflower_blue, 0, nullptr );
+  command_list->ClearDepthStencilView( dsv, D3D12_CLEAR_FLAG_DEPTH, 1.0f, 0, 0, nullptr );
 
   command_list->SetPipelineState( m_PipelineState.Get() );
   command_list->SetGraphicsRootSignature( m_RootSignature.Get() );
@@ -323,11 +336,17 @@ void Ember::App::Render()
 
   command_list->RSSetViewports( 1, &viewport );
   command_list->RSSetScissorRects( 1, &scissor );
-  command_list->OMSetRenderTargets( 1, &rtv, FALSE, nullptr );
+  command_list->OMSetRenderTargets( 1, &rtv, FALSE, &dsv );
 
-  command_list->SetGraphicsRoot32BitConstants( 0, sizeof( DirectX::XMMATRIX ) / 4, &m_GlobalTransform, 0 );
+  for ( int i = -2; i <= 2; ++i )
+  {
+    DirectX::XMMATRIX matrix =
+        XMMatrixMultiply( m_GlobalTransform, DirectX::XMMatrixTranslation( 0.5f * i, 0.0f, 0.0f ) );
 
-  command_list->DrawInstanced( 3, 1, 0, 0 );
+    command_list->SetGraphicsRoot32BitConstants( 0, sizeof( DirectX::XMMATRIX ) / 4, &matrix, 0 );
+
+    command_list->DrawInstanced( 3, 1, 0, 0 );
+  }
 
   barrier = CD3DX12_RESOURCE_BARRIER::Transition(
       backbuffer, D3D12_RESOURCE_STATE_RENDER_TARGET, D3D12_RESOURCE_STATE_PRESENT );
@@ -352,10 +371,14 @@ void Ember::App::Resize()
   m_WindowHeight = rect.bottom - rect.top;
 
   m_RenderDevice->ResizeSwapchain( m_WindowWidth, m_WindowHeight );
+  m_DepthBuffer = m_RenderDevice->CreateDepthBuffer( m_WindowWidth, m_WindowHeight );
+  m_RenderDevice->SetDepthBuffer( m_DepthBuffer );
 }
 
 void Ember::App::Destroy()
 {
+  m_DepthBuffer = {};
+
   m_RenderDevice->Destroy();
 
   delete m_RenderDevice;
@@ -363,4 +386,6 @@ void Ember::App::Destroy()
 
   m_RenderDevice = nullptr;
   m_PerfCounter  = nullptr;
+
+  m_Instance     = nullptr;
 }

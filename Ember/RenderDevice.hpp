@@ -1,9 +1,9 @@
 #pragma once
 
 #include "BufferManager.hpp"
+#include "DepthBuffer.hpp"
 #include "ResourceHandles.hpp"
 #include "Util/DirectXHeaders.hpp"
-#include "Util/HelperUtils.hpp"
 #include "Util/Runtime.hpp"
 
 namespace Ember
@@ -37,6 +37,9 @@ private:
   uint32_t                     m_RTVDescriptorSize{ 0 };
   uint32_t                     m_CurrentBackbufferIndex{ 0 };
 
+  // Depth Buffer
+  ComPtr<ID3D12DescriptorHeap> m_DSVDescriptorHeap;
+
   // Commands
   ComPtr<ID3D12GraphicsCommandList>           m_CommandList;
   std::vector<ComPtr<ID3D12CommandAllocator>> m_CommandAllocators;
@@ -62,6 +65,7 @@ public:
       ComPtr<ID3D12DescriptorHeap> const&           rtv_descriptor_heap,
       uint32_t                                      rtv_descriptor_size,
       uint32_t                                      current_backbuffer_index,
+      ComPtr<ID3D12DescriptorHeap> const&           dsv_descriptor_heap,
       ComPtr<ID3D12GraphicsCommandList> const&      command_list,
       std::vector<ComPtr<ID3D12CommandAllocator>>&& command_allocators,
       ComPtr<ID3D12Fence> const&                    fence,
@@ -69,13 +73,16 @@ public:
       bool                                          is_tearing_supported,
       BufferManager&&                               buffer_manager );
 
-  ComPtr<ID3D12Device2> GetDevice();
+  ComPtr<ID3D12Device2>     GetDevice();
 
-  static RenderDevice   Create( HWND window_handle, bool use_warp );
-  void                  Destroy();
+  static RenderDevice       Create( HWND window_handle, bool use_warp );
+  void                      Destroy();
 
-  void                  ResizeSwapchain( uint32_t width, uint32_t height );
-  Buffer                CreateUniformBuffer( size_t size );
+  void                      ResizeSwapchain( uint32_t width, uint32_t height );
+  Buffer                    CreateUniformBuffer( size_t size );
+  [[nodiscard]] DepthBuffer CreateDepthBuffer( uint32_t width, uint32_t height ) const;
+
+  void                      SetDepthBuffer( DepthBuffer const& depth_buffer ) const;
 
   // Wait until the all queues have finished all commands.
   void               WaitIdle();
@@ -86,6 +93,7 @@ public:
   [[nodiscard]] ID3D12Resource*               GetCurrentBackbuffer() const;
   [[nodiscard]] ID3D12GraphicsCommandList*    GetGraphicsCommandList() const;
   [[nodiscard]] CD3DX12_CPU_DESCRIPTOR_HANDLE GetCurrentRTVCpuDescriptorHandle() const;
+  [[nodiscard]] CD3DX12_CPU_DESCRIPTOR_HANDLE GetCurrentDSVCpuDescriptorHandle() const;
   void                                        ExecuteCommandList( ID3D12CommandList* command_list ) const;
   void                                        Present();
 
