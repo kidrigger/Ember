@@ -31,7 +31,6 @@ int CALLBACK wWinMain(
   }
 
   app.UnloadContent();
-  app.Destroy();
 
   return 0;
 }

@@ -5,6 +5,7 @@
 #include "ResourceHandles.hpp"
 #include "Util/DirectXHeaders.hpp"
 #include "Util/Runtime.hpp"
+#include "Util/ScopedHandle.hpp"
 
 namespace Ember
 {
@@ -48,7 +49,7 @@ private:
   ComPtr<ID3D12Fence>   m_Fence;
   uint64_t              m_CurrentFenceValue{ 0 };
   std::vector<uint64_t> m_FenceValues;
-  HANDLE                m_FenceEvent{ nullptr }; // Also acts as 'initialized'
+  ScopedHandle          m_FenceEvent;
 
   // Resource Management
   BufferManager m_BufferManager;
@@ -69,14 +70,13 @@ public:
       ComPtr<ID3D12GraphicsCommandList> const&      command_list,
       std::vector<ComPtr<ID3D12CommandAllocator>>&& command_allocators,
       ComPtr<ID3D12Fence> const&                    fence,
-      HANDLE                                        fence_event,
+      ScopedHandle&&                                fence_event,
       bool                                          is_tearing_supported,
       BufferManager&&                               buffer_manager );
 
   ComPtr<ID3D12Device2>     GetDevice();
 
   static RenderDevice       Create( HWND window_handle, bool use_warp );
-  void                      Destroy();
 
   void                      ResizeSwapchain( uint32_t width, uint32_t height );
   Buffer                    CreateUniformBuffer( size_t size );
@@ -99,6 +99,12 @@ public:
 
   [[nodiscard]] bool                          IsVsyncEnabled() const;
   [[nodiscard]] bool                          IsTearingSupported() const;
+
+  RenderDevice( RenderDevice const& other )                = delete;
+  RenderDevice( RenderDevice&& other ) noexcept            = default;
+  RenderDevice& operator=( RenderDevice const& other )     = delete;
+  RenderDevice& operator=( RenderDevice&& other ) noexcept = default;
+  ~RenderDevice();
 };
 
 } // namespace Ember

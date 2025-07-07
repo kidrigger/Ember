@@ -52,7 +52,33 @@ Ember::BufferManager Ember::BufferManager::Create( uint32_t const capacity )
   return BufferManager{ buffers, generations, ref_count, capacity };
 }
 
-void Ember::BufferManager::Destroy()
+Ember::BufferManager::BufferManager( BufferManager&& other ) noexcept
+  : m_FreeList{ std::move( other.m_FreeList ) }
+  , m_Buffers{ other.m_Buffers }
+  , m_Generations{ other.m_Generations }
+  , m_RefCount{ other.m_RefCount }
+  , m_Count{ other.m_Count }
+  , m_Capacity{ other.m_Capacity }
+{
+  other.m_Buffers     = nullptr;
+  other.m_Generations = nullptr;
+  other.m_RefCount    = nullptr;
+  other.m_Capacity    = 0;
+}
+
+Ember::BufferManager& Ember::BufferManager::operator=( BufferManager&& other ) noexcept
+{
+  if ( this == &other ) return *this;
+  std::swap( m_FreeList, other.m_FreeList );
+  std::swap( m_Buffers, other.m_Buffers );
+  std::swap( m_Generations, other.m_Generations );
+  std::swap( m_RefCount, other.m_RefCount );
+  std::swap( m_Count, other.m_Count );
+  std::swap( m_Capacity, other.m_Capacity );
+  return *this;
+}
+
+Ember::BufferManager::~BufferManager()
 {
   while ( not m_FreeList.Empty() )
   {
@@ -61,5 +87,6 @@ void Ember::BufferManager::Destroy()
   }
 
   delete[] m_Buffers;
-  m_Buffers = nullptr;
+  delete[] m_Generations;
+  delete[] m_RefCount;
 }

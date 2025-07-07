@@ -11,13 +11,13 @@ class RenderDevice;
 
 class App
 {
-  HWND          m_WindowHandle{ nullptr };
-  uint32_t      m_WindowWidth{ 1280 };
-  uint32_t      m_WindowHeight{ 720 };
+  HWND                          m_WindowHandle{ nullptr };
+  uint32_t                      m_WindowWidth{ 1280 };
+  uint32_t                      m_WindowHeight{ 720 };
 
-  RenderDevice* m_RenderDevice{ nullptr };
-  PerfCounter*  m_PerfCounter{ nullptr };
-  wchar_t       m_SprintfBuffer[1024]{};
+  std::unique_ptr<RenderDevice> m_RenderDevice;
+  std::unique_ptr<PerfCounter>  m_PerfCounter;
+  wchar_t                       m_SprintfBuffer[1024]{};
 
   // Specifics
   ComPtr<ID3D12RootSignature> m_RootSignature;
@@ -31,8 +31,7 @@ class App
   static App*       m_Instance;
 
 public:
-  App( HWND window_handle, RenderDevice* render_device, PerfCounter* perf_counter );
-
+  App( HWND window_handle, std::unique_ptr<RenderDevice>&& render_device, std::unique_ptr<PerfCounter>&& perf_counter );
   static App& Instance();
 
   void        LoadContent();
@@ -43,7 +42,12 @@ public:
   void        Resize();
 
   static App  Create( HINSTANCE instance_handle );
-  void        Destroy();
+
+  App( App const& other )                = delete;
+  App& operator=( App const& other )     = delete;
+  App( App&& other ) noexcept            = default;
+  App& operator=( App&& other ) noexcept = default;
+  ~App();
 };
 
 } // namespace Ember

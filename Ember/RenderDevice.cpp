@@ -34,7 +34,7 @@ Ember::RenderDevice::RenderDevice(
     ComPtr<ID3D12GraphicsCommandList> const&      command_list,
     std::vector<ComPtr<ID3D12CommandAllocator>>&& command_allocators,
     ComPtr<ID3D12Fence> const&                    fence,
-    HANDLE const                                  fence_event,
+    ScopedHandle&&                                fence_event,
     bool const                                    is_tearing_supported,
     BufferManager&&                               buffer_manager )
   : m_Device{ device }
@@ -51,7 +51,7 @@ Ember::RenderDevice::RenderDevice(
   , m_CommandList{ command_list }
   , m_CommandAllocators{ std::move( command_allocators ) }
   , m_Fence{ fence }
-  , m_FenceEvent{ fence_event }
+  , m_FenceEvent{ std::move( fence_event ) }
   , m_BufferManager{ std::move( buffer_manager ) }
 {
   m_FenceValues.resize( kNumFrames, 0 );
@@ -316,19 +316,6 @@ Ember::RenderDevice Ember::RenderDevice::Create( HWND window_handle, bool const 
   };
 }
 
-void Ember::RenderDevice::Destroy()
-{
-  if ( IsInit() )
-  {
-    WaitIdle();
-
-    m_BufferManager.Destroy();
-
-    ::CloseHandle( m_FenceEvent );
-    m_FenceEvent = nullptr;
-  }
-}
-
 void Ember::RenderDevice::ResizeSwapchain( uint32_t const width, uint32_t const height )
 {
   if ( m_SwapchainHeight != height or m_SwapchainWidth != width )
@@ -492,6 +479,11 @@ bool Ember::RenderDevice::IsVsyncEnabled() const
 bool Ember::RenderDevice::IsTearingSupported() const
 {
   return m_VsyncAndTearing & kSupportTearingBit;
+}
+
+Ember::RenderDevice::~RenderDevice()
+{
+  if ( m_Device ) WaitIdle();
 }
 
 void UpdateRenderTargetViews(

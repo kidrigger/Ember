@@ -40,8 +40,13 @@ public:
 
   Buffer               CreateUniformBuffer( D3D12MA::Allocator* allocator, size_t size );
 
-  static BufferManager Create( uint32_t const capacity );
-  void                 Destroy();
+  static BufferManager Create( uint32_t capacity );
+
+  BufferManager( BufferManager const& other ) = delete;
+  BufferManager( BufferManager&& other ) noexcept;
+  BufferManager& operator=( BufferManager const& other ) = delete;
+  BufferManager& operator=( BufferManager&& other ) noexcept;
+  ~BufferManager();
 };
 
 } // namespace Ember

@@ -156,6 +156,7 @@
     <ClCompile Include="Main.cpp" />
     <ClCompile Include="Util\FreeList.cpp" />
     <ClCompile Include="Util\PerfCounter.cpp" />
+    <ClCompile Include="Util\ScopedHandle.cpp" />
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="App.hpp" />
@@ -168,6 +169,7 @@
     <ClInclude Include="Util\HelperUtils.hpp" />
     <ClInclude Include="Util\PerfCounter.hpp" />
     <ClInclude Include="Util\Runtime.hpp" />
+    <ClInclude Include="Util\ScopedHandle.hpp" />
   </ItemGroup>
   <ItemGroup>
     <None Include="..\.clang-format" />

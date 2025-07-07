@@ -58,6 +58,12 @@ FreeList::Node* FreeList::PopFront()
   return element;
 }
 
+void FreeList::Clear()
+{
+  m_Head.Next = &m_Tail;
+  m_Tail.Prev = &m_Head;
+}
+
 bool FreeList::Empty() const
 {
   return m_Head.Next == &m_Tail;
@@ -77,6 +83,8 @@ FreeList::FreeList( FreeList&& other ) noexcept : m_Head{ other.m_Head }, m_Tail
 {
   m_Head.Next->Prev = &m_Head;
   m_Tail.Prev->Next = &m_Tail;
+
+  other.Clear();
 }
 
 FreeList& FreeList::operator=( FreeList&& other ) noexcept
@@ -97,6 +105,8 @@ FreeList& FreeList::operator=( FreeList&& other ) noexcept
   m_Tail            = other.m_Tail;
   m_Head.Next->Prev = &m_Head;
   m_Tail.Prev->Next = &m_Tail;
+
+  other.Clear();
 
   return *this;
 }

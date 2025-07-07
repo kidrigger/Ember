@@ -54,6 +54,9 @@
     <ClCompile Include="DepthBuffer.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
+    <ClCompile Include="Util\ScopedHandle.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="RenderDevice.hpp">
@@ -83,8 +86,11 @@
     <ClInclude Include="Util\Runtime.hpp">
       <Filter>Header Files\Util</Filter>
     </ClInclude>
-    <ClInclude Include="DepthBuffer.h">
+    <ClInclude Include="DepthBuffer.hpp">
       <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="Util\ScopedHandle.hpp">
+      <Filter>Header Files\Util</Filter>
     </ClInclude>
   </ItemGroup>
   <ItemGroup>

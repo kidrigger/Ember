@@ -151,8 +151,13 @@ HWND CreateWindow(
   return h_window;
 }
 
-Ember::App::App( HWND const window_handle, RenderDevice* render_device, PerfCounter* perf_counter )
-  : m_WindowHandle{ window_handle }, m_RenderDevice{ render_device }, m_PerfCounter{ perf_counter }
+Ember::App::App(
+    HWND const                      window_handle,
+    std::unique_ptr<RenderDevice>&& render_device,
+    std::unique_ptr<PerfCounter>&&  perf_counter )
+  : m_WindowHandle{ window_handle }
+  , m_RenderDevice{ std::move( render_device ) }
+  , m_PerfCounter{ std::move( perf_counter ) }
 {
   ASSERT_M( not m_Instance, "Second instance being created" );
   m_Instance = this;
@@ -184,14 +189,21 @@ Ember::App Ember::App::Create( HINSTANCE const instance_handle )
   HWND const window_handle =
       CreateWindow( window_class_name, instance_handle, L"Learning DirectX 12", client_width, client_height );
 
-  RenderDevice* render_device = new RenderDevice{ RenderDevice::Create( window_handle, use_warp ) };
-  PerfCounter*  perf_counter  = new PerfCounter{};
+  auto render_device = std::make_unique<RenderDevice>( RenderDevice::Create( window_handle, use_warp ) );
+  auto perf_counter  = std::make_unique<PerfCounter>();
 
   return App{
     window_handle,
-    render_device,
-    perf_counter,
+    std::move( render_device ),
+    std::move( perf_counter ),
   };
+}
+
+Ember::App::~App()
+{
+  m_RenderDevice->WaitIdle();
+
+  m_Instance = nullptr;
 }
 
 void Ember::App::LoadContent()
@@ -373,19 +385,4 @@ void Ember::App::Resize()
   m_RenderDevice->ResizeSwapchain( m_WindowWidth, m_WindowHeight );
   m_DepthBuffer = m_RenderDevice->CreateDepthBuffer( m_WindowWidth, m_WindowHeight );
   m_RenderDevice->SetDepthBuffer( m_DepthBuffer );
-}
-
-void Ember::App::Destroy()
-{
-  m_DepthBuffer = {};
-
-  m_RenderDevice->Destroy();
-
-  delete m_RenderDevice;
-  delete m_PerfCounter;
-
-  m_RenderDevice = nullptr;
-  m_PerfCounter  = nullptr;
-
-  m_Instance     = nullptr;
 }

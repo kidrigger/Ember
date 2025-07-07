@@ -27,6 +27,7 @@ public:
   void               PushBack( Node* node );
   void               PushFront( Node* node );
   Node*              PopFront();
+  void               Clear();
   [[nodiscard]] bool Empty() const;
 
   Iterator           begin();
