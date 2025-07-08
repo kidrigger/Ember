@@ -10,6 +10,8 @@
 - [ ] Setup D3D12 Renderer
 	- [X] Pipeline Creation
 	- [X] Render Triangle
+	- [ ] Render Box
+		- [ ] Switch to Vertex/Index buffer
 	- [ ] Render Texture
 		- [ ] Load Texture
 		- [ ] Render on Screen

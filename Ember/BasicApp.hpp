@@ -1,6 +1,7 @@
 #pragma once
 
 #include "DepthBuffer.hpp"
+#include "IApp.hpp"
 #include "Util/DirectXHeaders.hpp"
 #include "Util/Runtime.hpp"
 
@@ -9,7 +10,7 @@ namespace Ember
 class PerfCounter;
 class RenderDevice;
 
-class App
+class BasicApp final : public IApp
 {
   HWND                          m_WindowHandle{ nullptr };
   uint32_t                      m_WindowWidth{ 1280 };
@@ -28,26 +29,24 @@ class App
   // Model Specific
   DirectX::XMMATRIX m_GlobalTransform;
 
-  static App*       m_Instance;
-
 public:
-  App( HWND window_handle, std::unique_ptr<RenderDevice>&& render_device, std::unique_ptr<PerfCounter>&& perf_counter );
-  static App& Instance();
+  BasicApp(
+      HWND window_handle, std::unique_ptr<RenderDevice>&& render_device, std::unique_ptr<PerfCounter>&& perf_counter );
 
-  void        LoadContent();
-  void        Update();
-  void        Render();
-  void        UnloadContent();
+  void            LoadContent() override;
+  void            Update() override;
+  void            Render() override;
+  void            UnloadContent() override;
 
-  void        Resize();
+  void            Resize() override;
 
-  static App  Create( HINSTANCE instance_handle );
+  static BasicApp Create( HINSTANCE instance_handle );
 
-  App( App const& other )                = delete;
-  App& operator=( App const& other )     = delete;
-  App( App&& other ) noexcept            = default;
-  App& operator=( App&& other ) noexcept = default;
-  ~App();
+  BasicApp( BasicApp const& other )                = delete;
+  BasicApp& operator=( BasicApp const& other )     = delete;
+  BasicApp( BasicApp&& other ) noexcept            = default;
+  BasicApp& operator=( BasicApp&& other ) noexcept = default;
+  ~BasicApp() override;
 };
 
 } // namespace Ember

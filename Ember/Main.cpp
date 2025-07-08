@@ -1,5 +1,5 @@
 
-#include "App.hpp"
+#include "BasicApp.hpp"
 #include "RenderDevice.hpp"
 #include "Util/DirectXHeaders.hpp"
 #include "Util/HelperUtils.hpp"
@@ -11,7 +11,7 @@ int CALLBACK wWinMain(
     [[maybe_unused]] PWSTR const     lp_cmd_line,
     [[maybe_unused]] int const       n_cmd_show )
 {
-  Ember::App app = Ember::App::Create( instance_handle );
+  auto app = Ember::BasicApp::Create( instance_handle );
 
   app.LoadContent();
 

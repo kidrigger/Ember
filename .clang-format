@@ -70,5 +70,5 @@ ConstructorInitializerAllOnOneLineOrOnePerLine: true
 SpaceInEmptyParentheses: false
 SpacesInConditionalStatement: true
 SpacesInCStyleCastParentheses: false
-AlignArrayOfStructures: Right
+AlignArrayOfStructures: Left
 UseTab: Never

@@ -1,4 +1,4 @@
-#include "App.hpp"
+#include "BasicApp.hpp"
 
 #include <cstdint>
 #include <utility>
@@ -7,9 +7,7 @@
 #include "Util/HelperUtils.hpp"
 #include "Util/PerfCounter.hpp"
 
-Ember::App* Ember::App::m_Instance{ nullptr };
-
-void        ParseArguments( bool* use_warp, uint32_t* client_width, uint32_t* client_height )
+void ParseArguments( bool* use_warp, uint32_t* client_width, uint32_t* client_height )
 {
   // Parse Args
   {
@@ -77,7 +75,7 @@ LRESULT CALLBACK WndProc( HWND const window_handle, UINT const message, WPARAM c
       break;
     case WM_SIZE:
     {
-      Ember::App::Instance().Resize();
+      Ember::IApp::Instance().Resize();
     }
     break;
     case WM_DESTROY:
@@ -151,24 +149,17 @@ HWND CreateWindow(
   return h_window;
 }
 
-Ember::App::App(
+Ember::BasicApp::BasicApp(
     HWND const                      window_handle,
     std::unique_ptr<RenderDevice>&& render_device,
     std::unique_ptr<PerfCounter>&&  perf_counter )
   : m_WindowHandle{ window_handle }
   , m_RenderDevice{ std::move( render_device ) }
   , m_PerfCounter{ std::move( perf_counter ) }
-{
-  ASSERT_M( not m_Instance, "Second instance being created" );
-  m_Instance = this;
-}
+  , m_GlobalTransform{ DirectX::XMMatrixIdentity() }
+{}
 
-Ember::App& Ember::App::Instance()
-{
-  return *m_Instance;
-}
-
-Ember::App Ember::App::Create( HINSTANCE const instance_handle )
+Ember::BasicApp Ember::BasicApp::Create( HINSTANCE const instance_handle )
 {
   // Windows 10 Creators update adds Per Monitor V2 DPI awareness context.
   // Using this awareness context allows the client area of the window
@@ -192,21 +183,19 @@ Ember::App Ember::App::Create( HINSTANCE const instance_handle )
   auto render_device = std::make_unique<RenderDevice>( RenderDevice::Create( window_handle, use_warp ) );
   auto perf_counter  = std::make_unique<PerfCounter>();
 
-  return App{
+  return BasicApp{
     window_handle,
     std::move( render_device ),
     std::move( perf_counter ),
   };
 }
 
-Ember::App::~App()
+Ember::BasicApp::~BasicApp()
 {
   m_RenderDevice->WaitIdle();
-
-  m_Instance = nullptr;
 }
 
-void Ember::App::LoadContent()
+void Ember::BasicApp::LoadContent()
 {
   ERR_ABORT( ::ShowWindow( m_WindowHandle, SW_SHOW ) );
 
@@ -291,7 +280,7 @@ void Ember::App::LoadContent()
   m_RenderDevice->SetDepthBuffer( m_DepthBuffer );
 }
 
-void Ember::App::Update()
+void Ember::BasicApp::Update()
 {
   m_PerfCounter->Tick();
 
@@ -306,7 +295,7 @@ void Ember::App::Update()
       XMMatrixMultiply( m_GlobalTransform, DirectX::XMMatrixRotationY( DirectX::XM_PIDIV2 * delta_seconds ) );
 }
 
-void Ember::App::Render()
+void Ember::BasicApp::Render()
 {
   ID3D12CommandAllocator*    command_allocator = m_RenderDevice->GetCurrentCommandAllocator();
   ID3D12Resource*            backbuffer        = m_RenderDevice->GetCurrentBackbuffer();
@@ -371,10 +360,10 @@ void Ember::App::Render()
   m_RenderDevice->Present();
 }
 
-void Ember::App::UnloadContent()
+void Ember::BasicApp::UnloadContent()
 {}
 
-void Ember::App::Resize()
+void Ember::BasicApp::Resize()
 {
   RECT rect;
   ::GetWindowRect( m_WindowHandle, &rect );

@@ -149,9 +149,10 @@
     </FxCompile>
   </ItemDefinitionGroup>
   <ItemGroup>
-    <ClCompile Include="App.cpp" />
+    <ClCompile Include="BasicApp.cpp" />
     <ClCompile Include="BufferManager.cpp" />
     <ClCompile Include="DepthBuffer.cpp" />
+    <ClCompile Include="IApp.cpp" />
     <ClCompile Include="RenderDevice.cpp" />
     <ClCompile Include="Main.cpp" />
     <ClCompile Include="Util\FreeList.cpp" />
@@ -159,9 +160,10 @@
     <ClCompile Include="Util\ScopedHandle.cpp" />
   </ItemGroup>
   <ItemGroup>
-    <ClInclude Include="App.hpp" />
+    <ClInclude Include="BasicApp.hpp" />
     <ClInclude Include="BufferManager.hpp" />
     <ClInclude Include="DepthBuffer.hpp" />
+    <ClInclude Include="IApp.hpp" />
     <ClInclude Include="RenderDevice.hpp" />
     <ClInclude Include="ResourceHandles.hpp" />
     <ClInclude Include="Util\DirectXHeaders.hpp" />
