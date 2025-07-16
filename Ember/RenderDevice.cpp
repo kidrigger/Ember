@@ -70,9 +70,12 @@ Ember::RenderDevice Ember::RenderDevice::Create( HWND window_handle, bool const 
 {
 #if defined( _DEBUG )
   {
-    ComPtr<ID3D12Debug> debug_interface;
+    ComPtr<ID3D12Debug>  debug_interface;
+    ComPtr<ID3D12Debug1> debug_interface1;
     ERR_ABORT( D3D12GetDebugInterface( IID_PPV_ARGS( &debug_interface ) ) );
+    ERR_ABORT( debug_interface.As( &debug_interface1 ) );
     debug_interface->EnableDebugLayer();
+    debug_interface1->SetEnableGPUBasedValidation( true );
   }
 #endif
 
@@ -216,7 +219,7 @@ Ember::RenderDevice Ember::RenderDevice::Create( HWND window_handle, bool const 
       .Scaling     = DXGI_SCALING_STRETCH,
       .SwapEffect  = DXGI_SWAP_EFFECT_FLIP_DISCARD,
       .AlphaMode   = DXGI_ALPHA_MODE_UNSPECIFIED,
-      .Flags       = is_tearing_supported ? DXGI_SWAP_CHAIN_FLAG_ALLOW_TEARING : static_cast<UINT>( 0 ),
+      .Flags       = is_tearing_supported ? DXGI_SWAP_CHAIN_FLAG_ALLOW_TEARING : ( UINT )0,
     };
 
     ComPtr<IDXGISwapChain1> swapchain1;
@@ -506,6 +509,6 @@ void UpdateRenderTargetViews(
     device->CreateRenderTargetView( backbuffers[i].Get(), nullptr, rtv_handle );
 
     // Increment rtvHandle by the size of rtvDescriptor.
-    rtv_handle.Offset( static_cast<INT>( rtv_descriptor_size ) );
+    rtv_handle.Offset( ( INT )rtv_descriptor_size );
   }
 }

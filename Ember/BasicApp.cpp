@@ -120,7 +120,7 @@ HWND CreateWindow(
   int const screen_width  = ::GetSystemMetrics( SM_CXSCREEN );
   int const screen_height = ::GetSystemMetrics( SM_CYSCREEN );
 
-  RECT      window_rect   = { 0, 0, static_cast<LONG>( width ), static_cast<LONG>( height ) };
+  RECT      window_rect   = { 0, 0, ( LONG )width, ( LONG )height };
   ::AdjustWindowRect( &window_rect, WS_OVERLAPPEDWINDOW, FALSE );
 
   int const window_width  = window_rect.right - window_rect.left;
@@ -290,7 +290,7 @@ void Ember::BasicApp::Update()
 
   SetWindowText( m_WindowHandle, m_SprintfBuffer );
 
-  float const delta_seconds = static_cast<float>( m_PerfCounter->GetDeltaMilliSeconds() ) * 0.001f;
+  float const delta_seconds = ( float )m_PerfCounter->GetDeltaMilliSeconds() * 0.001f;
   m_GlobalTransform =
       XMMatrixMultiply( m_GlobalTransform, DirectX::XMMatrixRotationY( DirectX::XM_PIDIV2 * delta_seconds ) );
 }
@@ -307,16 +307,16 @@ void Ember::BasicApp::Render()
   D3D12_VIEWPORT const viewport = {
     .TopLeftX = 0,
     .TopLeftY = 0,
-    .Width    = static_cast<FLOAT>( m_WindowWidth ),
-    .Height   = static_cast<FLOAT>( m_WindowHeight ),
+    .Width    = ( FLOAT )m_WindowWidth,
+    .Height   = ( FLOAT )m_WindowHeight,
     .MinDepth = 0,
     .MaxDepth = 1,
   };
   D3D12_RECT const scissor = {
     .left   = 0,
     .top    = 0,
-    .right  = static_cast<LONG>( m_WindowWidth ),
-    .bottom = static_cast<LONG>( m_WindowHeight ),
+    .right  = ( LONG )m_WindowWidth,
+    .bottom = ( LONG )m_WindowHeight,
   };
 
   // Clear Backbuffer
