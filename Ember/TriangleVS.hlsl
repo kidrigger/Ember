@@ -19,11 +19,13 @@ cbuffer Transform : register(b0, space0)
   float4x4 g_Model;
 }
 
-VSOutput TriangleVS(uint idx : SV_VERTEXID)
+VSOutput TriangleVS(
+  float3 position : POSITION,
+  float3 color : COLOR)
 {
   VSOutput OUT;
-  float3 position = mul(g_Model, float4(kPoints[idx], 1.0f)).xyz;
-  OUT.Position = float4(position.xy, position.z + 0.5f, 1.0f);
-  OUT.Color = float4(kColors[idx], 1.0f);
+  float3 pos = mul(g_Model, float4(position, 1.0f)).xyz;
+  OUT.Position = float4(pos.xy, pos.z + 0.5f, 1.0f);
+  OUT.Color = float4(color, 1.0f);
   return OUT;
 }

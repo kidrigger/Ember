@@ -74,12 +74,20 @@ public:
       bool                                          is_tearing_supported,
       BufferManager&&                               buffer_manager );
 
-  ComPtr<ID3D12Device2>     GetDevice();
+  ComPtr<ID3D12Device2> GetDevice();
 
-  static RenderDevice       Create( HWND window_handle, bool use_warp );
+  static RenderDevice   Create( HWND window_handle, bool use_warp );
 
-  void                      ResizeSwapchain( uint32_t width, uint32_t height );
-  Buffer                    CreateUniformBuffer( size_t size );
+  void                  ResizeSwapchain( uint32_t width, uint32_t height );
+
+  // Buffer Management
+  Buffer                   CreateVertexBuffer( uint32_t size, uint32_t stride );
+  Buffer                   CreateIndexBuffer( uint32_t size, DXGI_FORMAT format );
+  D3D12_VERTEX_BUFFER_VIEW GetVertexBufferView( Buffer const& vertex_buffer ) const;
+  D3D12_INDEX_BUFFER_VIEW  GetIndexBufferView( Buffer const& index_buffer ) const;
+
+  void WriteToBuffer( Buffer const& buffer, uint32_t offset, uint32_t size, void const* data ) const;
+
   [[nodiscard]] DepthBuffer CreateDepthBuffer( uint32_t width, uint32_t height ) const;
 
   void                      SetDepthBuffer( DepthBuffer const& depth_buffer ) const;

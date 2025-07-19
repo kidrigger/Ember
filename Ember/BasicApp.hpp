@@ -2,6 +2,7 @@
 
 #include "DepthBuffer.hpp"
 #include "IApp.hpp"
+#include "ResourceHandles.hpp"
 #include "Util/DirectXHeaders.hpp"
 #include "Util/Runtime.hpp"
 
@@ -12,6 +13,12 @@ class RenderDevice;
 
 class BasicApp final : public IApp
 {
+  struct Vertex
+  {
+    DirectX::XMFLOAT3 Position;
+    DirectX::XMFLOAT3 Color;
+  };
+
   HWND                          m_WindowHandle{ nullptr };
   uint32_t                      m_WindowWidth{ 1280 };
   uint32_t                      m_WindowHeight{ 720 };
@@ -27,7 +34,14 @@ class BasicApp final : public IApp
   DepthBuffer                 m_DepthBuffer;
 
   // Model Specific
-  DirectX::XMMATRIX m_GlobalTransform;
+  DirectX::XMMATRIX        m_GlobalTransform;
+
+  std::vector<Vertex>      m_Vertices;
+  std::vector<uint16_t>    m_Indices;
+  Buffer                   m_VertexBuffer;
+  Buffer                   m_IndexBuffer;
+  D3D12_VERTEX_BUFFER_VIEW m_VertexBufferView;
+  D3D12_INDEX_BUFFER_VIEW  m_IndexBufferView;
 
 public:
   BasicApp(

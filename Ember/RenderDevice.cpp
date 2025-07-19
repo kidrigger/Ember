@@ -347,9 +347,30 @@ void Ember::RenderDevice::ResizeSwapchain( uint32_t const width, uint32_t const 
   }
 }
 
-Ember::Buffer Ember::RenderDevice::CreateUniformBuffer( size_t const size )
+Ember::Buffer Ember::RenderDevice::CreateVertexBuffer( uint32_t const size, uint32_t const stride )
 {
-  return m_BufferManager.CreateUniformBuffer( m_Allocator.Get(), size );
+  return m_BufferManager.CreateVertexBuffer( m_Allocator.Get(), size, stride );
+}
+
+Ember::Buffer Ember::RenderDevice::CreateIndexBuffer( uint32_t const size, DXGI_FORMAT const format )
+{
+  return m_BufferManager.CreateIndexBuffer( m_Allocator.Get(), size, format );
+}
+
+D3D12_VERTEX_BUFFER_VIEW Ember::RenderDevice::GetVertexBufferView( Buffer const& vertex_buffer ) const
+{
+  return m_BufferManager.GetVertexBufferView( vertex_buffer );
+}
+
+D3D12_INDEX_BUFFER_VIEW Ember::RenderDevice::GetIndexBufferView( Buffer const& index_buffer ) const
+{
+  return m_BufferManager.GetIndexBufferView( index_buffer );
+}
+
+void Ember::RenderDevice::WriteToBuffer(
+    Buffer const& buffer, uint32_t const offset, uint32_t const size, void const* data ) const
+{
+  return m_BufferManager.WriteToBuffer( buffer, offset, size, data );
 }
 
 Ember::DepthBuffer Ember::RenderDevice::CreateDepthBuffer( uint32_t const width, uint32_t const height ) const
