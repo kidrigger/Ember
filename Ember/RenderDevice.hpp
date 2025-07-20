@@ -1,5 +1,9 @@
 #pragma once
 
+#include <mutex>
+
+#include "BindlessHandle.hpp"
+#include "BindlessManager.hpp"
 #include "Buffer.hpp"
 #include "DepthBuffer.hpp"
 #include "Util/DirectXHeaders.hpp"
@@ -8,6 +12,7 @@
 
 namespace Ember
 {
+
 class RenderDevice
 {
 public:
@@ -35,8 +40,9 @@ private:
   uint32_t                     m_RTVDescriptorSize{ 0 };
   uint32_t                     m_CurrentBackbufferIndex{ 0 };
 
-  // Depth Buffer
-  ComPtr<ID3D12DescriptorHeap> m_DSVDescriptorHeap;
+  // Descriptor Heaps
+  ComPtr<ID3D12DescriptorHeap>     m_DSVDescriptorHeap;
+  std::unique_ptr<BindlessManager> m_Bindless;
 
   // Commands
   ComPtr<ID3D12GraphicsCommandList>           m_CommandList;
@@ -49,27 +55,28 @@ private:
   ScopedHandle          m_FenceEvent;
 
 public:
+  RenderDevice() = default;
   RenderDevice(
-      ComPtr<ID3D12Device2> const&                  device,
-      ComPtr<D3D12MA::Allocator> const&             allocator,
-      ComPtr<ID3D12CommandQueue> const&             direct_queue,
-      uint32_t                                      swapchain_width,
-      uint32_t                                      swapchain_height,
-      ComPtr<IDXGISwapChain4> const&                swapchain,
-      std::vector<ComPtr<ID3D12Resource>>&&         backbuffers,
-      ComPtr<ID3D12DescriptorHeap> const&           rtv_descriptor_heap,
-      uint32_t                                      rtv_descriptor_size,
-      uint32_t                                      current_backbuffer_index,
-      ComPtr<ID3D12DescriptorHeap> const&           dsv_descriptor_heap,
-      ComPtr<ID3D12GraphicsCommandList> const&      command_list,
-      std::vector<ComPtr<ID3D12CommandAllocator>>&& command_allocators,
-      ComPtr<ID3D12Fence> const&                    fence,
-      ScopedHandle&&                                fence_event,
-      bool                                          is_tearing_supported );
+      ComPtr<ID3D12Device2>                       device,
+      ComPtr<D3D12MA::Allocator>                  allocator,
+      ComPtr<ID3D12CommandQueue>                  direct_queue,
+      uint32_t                                    swapchain_width,
+      uint32_t                                    swapchain_height,
+      ComPtr<IDXGISwapChain4>                     swapchain,
+      std::vector<ComPtr<ID3D12Resource>>         backbuffers,
+      ComPtr<ID3D12DescriptorHeap>                rtv_descriptor_heap,
+      uint32_t                                    rtv_descriptor_size,
+      ComPtr<ID3D12DescriptorHeap>                dsv_descriptor_heap,
+      std::unique_ptr<BindlessManager>            bindless_manager,
+      ComPtr<ID3D12GraphicsCommandList>           command_list,
+      std::vector<ComPtr<ID3D12CommandAllocator>> command_allocators,
+      ComPtr<ID3D12Fence>                         fence,
+      ScopedHandle                                fence_event,
+      bool                                        is_tearing_supported );
 
   ComPtr<ID3D12Device2> GetDevice() noexcept;
 
-  static RenderDevice   Create( HWND window_handle, bool use_warp );
+  static void           Create( RenderDevice* render_device, HWND window_handle, bool use_warp );
 
   void                  ResizeSwapchain( uint32_t width, uint32_t height );
 
@@ -80,6 +87,14 @@ public:
   [[nodiscard]] DepthBuffer CreateDepthBuffer( uint32_t width, uint32_t height ) const;
 
   void                      SetDepthBuffer( DepthBuffer const& depth_buffer ) const;
+
+  // Descriptor Management
+  [[nodiscard]] SRVHandle CreateBindlessHandle(
+      ID3D12Resource* resource, D3D12_SHADER_RESOURCE_VIEW_DESC const& srv_desc ) const noexcept;
+  [[nodiscard]] UAVHandle CreateBindlessHandle(
+      ID3D12Resource* resource, D3D12_UNORDERED_ACCESS_VIEW_DESC const& uav_desc ) const noexcept;
+  [[nodiscard]] SamplerHandle CreateSamplerHandle( D3D12_SAMPLER_DESC const& sampler_desc ) const noexcept;
+  [[nodiscard]] std::array<ID3D12DescriptorHeap*, 2> GetBindlessDescriptorHeaps() const;
 
   // Wait until the all queues have finished all commands.
   void               WaitIdle();
@@ -98,9 +113,9 @@ public:
   [[nodiscard]] bool                          IsTearingSupported() const;
 
   RenderDevice( RenderDevice const& other )                = delete;
-  RenderDevice( RenderDevice&& other ) noexcept            = default;
+  RenderDevice( RenderDevice&& other ) noexcept            = delete;
   RenderDevice& operator=( RenderDevice const& other )     = delete;
-  RenderDevice& operator=( RenderDevice&& other ) noexcept = default;
+  RenderDevice& operator=( RenderDevice&& other ) noexcept = delete;
   ~RenderDevice();
 };
 

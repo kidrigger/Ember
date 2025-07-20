@@ -4,13 +4,18 @@
 
 #include <cassert>
 
+#define DEBUG_BREAK __debugbreak()
+
 #define ERR_FAIL_RET( hr )                                                                                             \
   do                                                                                                                   \
   {                                                                                                                    \
     HRESULT hres = ( hr );                                                                                             \
     if ( auto x = FAILED( hr ) )                                                                                       \
     {                                                                                                                  \
-      __debugbreak();                                                                                                  \
+      _com_error err( hr );                                                                                            \
+      LPCTSTR    err_msg = err.ErrorMessage();                                                                         \
+      MessageBox( nullptr, L"Warn: " #hr, err_msg, MB_OK | MB_ICONWARNING );                                           \
+      DEBUG_BREAK;                                                                                                     \
       return x;                                                                                                        \
     }                                                                                                                  \
   }                                                                                                                    \
@@ -22,7 +27,10 @@
     HRESULT hres = ( hr );                                                                                             \
     if ( auto x = FAILED( hres ) )                                                                                     \
     {                                                                                                                  \
-      __debugbreak();                                                                                                  \
+      _com_error err( hr );                                                                                            \
+      LPCTSTR    err_msg = err.ErrorMessage();                                                                         \
+      MessageBox( nullptr, L"Err: " #hr, err_msg, MB_OK | MB_ICONERROR );                                              \
+      DEBUG_BREAK;                                                                                                     \
       exit( x );                                                                                                       \
     }                                                                                                                  \
   }                                                                                                                    \

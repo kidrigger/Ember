@@ -150,21 +150,27 @@
   </ItemDefinitionGroup>
   <ItemGroup>
     <ClCompile Include="BasicApp.cpp" />
+    <ClCompile Include="BindlessHandle.cpp" />
+    <ClCompile Include="BindlessManager.cpp" />
     <ClCompile Include="Buffer.cpp" />
     <ClCompile Include="DepthBuffer.cpp" />
     <ClCompile Include="IApp.cpp" />
     <ClCompile Include="RenderDevice.cpp" />
     <ClCompile Include="Main.cpp" />
+    <ClCompile Include="Texture.cpp" />
     <ClCompile Include="Util\FreeList.cpp" />
     <ClCompile Include="Util\PerfCounter.cpp" />
     <ClCompile Include="Util\ScopedHandle.cpp" />
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="BasicApp.hpp" />
+    <ClInclude Include="BindlessHandle.hpp" />
+    <ClInclude Include="BindlessManager.hpp" />
     <ClInclude Include="Buffer.hpp" />
     <ClInclude Include="DepthBuffer.hpp" />
     <ClInclude Include="IApp.hpp" />
     <ClInclude Include="RenderDevice.hpp" />
+    <ClInclude Include="Texture.hpp" />
     <ClInclude Include="Util\DataUtil.hpp" />
     <ClInclude Include="Util\DirectXHeaders.hpp" />
     <ClInclude Include="Util\FreeList.hpp" />

@@ -2,6 +2,7 @@
 
 #include <span>
 
+#include "BindlessManager.hpp"
 #include "Buffer.hpp"
 #include "DepthBuffer.hpp"
 #include "Util/DirectXHeaders.hpp"
@@ -20,36 +21,36 @@ void UpdateRenderTargetViews(
     std::span<ComPtr<ID3D12Resource>> const& backbuffers );
 
 Ember::RenderDevice::RenderDevice(
-    ComPtr<ID3D12Device2> const&                  device,
-    ComPtr<D3D12MA::Allocator> const&             allocator,
-    ComPtr<ID3D12CommandQueue> const&             direct_queue,
-    UINT32 const                                  swapchain_width,
-    UINT32 const                                  swapchain_height,
-    ComPtr<IDXGISwapChain4> const&                swapchain,
-    std::vector<ComPtr<ID3D12Resource>>&&         backbuffers,
-    ComPtr<ID3D12DescriptorHeap> const&           rtv_descriptor_heap,
-    UINT32 const                                  rtv_descriptor_size,
-    UINT32 const                                  current_backbuffer_index,
-    ComPtr<ID3D12DescriptorHeap> const&           dsv_descriptor_heap,
-    ComPtr<ID3D12GraphicsCommandList> const&      command_list,
-    std::vector<ComPtr<ID3D12CommandAllocator>>&& command_allocators,
-    ComPtr<ID3D12Fence> const&                    fence,
-    ScopedHandle&&                                fence_event,
-    bool const                                    is_tearing_supported )
-  : m_Device{ device }
-  , m_Allocator{ allocator }
-  , m_DirectQueue{ direct_queue }
+    ComPtr<ID3D12Device2>                       device,
+    ComPtr<D3D12MA::Allocator>                  allocator,
+    ComPtr<ID3D12CommandQueue>                  direct_queue,
+    uint32_t const                              swapchain_width,
+    uint32_t const                              swapchain_height,
+    ComPtr<IDXGISwapChain4>                     swapchain,
+    std::vector<ComPtr<ID3D12Resource>>         backbuffers,
+    ComPtr<ID3D12DescriptorHeap>                rtv_descriptor_heap,
+    uint32_t const                              rtv_descriptor_size,
+    ComPtr<ID3D12DescriptorHeap>                dsv_descriptor_heap,
+    std::unique_ptr<BindlessManager>            bindless_manager,
+    ComPtr<ID3D12GraphicsCommandList>           command_list,
+    std::vector<ComPtr<ID3D12CommandAllocator>> command_allocators,
+    ComPtr<ID3D12Fence>                         fence,
+    ScopedHandle                                fence_event,
+    bool const                                  is_tearing_supported )
+  : m_Device{ std::move( device ) }
+  , m_Allocator{ std::move( allocator ) }
+  , m_DirectQueue{ std::move( direct_queue ) }
   , m_SwapchainWidth{ swapchain_width }
   , m_SwapchainHeight{ swapchain_height }
-  , m_Swapchain{ swapchain }
+  , m_Swapchain{ std::move( swapchain ) }
   , m_Backbuffers{ std::move( backbuffers ) }
-  , m_RTVDescriptorHeap{ rtv_descriptor_heap }
+  , m_RTVDescriptorHeap{ std::move( rtv_descriptor_heap ) }
   , m_RTVDescriptorSize{ rtv_descriptor_size }
-  , m_CurrentBackbufferIndex{ current_backbuffer_index }
-  , m_DSVDescriptorHeap{ dsv_descriptor_heap }
-  , m_CommandList{ command_list }
+  , m_DSVDescriptorHeap{ std::move( dsv_descriptor_heap ) }
+  , m_Bindless{ std::move( bindless_manager ) }
+  , m_CommandList{ std::move( command_list ) }
   , m_CommandAllocators{ std::move( command_allocators ) }
-  , m_Fence{ fence }
+  , m_Fence{ std::move( fence ) }
   , m_FenceEvent{ std::move( fence_event ) }
 {
   m_FenceValues.resize( kNumFrames, 0 );
@@ -64,7 +65,7 @@ ComPtr<ID3D12Device2> Ember::RenderDevice::GetDevice() noexcept
   return m_Device;
 }
 
-Ember::RenderDevice Ember::RenderDevice::Create( HWND window_handle, bool const use_warp )
+void Ember::RenderDevice::Create( RenderDevice* render_device, HWND window_handle, bool const use_warp )
 {
 #if defined( _DEBUG )
   {
@@ -255,6 +256,9 @@ Ember::RenderDevice Ember::RenderDevice::Create( HWND window_handle, bool const 
     ERR_ABORT( device->CreateDescriptorHeap( &desc, IID_PPV_ARGS( &dsv_descriptor_heap ) ) );
   }
 
+  auto bindless_manager = std::make_unique<BindlessManager>();
+  BindlessManager::Create( bindless_manager.get(), device, 10'000, 100 );
+
   // Create Command Allocator
   std::vector<ComPtr<ID3D12CommandAllocator>> command_allocators( kNumFrames );
   for ( int i = 0; i < kNumFrames; ++i )
@@ -294,21 +298,21 @@ Ember::RenderDevice Ember::RenderDevice::Create( HWND window_handle, bool const 
     assert( fence_event && "Failed to create fence event" );
   }
 
-  return RenderDevice{
-    device,
-    allocator,
-    command_queue,
+  new ( render_device ) RenderDevice{
+    std::move( device ),
+    std::move( allocator ),
+    std::move( command_queue ),
     width,
     height,
-    swapchain,
+    std::move( swapchain ),
     std::move( backbuffers ),
-    rtv_descriptor_heap,
+    std::move( rtv_descriptor_heap ),
     rtv_descriptor_size,
-    current_backbuffer_index,
-    dsv_descriptor_heap,
-    command_list,
+    std::move( dsv_descriptor_heap ),
+    std::move( bindless_manager ),
+    std::move( command_list ),
     std::move( command_allocators ),
-    fence,
+    std::move( fence ),
     fence_event,
     is_tearing_supported,
   };
@@ -390,6 +394,28 @@ void Ember::RenderDevice::SetDepthBuffer( DepthBuffer const& depth_buffer ) cons
   auto const dsv_handle = m_DSVDescriptorHeap->GetCPUDescriptorHandleForHeapStart();
 
   m_Device->CreateDepthStencilView( depth_buffer.GetBuffer(), &desc, dsv_handle );
+}
+
+Ember::SRVHandle Ember::RenderDevice::CreateBindlessHandle(
+    ID3D12Resource* resource, D3D12_SHADER_RESOURCE_VIEW_DESC const& srv_desc ) const noexcept
+{
+  return m_Bindless->CreateDescriptorHandle( resource, srv_desc );
+}
+
+Ember::UAVHandle Ember::RenderDevice::CreateBindlessHandle(
+    ID3D12Resource* resource, D3D12_UNORDERED_ACCESS_VIEW_DESC const& uav_desc ) const noexcept
+{
+  return m_Bindless->CreateDescriptorHandle( resource, uav_desc );
+}
+
+Ember::SamplerHandle Ember::RenderDevice::CreateSamplerHandle( D3D12_SAMPLER_DESC const& sampler_desc ) const noexcept
+{
+  return m_Bindless->CreateSamplerHandle( sampler_desc );
+}
+
+std::array<ID3D12DescriptorHeap*, 2> Ember::RenderDevice::GetBindlessDescriptorHeaps() const
+{
+  return m_Bindless->GetBindlessDescriptorHeaps();
 }
 
 void Ember::RenderDevice::WaitIdle()

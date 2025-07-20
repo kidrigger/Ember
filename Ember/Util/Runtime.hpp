@@ -23,3 +23,5 @@
 #include <wrl.h>
 
 using Microsoft::WRL::ComPtr;
+
+#include <comdef.h>

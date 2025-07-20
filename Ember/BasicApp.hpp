@@ -1,5 +1,6 @@
 #pragma once
 
+#include "BindlessHandle.hpp"
 #include "Buffer.hpp"
 #include "DepthBuffer.hpp"
 #include "IApp.hpp"
@@ -38,8 +39,9 @@ class BasicApp final : public IApp
 
   std::vector<Vertex>   m_Vertices;
   std::vector<uint16_t> m_Indices;
-  Buffer                m_VertexBuffer{};
-  Buffer                m_IndexBuffer{};
+  Buffer                m_VertexBuffer;
+  Buffer                m_IndexBuffer;
+  SRVHandle             m_VertexBufferSRV;
 
 public:
   BasicApp(

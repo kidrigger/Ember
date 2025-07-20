@@ -15,4 +15,9 @@ uint32_t CountOf( std::ranges::sized_range auto& range )
   return ( uint32_t )std::ranges::size( range );
 }
 
+auto DataOf( std::ranges::contiguous_range auto& range )
+{
+  return std::ranges::data( range );
+}
+
 } // namespace Ember

@@ -179,8 +179,10 @@ Ember::BasicApp Ember::BasicApp::Create( HINSTANCE const instance_handle )
   HWND const window_handle =
       CreateWindow( window_class_name, instance_handle, L"Learning DirectX 12", client_width, client_height );
 
-  auto render_device = std::make_unique<RenderDevice>( RenderDevice::Create( window_handle, use_warp ) );
-  auto perf_counter  = std::make_unique<PerfCounter>();
+  auto render_device = std::make_unique<RenderDevice>();
+  RenderDevice::Create( render_device.get(), window_handle, use_warp );
+
+  auto perf_counter = std::make_unique<PerfCounter>();
 
   return BasicApp{
     window_handle,
@@ -189,6 +191,7 @@ Ember::BasicApp Ember::BasicApp::Create( HINSTANCE const instance_handle )
   };
 }
 
+// NOLINT(modernize-use-equals-default)
 Ember::BasicApp::~BasicApp()
 {
   m_RenderDevice->WaitIdle();
@@ -220,6 +223,10 @@ void Ember::BasicApp::LoadContent()
   m_VertexBuffer.Write( 0, ByteSizeOf( m_Vertices ), m_Vertices.data() );
   m_IndexBuffer.Write( 0, ByteSizeOf( m_Indices ), m_Indices.data() );
 
+  m_VertexBufferSRV = m_RenderDevice->CreateBindlessHandle(
+      m_VertexBuffer.GetBuffer(),
+      CD3DX12_SHADER_RESOURCE_VIEW_DESC::StructuredBuffer( ( UINT )m_Vertices.size(), sizeof( Vertex ), 0 ) );
+
   ComPtr<ID3DBlob> vertex_shader_blob;
   ERR_ABORT( D3DReadFileToBlob( L"TriangleVS.cso", &vertex_shader_blob ) );
   ComPtr<ID3DBlob> pixel_shader_blob;
@@ -235,18 +242,21 @@ void Ember::BasicApp::LoadContent()
   }
 
   D3D12_ROOT_SIGNATURE_FLAGS const root_signature_flags =
-      D3D12_ROOT_SIGNATURE_FLAG_ALLOW_INPUT_ASSEMBLER_INPUT_LAYOUT |
-      D3D12_ROOT_SIGNATURE_FLAG_DENY_MESH_SHADER_ROOT_ACCESS |
+      // D3D12_ROOT_SIGNATURE_FLAG_ALLOW_INPUT_ASSEMBLER_INPUT_LAYOUT |
+      D3D12_ROOT_SIGNATURE_FLAG_CBV_SRV_UAV_HEAP_DIRECTLY_INDEXED |
+      D3D12_ROOT_SIGNATURE_FLAG_SAMPLER_HEAP_DIRECTLY_INDEXED | D3D12_ROOT_SIGNATURE_FLAG_DENY_MESH_SHADER_ROOT_ACCESS |
       D3D12_ROOT_SIGNATURE_FLAG_DENY_AMPLIFICATION_SHADER_ROOT_ACCESS |
       D3D12_ROOT_SIGNATURE_FLAG_DENY_GEOMETRY_SHADER_ROOT_ACCESS |
       D3D12_ROOT_SIGNATURE_FLAG_DENY_DOMAIN_SHADER_ROOT_ACCESS |
       D3D12_ROOT_SIGNATURE_FLAG_DENY_HULL_SHADER_ROOT_ACCESS | D3D12_ROOT_SIGNATURE_FLAG_DENY_PIXEL_SHADER_ROOT_ACCESS;
 
-  CD3DX12_ROOT_PARAMETER1 root_parameters[1];
-  root_parameters[0].InitAsConstants( sizeof( DirectX::XMMATRIX ) / 4, 0, 0, D3D12_SHADER_VISIBILITY_VERTEX );
+  CD3DX12_ROOT_PARAMETER1 root_parameters[2];
+  root_parameters[0].InitAsConstants( 1, 0, 0, D3D12_SHADER_VISIBILITY_VERTEX );
+  root_parameters[1].InitAsConstants( sizeof( DirectX::XMMATRIX ) / 4, 1, 0, D3D12_SHADER_VISIBILITY_VERTEX );
 
   CD3DX12_VERSIONED_ROOT_SIGNATURE_DESC root_signature_desc;
-  root_signature_desc.Init_1_1( CountOf( root_parameters ), root_parameters, 0, nullptr, root_signature_flags );
+  root_signature_desc.Init_1_1(
+      CountOf( root_parameters ), DataOf( root_parameters ), 0, nullptr, root_signature_flags );
 
   ComPtr<ID3DBlob> root_signature_blob;
   ComPtr<ID3DBlob> error_blob;
@@ -289,14 +299,13 @@ void Ember::BasicApp::LoadContent()
   };
 
   D3D12_INPUT_LAYOUT_DESC input_layout = {
-
-    .pInputElementDescs = input_element,
+    .pInputElementDescs = DataOf( input_element ),
     .NumElements        = CountOf( input_element ),
   };
 
   struct PipelineStateStream
   {
-    CD3DX12_PIPELINE_STATE_STREAM_INPUT_LAYOUT          InputLayout;
+    // CD3DX12_PIPELINE_STATE_STREAM_INPUT_LAYOUT          InputLayout;
     CD3DX12_PIPELINE_STATE_STREAM_ROOT_SIGNATURE        RootSignature;
     CD3DX12_PIPELINE_STATE_STREAM_PRIMITIVE_TOPOLOGY    PrimitiveTopologyType;
     CD3DX12_PIPELINE_STATE_STREAM_VS                    VS;
@@ -307,7 +316,7 @@ void Ember::BasicApp::LoadContent()
   };
 
   PipelineStateStream pipeline_stream = {
-    .InputLayout           = input_layout,
+    //.InputLayout           = input_layout,
     .RootSignature         = m_RootSignature.Get(),
     .PrimitiveTopologyType = D3D12_PRIMITIVE_TOPOLOGY_TYPE_TRIANGLE,
     .VS                    = CD3DX12_SHADER_BYTECODE( vertex_shader_blob.Get() ),
@@ -382,21 +391,24 @@ void Ember::BasicApp::Render()
 
   command_list->SetPipelineState( m_PipelineState.Get() );
   command_list->SetGraphicsRootSignature( m_RootSignature.Get() );
-  command_list->IASetPrimitiveTopology( D3D10_PRIMITIVE_TOPOLOGY_TRIANGLELIST );
+  command_list->IASetPrimitiveTopology( D3D_PRIMITIVE_TOPOLOGY_TRIANGLELIST );
 
+  auto bindless_desc_heaps = m_RenderDevice->GetBindlessDescriptorHeaps();
+  command_list->SetDescriptorHeaps( CountOf( bindless_desc_heaps ), DataOf( bindless_desc_heaps ) );
   command_list->RSSetViewports( 1, &viewport );
   command_list->RSSetScissorRects( 1, &scissor );
   command_list->OMSetRenderTargets( 1, &rtv, FALSE, &dsv );
 
   command_list->IASetIndexBuffer( &m_IndexBuffer.GetIndexBufferView() );
-  command_list->IASetVertexBuffers( 0, 1, &m_VertexBuffer.GetVertexBufferView() );
+  // command_list->IASetVertexBuffers( 0, 1, &m_VertexBuffer.GetVertexBufferView() );
+  command_list->SetGraphicsRoot32BitConstant( 0, ( UINT )m_VertexBufferSRV, 0 );
 
   for ( int i = -2; i <= 2; ++i )
   {
     DirectX::XMMATRIX matrix = XMMatrixMultiply(
         m_GlobalTransform, DirectX::XMMatrixTranslation( 0.5f * ( float )i, 0.2f * ( float )i, 0.0f ) );
 
-    command_list->SetGraphicsRoot32BitConstants( 0, sizeof( DirectX::XMMATRIX ) / 4, &matrix, 0 );
+    command_list->SetGraphicsRoot32BitConstants( 1, sizeof( DirectX::XMMATRIX ) / 4, &matrix, 0 );
 
     command_list->DrawIndexedInstanced( CountOf( m_Indices ), 1, 0, 0, 0 );
   }
