@@ -151,9 +151,7 @@ HWND CreateWindow(
 }
 
 Ember::BasicApp::BasicApp(
-    HWND const                      window_handle,
-    std::unique_ptr<RenderDevice>&& render_device,
-    std::unique_ptr<PerfCounter>&&  perf_counter )
+    HWND const window_handle, std::unique_ptr<RenderDevice> render_device, std::unique_ptr<PerfCounter> perf_counter )
   : m_WindowHandle{ window_handle }
   , m_RenderDevice{ std::move( render_device ) }
   , m_PerfCounter{ std::move( perf_counter ) }
@@ -216,14 +214,11 @@ void Ember::BasicApp::LoadContent()
     0, 1, 2, 0, 2, 3, 4, 6, 5, 4, 7, 6, 4, 5, 1, 4, 1, 0, 3, 2, 6, 3, 6, 7, 1, 5, 6, 1, 6, 2, 4, 0, 3, 4, 3, 7,
   };
 
-  m_VertexBuffer     = m_RenderDevice->CreateVertexBuffer( ByteSizeOf( m_Vertices ), sizeof( Vertex ) );
-  m_VertexBufferView = m_RenderDevice->GetVertexBufferView( m_VertexBuffer );
+  m_VertexBuffer = m_RenderDevice->CreateVertexBuffer( ByteSizeOf( m_Vertices ), sizeof( Vertex ) );
+  m_IndexBuffer  = m_RenderDevice->CreateIndexBuffer( ByteSizeOf( m_Indices ), DXGI_FORMAT_R16_UINT );
 
-  m_IndexBuffer      = m_RenderDevice->CreateIndexBuffer( ByteSizeOf( m_Indices ), DXGI_FORMAT_R16_UINT );
-  m_IndexBufferView  = m_RenderDevice->GetIndexBufferView( m_IndexBuffer );
-
-  m_RenderDevice->WriteToBuffer( m_VertexBuffer, 0, ByteSizeOf( m_Vertices ), m_Vertices.data() );
-  m_RenderDevice->WriteToBuffer( m_IndexBuffer, 0, ByteSizeOf( m_Indices ), m_Indices.data() );
+  m_VertexBuffer.Write( 0, ByteSizeOf( m_Vertices ), m_Vertices.data() );
+  m_IndexBuffer.Write( 0, ByteSizeOf( m_Indices ), m_Indices.data() );
 
   ComPtr<ID3DBlob> vertex_shader_blob;
   ERR_ABORT( D3DReadFileToBlob( L"TriangleVS.cso", &vertex_shader_blob ) );
@@ -393,8 +388,8 @@ void Ember::BasicApp::Render()
   command_list->RSSetScissorRects( 1, &scissor );
   command_list->OMSetRenderTargets( 1, &rtv, FALSE, &dsv );
 
-  command_list->IASetIndexBuffer( &m_IndexBufferView );
-  command_list->IASetVertexBuffers( 0, 1, &m_VertexBufferView );
+  command_list->IASetIndexBuffer( &m_IndexBuffer.GetIndexBufferView() );
+  command_list->IASetVertexBuffers( 0, 1, &m_VertexBuffer.GetVertexBufferView() );
 
   for ( int i = -2; i <= 2; ++i )
   {

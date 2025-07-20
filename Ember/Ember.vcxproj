@@ -150,7 +150,7 @@
   </ItemDefinitionGroup>
   <ItemGroup>
     <ClCompile Include="BasicApp.cpp" />
-    <ClCompile Include="BufferManager.cpp" />
+    <ClCompile Include="Buffer.cpp" />
     <ClCompile Include="DepthBuffer.cpp" />
     <ClCompile Include="IApp.cpp" />
     <ClCompile Include="RenderDevice.cpp" />
@@ -161,11 +161,10 @@
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="BasicApp.hpp" />
-    <ClInclude Include="BufferManager.hpp" />
+    <ClInclude Include="Buffer.hpp" />
     <ClInclude Include="DepthBuffer.hpp" />
     <ClInclude Include="IApp.hpp" />
     <ClInclude Include="RenderDevice.hpp" />
-    <ClInclude Include="ResourceHandles.hpp" />
     <ClInclude Include="Util\DataUtil.hpp" />
     <ClInclude Include="Util\DirectXHeaders.hpp" />
     <ClInclude Include="Util\FreeList.hpp" />

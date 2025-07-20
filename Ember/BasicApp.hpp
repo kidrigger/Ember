@@ -1,8 +1,8 @@
 #pragma once
 
+#include "Buffer.hpp"
 #include "DepthBuffer.hpp"
 #include "IApp.hpp"
-#include "ResourceHandles.hpp"
 #include "Util/DirectXHeaders.hpp"
 #include "Util/Runtime.hpp"
 
@@ -34,18 +34,16 @@ class BasicApp final : public IApp
   DepthBuffer                 m_DepthBuffer;
 
   // Model Specific
-  DirectX::XMMATRIX        m_GlobalTransform;
+  DirectX::XMMATRIX     m_GlobalTransform;
 
-  std::vector<Vertex>      m_Vertices;
-  std::vector<uint16_t>    m_Indices;
-  Buffer                   m_VertexBuffer;
-  Buffer                   m_IndexBuffer;
-  D3D12_VERTEX_BUFFER_VIEW m_VertexBufferView;
-  D3D12_INDEX_BUFFER_VIEW  m_IndexBufferView;
+  std::vector<Vertex>   m_Vertices;
+  std::vector<uint16_t> m_Indices;
+  Buffer                m_VertexBuffer{};
+  Buffer                m_IndexBuffer{};
 
 public:
   BasicApp(
-      HWND window_handle, std::unique_ptr<RenderDevice>&& render_device, std::unique_ptr<PerfCounter>&& perf_counter );
+      HWND window_handle, std::unique_ptr<RenderDevice> render_device, std::unique_ptr<PerfCounter> perf_counter );
 
   void            LoadContent() override;
   void            Update() override;

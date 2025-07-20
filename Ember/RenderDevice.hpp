@@ -1,16 +1,13 @@
 #pragma once
 
-#include "BufferManager.hpp"
+#include "Buffer.hpp"
 #include "DepthBuffer.hpp"
-#include "ResourceHandles.hpp"
 #include "Util/DirectXHeaders.hpp"
 #include "Util/Runtime.hpp"
 #include "Util/ScopedHandle.hpp"
 
 namespace Ember
 {
-class BufferManager;
-
 class RenderDevice
 {
 public:
@@ -51,9 +48,6 @@ private:
   std::vector<uint64_t> m_FenceValues;
   ScopedHandle          m_FenceEvent;
 
-  // Resource Management
-  BufferManager m_BufferManager;
-
 public:
   RenderDevice(
       ComPtr<ID3D12Device2> const&                  device,
@@ -71,22 +65,17 @@ public:
       std::vector<ComPtr<ID3D12CommandAllocator>>&& command_allocators,
       ComPtr<ID3D12Fence> const&                    fence,
       ScopedHandle&&                                fence_event,
-      bool                                          is_tearing_supported,
-      BufferManager&&                               buffer_manager );
+      bool                                          is_tearing_supported );
 
-  ComPtr<ID3D12Device2> GetDevice();
+  ComPtr<ID3D12Device2> GetDevice() noexcept;
 
   static RenderDevice   Create( HWND window_handle, bool use_warp );
 
   void                  ResizeSwapchain( uint32_t width, uint32_t height );
 
   // Buffer Management
-  Buffer                   CreateVertexBuffer( uint32_t size, uint32_t stride );
-  Buffer                   CreateIndexBuffer( uint32_t size, DXGI_FORMAT format );
-  D3D12_VERTEX_BUFFER_VIEW GetVertexBufferView( Buffer const& vertex_buffer ) const;
-  D3D12_INDEX_BUFFER_VIEW  GetIndexBufferView( Buffer const& index_buffer ) const;
-
-  void WriteToBuffer( Buffer const& buffer, uint32_t offset, uint32_t size, void const* data ) const;
+  [[nodiscard]] Buffer      CreateVertexBuffer( uint32_t size, uint32_t stride ) const;
+  [[nodiscard]] Buffer      CreateIndexBuffer( uint32_t size, DXGI_FORMAT format ) const;
 
   [[nodiscard]] DepthBuffer CreateDepthBuffer( uint32_t width, uint32_t height ) const;
 
@@ -97,11 +86,11 @@ public:
   [[nodiscard]] bool IsInit() const;
 
   // Per Frame getters.
-  [[nodiscard]] ID3D12CommandAllocator*       GetCurrentCommandAllocator() const;
-  [[nodiscard]] ID3D12Resource*               GetCurrentBackbuffer() const;
-  [[nodiscard]] ID3D12GraphicsCommandList*    GetGraphicsCommandList() const;
-  [[nodiscard]] CD3DX12_CPU_DESCRIPTOR_HANDLE GetCurrentRTVCpuDescriptorHandle() const;
-  [[nodiscard]] CD3DX12_CPU_DESCRIPTOR_HANDLE GetCurrentDSVCpuDescriptorHandle() const;
+  [[nodiscard]] ID3D12CommandAllocator*       GetCurrentCommandAllocator() const noexcept;
+  [[nodiscard]] ID3D12Resource*               GetCurrentBackbuffer() const noexcept;
+  [[nodiscard]] ID3D12GraphicsCommandList*    GetGraphicsCommandList() const noexcept;
+  [[nodiscard]] CD3DX12_CPU_DESCRIPTOR_HANDLE GetCurrentRTVCpuDescriptorHandle() const noexcept;
+  [[nodiscard]] CD3DX12_CPU_DESCRIPTOR_HANDLE GetCurrentDSVCpuDescriptorHandle() const noexcept;
   void                                        ExecuteCommandList( ID3D12CommandList* command_list ) const;
   void                                        Present();
 

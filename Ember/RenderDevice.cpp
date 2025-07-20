@@ -2,7 +2,7 @@
 
 #include <span>
 
-#include "BufferManager.hpp"
+#include "Buffer.hpp"
 #include "DepthBuffer.hpp"
 #include "Util/DirectXHeaders.hpp"
 #include "Util/HelperUtils.hpp"
@@ -35,8 +35,7 @@ Ember::RenderDevice::RenderDevice(
     std::vector<ComPtr<ID3D12CommandAllocator>>&& command_allocators,
     ComPtr<ID3D12Fence> const&                    fence,
     ScopedHandle&&                                fence_event,
-    bool const                                    is_tearing_supported,
-    BufferManager&&                               buffer_manager )
+    bool const                                    is_tearing_supported )
   : m_Device{ device }
   , m_Allocator{ allocator }
   , m_DirectQueue{ direct_queue }
@@ -52,7 +51,6 @@ Ember::RenderDevice::RenderDevice(
   , m_CommandAllocators{ std::move( command_allocators ) }
   , m_Fence{ fence }
   , m_FenceEvent{ std::move( fence_event ) }
-  , m_BufferManager{ std::move( buffer_manager ) }
 {
   m_FenceValues.resize( kNumFrames, 0 );
   if ( is_tearing_supported )
@@ -61,7 +59,7 @@ Ember::RenderDevice::RenderDevice(
   }
 }
 
-ComPtr<ID3D12Device2> Ember::RenderDevice::GetDevice()
+ComPtr<ID3D12Device2> Ember::RenderDevice::GetDevice() noexcept
 {
   return m_Device;
 }
@@ -296,8 +294,6 @@ Ember::RenderDevice Ember::RenderDevice::Create( HWND window_handle, bool const 
     assert( fence_event && "Failed to create fence event" );
   }
 
-  BufferManager buffer_manager = BufferManager::Create( 1000 );
-
   return RenderDevice{
     device,
     allocator,
@@ -315,7 +311,6 @@ Ember::RenderDevice Ember::RenderDevice::Create( HWND window_handle, bool const 
     fence,
     fence_event,
     is_tearing_supported,
-    std::move( buffer_manager ),
   };
 }
 
@@ -347,30 +342,14 @@ void Ember::RenderDevice::ResizeSwapchain( uint32_t const width, uint32_t const 
   }
 }
 
-Ember::Buffer Ember::RenderDevice::CreateVertexBuffer( uint32_t const size, uint32_t const stride )
+Ember::Buffer Ember::RenderDevice::CreateVertexBuffer( uint32_t const size, uint32_t const stride ) const
 {
-  return m_BufferManager.CreateVertexBuffer( m_Allocator.Get(), size, stride );
+  return Buffer::CreateVertexBuffer( m_Allocator.Get(), size, stride );
 }
 
-Ember::Buffer Ember::RenderDevice::CreateIndexBuffer( uint32_t const size, DXGI_FORMAT const format )
+Ember::Buffer Ember::RenderDevice::CreateIndexBuffer( uint32_t const size, DXGI_FORMAT const format ) const
 {
-  return m_BufferManager.CreateIndexBuffer( m_Allocator.Get(), size, format );
-}
-
-D3D12_VERTEX_BUFFER_VIEW Ember::RenderDevice::GetVertexBufferView( Buffer const& vertex_buffer ) const
-{
-  return m_BufferManager.GetVertexBufferView( vertex_buffer );
-}
-
-D3D12_INDEX_BUFFER_VIEW Ember::RenderDevice::GetIndexBufferView( Buffer const& index_buffer ) const
-{
-  return m_BufferManager.GetIndexBufferView( index_buffer );
-}
-
-void Ember::RenderDevice::WriteToBuffer(
-    Buffer const& buffer, uint32_t const offset, uint32_t const size, void const* data ) const
-{
-  return m_BufferManager.WriteToBuffer( buffer, offset, size, data );
+  return Buffer::CreateIndexBuffer( m_Allocator.Get(), size, format );
 }
 
 Ember::DepthBuffer Ember::RenderDevice::CreateDepthBuffer( uint32_t const width, uint32_t const height ) const
@@ -437,28 +416,28 @@ bool Ember::RenderDevice::IsInit() const
   return m_FenceEvent;
 }
 
-ID3D12CommandAllocator* Ember::RenderDevice::GetCurrentCommandAllocator() const
+ID3D12CommandAllocator* Ember::RenderDevice::GetCurrentCommandAllocator() const noexcept
 {
   return m_CommandAllocators[m_CurrentBackbufferIndex].Get();
 }
 
-ID3D12Resource* Ember::RenderDevice::GetCurrentBackbuffer() const
+ID3D12Resource* Ember::RenderDevice::GetCurrentBackbuffer() const noexcept
 {
   return m_Backbuffers[m_CurrentBackbufferIndex].Get();
 }
 
-ID3D12GraphicsCommandList* Ember::RenderDevice::GetGraphicsCommandList() const
+ID3D12GraphicsCommandList* Ember::RenderDevice::GetGraphicsCommandList() const noexcept
 {
   return m_CommandList.Get();
 }
 
-CD3DX12_CPU_DESCRIPTOR_HANDLE Ember::RenderDevice::GetCurrentRTVCpuDescriptorHandle() const
+CD3DX12_CPU_DESCRIPTOR_HANDLE Ember::RenderDevice::GetCurrentRTVCpuDescriptorHandle() const noexcept
 {
   return CD3DX12_CPU_DESCRIPTOR_HANDLE(
       m_RTVDescriptorHeap->GetCPUDescriptorHandleForHeapStart(), m_CurrentBackbufferIndex, m_RTVDescriptorSize );
 }
 
-CD3DX12_CPU_DESCRIPTOR_HANDLE Ember::RenderDevice::GetCurrentDSVCpuDescriptorHandle() const
+CD3DX12_CPU_DESCRIPTOR_HANDLE Ember::RenderDevice::GetCurrentDSVCpuDescriptorHandle() const noexcept
 {
   return CD3DX12_CPU_DESCRIPTOR_HANDLE( m_DSVDescriptorHeap->GetCPUDescriptorHandleForHeapStart() );
 }
