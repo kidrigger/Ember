@@ -93,6 +93,23 @@ void Ember::BindlessManager::Create(
   };
 }
 
+Ember::CBVHandle Ember::BindlessManager::CreateDescriptorHandle( D3D12_CONSTANT_BUFFER_VIEW_DESC const& cbv_desc )
+{
+  std::lock_guard                     lock_guard{ m_ResourceDescriptorLock };
+
+  uint32_t const                      index = m_ResourceFreeList.Allocate();
+
+  CD3DX12_CPU_DESCRIPTOR_HANDLE const cbv_descriptor_handle{
+    m_ResourceDescriptorHeap->GetCPUDescriptorHandleForHeapStart(),
+    ( int )index,
+    m_ResourceDescriptorIncrement,
+  };
+
+  m_Device->CreateConstantBufferView( &cbv_desc, cbv_descriptor_handle );
+
+  return CBVHandle{ index };
+}
+
 Ember::SRVHandle Ember::BindlessManager::CreateDescriptorHandle(
     ID3D12Resource* resource, D3D12_SHADER_RESOURCE_VIEW_DESC const& srv_desc )
 {
@@ -159,6 +176,12 @@ void Ember::BindlessManager::Free( SRVHandle const handle )
 }
 
 void Ember::BindlessManager::Free( UAVHandle const handle )
+{
+  if ( handle.IsNull() ) return;
+  m_ResourceFreeList.Free( handle.GetInner() );
+}
+
+void Ember::BindlessManager::Free( CBVHandle const handle )
 {
   if ( handle.IsNull() ) return;
   m_ResourceFreeList.Free( handle.GetInner() );

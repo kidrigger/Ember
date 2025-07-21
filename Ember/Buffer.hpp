@@ -38,10 +38,25 @@ public:
   };
   using StorageBufferInfo = std::shared_ptr<StorageBufferInfoImpl>;
 
+  struct ConstantBufferInfoImpl
+  {
+    BindlessManager* Bindless;
+    CBVHandle        AsCBV;
+
+    ConstantBufferInfoImpl( BindlessManager* bindless, CBVHandle cbv_handle );
+    ConstantBufferInfoImpl( ConstantBufferInfoImpl const& other ) = delete;
+    ConstantBufferInfoImpl( ConstantBufferInfoImpl&& other ) noexcept;
+    ConstantBufferInfoImpl& operator=( ConstantBufferInfoImpl const& other ) = delete;
+    ConstantBufferInfoImpl& operator=( ConstantBufferInfoImpl&& other ) noexcept;
+    ~ConstantBufferInfoImpl();
+  };
+  using ConstantBufferInfo = std::shared_ptr<ConstantBufferInfoImpl>;
+
 private:
-  constexpr static uint32_t kBufferTypeMask = 0b11;
-  constexpr static uint32_t kOffsetMask     = ~kBufferTypeMask;
-  using Views = std::variant<D3D12_VERTEX_BUFFER_VIEW, D3D12_INDEX_BUFFER_VIEW, StorageBufferInfo>;
+  using Views = std::variant<D3D12_VERTEX_BUFFER_VIEW, D3D12_INDEX_BUFFER_VIEW, StorageBufferInfo, ConstantBufferInfo>;
+
+  constexpr static uint32_t   kBufferTypeMask = 0b11;
+  constexpr static uint32_t   kOffsetMask     = ~kBufferTypeMask;
 
   ComPtr<ID3D12Resource>      m_Buffer;
   ComPtr<D3D12MA::Allocation> m_Allocation;
@@ -73,6 +88,13 @@ public:
       uint32_t                    size,
       StorageBufferInfo           storage_buffer_info );
 
+  Buffer(
+      ComPtr<ID3D12Resource>      buffer,
+      ComPtr<D3D12MA::Allocation> allocation,
+      uint32_t                    offset,
+      uint32_t                    size,
+      ConstantBufferInfo          constant_buffer_info );
+
   void                                          Write( uint32_t offset, uint32_t size, void const* data ) const;
   [[nodiscard]] ID3D12Resource*                 GetBuffer() const noexcept;
   [[nodiscard]] uint32_t                        GetSize() const noexcept;
@@ -82,21 +104,26 @@ public:
   [[nodiscard]] D3D12_VERTEX_BUFFER_VIEW const& GetVertexBufferView() const noexcept;
   [[nodiscard]] D3D12_INDEX_BUFFER_VIEW const&  GetIndexBufferView() const noexcept;
   [[nodiscard]] SRVHandle                       GetSRVHandle() const;
+  [[nodiscard]] UAVHandle                       GetUAVHandle() const;
+  [[nodiscard]] CBVHandle                       GetCBVHandle() const;
 };
 
 class BufferManager
 {
   std::pmr::synchronized_pool_resource m_MemoryPool;
   BindlessManager*                     m_Bindless{ nullptr };
+  ComPtr<ID3D12Device2>                m_Device;
   ComPtr<D3D12MA::Allocator>           m_GpuAllocator;
 
 public:
   BufferManager() = default;
-  explicit BufferManager( ComPtr<D3D12MA::Allocator> gpu_allocator, BindlessManager* bindless_manager );
+  explicit BufferManager(
+      ComPtr<ID3D12Device2> device, ComPtr<D3D12MA::Allocator> gpu_allocator, BindlessManager* bindless_manager );
 
   Buffer CreateVertexBuffer( uint32_t size, uint32_t stride );
   Buffer CreateIndexBuffer( uint32_t size, DXGI_FORMAT format );
   Buffer CreateStorageBuffer( uint32_t size, uint32_t stride );
+  Buffer CreateConstantBuffer( uint32_t size );
 };
 
 } // namespace Ember

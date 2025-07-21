@@ -1,7 +1,7 @@
 ﻿
 Microsoft Visual Studio Solution File, Format Version 12.00
 # Visual Studio Version 17
-VisualStudioVersion = 17.13.36105.23 d17.13
+VisualStudioVersion = 17.13.36105.23
 MinimumVisualStudioVersion = 10.0.40219.1
 Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "Ember", "Ember\Ember.vcxproj", "{11EAEADB-E456-42D6-A022-7D2093C6AF72}"
 EndProject
@@ -11,6 +11,8 @@ Global
 		Debug|x86 = Debug|x86
 		Release|x64 = Release|x64
 		Release|x86 = Release|x86
+		RenderDoc_Compat|x64 = RenderDoc_Compat|x64
+		RenderDoc_Compat|x86 = RenderDoc_Compat|x86
 	EndGlobalSection
 	GlobalSection(ProjectConfigurationPlatforms) = postSolution
 		{11EAEADB-E456-42D6-A022-7D2093C6AF72}.Debug|x64.ActiveCfg = Debug|x64
@@ -21,6 +23,10 @@ Global
 		{11EAEADB-E456-42D6-A022-7D2093C6AF72}.Release|x64.Build.0 = Release|x64
 		{11EAEADB-E456-42D6-A022-7D2093C6AF72}.Release|x86.ActiveCfg = Release|Win32
 		{11EAEADB-E456-42D6-A022-7D2093C6AF72}.Release|x86.Build.0 = Release|Win32
+		{11EAEADB-E456-42D6-A022-7D2093C6AF72}.RenderDoc_Compat|x64.ActiveCfg = RenderDoc_Compat|x64
+		{11EAEADB-E456-42D6-A022-7D2093C6AF72}.RenderDoc_Compat|x64.Build.0 = RenderDoc_Compat|x64
+		{11EAEADB-E456-42D6-A022-7D2093C6AF72}.RenderDoc_Compat|x86.ActiveCfg = RenderDoc_Compat|Win32
+		{11EAEADB-E456-42D6-A022-7D2093C6AF72}.RenderDoc_Compat|x86.Build.0 = RenderDoc_Compat|Win32
 	EndGlobalSection
 	GlobalSection(SolutionProperties) = preSolution
 		HideSolutionNode = FALSE

@@ -20,6 +20,12 @@ class BasicApp final : public IApp
     DirectX::XMFLOAT3 Color;
   };
 
+  struct Camera
+  {
+    DirectX::XMMATRIX Projection;
+    DirectX::XMMATRIX View;
+  };
+
   HWND                          m_WindowHandle{ nullptr };
   uint32_t                      m_WindowWidth{ 1280 };
   uint32_t                      m_WindowHeight{ 720 };
@@ -33,6 +39,9 @@ class BasicApp final : public IApp
   ComPtr<ID3D12PipelineState> m_PipelineState;
 
   DepthBuffer                 m_DepthBuffer;
+
+  Camera                      m_Camera;
+  Buffer                      m_CameraBuffer;
 
   // Model Specific
   DirectX::XMMATRIX     m_GlobalTransform;

@@ -48,7 +48,7 @@ Ember::RenderDevice::RenderDevice(
   , m_RTVDescriptorSize{ rtv_descriptor_size }
   , m_DSVDescriptorHeap{ std::move( dsv_descriptor_heap ) }
   , m_Bindless{ std::move( bindless_manager ) }
-  , m_BufferManager{ m_Allocator, m_Bindless.get() }
+  , m_BufferManager{ m_Device, m_Allocator, m_Bindless.get() }
   , m_CommandList{ std::move( command_list ) }
   , m_CommandAllocators{ std::move( command_allocators ) }
   , m_Fence{ std::move( fence ) }
@@ -357,9 +357,14 @@ Ember::Buffer Ember::RenderDevice::CreateIndexBuffer( uint32_t const size, DXGI_
   return m_BufferManager.CreateIndexBuffer( size, format );
 }
 
-Ember::Buffer Ember::RenderDevice::CreateStorageBuffer( uint32_t size, uint32_t stride )
+Ember::Buffer Ember::RenderDevice::CreateStorageBuffer( uint32_t const size, uint32_t const stride )
 {
   return m_BufferManager.CreateStorageBuffer( size, stride );
+}
+
+Ember::Buffer Ember::RenderDevice::CreateConstantBuffer( uint32_t const size )
+{
+  return m_BufferManager.CreateConstantBuffer( size );
 }
 
 Ember::DepthBuffer Ember::RenderDevice::CreateDepthBuffer( uint32_t const width, uint32_t const height ) const

@@ -1,31 +1,37 @@
 #include "Triangle.hlsli"
 
-cbuffer BindlessIndex : register(b0, space0)
+cbuffer BindlessIndex : register( b0, space0 )
 {
-  uint g_VertexBufferIndex;
+  uint g_CameraIndex;
 }
-cbuffer Transform : register(b1, space0)
+
+cbuffer Transform : register( b1, space0 )
 {
   float4x4 g_Model;
 }
 
 struct Vertex
 {
-  float3 Position;
-  float3 Color;
+  float3 Position : POSITION;
+  float3 Color : COLOR;
 };
 
-
-VSOutput TriangleVS(uint index : SV_VERTEXID)
+struct Camera
 {
-  VSOutput OUT;
+  float4x4 Projection;
+  float4x4 View;
+};
 
-  StructuredBuffer<Vertex> vbo = ResourceDescriptorHeap[g_VertexBufferIndex];
+VSOutput TriangleVS( Vertex vertex )
+{
+  VSOutput               OUT;
 
-  Vertex vertex = vbo[index];
+  ConstantBuffer<Camera> camera = ResourceDescriptorHeap[g_CameraIndex];
 
-  float3 pos = mul(g_Model, float4(vertex.Position, 1.0f)).xyz;
-  OUT.Position = float4(pos.xy, pos.z + 0.5f, 1.0f);
-  OUT.Color = float4(vertex.Color, 1.0f);
+  float4                 pos    = mul( g_Model, float4( vertex.Position, 1.0f ) );
+  pos                           = mul( camera.View, pos );
+  pos                           = mul( camera.Projection, pos );
+  OUT.Position                  = pos;
+  OUT.Color                     = float4( vertex.Color, 1.0f );
   return OUT;
 }

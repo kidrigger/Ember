@@ -48,6 +48,7 @@ static_assert( sizeof( BindlessHandle ) == sizeof( DWORD32 ) );
 
 TYPED_BINDLESS_HANDLE( SRV );
 TYPED_BINDLESS_HANDLE( UAV );
+TYPED_BINDLESS_HANDLE( CBV );
 TYPED_BINDLESS_HANDLE( Sampler );
 
 } // namespace Ember

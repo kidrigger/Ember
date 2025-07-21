@@ -10,13 +10,14 @@
 - [ ] Setup D3D12 Renderer
 	- [X] Pipeline Creation
 	- [X] Render Triangle
-	- [ ] Render Box
-		- [ ] Switch to Vertex/Index buffer
+	- [X] Render Box
+		- [X] Switch to Vertex/Index buffer
+		- [X] Bindless Vertex Pulling
 	- [ ] Render Texture
 		- [ ] Load Texture
 		- [ ] Render on Screen
-	- [ ] Camera
-		- [ ] Fixed
+	- [X] Camera
+		- [X] Fixed
 		- [ ] With User Control
 	- [ ] Scene Rendering
 		- [ ] Load glTF2.0 Mesh
