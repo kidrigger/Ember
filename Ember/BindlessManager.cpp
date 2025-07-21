@@ -152,6 +152,24 @@ Ember::SamplerHandle Ember::BindlessManager::CreateSamplerHandle( D3D12_SAMPLER_
   return SamplerHandle{ index };
 }
 
+void Ember::BindlessManager::Free( SRVHandle const handle )
+{
+  if ( handle.IsNull() ) return;
+  m_ResourceFreeList.Free( handle.GetInner() );
+}
+
+void Ember::BindlessManager::Free( UAVHandle const handle )
+{
+  if ( handle.IsNull() ) return;
+  m_ResourceFreeList.Free( handle.GetInner() );
+}
+
+void Ember::BindlessManager::Free( SamplerHandle const handle )
+{
+  if ( handle.IsNull() ) return;
+  m_SamplerFreeList.Free( handle.GetInner() );
+}
+
 std::array<ID3D12DescriptorHeap*, 2> Ember::BindlessManager::GetBindlessDescriptorHeaps() const
 {
   return { m_ResourceDescriptorHeap.Get(), m_SamplerDescriptorHeap.Get() };

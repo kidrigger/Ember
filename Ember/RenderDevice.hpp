@@ -43,6 +43,7 @@ private:
   // Descriptor Heaps
   ComPtr<ID3D12DescriptorHeap>     m_DSVDescriptorHeap;
   std::unique_ptr<BindlessManager> m_Bindless;
+  BufferManager                    m_BufferManager;
 
   // Commands
   ComPtr<ID3D12GraphicsCommandList>           m_CommandList;
@@ -81,8 +82,9 @@ public:
   void                  ResizeSwapchain( uint32_t width, uint32_t height );
 
   // Buffer Management
-  [[nodiscard]] Buffer      CreateVertexBuffer( uint32_t size, uint32_t stride ) const;
-  [[nodiscard]] Buffer      CreateIndexBuffer( uint32_t size, DXGI_FORMAT format ) const;
+  [[nodiscard]] Buffer      CreateVertexBuffer( uint32_t size, uint32_t stride );
+  [[nodiscard]] Buffer      CreateIndexBuffer( uint32_t size, DXGI_FORMAT format );
+  [[nodiscard]] Buffer      CreateStorageBuffer( uint32_t size, uint32_t stride );
 
   [[nodiscard]] DepthBuffer CreateDepthBuffer( uint32_t width, uint32_t height ) const;
 

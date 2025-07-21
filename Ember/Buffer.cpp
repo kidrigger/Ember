@@ -3,83 +3,74 @@
 #include "RenderDevice.hpp"
 #include "Util/HelperUtils.hpp"
 
-Ember::Buffer::Buffer(
-    ComPtr<ID3D12Resource>      buffer,
-    ComPtr<D3D12MA::Allocation> allocation,
-    Type const                  type,
-    uint32_t const              offset,
-    uint32_t const              stride,
-    uint32_t const              size )
-  : m_Buffer{ std::move( buffer ) }
-  , m_Allocation{ std::move( allocation ) }
-  , m_VirtualAddress{ m_Buffer->GetGPUVirtualAddress() }
-  , m_OffsetAndType{ offset | ( uint32_t )type }
-  , m_Size{ size }
-{
-  ASSERT_M( ( offset & kBufferTypeMask ) == 0, "Offset should be multiple of 8." );
+Ember::Buffer::StorageBufferInfoImpl::StorageBufferInfoImpl(
+    BindlessManager* const bindless, SRVHandle srv_handle, UAVHandle uav_handle )
+  : Bindless{ bindless }, AsSRV{ std::move( srv_handle ) }, AsUAV{ std::move( uav_handle ) }
+{}
 
-  switch ( type )
-  {
-    case Type::kVertexBuffer:
-    {
-      m_VertexBufferView = {
-        .BufferLocation = m_VirtualAddress + offset,
-        .SizeInBytes    = size,
-        .StrideInBytes  = stride,
-      };
-    }
-    break;
-    case Type::kIndexBuffer:
-    {
-      DXGI_FORMAT format = DXGI_FORMAT_UNKNOWN;
-      if ( stride == 1 )
-      {
-        format = DXGI_FORMAT_R8_UINT;
-      }
-      else if ( stride == 2 )
-      {
-        format = DXGI_FORMAT_R16_UINT;
-      }
-      else if ( stride == 4 )
-      {
-        format = DXGI_FORMAT_R32_UINT;
-      }
-      ASSERT_M( format, "Invalid stride for an index buffer" );
-      m_IndexBufferView = {
-        .BufferLocation = m_VirtualAddress + offset,
-        .SizeInBytes    = size,
-        .Format         = format,
-      };
-    }
-    break;
-    case Type::kStorageBuffer:
-    case Type::kConstantBuffer:
-      ASSERT_M( false, "Unimplemented" );
-      break;
-  }
+Ember::Buffer::StorageBufferInfoImpl::StorageBufferInfoImpl( StorageBufferInfoImpl&& other ) noexcept
+  : Bindless{ other.Bindless }, AsSRV{ other.AsSRV }, AsUAV{ other.AsUAV }
+{
+  other.AsSRV = {};
+  other.AsUAV = {};
+}
+
+Ember::Buffer::StorageBufferInfoImpl& Ember::Buffer::StorageBufferInfoImpl::operator=(
+    StorageBufferInfoImpl&& other ) noexcept
+{
+  if ( this == &other ) return *this;
+  std::swap( Bindless, other.Bindless );
+  std::swap( AsSRV, other.AsSRV );
+  std::swap( AsUAV, other.AsUAV );
+  return *this;
+}
+
+Ember::Buffer::StorageBufferInfoImpl::~StorageBufferInfoImpl()
+{
+  if ( not Bindless ) return;
+
+  Bindless->Free( AsSRV );
+  Bindless->Free( AsUAV );
 }
 
 Ember::Buffer::Buffer(
     ComPtr<ID3D12Resource>      buffer,
     ComPtr<D3D12MA::Allocation> allocation,
-    Type                        type,
     uint32_t const              offset,
-    DXGI_FORMAT const           format,
-    uint32_t const              size )
+    uint32_t const              size,
+    D3D12_VERTEX_BUFFER_VIEW    vertex_buffer_view )
   : m_Buffer{ std::move( buffer ) }
   , m_Allocation{ std::move( allocation ) }
-  , m_VirtualAddress{ m_Buffer->GetGPUVirtualAddress() }
-  , m_OffsetAndType{ offset | ( uint32_t )type }
+  , m_OffsetAndType{ offset | ( uint32_t )Type::kVertexBuffer }
   , m_Size{ size }
-{
-  ASSERT( type == Type::kIndexBuffer );
+  , m_Views{ vertex_buffer_view }
+{}
 
-  m_IndexBufferView = {
-    .BufferLocation = m_VirtualAddress + offset,
-    .SizeInBytes    = size,
-    .Format         = format,
-  };
-}
+Ember::Buffer::Buffer(
+    ComPtr<ID3D12Resource>      buffer,
+    ComPtr<D3D12MA::Allocation> allocation,
+    uint32_t const              offset,
+    uint32_t const              size,
+    D3D12_INDEX_BUFFER_VIEW     index_buffer_view )
+  : m_Buffer{ std::move( buffer ) }
+  , m_Allocation{ std::move( allocation ) }
+  , m_OffsetAndType{ offset | ( uint32_t )Type::kIndexBuffer }
+  , m_Size{ size }
+  , m_Views{ index_buffer_view }
+{}
+
+Ember::Buffer::Buffer(
+    ComPtr<ID3D12Resource>      buffer,
+    ComPtr<D3D12MA::Allocation> allocation,
+    uint32_t const              offset,
+    uint32_t const              size,
+    StorageBufferInfo           storage_buffer_info )
+  : m_Buffer{ std::move( buffer ) }
+  , m_Allocation{ std::move( allocation ) }
+  , m_OffsetAndType{ offset | ( uint32_t )Type::kStorageBuffer }
+  , m_Size{ size }
+  , m_Views{ storage_buffer_info }
+{}
 
 void Ember::Buffer::Write( uint32_t const offset, uint32_t const size, void const* data ) const
 {
@@ -124,7 +115,7 @@ D3D12_VERTEX_BUFFER_VIEW const& Ember::Buffer::GetVertexBufferView() const noexc
   ASSERT( m_Buffer );
   ASSERT( GetType() == Type::kVertexBuffer );
 
-  return m_VertexBufferView;
+  return std::get<D3D12_VERTEX_BUFFER_VIEW>( m_Views );
 }
 
 D3D12_INDEX_BUFFER_VIEW const& Ember::Buffer::GetIndexBufferView() const noexcept
@@ -132,10 +123,39 @@ D3D12_INDEX_BUFFER_VIEW const& Ember::Buffer::GetIndexBufferView() const noexcep
   ASSERT( m_Buffer );
   ASSERT( GetType() == Type::kIndexBuffer );
 
-  return m_IndexBufferView;
+  return std::get<D3D12_INDEX_BUFFER_VIEW>( m_Views );
 }
 
-void Ember::AllocateBufferImpl(
+Ember::SRVHandle Ember::Buffer::GetSRVHandle() const
+{
+  ASSERT( m_Buffer );
+  ASSERT( GetType() == Type::kStorageBuffer );
+
+  return std::get<StorageBufferInfo>( m_Views )->AsSRV;
+}
+
+Ember::BufferManager::BufferManager( ComPtr<D3D12MA::Allocator> gpu_allocator, BindlessManager* bindless_manager )
+  : m_Bindless{ bindless_manager }, m_GpuAllocator{ std::move( gpu_allocator ) }
+{}
+
+namespace
+{
+void AllocateUnorderedAccessBufferImpl(
+    D3D12MA::Allocator* allocator, uint32_t const size, D3D12MA::Allocation** allocation, ID3D12Resource** resource )
+{
+  D3D12MA::ALLOCATION_DESC constexpr allocation_desc = {
+    .Flags    = D3D12MA::ALLOCATION_FLAG_NONE,
+    .HeapType = D3D12_HEAP_TYPE_GPU_UPLOAD,
+  };
+
+  CD3DX12_RESOURCE_DESC1 const buffer_desc =
+      CD3DX12_RESOURCE_DESC1::Buffer( size, D3D12_RESOURCE_FLAG_ALLOW_UNORDERED_ACCESS );
+
+  ERR_ABORT( allocator->CreateResource2(
+      &allocation_desc, &buffer_desc, D3D12_RESOURCE_STATE_COMMON, nullptr, allocation, IID_PPV_ARGS( resource ) ) );
+}
+
+void AllocateBufferImpl(
     D3D12MA::Allocator* allocator, uint32_t const size, D3D12MA::Allocation** allocation, ID3D12Resource** resource )
 {
   D3D12MA::ALLOCATION_DESC constexpr allocation_desc = {
@@ -148,23 +168,57 @@ void Ember::AllocateBufferImpl(
   ERR_ABORT( allocator->CreateResource2(
       &allocation_desc, &buffer_desc, D3D12_RESOURCE_STATE_COMMON, nullptr, allocation, IID_PPV_ARGS( resource ) ) );
 }
+} // namespace
 
-Ember::Buffer Ember::Buffer::CreateVertexBuffer(
-    D3D12MA::Allocator* allocator, uint32_t const size, uint32_t const stride )
+Ember::Buffer Ember::BufferManager::CreateVertexBuffer( uint32_t const size, uint32_t const stride )
 {
   ComPtr<ID3D12Resource>      buffer;
   ComPtr<D3D12MA::Allocation> allocation;
-  AllocateBufferImpl( allocator, size, &allocation, &buffer );
+  AllocateBufferImpl( m_GpuAllocator.Get(), size, &allocation, &buffer );
 
-  return Buffer{ std::move( buffer ), std::move( allocation ), Buffer::Type::kVertexBuffer, 0, stride, size };
+  D3D12_VERTEX_BUFFER_VIEW const vertex_buffer_view = {
+    .BufferLocation = buffer->GetGPUVirtualAddress(),
+    .SizeInBytes    = size,
+    .StrideInBytes  = stride,
+  };
+
+  return Buffer{ std::move( buffer ), std::move( allocation ), 0, size, vertex_buffer_view };
 }
 
-Ember::Buffer Ember::Buffer::CreateIndexBuffer(
-    D3D12MA::Allocator* allocator, uint32_t const size, DXGI_FORMAT const format )
+Ember::Buffer Ember::BufferManager::CreateIndexBuffer( uint32_t const size, DXGI_FORMAT const format )
 {
   ComPtr<ID3D12Resource>      buffer;
   ComPtr<D3D12MA::Allocation> allocation;
-  AllocateBufferImpl( allocator, size, &allocation, &buffer );
+  AllocateBufferImpl( m_GpuAllocator.Get(), size, &allocation, &buffer );
 
-  return Buffer{ std::move( buffer ), std::move( allocation ), Buffer::Type::kIndexBuffer, 0, format, size };
+  D3D12_INDEX_BUFFER_VIEW const index_buffer_view = {
+    .BufferLocation = buffer->GetGPUVirtualAddress(),
+    .SizeInBytes    = size,
+    .Format         = format,
+  };
+
+  return Buffer{ std::move( buffer ), std::move( allocation ), 0, size, index_buffer_view };
+}
+
+Ember::Buffer Ember::BufferManager::CreateStorageBuffer( uint32_t size, uint32_t stride )
+{
+  ASSERT( size % stride == 0 );
+
+  ComPtr<ID3D12Resource>      buffer;
+  ComPtr<D3D12MA::Allocation> allocation;
+  AllocateUnorderedAccessBufferImpl( m_GpuAllocator.Get(), size, &allocation, &buffer );
+
+  CD3DX12_SHADER_RESOURCE_VIEW_DESC const srv_desc =
+      CD3DX12_SHADER_RESOURCE_VIEW_DESC::StructuredBuffer( size / stride, stride );
+
+  CD3DX12_UNORDERED_ACCESS_VIEW_DESC const uav_desc =
+      CD3DX12_UNORDERED_ACCESS_VIEW_DESC::StructuredBuffer( size / stride, stride );
+
+  SRVHandle srv_handle   = m_Bindless->CreateDescriptorHandle( buffer.Get(), srv_desc );
+  UAVHandle uav_handle   = m_Bindless->CreateDescriptorHandle( buffer.Get(), uav_desc );
+
+  auto      storage_info = std::allocate_shared<Buffer::StorageBufferInfoImpl>(
+      std::pmr::polymorphic_allocator<byte>{ &m_MemoryPool }, m_Bindless, srv_handle, uav_handle );
+
+  return Buffer{ std::move( buffer ), std::move( allocation ), 0, size, storage_info };
 }

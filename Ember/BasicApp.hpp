@@ -41,7 +41,6 @@ class BasicApp final : public IApp
   std::vector<uint16_t> m_Indices;
   Buffer                m_VertexBuffer;
   Buffer                m_IndexBuffer;
-  SRVHandle             m_VertexBufferSRV;
 
 public:
   BasicApp(

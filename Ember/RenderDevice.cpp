@@ -48,6 +48,7 @@ Ember::RenderDevice::RenderDevice(
   , m_RTVDescriptorSize{ rtv_descriptor_size }
   , m_DSVDescriptorHeap{ std::move( dsv_descriptor_heap ) }
   , m_Bindless{ std::move( bindless_manager ) }
+  , m_BufferManager{ m_Allocator, m_Bindless.get() }
   , m_CommandList{ std::move( command_list ) }
   , m_CommandAllocators{ std::move( command_allocators ) }
   , m_Fence{ std::move( fence ) }
@@ -346,14 +347,19 @@ void Ember::RenderDevice::ResizeSwapchain( uint32_t const width, uint32_t const 
   }
 }
 
-Ember::Buffer Ember::RenderDevice::CreateVertexBuffer( uint32_t const size, uint32_t const stride ) const
+Ember::Buffer Ember::RenderDevice::CreateVertexBuffer( uint32_t const size, uint32_t const stride )
 {
-  return Buffer::CreateVertexBuffer( m_Allocator.Get(), size, stride );
+  return m_BufferManager.CreateVertexBuffer( size, stride );
 }
 
-Ember::Buffer Ember::RenderDevice::CreateIndexBuffer( uint32_t const size, DXGI_FORMAT const format ) const
+Ember::Buffer Ember::RenderDevice::CreateIndexBuffer( uint32_t const size, DXGI_FORMAT const format )
 {
-  return Buffer::CreateIndexBuffer( m_Allocator.Get(), size, format );
+  return m_BufferManager.CreateIndexBuffer( size, format );
+}
+
+Ember::Buffer Ember::RenderDevice::CreateStorageBuffer( uint32_t size, uint32_t stride )
+{
+  return m_BufferManager.CreateStorageBuffer( size, stride );
 }
 
 Ember::DepthBuffer Ember::RenderDevice::CreateDepthBuffer( uint32_t const width, uint32_t const height ) const

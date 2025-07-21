@@ -5,6 +5,7 @@
 #include <queue>
 
 #include "BindlessHandle.hpp"
+#include "Buffer.hpp"
 #include "Util/DirectXHeaders.hpp"
 
 namespace Ember
@@ -52,13 +53,19 @@ public:
   static void Create(
       BindlessManager* bindless, ComPtr<ID3D12Device2> device, uint32_t max_resources, uint32_t max_samplers );
 
-  SRVHandle CreateDescriptorHandle( ID3D12Resource* resource, D3D12_SHADER_RESOURCE_VIEW_DESC const& srv_desc );
-  UAVHandle CreateDescriptorHandle( ID3D12Resource* resource, D3D12_UNORDERED_ACCESS_VIEW_DESC const& uav_desc );
-  UAVHandle CreateDescriptorHandle(
+  [[nodiscard]] SRVHandle CreateDescriptorHandle(
+      ID3D12Resource* resource, D3D12_SHADER_RESOURCE_VIEW_DESC const& srv_desc );
+  [[nodiscard]] UAVHandle CreateDescriptorHandle(
+      ID3D12Resource* resource, D3D12_UNORDERED_ACCESS_VIEW_DESC const& uav_desc );
+  [[nodiscard]] UAVHandle CreateDescriptorHandle(
       ID3D12Resource* resource, ID3D12Resource* counter, D3D12_UNORDERED_ACCESS_VIEW_DESC const& uav_desc );
 
-  SamplerHandle                        CreateSamplerHandle( D3D12_SAMPLER_DESC const& sampler_desc );
+  [[nodiscard]] SamplerHandle                        CreateSamplerHandle( D3D12_SAMPLER_DESC const& sampler_desc );
 
-  std::array<ID3D12DescriptorHeap*, 2> GetBindlessDescriptorHeaps() const;
+  void                                               Free( SRVHandle handle );
+  void                                               Free( UAVHandle handle );
+  void                                               Free( SamplerHandle handle );
+
+  [[nodiscard]] std::array<ID3D12DescriptorHeap*, 2> GetBindlessDescriptorHeaps() const;
 };
 } // namespace Ember

@@ -217,15 +217,11 @@ void Ember::BasicApp::LoadContent()
     0, 1, 2, 0, 2, 3, 4, 6, 5, 4, 7, 6, 4, 5, 1, 4, 1, 0, 3, 2, 6, 3, 6, 7, 1, 5, 6, 1, 6, 2, 4, 0, 3, 4, 3, 7,
   };
 
-  m_VertexBuffer = m_RenderDevice->CreateVertexBuffer( ByteSizeOf( m_Vertices ), sizeof( Vertex ) );
+  m_VertexBuffer = m_RenderDevice->CreateStorageBuffer( ByteSizeOf( m_Vertices ), sizeof( Vertex ) );
   m_IndexBuffer  = m_RenderDevice->CreateIndexBuffer( ByteSizeOf( m_Indices ), DXGI_FORMAT_R16_UINT );
 
   m_VertexBuffer.Write( 0, ByteSizeOf( m_Vertices ), m_Vertices.data() );
   m_IndexBuffer.Write( 0, ByteSizeOf( m_Indices ), m_Indices.data() );
-
-  m_VertexBufferSRV = m_RenderDevice->CreateBindlessHandle(
-      m_VertexBuffer.GetBuffer(),
-      CD3DX12_SHADER_RESOURCE_VIEW_DESC::StructuredBuffer( ( UINT )m_Vertices.size(), sizeof( Vertex ), 0 ) );
 
   ComPtr<ID3DBlob> vertex_shader_blob;
   ERR_ABORT( D3DReadFileToBlob( L"TriangleVS.cso", &vertex_shader_blob ) );
@@ -401,7 +397,7 @@ void Ember::BasicApp::Render()
 
   command_list->IASetIndexBuffer( &m_IndexBuffer.GetIndexBufferView() );
   // command_list->IASetVertexBuffers( 0, 1, &m_VertexBuffer.GetVertexBufferView() );
-  command_list->SetGraphicsRoot32BitConstant( 0, ( UINT )m_VertexBufferSRV, 0 );
+  command_list->SetGraphicsRoot32BitConstant( 0, ( UINT )m_VertexBuffer.GetSRVHandle(), 0 );
 
   for ( int i = -2; i <= 2; ++i )
   {
