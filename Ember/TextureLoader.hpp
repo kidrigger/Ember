@@ -36,9 +36,10 @@ class TextureLoader
 
   using TextureCache = std::pmr::unordered_map<std::pmr::wstring, Texture>;
 
-  BindlessManager*                       m_BindlessManager;
   ComPtr<ID3D12Device2>                  m_Device;
   ComPtr<D3D12MA::Allocator>             m_Allocator;
+  BindlessManager*                       m_BindlessManager;
+  TextureManager*                        m_TextureManager;
   std::pmr::unsynchronized_pool_resource m_CachePool;
   TextureCache                           m_Cache;
   std::mutex                             m_LoadLock;
@@ -57,9 +58,10 @@ public:
   TextureLoader() = default;
 
   TextureLoader(
-      BindlessManager*           bindless_manager,
       ComPtr<ID3D12Device2>      device,
       ComPtr<D3D12MA::Allocator> allocator,
+      BindlessManager*           bindless_manager,
+      TextureManager*            texture_manager,
       Context                    copy_context,
       uint32_t                   upload_frame_count );
 
@@ -68,6 +70,7 @@ public:
       ComPtr<ID3D12Device2>      device,
       ComPtr<D3D12MA::Allocator> allocator,
       BindlessManager*           bindless_manager,
+      TextureManager*            texture_manager,
       uint32_t                   upload_frame_count );
 
   bool             TryLoadTexture( Texture* texture, wchar_t const* filename );

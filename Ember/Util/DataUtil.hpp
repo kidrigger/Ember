@@ -5,17 +5,17 @@
 namespace Ember
 {
 
-uint32_t ByteSizeOf( std::ranges::contiguous_range auto& range )
+constexpr uint32_t ByteSizeOf( std::ranges::contiguous_range auto& range )
 {
   return ( uint32_t )( std::ranges::size( range ) * sizeof( std::ranges::range_value_t<decltype( range )> ) );
 }
 
-uint32_t CountOf( std::ranges::sized_range auto& range )
+constexpr uint32_t CountOf( std::ranges::sized_range auto& range )
 {
   return ( uint32_t )std::ranges::size( range );
 }
 
-auto DataOf( std::ranges::contiguous_range auto& range )
+constexpr auto DataOf( std::ranges::contiguous_range auto& range )
 {
   return std::ranges::data( range );
 }

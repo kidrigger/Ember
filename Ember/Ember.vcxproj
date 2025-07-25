@@ -209,7 +209,6 @@
   </ItemDefinitionGroup>
   <ItemGroup>
     <ClCompile Include="BasicApp.cpp" />
-    <ClCompile Include="BindlessHandle.cpp" />
     <ClCompile Include="BindlessManager.cpp" />
     <ClCompile Include="Buffer.cpp" />
     <ClCompile Include="DepthBuffer.cpp" />

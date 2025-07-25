@@ -183,10 +183,10 @@ Ember::BasicApp Ember::BasicApp::Create( HINSTANCE const instance_handle )
   HWND const window_handle =
       CreateWindow( window_class_name, instance_handle, L"Learning DirectX 12", client_width, client_height );
 
-  auto render_device = std::make_unique<RenderDevice>();
+  auto render_device = std::make_unique_for_overwrite<RenderDevice>();
   RenderDevice::Create( render_device.get(), window_handle, use_warp );
 
-  auto texture_loader = std::make_unique<TextureLoader>();
+  auto texture_loader = std::make_unique_for_overwrite<TextureLoader>();
   render_device->CreateTextureLoader( texture_loader.get() );
 
   auto perf_counter = std::make_unique<PerfCounter>();
@@ -272,21 +272,20 @@ void Ember::BasicApp::LoadContent()
   m_IndexBuffer.Write( 0, ByteSizeOf( m_Indices ), DataOf( m_Indices ) );
 
   ASSERT( m_TextureLoader->TryLoadTexture( &m_CubeTexture, L"container2.png" ) );
-  auto          texture_load_receipt = m_TextureLoader->EndBatch();
+  auto texture_load_receipt = m_TextureLoader->EndBatch();
 
-  SamplerHandle sampler_handle       = m_RenderDevice->CreateSamplerHandle( {
-            .Filter         = D3D12_FILTER_ANISOTROPIC,
-            .AddressU       = D3D12_TEXTURE_ADDRESS_MODE_WRAP,
-            .AddressV       = D3D12_TEXTURE_ADDRESS_MODE_WRAP,
-            .AddressW       = D3D12_TEXTURE_ADDRESS_MODE_WRAP,
-            .MipLODBias     = 0.0f,
-            .MaxAnisotropy  = D3D12_DEFAULT_MAX_ANISOTROPY,
-            .ComparisonFunc = D3D12_COMPARISON_FUNC_NONE,
-            .BorderColor    = D3D12_STATIC_BORDER_COLOR_OPAQUE_BLACK,
-            .MinLOD         = 0.0f,
-            .MaxLOD         = 1.0f,
+  m_Sampler                 = m_RenderDevice->CreateSamplerHandle( {
+                      .Filter         = D3D12_FILTER_ANISOTROPIC,
+                      .AddressU       = D3D12_TEXTURE_ADDRESS_MODE_WRAP,
+                      .AddressV       = D3D12_TEXTURE_ADDRESS_MODE_WRAP,
+                      .AddressW       = D3D12_TEXTURE_ADDRESS_MODE_WRAP,
+                      .MipLODBias     = 0.0f,
+                      .MaxAnisotropy  = D3D12_DEFAULT_MAX_ANISOTROPY,
+                      .ComparisonFunc = D3D12_COMPARISON_FUNC_NONE,
+                      .BorderColor    = D3D12_STATIC_BORDER_COLOR_OPAQUE_BLACK,
+                      .MinLOD         = 0.0f,
+                      .MaxLOD         = 1.0f,
   } );
-  ASSERT( 0 == ( UINT )sampler_handle );
 
   ComPtr<ID3DBlob> vertex_shader_blob;
   ERR_ABORT( D3DReadFileToBlob( L"TriangleVS.cso", &vertex_shader_blob ) );
@@ -311,7 +310,7 @@ void Ember::BasicApp::LoadContent()
       D3D12_ROOT_SIGNATURE_FLAG_DENY_DOMAIN_SHADER_ROOT_ACCESS | D3D12_ROOT_SIGNATURE_FLAG_DENY_HULL_SHADER_ROOT_ACCESS;
 
   CD3DX12_ROOT_PARAMETER1 root_parameters[2];
-  root_parameters[0].InitAsConstants( 2, 0, 0, D3D12_SHADER_VISIBILITY_ALL );
+  root_parameters[0].InitAsConstants( 3, 0, 0, D3D12_SHADER_VISIBILITY_ALL );
   root_parameters[1].InitAsConstants( sizeof( DirectX::XMMATRIX ) / 4, 1, 0, D3D12_SHADER_VISIBILITY_VERTEX );
 
   CD3DX12_VERSIONED_ROOT_SIGNATURE_DESC root_signature_desc;
@@ -473,6 +472,7 @@ void Ember::BasicApp::Render()
   command_list->IASetVertexBuffers( 0, 1, &m_VertexBuffer.GetVertexBufferView() );
   command_list->SetGraphicsRoot32BitConstant( 0, ( UINT )m_CameraBuffer.GetCBVHandle(), 0 );
   command_list->SetGraphicsRoot32BitConstant( 0, ( UINT )m_CubeTexture.GetSRVHandle(), 1 );
+  command_list->SetGraphicsRoot32BitConstant( 0, ( UINT )m_Sampler, 2 );
 
   for ( int i = -2; i <= 2; ++i )
   {

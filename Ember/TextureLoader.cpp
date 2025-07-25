@@ -25,14 +25,16 @@ void Ember::TextureLoader::UploadBatch::ClearResources()
 }
 
 Ember::TextureLoader::TextureLoader(
-    BindlessManager*           bindless_manager,
     ComPtr<ID3D12Device2>      device,
     ComPtr<D3D12MA::Allocator> allocator,
+    BindlessManager*           bindless_manager,
+    TextureManager*            texture_manager,
     Context                    copy_context,
     uint32_t const             upload_frame_count )
-  : m_BindlessManager{ bindless_manager }
-  , m_Device{ std::move( device ) }
+  : m_Device{ std::move( device ) }
   , m_Allocator{ std::move( allocator ) }
+  , m_BindlessManager{ bindless_manager }
+  , m_TextureManager{ texture_manager }
   , m_CopyContext{ std::move( copy_context ) }
 {
   m_UploadBatches.reserve( upload_frame_count );
@@ -49,13 +51,15 @@ void Ember::TextureLoader::Create(
     ComPtr<ID3D12Device2>      device,
     ComPtr<D3D12MA::Allocator> allocator,
     BindlessManager*           bindless_manager,
+    TextureManager*            texture_manager,
     uint32_t const             upload_frame_count )
 {
   Context transfer_context;
   Context::Create( &transfer_context, device, D3D12_COMMAND_LIST_TYPE_COPY );
 
   new ( loader ) TextureLoader{
-    bindless_manager, std::move( device ), std::move( allocator ), std::move( transfer_context ), upload_frame_count,
+    std::move( device ), std::move( allocator ),        bindless_manager,
+    texture_manager,     std::move( transfer_context ), upload_frame_count,
   };
 }
 
@@ -74,43 +78,12 @@ bool Ember::TextureLoader::TryLoadTexture( Texture* texture, wchar_t const* file
   DirectX::ScratchImage scratch_image;
   ERR_FAIL_RET_V( LoadFromWICFile( filename, DirectX::WIC_FLAGS_DEFAULT_SRGB, &metadata, scratch_image ), false );
 
-  std::span                   images{ scratch_image.GetImages(), scratch_image.GetImageCount() };
+  std::span images{ scratch_image.GetImages(), scratch_image.GetImageCount() };
 
-  ComPtr<ID3D12Resource>      texture_res;
-  ComPtr<D3D12MA::Allocation> texture_alloc;
-  {
-    CD3DX12_RESOURCE_DESC const resource_desc =
-        CD3DX12_RESOURCE_DESC::Tex2D( metadata.format, ( UINT )metadata.width, ( UINT )metadata.height );
-#if not defined( RENDERDOC_COMPAT )
-    D3D12MA::ALLOCATION_DESC const allocation_desc = {
-      .Flags    = D3D12MA::ALLOCATION_FLAG_NONE,
-      .HeapType = D3D12_HEAP_TYPE_DEFAULT,
-    };
+  new ( texture ) Texture{ m_TextureManager->CreateTexture2D(
+      metadata.format, ( uint32_t )metadata.width, ( uint32_t )metadata.height ) };
 
-    ERR_FAIL_RET_V(
-        m_Allocator->CreateResource(
-            &allocation_desc,
-            &resource_desc,
-            D3D12_RESOURCE_STATE_COPY_DEST,
-            nullptr,
-            &texture_alloc,
-            IID_PPV_ARGS( &texture_res ) ),
-        false );
-#else
-    auto heap_properties = CD3DX12_HEAP_PROPERTIES{ D3D12_HEAP_TYPE_DEFAULT };
-    ERR_FAIL_RET_V(
-        m_Device->CreateCommittedResource(
-            &heap_properties,
-            D3D12_HEAP_FLAG_NONE,
-            &resource_desc,
-            D3D12_RESOURCE_STATE_COPY_DEST,
-            nullptr,
-            IID_PPV_ARGS( &texture_res ) ),
-        false );
-#endif
-  }
-
-  uint64_t const              req_size = GetRequiredIntermediateSize( texture_res.Get(), 0, 1 );
+  uint64_t const              req_size = GetRequiredIntermediateSize( texture->GetTexture(), 0, 1 );
 
   ComPtr<ID3D12Resource>      staging_res;
   ComPtr<D3D12MA::Allocation> staging_alloc;
@@ -164,7 +137,7 @@ bool Ember::TextureLoader::TryLoadTexture( Texture* texture, wchar_t const* file
 
   UpdateSubresources(
       m_CurrentCommandList.Get(),
-      texture_res.Get(),
+      texture->GetTexture(),
       staging_res.Get(),
       0,
       0,
@@ -172,30 +145,10 @@ bool Ember::TextureLoader::TryLoadTexture( Texture* texture, wchar_t const* file
       DataOf( subresources ) );
 
 #if not defined( RENDERDOC_COMPAT )
-  m_UploadBatches[m_CurrentUploadBatch].PushUpload( texture_res, staging_alloc );
+  m_UploadBatches[m_CurrentUploadBatch].PushUpload( texture->GetTexture(), staging_alloc );
 #else
-  m_UploadBatches[m_CurrentUploadBatch].PushUpload( texture_res, staging_res );
+  m_UploadBatches[m_CurrentUploadBatch].PushUpload( texture->GetTexture(), staging_res );
 #endif
-
-  SRVHandle srv_handle = m_BindlessManager->CreateDescriptorHandle(
-      texture_res.Get(),
-      D3D12_SHADER_RESOURCE_VIEW_DESC{
-          .Format                  = metadata.format,
-          .ViewDimension           = D3D12_SRV_DIMENSION_TEXTURE2D,
-          .Shader4ComponentMapping = D3D12_DEFAULT_SHADER_4_COMPONENT_MAPPING,
-          .Texture2D               = {
-                                      .MostDetailedMip     = 0,
-                                      .MipLevels           = 1,
-                                      .PlaneSlice          = 0,
-                                      .ResourceMinLODClamp = 0,
-                                      },
-  } );
-
-  new ( texture ) Texture{
-    texture_res,
-    texture_alloc,
-    srv_handle,
-  };
 
   m_Cache[filename] = *texture;
   // [1] Until here.

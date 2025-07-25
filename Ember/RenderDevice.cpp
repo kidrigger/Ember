@@ -5,6 +5,7 @@
 #include "BindlessManager.hpp"
 #include "Buffer.hpp"
 #include "DepthBuffer.hpp"
+#include "Util/DataUtil.hpp"
 #include "Util/DirectXHeaders.hpp"
 #include "Util/HelperUtils.hpp"
 #include "Util/Runtime.hpp"
@@ -44,6 +45,7 @@ Ember::RenderDevice::RenderDevice(
   , m_DSVDescriptorHeap{ std::move( dsv_descriptor_heap ) }
   , m_Bindless{ std::move( bindless_manager ) }
   , m_BufferManager{ m_Device, m_Allocator, m_Bindless.get() }
+  , m_TextureManager{ m_Device, m_Allocator, m_Bindless.get() }
   , m_DirectContext{ std::move( direct_context ) }
 {
   auto const always_true_receipt = m_DirectContext.CreateReceipt();
@@ -158,10 +160,10 @@ void Ember::RenderDevice::Create( RenderDevice* render_device, HWND window_handl
 
       D3D12_INFO_QUEUE_FILTER new_filter = {
         .DenyList = {
-          .NumSeverities = COUNTOF(severities),
-          .pSeverityList = severities,
-          .NumIDs = COUNTOF(deny_ids),
-          .pIDList = deny_ids,
+          .NumSeverities = CountOf( severities ),
+          .pSeverityList = DataOf( severities ),
+          .NumIDs = CountOf( deny_ids ),
+          .pIDList = DataOf( deny_ids ),
         },
       };
 
@@ -240,7 +242,7 @@ void Ember::RenderDevice::Create( RenderDevice* render_device, HWND window_handl
     ERR_ABORT( device->CreateDescriptorHeap( &desc, IID_PPV_ARGS( &dsv_descriptor_heap ) ) );
   }
 
-  auto bindless_manager = std::make_unique<BindlessManager>();
+  auto bindless_manager = std::make_unique_for_overwrite<BindlessManager>();
   BindlessManager::Create( bindless_manager.get(), device, 10'000, 100 );
 
   new ( render_device ) RenderDevice{
@@ -285,9 +287,9 @@ void Ember::RenderDevice::ResizeSwapchain( uint32_t const width, uint32_t const 
   }
 }
 
-void Ember::RenderDevice::CreateTextureLoader( TextureLoader* loader ) const
+void Ember::RenderDevice::CreateTextureLoader( TextureLoader* loader )
 {
-  TextureLoader::Create( loader, m_Device, m_Allocator, m_Bindless.get(), 3 );
+  TextureLoader::Create( loader, m_Device, m_Allocator, m_Bindless.get(), &m_TextureManager, 3 );
 }
 
 Ember::Buffer Ember::RenderDevice::CreateVertexBuffer( uint32_t const size, uint32_t const stride )

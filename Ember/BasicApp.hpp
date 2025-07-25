@@ -54,6 +54,7 @@ class BasicApp final : public IApp
   Buffer                m_VertexBuffer;
   Buffer                m_IndexBuffer;
   Texture               m_CubeTexture;
+  SamplerHandle         m_Sampler;
 
 public:
   BasicApp(
