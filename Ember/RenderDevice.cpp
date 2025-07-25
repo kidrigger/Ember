@@ -21,25 +21,20 @@ void UpdateRenderTargetViews(
     std::span<ComPtr<ID3D12Resource>> const& backbuffers );
 
 Ember::RenderDevice::RenderDevice(
-    ComPtr<ID3D12Device2>                       device,
-    ComPtr<D3D12MA::Allocator>                  allocator,
-    ComPtr<ID3D12CommandQueue>                  direct_queue,
-    uint32_t const                              swapchain_width,
-    uint32_t const                              swapchain_height,
-    ComPtr<IDXGISwapChain4>                     swapchain,
-    std::vector<ComPtr<ID3D12Resource>>         backbuffers,
-    ComPtr<ID3D12DescriptorHeap>                rtv_descriptor_heap,
-    uint32_t const                              rtv_descriptor_size,
-    ComPtr<ID3D12DescriptorHeap>                dsv_descriptor_heap,
-    std::unique_ptr<BindlessManager>            bindless_manager,
-    ComPtr<ID3D12GraphicsCommandList>           command_list,
-    std::vector<ComPtr<ID3D12CommandAllocator>> command_allocators,
-    ComPtr<ID3D12Fence>                         fence,
-    ScopedHandle                                fence_event,
-    bool const                                  is_tearing_supported )
+    ComPtr<ID3D12Device2>               device,
+    ComPtr<D3D12MA::Allocator>          allocator,
+    uint32_t const                      swapchain_width,
+    uint32_t const                      swapchain_height,
+    ComPtr<IDXGISwapChain4>             swapchain,
+    std::vector<ComPtr<ID3D12Resource>> backbuffers,
+    ComPtr<ID3D12DescriptorHeap>        rtv_descriptor_heap,
+    uint32_t const                      rtv_descriptor_size,
+    ComPtr<ID3D12DescriptorHeap>        dsv_descriptor_heap,
+    std::unique_ptr<BindlessManager>    bindless_manager,
+    Context                             direct_context,
+    bool const                          is_tearing_supported )
   : m_Device{ std::move( device ) }
   , m_Allocator{ std::move( allocator ) }
-  , m_DirectQueue{ std::move( direct_queue ) }
   , m_SwapchainWidth{ swapchain_width }
   , m_SwapchainHeight{ swapchain_height }
   , m_Swapchain{ std::move( swapchain ) }
@@ -49,12 +44,11 @@ Ember::RenderDevice::RenderDevice(
   , m_DSVDescriptorHeap{ std::move( dsv_descriptor_heap ) }
   , m_Bindless{ std::move( bindless_manager ) }
   , m_BufferManager{ m_Device, m_Allocator, m_Bindless.get() }
-  , m_CommandList{ std::move( command_list ) }
-  , m_CommandAllocators{ std::move( command_allocators ) }
-  , m_Fence{ std::move( fence ) }
-  , m_FenceEvent{ std::move( fence_event ) }
+  , m_DirectContext{ std::move( direct_context ) }
 {
-  m_FenceValues.resize( kNumFrames, 0 );
+  auto const always_true_receipt = m_DirectContext.CreateReceipt();
+  m_FrameReceipts.resize( m_Backbuffers.size(), always_true_receipt );
+
   if ( is_tearing_supported )
   {
     m_VsyncAndTearing = m_VsyncAndTearing | kSupportTearingBit;
@@ -187,18 +181,9 @@ void Ember::RenderDevice::Create( RenderDevice* render_device, HWND window_handl
     ERR_ABORT( CreateAllocator( &allocator_desc, allocator.GetAddressOf() ) );
   }
 
-  // Command Queue Creation.
-  ComPtr<ID3D12CommandQueue> command_queue;
-  {
-    D3D12_COMMAND_QUEUE_DESC desc = {
-      .Type     = D3D12_COMMAND_LIST_TYPE_DIRECT,
-      .Priority = D3D12_COMMAND_QUEUE_PRIORITY_NORMAL,
-      .Flags    = D3D12_COMMAND_QUEUE_FLAG_NONE,
-      .NodeMask = 0,
-    };
-
-    ERR_ABORT( device->CreateCommandQueue( &desc, IID_PPV_ARGS( &command_queue ) ) );
-  }
+  // Context Creation
+  Context direct_context;
+  Context::Create( &direct_context, device, D3D12_COMMAND_LIST_TYPE_DIRECT );
 
   RECT window_rect;
   ::GetWindowRect( window_handle, &window_rect );
@@ -224,12 +209,10 @@ void Ember::RenderDevice::Create( RenderDevice* render_device, HWND window_handl
 
     ComPtr<IDXGISwapChain1> swapchain1;
     ERR_ABORT( dxgi_factory->CreateSwapChainForHwnd(
-        command_queue.Get(), window_handle, &swapchain_desc, nullptr, nullptr, &swapchain1 ) );
+        direct_context.GetCommandQueue(), window_handle, &swapchain_desc, nullptr, nullptr, &swapchain1 ) );
 
     ERR_ABORT( swapchain1.As( &swapchain ) );
   }
-
-  UINT current_backbuffer_index = swapchain->GetCurrentBackBufferIndex();
 
   // Create DescriptorHeap
   ComPtr<ID3D12DescriptorHeap>        rtv_descriptor_heap;
@@ -260,49 +243,9 @@ void Ember::RenderDevice::Create( RenderDevice* render_device, HWND window_handl
   auto bindless_manager = std::make_unique<BindlessManager>();
   BindlessManager::Create( bindless_manager.get(), device, 10'000, 100 );
 
-  // Create Command Allocator
-  std::vector<ComPtr<ID3D12CommandAllocator>> command_allocators( kNumFrames );
-  for ( int i = 0; i < kNumFrames; ++i )
-  {
-    ERR_ABORT(
-        device->CreateCommandAllocator( D3D12_COMMAND_LIST_TYPE_DIRECT, IID_PPV_ARGS( &command_allocators[i] ) ) );
-  }
-
-  // Create a CommandList (for the current frame)
-  // Unlike Vulkan CommandBuffers, the lists themselves are 'reusable' after submit.
-  // Only the allocators need to be 'valid'.
-  ComPtr<ID3D12GraphicsCommandList> command_list;
-  {
-    ERR_ABORT( device->CreateCommandList(
-        0,
-        D3D12_COMMAND_LIST_TYPE_DIRECT,
-        command_allocators[current_backbuffer_index].Get(),
-        nullptr,
-        IID_PPV_ARGS( &command_list ) ) );
-
-    // We don't record anything. Just clear the screen.
-    ERR_ABORT( command_list->Close() );
-  }
-
-  // Create a Fence (this is similar to timeline semaphores on Vulkan)
-  ComPtr<ID3D12Fence> fence;
-  {
-    ERR_ABORT( device->CreateFence( 0, D3D12_FENCE_FLAG_NONE, IID_PPV_ARGS( &fence ) ) );
-  }
-
-  // Create Event handle.
-  // These are OS events that block CPU threads.
-  // Benefit of DirectX integrating pretty tightly into Windows.
-  HANDLE fence_event;
-  {
-    fence_event = ::CreateEventA( nullptr, FALSE, FALSE, nullptr );
-    ASSERT( fence_event && "Failed to create fence event" );
-  }
-
   new ( render_device ) RenderDevice{
     std::move( device ),
     std::move( allocator ),
-    std::move( command_queue ),
     width,
     height,
     std::move( swapchain ),
@@ -311,10 +254,7 @@ void Ember::RenderDevice::Create( RenderDevice* render_device, HWND window_handl
     rtv_descriptor_size,
     std::move( dsv_descriptor_heap ),
     std::move( bindless_manager ),
-    std::move( command_list ),
-    std::move( command_allocators ),
-    std::move( fence ),
-    fence_event,
+    std::move( direct_context ),
     is_tearing_supported,
   };
 }
@@ -326,13 +266,11 @@ void Ember::RenderDevice::ResizeSwapchain( uint32_t const width, uint32_t const 
     m_SwapchainWidth  = std::max( 1u, width );
     m_SwapchainHeight = std::max( 1u, height );
 
-    WaitIdle();
+    m_DirectContext.WaitIdle();
 
     for ( int i = 0; i < kNumFrames; ++i )
     {
       m_Backbuffers[i].Reset();
-      // Restart the count from here. Everyone should have waited for this.
-      m_FenceValues[i] = m_FenceValues[m_CurrentBackbufferIndex];
     }
 
     DXGI_SWAP_CHAIN_DESC swapchain_desc = {};
@@ -436,49 +374,17 @@ std::array<ID3D12DescriptorHeap*, 2> Ember::RenderDevice::GetBindlessDescriptorH
 
 void Ember::RenderDevice::WaitOn( Context::Receipt const receipt ) const
 {
-  if ( not receipt.IsValid() or receipt.IsComplete() ) return;
-
-  // Set the event on fence.
-  ERR_ABORT( receipt.GetFence()->SetEventOnCompletion( receipt.GetFenceValue(), m_FenceEvent ) );
-
-  // Wait for the event (with max timeout).
-  ::WaitForSingleObject( m_FenceEvent, INFINITE );
+  m_DirectContext.WaitOn( receipt );
 }
 
 void Ember::RenderDevice::QueueWaitOn( Context::Receipt const receipt ) const
 {
-  if ( receipt.IsComplete() ) return;
-
-  ERR_ABORT( m_DirectQueue->Wait( receipt.GetFence(), receipt.GetFenceValue() ) );
+  m_DirectContext.QueueWaitOn( receipt );
 }
 
 void Ember::RenderDevice::WaitIdle()
 {
-  auto const wait_on_fence_value = ++m_CurrentFenceValue;
-
-  // Signal on commandQueue.
-  ERR_ABORT( m_DirectQueue->Signal( m_Fence.Get(), wait_on_fence_value ) );
-
-  // Wait on CPU.
-  // If the fence is less than 'value' we need to wait.
-  if ( m_Fence->GetCompletedValue() < wait_on_fence_value )
-  {
-    // Set the event on fence.
-    ERR_ABORT( m_Fence->SetEventOnCompletion( wait_on_fence_value, m_FenceEvent ) );
-
-    // Wait for the event (with max timeout).
-    ::WaitForSingleObject( m_FenceEvent, INFINITE );
-  }
-}
-
-bool Ember::RenderDevice::IsInit() const
-{
-  return m_FenceEvent;
-}
-
-ID3D12CommandAllocator* Ember::RenderDevice::GetCurrentCommandAllocator() const noexcept
-{
-  return m_CommandAllocators[m_CurrentBackbufferIndex].Get();
+  m_DirectContext.WaitIdle();
 }
 
 ID3D12Resource* Ember::RenderDevice::GetCurrentBackbuffer() const noexcept
@@ -486,9 +392,9 @@ ID3D12Resource* Ember::RenderDevice::GetCurrentBackbuffer() const noexcept
   return m_Backbuffers[m_CurrentBackbufferIndex].Get();
 }
 
-ID3D12GraphicsCommandList* Ember::RenderDevice::GetGraphicsCommandList() const noexcept
+ComPtr<ID3D12GraphicsCommandList> Ember::RenderDevice::GetGraphicsCommandList() noexcept
 {
-  return m_CommandList.Get();
+  return m_DirectContext.GetCommandList();
 }
 
 CD3DX12_CPU_DESCRIPTOR_HANDLE Ember::RenderDevice::GetCurrentRTVCpuDescriptorHandle() const noexcept
@@ -502,9 +408,9 @@ CD3DX12_CPU_DESCRIPTOR_HANDLE Ember::RenderDevice::GetCurrentDSVCpuDescriptorHan
   return CD3DX12_CPU_DESCRIPTOR_HANDLE( m_DSVDescriptorHeap->GetCPUDescriptorHandleForHeapStart() );
 }
 
-void Ember::RenderDevice::ExecuteCommandList( ID3D12CommandList* command_list ) const
+void Ember::RenderDevice::ExecuteCommandList( Context::CommandList&& command_list )
 {
-  m_DirectQueue->ExecuteCommandLists( 1, &command_list );
+  m_DirectContext.Submit( std::move( command_list ) );
 }
 
 void Ember::RenderDevice::Present()
@@ -516,22 +422,12 @@ void Ember::RenderDevice::Present()
 
   ERR_ABORT( m_Swapchain->Present( sync_interval, present_flags ) );
 
-  uint64_t const next_fence_value = ++m_CurrentFenceValue;
-  ERR_ABORT( m_DirectQueue->Signal( m_Fence.Get(), next_fence_value ) );
-  m_FenceValues[m_CurrentBackbufferIndex] = next_fence_value;
+  m_FrameReceipts[m_CurrentBackbufferIndex] = m_DirectContext.Signal();
 
   // At the end of the queue, we wait for the next frame.
-  m_CurrentBackbufferIndex  = m_Swapchain->GetCurrentBackBufferIndex();
+  m_CurrentBackbufferIndex = m_Swapchain->GetCurrentBackBufferIndex();
 
-  uint64_t const wait_value = m_FenceValues[m_CurrentBackbufferIndex];
-  if ( m_Fence->GetCompletedValue() < wait_value )
-  {
-    // Set the event on fence.
-    ERR_ABORT( m_Fence->SetEventOnCompletion( wait_value, m_FenceEvent ) );
-
-    // Wait for the event (with max timeout).
-    ::WaitForSingleObject( m_FenceEvent, INFINITE );
-  }
+  m_DirectContext.WaitOn( m_FrameReceipts[m_CurrentBackbufferIndex] );
 }
 
 bool Ember::RenderDevice::IsVsyncEnabled() const

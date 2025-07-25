@@ -23,7 +23,6 @@ private:
   // Device and queues.
   ComPtr<ID3D12Device2>      m_Device;
   ComPtr<D3D12MA::Allocator> m_Allocator;
-  ComPtr<ID3D12CommandQueue> m_DirectQueue;
 
   // Swapchain and internal images.
   uint32_t                            m_SwapchainWidth{ 640 };
@@ -46,35 +45,25 @@ private:
   std::unique_ptr<BindlessManager> m_Bindless;
   BufferManager                    m_BufferManager;
 
-  // Commands
-  ComPtr<ID3D12GraphicsCommandList>           m_CommandList;
-  std::vector<ComPtr<ID3D12CommandAllocator>> m_CommandAllocators;
-
-  // Synchronization
-  ComPtr<ID3D12Fence>   m_Fence;
-  uint64_t              m_CurrentFenceValue{ 0 };
-  std::vector<uint64_t> m_FenceValues;
-  ScopedHandle          m_FenceEvent;
+  // Commands and Sync
+  Context                       m_DirectContext;
+  std::vector<Context::Receipt> m_FrameReceipts;
 
 public:
   RenderDevice() = default;
   RenderDevice(
-      ComPtr<ID3D12Device2>                       device,
-      ComPtr<D3D12MA::Allocator>                  allocator,
-      ComPtr<ID3D12CommandQueue>                  direct_queue,
-      uint32_t                                    swapchain_width,
-      uint32_t                                    swapchain_height,
-      ComPtr<IDXGISwapChain4>                     swapchain,
-      std::vector<ComPtr<ID3D12Resource>>         backbuffers,
-      ComPtr<ID3D12DescriptorHeap>                rtv_descriptor_heap,
-      uint32_t                                    rtv_descriptor_size,
-      ComPtr<ID3D12DescriptorHeap>                dsv_descriptor_heap,
-      std::unique_ptr<BindlessManager>            bindless_manager,
-      ComPtr<ID3D12GraphicsCommandList>           command_list,
-      std::vector<ComPtr<ID3D12CommandAllocator>> command_allocators,
-      ComPtr<ID3D12Fence>                         fence,
-      ScopedHandle                                fence_event,
-      bool                                        is_tearing_supported );
+      ComPtr<ID3D12Device2>               device,
+      ComPtr<D3D12MA::Allocator>          allocator,
+      uint32_t                            swapchain_width,
+      uint32_t                            swapchain_height,
+      ComPtr<IDXGISwapChain4>             swapchain,
+      std::vector<ComPtr<ID3D12Resource>> backbuffers,
+      ComPtr<ID3D12DescriptorHeap>        rtv_descriptor_heap,
+      uint32_t                            rtv_descriptor_size,
+      ComPtr<ID3D12DescriptorHeap>        dsv_descriptor_heap,
+      std::unique_ptr<BindlessManager>    bindless_manager,
+      Context                             direct_context,
+      bool                                is_tearing_supported );
 
   ComPtr<ID3D12Device2> GetDevice() noexcept;
 
@@ -109,16 +98,15 @@ public:
   [[nodiscard]] bool IsInit() const;
 
   // Per Frame getters.
-  [[nodiscard]] ID3D12CommandAllocator*       GetCurrentCommandAllocator() const noexcept;
-  [[nodiscard]] ID3D12Resource*               GetCurrentBackbuffer() const noexcept;
-  [[nodiscard]] ID3D12GraphicsCommandList*    GetGraphicsCommandList() const noexcept;
-  [[nodiscard]] CD3DX12_CPU_DESCRIPTOR_HANDLE GetCurrentRTVCpuDescriptorHandle() const noexcept;
-  [[nodiscard]] CD3DX12_CPU_DESCRIPTOR_HANDLE GetCurrentDSVCpuDescriptorHandle() const noexcept;
-  void                                        ExecuteCommandList( ID3D12CommandList* command_list ) const;
-  void                                        Present();
+  [[nodiscard]] ID3D12Resource*                   GetCurrentBackbuffer() const noexcept;
+  [[nodiscard]] ComPtr<ID3D12GraphicsCommandList> GetGraphicsCommandList() noexcept;
+  [[nodiscard]] CD3DX12_CPU_DESCRIPTOR_HANDLE     GetCurrentRTVCpuDescriptorHandle() const noexcept;
+  [[nodiscard]] CD3DX12_CPU_DESCRIPTOR_HANDLE     GetCurrentDSVCpuDescriptorHandle() const noexcept;
+  void                                            ExecuteCommandList( Context::CommandList&& command_list );
+  void                                            Present();
 
-  [[nodiscard]] bool                          IsVsyncEnabled() const;
-  [[nodiscard]] bool                          IsTearingSupported() const;
+  [[nodiscard]] bool                              IsVsyncEnabled() const;
+  [[nodiscard]] bool                              IsTearingSupported() const;
 
   RenderDevice( RenderDevice const& other )                = delete;
   RenderDevice( RenderDevice&& other ) noexcept            = delete;

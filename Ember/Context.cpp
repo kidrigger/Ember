@@ -29,22 +29,34 @@ uint64_t Ember::Context::Receipt::GetFenceValue() const
 }
 
 Ember::Context::Context(
-    ComPtr<ID3D12Device2>      device,
-    ComPtr<ID3D12CommandQueue> command_queue,
-    ComPtr<ID3D12Fence>        fence,
-    ScopedHandle               fence_event )
+    ComPtr<ID3D12Device2>         device,
+    ComPtr<ID3D12CommandQueue>    command_queue,
+    ComPtr<ID3D12Fence>           fence,
+    ScopedHandle                  fence_event,
+    D3D12_COMMAND_LIST_TYPE const command_list_type )
   : m_Device{ std::move( device ) }
   , m_CommandQueue{ std::move( command_queue ) }
   , m_Fence{ std::move( fence ) }
   , m_FenceEvent{ std::move( fence_event ) }
+  , m_CommandListType{ command_list_type }
 {}
+
+ID3D12CommandQueue* Ember::Context::GetCommandQueue() const
+{
+  return m_CommandQueue.Get();
+}
 
 bool Ember::Context::IsFenceComplete( uint64_t const fence_value ) const
 {
   return m_Fence->GetCompletedValue() >= fence_value;
 }
 
-ComPtr<ID3D12GraphicsCommandList2> Ember::Context::GetCommandList()
+Ember::Context::Receipt Ember::Context::CreateReceipt( uint64_t value ) const
+{
+  return { m_Fence.Get(), value };
+}
+
+Ember::Context::CommandList Ember::Context::GetCommandList()
 {
   ComPtr<ID3D12CommandAllocator> command_allocator;
   if ( not m_CommandAllocators.empty() and IsFenceComplete( m_CommandAllocators.front().FenceValue ) )
@@ -56,21 +68,21 @@ ComPtr<ID3D12GraphicsCommandList2> Ember::Context::GetCommandList()
   }
   else
   {
-    ERR_ABORT( m_Device->CreateCommandAllocator( D3D12_COMMAND_LIST_TYPE_COPY, IID_PPV_ARGS( &command_allocator ) ) );
+    ERR_ABORT( m_Device->CreateCommandAllocator( m_CommandListType, IID_PPV_ARGS( &command_allocator ) ) );
   }
 
-  ComPtr<ID3D12GraphicsCommandList2> command_list;
+  CommandList command_list;
   if ( m_CommandLists.empty() )
   {
     ERR_ABORT( m_Device->CreateCommandList(
-        0, D3D12_COMMAND_LIST_TYPE_COPY, command_allocator.Get(), nullptr, IID_PPV_ARGS( &command_list ) ) );
-    command_list->Close();
+        0, m_CommandListType, command_allocator.Get(), nullptr, IID_PPV_ARGS( &command_list ) ) );
+    ERR_ABORT( command_list->SetPrivateDataInterface( _uuidof( ID3D12CommandAllocator ), command_allocator.Get() ) );
+
+    return command_list;
   }
-  else
-  {
-    command_list = m_CommandLists.front();
-    m_CommandLists.pop();
-  }
+
+  command_list = m_CommandLists.front();
+  m_CommandLists.pop();
 
   ERR_ABORT( command_list->Reset( command_allocator.Get(), nullptr ) );
   ERR_ABORT( command_list->SetPrivateDataInterface( _uuidof( ID3D12CommandAllocator ), command_allocator.Get() ) );
@@ -78,7 +90,7 @@ ComPtr<ID3D12GraphicsCommandList2> Ember::Context::GetCommandList()
   return command_list;
 }
 
-Ember::Context::Receipt Ember::Context::Submit( ComPtr<ID3D12GraphicsCommandList2>&& command_list )
+Ember::Context::Receipt Ember::Context::Submit( CommandList&& command_list )
 {
   ID3D12CommandList* p_command_list = command_list.Get();
   m_CommandQueue->ExecuteCommandLists( 1, &p_command_list );
@@ -93,6 +105,16 @@ Ember::Context::Receipt Ember::Context::Submit( ComPtr<ID3D12GraphicsCommandList
   m_CommandAllocators.emplace( command_allocator, signal_value );
 
   return { m_Fence.Get(), signal_value };
+}
+
+Ember::Context::Receipt Ember::Context::Signal()
+{
+  auto const wait_on_fence_value = ++m_FenceValue;
+
+  // Signal on commandQueue.
+  ERR_ABORT( m_CommandQueue->Signal( m_Fence.Get(), wait_on_fence_value ) );
+
+  return Receipt{ m_Fence.Get(), wait_on_fence_value };
 }
 
 void Ember::Context::WaitOn( Receipt const& receipt ) const
@@ -111,6 +133,11 @@ void Ember::Context::QueueWaitOn( Receipt const receipt ) const
   if ( receipt.IsComplete() ) return;
 
   ERR_ABORT( m_CommandQueue->Wait( receipt.GetFence(), receipt.GetFenceValue() ) );
+}
+
+void Ember::Context::WaitIdle()
+{
+  WaitOn( Signal() );
 }
 
 void Ember::Context::Create( Context* context, ComPtr<ID3D12Device2> device, D3D12_COMMAND_LIST_TYPE const type )
@@ -133,5 +160,5 @@ void Ember::Context::Create( Context* context, ComPtr<ID3D12Device2> device, D3D
     assert( fence_event && "Failed to create fence event" );
   }
 
-  new ( context ) Context{ std::move( device ), std::move( command_queue ), std::move( fence ), fence_event };
+  new ( context ) Context{ std::move( device ), std::move( command_queue ), std::move( fence ), fence_event, type };
 }

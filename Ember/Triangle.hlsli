@@ -1,4 +1,4 @@
-cbuffer BindlessIndex : register(b0, space0)
+cbuffer BindlessIndex : register( b0, space0 )
 {
   uint g_CameraIndex;
   uint g_TextureIndex;

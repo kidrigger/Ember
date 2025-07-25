@@ -48,7 +48,7 @@ class TextureLoader
   Context                                m_CopyContext;
   std::vector<UploadBatch>               m_UploadBatches;
   uint32_t                               m_CurrentUploadBatch{ 0 };
-  ComPtr<ID3D12GraphicsCommandList2>     m_CurrentCommandList;
+  Context::CommandList                   m_CurrentCommandList;
   uint32_t                               m_CurrentUploadBatchSize{ 0 };
 
   std::vector<D3D12_RESOURCE_BARRIER>    m_PendingBarriers;

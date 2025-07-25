@@ -428,20 +428,16 @@ void Ember::BasicApp::Update()
 
 void Ember::BasicApp::Render()
 {
-  ID3D12CommandAllocator*    command_allocator = m_RenderDevice->GetCurrentCommandAllocator();
-  ID3D12Resource*            backbuffer        = m_RenderDevice->GetCurrentBackbuffer();
-  ID3D12GraphicsCommandList* command_list      = m_RenderDevice->GetGraphicsCommandList();
+  ID3D12Resource*                   backbuffer   = m_RenderDevice->GetCurrentBackbuffer();
+  ComPtr<ID3D12GraphicsCommandList> command_list = m_RenderDevice->GetGraphicsCommandList();
 
-  ERR_ABORT( command_allocator->Reset() );
-  ERR_ABORT( command_list->Reset( command_allocator, nullptr ) );
-
-  D3D12_VIEWPORT const viewport = {
-    .TopLeftX = 0,
-    .TopLeftY = 0,
-    .Width    = ( FLOAT )m_WindowWidth,
-    .Height   = ( FLOAT )m_WindowHeight,
-    .MinDepth = 0,
-    .MaxDepth = 1,
+  D3D12_VIEWPORT const              viewport     = {
+                     .TopLeftX = 0,
+                     .TopLeftY = 0,
+                     .Width    = ( FLOAT )m_WindowWidth,
+                     .Height   = ( FLOAT )m_WindowHeight,
+                     .MinDepth = 0,
+                     .MaxDepth = 1,
   };
   D3D12_RECT const scissor = {
     .left   = 0,
@@ -455,7 +451,7 @@ void Ember::BasicApp::Render()
       backbuffer, D3D12_RESOURCE_STATE_PRESENT, D3D12_RESOURCE_STATE_RENDER_TARGET );
 
   command_list->ResourceBarrier( 1, &barrier );
-  m_TextureLoader->FlushBarriers( command_list );
+  m_TextureLoader->FlushBarriers( command_list.Get() );
 
   FLOAT constexpr cornflower_blue[]       = { 0.4f, 0.6f, 0.9f, 1.0f };
   CD3DX12_CPU_DESCRIPTOR_HANDLE const rtv = m_RenderDevice->GetCurrentRTVCpuDescriptorHandle();
@@ -494,7 +490,7 @@ void Ember::BasicApp::Render()
 
   ERR_ABORT( command_list->Close() );
 
-  m_RenderDevice->ExecuteCommandList( command_list );
+  m_RenderDevice->ExecuteCommandList( std::move( command_list ) );
 
   m_RenderDevice->Present();
 }

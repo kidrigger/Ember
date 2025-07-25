@@ -28,9 +28,9 @@ public:
     [[nodiscard]] uint64_t     GetFenceValue() const;
   };
 
-private:
-  using CommandList = ComPtr<ID3D12GraphicsCommandList2>;
+  using CommandList = ComPtr<ID3D12GraphicsCommandList>;
 
+private:
   struct InFlightAllocators
   {
     ComPtr<ID3D12CommandAllocator> Allocator;
@@ -47,6 +47,7 @@ private:
   CommandAllocatorQueue      m_CommandAllocators;
   ScopedHandle               m_FenceEvent;
   uint64_t                   m_FenceValue{ 0 };
+  D3D12_COMMAND_LIST_TYPE    m_CommandListType;
 
 public:
   Context() = default;
@@ -55,15 +56,23 @@ public:
       ComPtr<ID3D12Device2>      device,
       ComPtr<ID3D12CommandQueue> command_queue,
       ComPtr<ID3D12Fence>        fence,
-      ScopedHandle               fence_event );
+      ScopedHandle               fence_event,
+      D3D12_COMMAND_LIST_TYPE    command_list_type );
 
-  [[nodiscard]] bool IsFenceComplete( uint64_t fence_value ) const;
-  CommandList        GetCommandList();
-  Receipt            Submit( CommandList&& command_list );
-  void               WaitOn( Receipt const& receipt ) const;
-  void               QueueWaitOn( Receipt receipt ) const;
+  [[nodiscard]] ID3D12CommandQueue* GetCommandQueue() const;
+  [[nodiscard]] bool                IsFenceComplete( uint64_t fence_value ) const;
 
-  static void        Create( Context* context, ComPtr<ID3D12Device2> device, D3D12_COMMAND_LIST_TYPE type );
+  [[nodiscard]] Receipt             CreateReceipt( uint64_t value = 0 ) const;
+  CommandList                       GetCommandList();
+
+  Receipt                           Submit( CommandList&& command_list );
+  [[nodiscard]] Receipt             Signal();
+
+  void                              WaitOn( Receipt const& receipt ) const;
+  void                              QueueWaitOn( Receipt receipt ) const;
+  void                              WaitIdle();
+
+  static void Create( Context* context, ComPtr<ID3D12Device2> device, D3D12_COMMAND_LIST_TYPE type );
 
   Context( Context const& other )                = delete;
   Context( Context&& other ) noexcept            = default;
