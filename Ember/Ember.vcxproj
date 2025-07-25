@@ -217,6 +217,8 @@
     <ClCompile Include="RenderDevice.cpp" />
     <ClCompile Include="Main.cpp" />
     <ClCompile Include="Texture.cpp" />
+    <ClCompile Include="TextureLoader.cpp" />
+    <ClCompile Include="Context.cpp" />
     <ClCompile Include="Util\FreeList.cpp" />
     <ClCompile Include="Util\PerfCounter.cpp" />
     <ClCompile Include="Util\ScopedHandle.cpp" />
@@ -230,6 +232,8 @@
     <ClInclude Include="IApp.hpp" />
     <ClInclude Include="RenderDevice.hpp" />
     <ClInclude Include="Texture.hpp" />
+    <ClInclude Include="TextureLoader.hpp" />
+    <ClInclude Include="Context.hpp" />
     <ClInclude Include="Util\DataUtil.hpp" />
     <ClInclude Include="Util\DirectXHeaders.hpp" />
     <ClInclude Include="Util\FreeList.hpp" />
@@ -264,6 +268,16 @@
       <ShaderType Condition="'$(Configuration)|$(Platform)'=='Release|Win32'">Pixel</ShaderType>
       <ShaderType Condition="'$(Configuration)|$(Platform)'=='Release|x64'">Pixel</ShaderType>
     </FxCompile>
+  </ItemGroup>
+  <ItemGroup>
+    <CopyFileToFolders Include="Assets\container2.png">
+      <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">false</ExcludedFromBuild>
+      <DeploymentContent Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">true</DeploymentContent>
+      <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='RenderDoc_Compat|x64'">false</ExcludedFromBuild>
+      <DeploymentContent Condition="'$(Configuration)|$(Platform)'=='RenderDoc_Compat|x64'">true</DeploymentContent>
+      <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='Release|x64'">false</ExcludedFromBuild>
+      <DeploymentContent Condition="'$(Configuration)|$(Platform)'=='Release|x64'">true</DeploymentContent>
+    </CopyFileToFolders>
   </ItemGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.targets" />
   <ImportGroup Label="ExtensionTargets">

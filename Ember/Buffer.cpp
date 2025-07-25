@@ -203,15 +203,18 @@ void AllocateBufferImpl(
     ID3D12Resource**                resource,
     D3D12_RESOURCE_FLAGS const      flags = D3D12_RESOURCE_FLAG_NONE )
 {
+  CD3DX12_RESOURCE_DESC const buffer_desc = CD3DX12_RESOURCE_DESC::Buffer( size, flags );
+
+#if not defined( RENDERDOC_COMPAT )
   D3D12MA::ALLOCATION_DESC constexpr allocation_desc = {
     .Flags    = D3D12MA::ALLOCATION_FLAG_NONE,
     .HeapType = D3D12_HEAP_TYPE_GPU_UPLOAD,
   };
 
-  CD3DX12_RESOURCE_DESC const buffer_desc = CD3DX12_RESOURCE_DESC::Buffer( size, flags );
-
-#if defined( RENDERDOC_COMPAT )
-  D3D12_HEAP_PROPERTIES heap_properties = CD3DX12_HEAP_PROPERTIES{ allocation_desc.HeapType };
+  ERR_ABORT( allocator->CreateResource(
+      &allocation_desc, &buffer_desc, D3D12_RESOURCE_STATE_COMMON, nullptr, allocation, IID_PPV_ARGS( resource ) ) );
+#else
+  auto heap_properties = CD3DX12_HEAP_PROPERTIES{ D3D12_HEAP_TYPE_GPU_UPLOAD };
   ERR_ABORT( device->CreateCommittedResource(
       &heap_properties,
       D3D12_HEAP_FLAG_ALLOW_ALL_BUFFERS_AND_TEXTURES,
@@ -219,9 +222,6 @@ void AllocateBufferImpl(
       D3D12_RESOURCE_STATE_COMMON,
       nullptr,
       IID_PPV_ARGS( resource ) ) );
-#else
-  ERR_ABORT( allocator->CreateResource(
-      &allocation_desc, &buffer_desc, D3D12_RESOURCE_STATE_COMMON, nullptr, allocation, IID_PPV_ARGS( resource ) ) );
 #endif
 }
 } // namespace

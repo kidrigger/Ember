@@ -296,7 +296,7 @@ void Ember::RenderDevice::Create( RenderDevice* render_device, HWND window_handl
   HANDLE fence_event;
   {
     fence_event = ::CreateEventA( nullptr, FALSE, FALSE, nullptr );
-    assert( fence_event && "Failed to create fence event" );
+    ASSERT( fence_event && "Failed to create fence event" );
   }
 
   new ( render_device ) RenderDevice{
@@ -347,6 +347,11 @@ void Ember::RenderDevice::ResizeSwapchain( uint32_t const width, uint32_t const 
   }
 }
 
+void Ember::RenderDevice::CreateTextureLoader( TextureLoader* loader ) const
+{
+  TextureLoader::Create( loader, m_Device, m_Allocator, m_Bindless.get(), 3 );
+}
+
 Ember::Buffer Ember::RenderDevice::CreateVertexBuffer( uint32_t const size, uint32_t const stride )
 {
   return m_BufferManager.CreateVertexBuffer( size, stride );
@@ -379,12 +384,12 @@ Ember::DepthBuffer Ember::RenderDevice::CreateDepthBuffer( uint32_t const width,
     .DepthStencil = { 1.0f, 0 },
   };
 
-  CD3DX12_RESOURCE_DESC1 const resource_desc = CD3DX12_RESOURCE_DESC1::Tex2D(
+  CD3DX12_RESOURCE_DESC const resource_desc = CD3DX12_RESOURCE_DESC::Tex2D(
       DXGI_FORMAT_D32_FLOAT, width, height, 1, 0, 1, 0, D3D12_RESOURCE_FLAG_ALLOW_DEPTH_STENCIL );
 
   ComPtr<ID3D12Resource>      depth_stencil_res;
   ComPtr<D3D12MA::Allocation> allocation;
-  ERR_ABORT( m_Allocator->CreateResource2(
+  ERR_ABORT( m_Allocator->CreateResource(
       &allocation_desc,
       &resource_desc,
       D3D12_RESOURCE_STATE_DEPTH_WRITE,
@@ -427,6 +432,24 @@ Ember::SamplerHandle Ember::RenderDevice::CreateSamplerHandle( D3D12_SAMPLER_DES
 std::array<ID3D12DescriptorHeap*, 2> Ember::RenderDevice::GetBindlessDescriptorHeaps() const
 {
   return m_Bindless->GetBindlessDescriptorHeaps();
+}
+
+void Ember::RenderDevice::WaitOn( Context::Receipt const receipt ) const
+{
+  if ( not receipt.IsValid() or receipt.IsComplete() ) return;
+
+  // Set the event on fence.
+  ERR_ABORT( receipt.GetFence()->SetEventOnCompletion( receipt.GetFenceValue(), m_FenceEvent ) );
+
+  // Wait for the event (with max timeout).
+  ::WaitForSingleObject( m_FenceEvent, INFINITE );
+}
+
+void Ember::RenderDevice::QueueWaitOn( Context::Receipt const receipt ) const
+{
+  if ( receipt.IsComplete() ) return;
+
+  ERR_ABORT( m_DirectQueue->Wait( receipt.GetFence(), receipt.GetFenceValue() ) );
 }
 
 void Ember::RenderDevice::WaitIdle()

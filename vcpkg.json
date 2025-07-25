@@ -2,6 +2,7 @@
   "builtin-baseline": "5a2324f6667233aeb903d3117f6fd259a2be6f8b",
   "dependencies": [
     "directx-headers",
-    "d3d12-memory-allocator"
+    "d3d12-memory-allocator",
+    "directxtex"
   ]
 }

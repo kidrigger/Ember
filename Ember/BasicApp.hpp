@@ -1,9 +1,9 @@
 #pragma once
 
-#include "BindlessHandle.hpp"
 #include "Buffer.hpp"
 #include "DepthBuffer.hpp"
 #include "IApp.hpp"
+#include "Texture.hpp"
 #include "Util/DirectXHeaders.hpp"
 #include "Util/Runtime.hpp"
 
@@ -11,6 +11,7 @@ namespace Ember
 {
 class PerfCounter;
 class RenderDevice;
+class TextureLoader;
 
 class BasicApp final : public IApp
 {
@@ -18,21 +19,23 @@ class BasicApp final : public IApp
   {
     DirectX::XMFLOAT3 Position;
     DirectX::XMFLOAT3 Color;
+    DirectX::XMFLOAT2 TexCoord0;
   };
 
   struct Camera
   {
-    DirectX::XMMATRIX Projection;
-    DirectX::XMMATRIX View;
+    DirectX::XMMATRIX Projection{ DirectX::XMMatrixIdentity() };
+    DirectX::XMMATRIX View{ DirectX::XMMatrixIdentity() };
   };
 
-  HWND                          m_WindowHandle{ nullptr };
-  uint32_t                      m_WindowWidth{ 1280 };
-  uint32_t                      m_WindowHeight{ 720 };
+  HWND                           m_WindowHandle{ nullptr };
+  uint32_t                       m_WindowWidth{ 1280 };
+  uint32_t                       m_WindowHeight{ 720 };
 
-  std::unique_ptr<RenderDevice> m_RenderDevice;
-  std::unique_ptr<PerfCounter>  m_PerfCounter;
-  wchar_t                       m_SprintfBuffer[1024]{};
+  std::unique_ptr<RenderDevice>  m_RenderDevice;
+  std::unique_ptr<PerfCounter>   m_PerfCounter;
+  std::unique_ptr<TextureLoader> m_TextureLoader;
+  wchar_t                        m_SprintfBuffer[1024]{};
 
   // Specifics
   ComPtr<ID3D12RootSignature> m_RootSignature;
@@ -50,10 +53,14 @@ class BasicApp final : public IApp
   std::vector<uint16_t> m_Indices;
   Buffer                m_VertexBuffer;
   Buffer                m_IndexBuffer;
+  Texture               m_CubeTexture;
 
 public:
   BasicApp(
-      HWND window_handle, std::unique_ptr<RenderDevice> render_device, std::unique_ptr<PerfCounter> perf_counter );
+      HWND                           window_handle,
+      std::unique_ptr<RenderDevice>  render_device,
+      std::unique_ptr<PerfCounter>   perf_counter,
+      std::unique_ptr<TextureLoader> texture_loader );
 
   void            LoadContent() override;
   void            Update() override;

@@ -4,6 +4,7 @@
 #include <utility>
 
 #include "RenderDevice.hpp"
+#include "TextureLoader.hpp"
 #include "Util/DataUtil.hpp"
 #include "Util/HelperUtils.hpp"
 #include "Util/PerfCounter.hpp"
@@ -92,8 +93,7 @@ LRESULT CALLBACK WndProc( HWND const window_handle, UINT const message, WPARAM c
 void RegisterWindowClass( HINSTANCE const instance_handle, const wchar_t* window_class_name )
 {
   // Register a window class for creating our render window with.
-  WNDCLASSEXW window_class   = {};
-
+  WNDCLASSEXW window_class;
   window_class.cbSize        = sizeof( WNDCLASSEX );
   window_class.style         = CS_HREDRAW | CS_VREDRAW;
   window_class.lpfnWndProc   = &WndProc;
@@ -108,7 +108,7 @@ void RegisterWindowClass( HINSTANCE const instance_handle, const wchar_t* window
   window_class.hIconSm       = ::LoadIcon( instance_handle, nullptr );
 
   static ATOM atom           = ::RegisterClassExW( &window_class );
-  assert( atom > 0 );
+  ASSERT( atom > 0 );
 }
 
 HWND CreateWindow(
@@ -151,10 +151,14 @@ HWND CreateWindow(
 }
 
 Ember::BasicApp::BasicApp(
-    HWND const window_handle, std::unique_ptr<RenderDevice> render_device, std::unique_ptr<PerfCounter> perf_counter )
+    HWND const                     window_handle,
+    std::unique_ptr<RenderDevice>  render_device,
+    std::unique_ptr<PerfCounter>   perf_counter,
+    std::unique_ptr<TextureLoader> texture_loader )
   : m_WindowHandle{ window_handle }
   , m_RenderDevice{ std::move( render_device ) }
   , m_PerfCounter{ std::move( perf_counter ) }
+  , m_TextureLoader{ std::move( texture_loader ) }
   , m_GlobalTransform{ DirectX::XMMatrixIdentity() }
 {}
 
@@ -182,12 +186,16 @@ Ember::BasicApp Ember::BasicApp::Create( HINSTANCE const instance_handle )
   auto render_device = std::make_unique<RenderDevice>();
   RenderDevice::Create( render_device.get(), window_handle, use_warp );
 
+  auto texture_loader = std::make_unique<TextureLoader>();
+  render_device->CreateTextureLoader( texture_loader.get() );
+
   auto perf_counter = std::make_unique<PerfCounter>();
 
   return BasicApp{
     window_handle,
     std::move( render_device ),
     std::move( perf_counter ),
+    std::move( texture_loader ),
   };
 }
 
@@ -204,21 +212,51 @@ void Ember::BasicApp::LoadContent()
     .Projection = DirectX::XMMatrixPerspectiveFovLH(
         DirectX::XMConvertToRadians( 70.0f ), ( float )m_WindowWidth / ( float )m_WindowHeight, 0.1f, 100.0f ),
     .View = DirectX::XMMatrixLookAtLH(
-        DirectX::XMVectorSet( 0.0f, 0.0f, -10.0f, 1.0f ),
+        DirectX::XMVectorSet( 0.0f, 0.0f, -1.0f, 1.0f ),
         DirectX::XMVectorSet( 0.0f, 0.0f, 0.0f, 1.0f ),
         DirectX::XMVectorSet( 0.0f, 1.0f, 0.0f, 0.0f ) ),
   };
 
   m_GlobalTransform = DirectX::XMMatrixScaling( 0.2f, 0.2f, 0.2f );
   m_Vertices        = {
-    { DirectX::XMFLOAT3( -1.0f, -1.0f, -1.0f ), DirectX::XMFLOAT3( 0.0f, 0.0f, 0.0f ) }, // 0
-    { DirectX::XMFLOAT3( -1.0f, 1.0f,  -1.0f ), DirectX::XMFLOAT3( 0.0f, 1.0f, 0.0f ) }, // 1
-    { DirectX::XMFLOAT3( 1.0f,  1.0f,  -1.0f ), DirectX::XMFLOAT3( 1.0f, 1.0f, 0.0f ) }, // 2
-    { DirectX::XMFLOAT3( 1.0f,  -1.0f, -1.0f ), DirectX::XMFLOAT3( 1.0f, 0.0f, 0.0f ) }, // 3
-    { DirectX::XMFLOAT3( -1.0f, -1.0f, 1.0f ),  DirectX::XMFLOAT3( 0.0f, 0.0f, 1.0f ) }, // 4
-    { DirectX::XMFLOAT3( -1.0f, 1.0f,  1.0f ),  DirectX::XMFLOAT3( 0.0f, 1.0f, 1.0f ) }, // 5
-    { DirectX::XMFLOAT3( 1.0f,  1.0f,  1.0f ),  DirectX::XMFLOAT3( 1.0f, 1.0f, 1.0f ) }, // 6
-    { DirectX::XMFLOAT3( 1.0f,  -1.0f, 1.0f ),  DirectX::XMFLOAT3( 1.0f, 0.0f, 1.0f ) }, // 7
+    {
+     .Position  = DirectX::XMFLOAT3( -1.0f, -1.0f, -1.0f ),
+     .Color     = DirectX::XMFLOAT3( 0.0f, 0.0f, 0.0f ),
+     .TexCoord0 = DirectX::XMFLOAT2( 0.0f, 0.0f ),
+     }, // 0
+    {
+     .Position  = DirectX::XMFLOAT3( -1.0f, 1.0f, -1.0f ),
+     .Color     = DirectX::XMFLOAT3( 0.0f, 1.0f, 0.0f ),
+     .TexCoord0 = DirectX::XMFLOAT2( 0.0f, 1.0f ),
+     }, // 1
+    {
+     .Position  = DirectX::XMFLOAT3( 1.0f, 1.0f, -1.0f ),
+     .Color     = DirectX::XMFLOAT3( 1.0f, 1.0f, 0.0f ),
+     .TexCoord0 = DirectX::XMFLOAT2( 1.0f, 1.0f ),
+     }, // 2
+    {
+     .Position  = DirectX::XMFLOAT3( 1.0f, -1.0f, -1.0f ),
+     .Color     = DirectX::XMFLOAT3( 1.0f, 0.0f, 0.0f ),
+     .TexCoord0 = DirectX::XMFLOAT2( 1.0f, 0.0f ),
+     }, // 3
+    {
+     .Position  = DirectX::XMFLOAT3( -1.0f, -1.0f, 1.0f ),
+     .Color     = DirectX::XMFLOAT3( 0.0f, 0.0f, 1.0f ),
+     .TexCoord0 = DirectX::XMFLOAT2( 1.0f, 0.0f ),
+     }, // 4
+    {
+     .Position  = DirectX::XMFLOAT3( -1.0f, 1.0f, 1.0f ),
+     .Color     = DirectX::XMFLOAT3( 0.0f, 1.0f, 1.0f ),
+     .TexCoord0 = DirectX::XMFLOAT2( 0.0f, 0.0f ),
+     }, // 5
+    {
+     .Position  = DirectX::XMFLOAT3( 1.0f, 1.0f, 1.0f ),
+     .Color     = DirectX::XMFLOAT3( 1.0f, 1.0f, 1.0f ),
+     .TexCoord0 = DirectX::XMFLOAT2( 0.0f, 1.0f ),
+     }, // 6
+    { .Position  = DirectX::XMFLOAT3( 1.0f, -1.0f, 1.0f ),
+     .Color     = DirectX::XMFLOAT3( 1.0f, 0.0f, 1.0f ),
+     .TexCoord0 = DirectX::XMFLOAT2( 1.0f, 1.0f ) }, // 7
   };
 
   m_Indices = {
@@ -232,6 +270,23 @@ void Ember::BasicApp::LoadContent()
   m_CameraBuffer.Write( 0, sizeof( m_Camera ), &m_Camera );
   m_VertexBuffer.Write( 0, ByteSizeOf( m_Vertices ), DataOf( m_Vertices ) );
   m_IndexBuffer.Write( 0, ByteSizeOf( m_Indices ), DataOf( m_Indices ) );
+
+  ASSERT( m_TextureLoader->TryLoadTexture( &m_CubeTexture, L"container2.png" ) );
+  auto          texture_load_receipt = m_TextureLoader->EndBatch();
+
+  SamplerHandle sampler_handle       = m_RenderDevice->CreateSamplerHandle( {
+            .Filter         = D3D12_FILTER_ANISOTROPIC,
+            .AddressU       = D3D12_TEXTURE_ADDRESS_MODE_WRAP,
+            .AddressV       = D3D12_TEXTURE_ADDRESS_MODE_WRAP,
+            .AddressW       = D3D12_TEXTURE_ADDRESS_MODE_WRAP,
+            .MipLODBias     = 0.0f,
+            .MaxAnisotropy  = D3D12_DEFAULT_MAX_ANISOTROPY,
+            .ComparisonFunc = D3D12_COMPARISON_FUNC_NONE,
+            .BorderColor    = D3D12_STATIC_BORDER_COLOR_OPAQUE_BLACK,
+            .MinLOD         = 0.0f,
+            .MaxLOD         = 1.0f,
+  } );
+  ASSERT( 0 == ( UINT )sampler_handle );
 
   ComPtr<ID3DBlob> vertex_shader_blob;
   ERR_ABORT( D3DReadFileToBlob( L"TriangleVS.cso", &vertex_shader_blob ) );
@@ -253,11 +308,10 @@ void Ember::BasicApp::LoadContent()
       D3D12_ROOT_SIGNATURE_FLAG_SAMPLER_HEAP_DIRECTLY_INDEXED | D3D12_ROOT_SIGNATURE_FLAG_DENY_MESH_SHADER_ROOT_ACCESS |
       D3D12_ROOT_SIGNATURE_FLAG_DENY_AMPLIFICATION_SHADER_ROOT_ACCESS |
       D3D12_ROOT_SIGNATURE_FLAG_DENY_GEOMETRY_SHADER_ROOT_ACCESS |
-      D3D12_ROOT_SIGNATURE_FLAG_DENY_DOMAIN_SHADER_ROOT_ACCESS |
-      D3D12_ROOT_SIGNATURE_FLAG_DENY_HULL_SHADER_ROOT_ACCESS | D3D12_ROOT_SIGNATURE_FLAG_DENY_PIXEL_SHADER_ROOT_ACCESS;
+      D3D12_ROOT_SIGNATURE_FLAG_DENY_DOMAIN_SHADER_ROOT_ACCESS | D3D12_ROOT_SIGNATURE_FLAG_DENY_HULL_SHADER_ROOT_ACCESS;
 
   CD3DX12_ROOT_PARAMETER1 root_parameters[2];
-  root_parameters[0].InitAsConstants( 1, 0, 0, D3D12_SHADER_VISIBILITY_VERTEX );
+  root_parameters[0].InitAsConstants( 2, 0, 0, D3D12_SHADER_VISIBILITY_ALL );
   root_parameters[1].InitAsConstants( sizeof( DirectX::XMMATRIX ) / 4, 1, 0, D3D12_SHADER_VISIBILITY_VERTEX );
 
   CD3DX12_VERSIONED_ROOT_SIGNATURE_DESC root_signature_desc;
@@ -281,9 +335,9 @@ void Ember::BasicApp::LoadContent()
   rtv_formats.RTFormats[0] = DXGI_FORMAT_R8G8B8A8_UNORM;
 
   CD3DX12_RASTERIZER_DESC2 rasterizer_desc{ D3D12_DEFAULT };
-  rasterizer_desc.CullMode                 = D3D12_CULL_MODE_NONE;
+  rasterizer_desc.CullMode                  = D3D12_CULL_MODE_NONE;
 
-  D3D12_INPUT_ELEMENT_DESC input_element[] = {
+  D3D12_INPUT_ELEMENT_DESC input_elements[] = {
     {
      .SemanticName         = "POSITION",
      .SemanticIndex        = 0,
@@ -302,11 +356,20 @@ void Ember::BasicApp::LoadContent()
      .InputSlotClass       = D3D12_INPUT_CLASSIFICATION_PER_VERTEX_DATA,
      .InstanceDataStepRate = 0,
      },
+    {
+     .SemanticName         = "TEX_COORD",
+     .SemanticIndex        = 0,
+     .Format               = DXGI_FORMAT_R32G32_FLOAT,
+     .InputSlot            = 0,
+     .AlignedByteOffset    = D3D12_APPEND_ALIGNED_ELEMENT,
+     .InputSlotClass       = D3D12_INPUT_CLASSIFICATION_PER_VERTEX_DATA,
+     .InstanceDataStepRate = 0,
+     },
   };
 
   D3D12_INPUT_LAYOUT_DESC input_layout = {
-    .pInputElementDescs = DataOf( input_element ),
-    .NumElements        = CountOf( input_element ),
+    .pInputElementDescs = DataOf( input_elements ),
+    .NumElements        = CountOf( input_elements ),
   };
 
   struct PipelineStateStream
@@ -342,6 +405,8 @@ void Ember::BasicApp::LoadContent()
   m_DepthBuffer = m_RenderDevice->CreateDepthBuffer( m_WindowWidth, m_WindowHeight );
 
   m_RenderDevice->SetDepthBuffer( m_DepthBuffer );
+
+  m_RenderDevice->WaitOn( texture_load_receipt );
 }
 
 void Ember::BasicApp::Update()
@@ -357,6 +422,8 @@ void Ember::BasicApp::Update()
   float const delta_seconds = ( float )m_PerfCounter->GetDeltaMilliSeconds() * 0.001f;
   m_GlobalTransform =
       XMMatrixMultiply( m_GlobalTransform, DirectX::XMMatrixRotationY( DirectX::XM_PIDIV2 * delta_seconds ) );
+
+  m_TextureLoader->Update();
 }
 
 void Ember::BasicApp::Render()
@@ -388,6 +455,7 @@ void Ember::BasicApp::Render()
       backbuffer, D3D12_RESOURCE_STATE_PRESENT, D3D12_RESOURCE_STATE_RENDER_TARGET );
 
   command_list->ResourceBarrier( 1, &barrier );
+  m_TextureLoader->FlushBarriers( command_list );
 
   FLOAT constexpr cornflower_blue[]       = { 0.4f, 0.6f, 0.9f, 1.0f };
   CD3DX12_CPU_DESCRIPTOR_HANDLE const rtv = m_RenderDevice->GetCurrentRTVCpuDescriptorHandle();
@@ -408,6 +476,7 @@ void Ember::BasicApp::Render()
   command_list->IASetIndexBuffer( &m_IndexBuffer.GetIndexBufferView() );
   command_list->IASetVertexBuffers( 0, 1, &m_VertexBuffer.GetVertexBufferView() );
   command_list->SetGraphicsRoot32BitConstant( 0, ( UINT )m_CameraBuffer.GetCBVHandle(), 0 );
+  command_list->SetGraphicsRoot32BitConstant( 0, ( UINT )m_CubeTexture.GetSRVHandle(), 1 );
 
   for ( int i = -2; i <= 2; ++i )
   {

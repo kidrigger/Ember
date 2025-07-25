@@ -6,6 +6,7 @@
 #include "BindlessManager.hpp"
 #include "Buffer.hpp"
 #include "DepthBuffer.hpp"
+#include "TextureLoader.hpp"
 #include "Util/DirectXHeaders.hpp"
 #include "Util/Runtime.hpp"
 #include "Util/ScopedHandle.hpp"
@@ -81,6 +82,8 @@ public:
 
   void                  ResizeSwapchain( uint32_t width, uint32_t height );
 
+  void                  CreateTextureLoader( TextureLoader* loader ) const;
+
   // Buffer Management
   [[nodiscard]] Buffer      CreateVertexBuffer( uint32_t size, uint32_t stride );
   [[nodiscard]] Buffer      CreateIndexBuffer( uint32_t size, DXGI_FORMAT format );
@@ -100,6 +103,8 @@ public:
   [[nodiscard]] std::array<ID3D12DescriptorHeap*, 2> GetBindlessDescriptorHeaps() const;
 
   // Wait until the all queues have finished all commands.
+  void               WaitOn( Context::Receipt receipt ) const;
+  void               QueueWaitOn( Context::Receipt receipt ) const;
   void               WaitIdle();
   [[nodiscard]] bool IsInit() const;
 
