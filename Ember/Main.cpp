@@ -11,9 +11,11 @@ int CALLBACK wWinMain(
     [[maybe_unused]] PWSTR const     lp_cmd_line,
     [[maybe_unused]] int const       n_cmd_show )
 {
-  auto app = Ember::BasicApp::Create( instance_handle );
+  byte* mem = new byte[sizeof( Ember::BasicApp )];
+  auto* app = ( Ember::BasicApp* )mem;
+  Ember::BasicApp::Create( app, instance_handle );
 
-  app.LoadContent();
+  app->LoadContent();
 
   MSG msg = {};
   while ( msg.message != WM_QUIT )
@@ -25,12 +27,14 @@ int CALLBACK wWinMain(
     }
     else
     {
-      app.Update();
-      app.Render();
+      app->Update();
+      app->Render();
     }
   }
 
-  app.UnloadContent();
+  app->UnloadContent();
+
+  delete[] mem;
 
   return 0;
 }

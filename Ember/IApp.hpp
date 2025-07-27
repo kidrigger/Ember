@@ -1,4 +1,5 @@
 #pragma once
+#include <cstddef>
 
 namespace Ember
 {
@@ -16,7 +17,7 @@ public:
 
   static IApp& Instance();
 
-  IApp();
+  explicit IApp( nullptr_t );
   IApp( IApp const& other )                = delete;
   IApp( IApp&& other ) noexcept            = default;
   IApp& operator=( IApp const& other )     = delete;

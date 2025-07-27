@@ -150,19 +150,42 @@ HWND CreateWindow(
   return h_window;
 }
 
+class RotModel final : public Ember::Node
+{
+public:
+  explicit RotModel( Object* parent, allocator_type const& allocator = {} ) : Node{ parent, allocator }
+  {}
+
+  void Update( float const delta_seconds ) override
+  {
+    auto transform = GetLocalTransform();
+    transform      = XMMatrixMultiply(
+        DirectX::XMMatrixRotationY( DirectX::XMConvertToRadians( 20.0f ) * delta_seconds ), transform );
+    SetLocalTransform( transform );
+
+    Node::Update( delta_seconds );
+  }
+
+  Ember::Model* AddModel(
+      Ember::Mesh* mesh, std::span<Ember::Material*> materials, std::span<Ember::Primitive> primitives )
+  {
+    return CreateChildObject<Ember::Model>( mesh, std::move( materials ), std::move( primitives ) );
+  }
+};
+
 Ember::BasicApp::BasicApp(
     HWND const                     window_handle,
     std::unique_ptr<RenderDevice>  render_device,
     std::unique_ptr<PerfCounter>   perf_counter,
     std::unique_ptr<TextureLoader> texture_loader )
-  : m_WindowHandle{ window_handle }
+  : IApp{ nullptr }
+  , m_WindowHandle{ window_handle }
   , m_RenderDevice{ std::move( render_device ) }
   , m_PerfCounter{ std::move( perf_counter ) }
   , m_TextureLoader{ std::move( texture_loader ) }
-  , m_GlobalTransform{ DirectX::XMMatrixIdentity() }
 {}
 
-Ember::BasicApp Ember::BasicApp::Create( HINSTANCE const instance_handle )
+void Ember::BasicApp::Create( BasicApp* app, HINSTANCE const instance_handle )
 {
   // Windows 10 Creators update adds Per Monitor V2 DPI awareness context.
   // Using this awareness context allows the client area of the window
@@ -191,7 +214,7 @@ Ember::BasicApp Ember::BasicApp::Create( HINSTANCE const instance_handle )
 
   auto perf_counter = std::make_unique<PerfCounter>();
 
-  return BasicApp{
+  new ( app ) BasicApp{
     window_handle,
     std::move( render_device ),
     std::move( perf_counter ),
@@ -212,13 +235,12 @@ void Ember::BasicApp::LoadContent()
     .Projection = DirectX::XMMatrixPerspectiveFovLH(
         DirectX::XMConvertToRadians( 70.0f ), ( float )m_WindowWidth / ( float )m_WindowHeight, 0.1f, 100.0f ),
     .View = DirectX::XMMatrixLookAtLH(
-        DirectX::XMVectorSet( 0.0f, 0.0f, -1.0f, 1.0f ),
+        DirectX::XMVectorSet( 0.0f, 0.0f, -5.0f, 1.0f ),
         DirectX::XMVectorSet( 0.0f, 0.0f, 0.0f, 1.0f ),
         DirectX::XMVectorSet( 0.0f, 1.0f, 0.0f, 0.0f ) ),
   };
 
-  m_GlobalTransform = DirectX::XMMatrixScaling( 0.2f, 0.2f, 0.2f );
-  m_Vertices        = {
+  std::vector<Vertex> vertices = {
     {
      .Position  = DirectX::XMFLOAT3( -1.0f, -1.0f, -1.0f ),
      .Color     = DirectX::XMFLOAT3( 0.0f, 0.0f, 0.0f ),
@@ -259,33 +281,47 @@ void Ember::BasicApp::LoadContent()
      .TexCoord0 = DirectX::XMFLOAT2( 1.0f, 1.0f ) }, // 7
   };
 
-  m_Indices = {
+  std::vector<uint16_t> indices = {
     0, 1, 2, 0, 2, 3, 4, 6, 5, 4, 7, 6, 4, 5, 1, 4, 1, 0, 3, 2, 6, 3, 6, 7, 1, 5, 6, 1, 6, 2, 4, 0, 3, 4, 3, 7,
   };
 
   m_CameraBuffer = m_RenderDevice->CreateConstantBuffer( sizeof( m_Camera ) );
-  m_VertexBuffer = m_RenderDevice->CreateVertexBuffer( ByteSizeOf( m_Vertices ), sizeof( Vertex ) );
-  m_IndexBuffer  = m_RenderDevice->CreateIndexBuffer( ByteSizeOf( m_Indices ), DXGI_FORMAT_R16_UINT );
-
   m_CameraBuffer.Write( 0, sizeof( m_Camera ), &m_Camera );
-  m_VertexBuffer.Write( 0, ByteSizeOf( m_Vertices ), DataOf( m_Vertices ) );
-  m_IndexBuffer.Write( 0, ByteSizeOf( m_Indices ), DataOf( m_Indices ) );
 
-  ASSERT( m_TextureLoader->TryLoadTexture( &m_CubeTexture, L"container2.png" ) );
-  auto texture_load_receipt = m_TextureLoader->EndBatch();
+  Buffer vertex_buffer = m_RenderDevice->CreateVertexBuffer( ByteSizeOf( vertices ), sizeof( Vertex ) );
+  Buffer index_buffer  = m_RenderDevice->CreateIndexBuffer( ByteSizeOf( indices ), DXGI_FORMAT_R16_UINT );
+  vertex_buffer.Write( 0, ByteSizeOf( vertices ), DataOf( vertices ) );
+  index_buffer.Write( 0, ByteSizeOf( indices ), DataOf( indices ) );
 
-  m_Sampler                 = m_RenderDevice->CreateSamplerHandle( {
-                      .Filter         = D3D12_FILTER_ANISOTROPIC,
-                      .AddressU       = D3D12_TEXTURE_ADDRESS_MODE_WRAP,
-                      .AddressV       = D3D12_TEXTURE_ADDRESS_MODE_WRAP,
-                      .AddressW       = D3D12_TEXTURE_ADDRESS_MODE_WRAP,
-                      .MipLODBias     = 0.0f,
-                      .MaxAnisotropy  = D3D12_DEFAULT_MAX_ANISOTROPY,
-                      .ComparisonFunc = D3D12_COMPARISON_FUNC_NONE,
-                      .BorderColor    = D3D12_STATIC_BORDER_COLOR_OPAQUE_BLACK,
-                      .MinLOD         = 0.0f,
-                      .MaxLOD         = 1.0f,
+  Texture cube_texture;
+  ASSERT( m_TextureLoader->TryLoadTexture( &cube_texture, L"container2.png" ) );
+  auto          texture_load_receipt = m_TextureLoader->EndBatch();
+
+  SamplerHandle sampler              = m_RenderDevice->CreateSamplerHandle( {
+                   .Filter         = D3D12_FILTER_ANISOTROPIC,
+                   .AddressU       = D3D12_TEXTURE_ADDRESS_MODE_WRAP,
+                   .AddressV       = D3D12_TEXTURE_ADDRESS_MODE_WRAP,
+                   .AddressW       = D3D12_TEXTURE_ADDRESS_MODE_WRAP,
+                   .MipLODBias     = 0.0f,
+                   .MaxAnisotropy  = D3D12_DEFAULT_MAX_ANISOTROPY,
+                   .ComparisonFunc = D3D12_COMPARISON_FUNC_NONE,
+                   .BorderColor    = D3D12_STATIC_BORDER_COLOR_OPAQUE_BLACK,
+                   .MinLOD         = 0.0f,
+                   .MaxLOD         = 1.0f,
   } );
+
+  Mesh*         mesh                 = World::MeshManager().Construct( vertex_buffer, index_buffer );
+  Material*     material             = World::MaterialManager().Construct( cube_texture, sampler );
+  Primitive     primitive            = {
+                   .Material = material,
+                   .Indexes  = { .FirstIndex = 0, .IndexCount = CountOf( indices ), .FirstVertex = 0 },
+  };
+  for ( int i = -2; i <= 2; ++i )
+  {
+    RotModel* rm = m_World.CreateObject<RotModel>();
+    rm->SetLocalTransform( DirectX::XMMatrixTranslation( ( float )i, ( float )i * 0.3f, ( float )i * 0.1f ) );
+    rm->AddModel( mesh, std::span{ &material, 1 }, std::span{ &primitive, 1 } );
+  }
 
   ComPtr<ID3DBlob> vertex_shader_blob;
   ERR_ABORT( D3DReadFileToBlob( L"TriangleVS.cso", &vertex_shader_blob ) );
@@ -419,14 +455,17 @@ void Ember::BasicApp::Update()
   SetWindowText( m_WindowHandle, m_SprintfBuffer );
 
   float const delta_seconds = ( float )m_PerfCounter->GetDeltaMilliSeconds() * 0.001f;
-  m_GlobalTransform =
-      XMMatrixMultiply( m_GlobalTransform, DirectX::XMMatrixRotationY( DirectX::XM_PIDIV2 * delta_seconds ) );
 
   m_TextureLoader->Update();
+
+  m_World.Update( delta_seconds );
 }
 
 void Ember::BasicApp::Render()
 {
+  m_RenderQueue.Clear();
+  m_World.Render( &m_RenderQueue );
+
   ID3D12Resource*                   backbuffer   = m_RenderDevice->GetCurrentBackbuffer();
   ComPtr<ID3D12GraphicsCommandList> command_list = m_RenderDevice->GetGraphicsCommandList();
 
@@ -468,20 +507,22 @@ void Ember::BasicApp::Render()
   command_list->RSSetScissorRects( 1, &scissor );
   command_list->OMSetRenderTargets( 1, &rtv, FALSE, &dsv );
 
-  command_list->IASetIndexBuffer( &m_IndexBuffer.GetIndexBufferView() );
-  command_list->IASetVertexBuffers( 0, 1, &m_VertexBuffer.GetVertexBufferView() );
-  command_list->SetGraphicsRoot32BitConstant( 0, ( UINT )m_CameraBuffer.GetCBVHandle(), 0 );
-  command_list->SetGraphicsRoot32BitConstant( 0, ( UINT )m_CubeTexture.GetSRVHandle(), 1 );
-  command_list->SetGraphicsRoot32BitConstant( 0, ( UINT )m_Sampler, 2 );
-
-  for ( int i = -2; i <= 2; ++i )
+  size_t const count = m_RenderQueue.Count();
+  for ( size_t i = 0; i < count; ++i )
   {
-    DirectX::XMMATRIX matrix = XMMatrixMultiply(
-        m_GlobalTransform, DirectX::XMMatrixTranslation( 0.5f * ( float )i, 0.2f * ( float )i, 0.0f ) );
-
-    command_list->SetGraphicsRoot32BitConstants( 1, sizeof( DirectX::XMMATRIX ) / 4, &matrix, 0 );
-
-    command_list->DrawIndexedInstanced( CountOf( m_Indices ), 1, 0, 0, 0 );
+    command_list->IASetIndexBuffer( &m_RenderQueue.Meshes[i]->IndexBuffer.GetIndexBufferView() );
+    command_list->IASetVertexBuffers( 0, 1, &m_RenderQueue.Meshes[i]->VertexBuffer.GetVertexBufferView() );
+    command_list->SetGraphicsRoot32BitConstant( 0, ( UINT )m_CameraBuffer.GetCBVHandle(), 0 );
+    command_list->SetGraphicsRoot32BitConstant( 0, ( UINT )m_RenderQueue.Materials[i]->Albedo.GetSRVHandle(), 1 );
+    command_list->SetGraphicsRoot32BitConstant( 0, ( UINT )m_RenderQueue.Materials[i]->Sampler, 2 );
+    command_list->SetGraphicsRoot32BitConstants(
+        1, sizeof( DirectX::XMMATRIX ) / 4, &m_RenderQueue.Transforms[i].Transform, 0 );
+    command_list->DrawIndexedInstanced(
+        m_RenderQueue.Primitives[i].IndexCount,
+        1,
+        m_RenderQueue.Primitives[i].FirstIndex,
+        m_RenderQueue.Primitives[i].FirstVertex,
+        0 );
   }
 
   barrier = CD3DX12_RESOURCE_BARRIER::Transition(

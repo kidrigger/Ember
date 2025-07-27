@@ -10,7 +10,7 @@ Ember::IApp& Ember::IApp::Instance()
   return *m_Instance;
 }
 
-Ember::IApp::IApp()
+Ember::IApp::IApp( nullptr_t )
 {
   ASSERT_M( not m_Instance, "Only one instance of App allowed at once" );
   m_Instance = this;

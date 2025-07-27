@@ -3,6 +3,7 @@
 #include "Buffer.hpp"
 #include "DepthBuffer.hpp"
 #include "IApp.hpp"
+#include "Scene.hpp"
 #include "Texture.hpp"
 #include "Util/DirectXHeaders.hpp"
 #include "Util/Runtime.hpp"
@@ -46,15 +47,8 @@ class BasicApp final : public IApp
   Camera                      m_Camera;
   Buffer                      m_CameraBuffer;
 
-  // Model Specific
-  DirectX::XMMATRIX     m_GlobalTransform;
-
-  std::vector<Vertex>   m_Vertices;
-  std::vector<uint16_t> m_Indices;
-  Buffer                m_VertexBuffer;
-  Buffer                m_IndexBuffer;
-  Texture               m_CubeTexture;
-  SamplerHandle         m_Sampler;
+  World                       m_World;
+  RenderCommandQueue          m_RenderQueue;
 
 public:
   BasicApp(
@@ -63,19 +57,19 @@ public:
       std::unique_ptr<PerfCounter>   perf_counter,
       std::unique_ptr<TextureLoader> texture_loader );
 
-  void            LoadContent() override;
-  void            Update() override;
-  void            Render() override;
-  void            UnloadContent() override;
+  void        LoadContent() override;
+  void        Update() override;
+  void        Render() override;
+  void        UnloadContent() override;
 
-  void            Resize() override;
+  void        Resize() override;
 
-  static BasicApp Create( HINSTANCE instance_handle );
+  static void Create( BasicApp* app, HINSTANCE instance_handle );
 
   BasicApp( BasicApp const& other )                = delete;
   BasicApp& operator=( BasicApp const& other )     = delete;
-  BasicApp( BasicApp&& other ) noexcept            = default;
-  BasicApp& operator=( BasicApp&& other ) noexcept = default;
+  BasicApp( BasicApp&& other ) noexcept            = delete;
+  BasicApp& operator=( BasicApp&& other ) noexcept = delete;
   ~BasicApp() override;
 };
 

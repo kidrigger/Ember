@@ -213,8 +213,10 @@
     <ClCompile Include="Buffer.cpp" />
     <ClCompile Include="DepthBuffer.cpp" />
     <ClCompile Include="IApp.cpp" />
+    <ClCompile Include="ObjectPool.cpp" />
     <ClCompile Include="RenderDevice.cpp" />
     <ClCompile Include="Main.cpp" />
+    <ClCompile Include="Scene.cpp" />
     <ClCompile Include="Texture.cpp" />
     <ClCompile Include="TextureLoader.cpp" />
     <ClCompile Include="Context.cpp" />
@@ -229,7 +231,9 @@
     <ClInclude Include="Buffer.hpp" />
     <ClInclude Include="DepthBuffer.hpp" />
     <ClInclude Include="IApp.hpp" />
+    <ClInclude Include="ObjectPool.hpp" />
     <ClInclude Include="RenderDevice.hpp" />
+    <ClInclude Include="Scene.hpp" />
     <ClInclude Include="Texture.hpp" />
     <ClInclude Include="TextureLoader.hpp" />
     <ClInclude Include="Context.hpp" />
