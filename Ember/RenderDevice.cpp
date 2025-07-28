@@ -312,6 +312,11 @@ Ember::Buffer Ember::RenderDevice::CreateConstantBuffer( uint32_t const size )
   return m_BufferManager.CreateConstantBuffer( size );
 }
 
+Ember::Sampler Ember::RenderDevice::CreateSampler( D3D12_SAMPLER_DESC const& sampler_desc )
+{
+  return m_TextureManager.CreateSampler( sampler_desc );
+}
+
 Ember::DepthBuffer Ember::RenderDevice::CreateDepthBuffer( uint32_t const width, uint32_t const height ) const
 {
   D3D12MA::ALLOCATION_DESC const allocation_desc = {

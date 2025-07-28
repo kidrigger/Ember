@@ -1,19 +1,67 @@
 #include "Scene.hpp"
 
+DirectX::XMMATRIX Ember::LocalTransform::GetTransform() const
+{
+  return DirectX::XMMatrixAffineTransformation( Scale, DirectX::XMVectorZero(), Rotation, Translation );
+}
+
+void Ember::LocalTransform::SetTransform( DirectX::FXMMATRIX& transform )
+{
+  XMMatrixDecompose( &Scale, &Rotation, &Translation, transform );
+}
+
 Ember::Object::Object( Object* const parent )
   : m_LocalTransform{ World::LocalTransformManager().Construct() }
   , m_WorldTransform{ World::WorldTransformManager().Construct() }
   , m_Parent{ parent }
 {}
 
-DirectX::FXMMATRIX& Ember::Object::GetLocalTransform() const
+DirectX::FXMMATRIX Ember::Object::GetLocalTransform() const
 {
-  return m_LocalTransform->Transform;
+  return m_LocalTransform->GetTransform();
 }
 
 void Ember::Object::SetLocalTransform( DirectX::XMMATRIX const& transform ) const
 {
-  m_LocalTransform->Transform = transform;
+  m_LocalTransform->SetTransform( transform );
+}
+
+void Ember::Object::SetLocalTransform(
+    DirectX::XMVECTOR const& translation, DirectX::XMVECTOR const& rotation, DirectX::XMVECTOR const& scale ) const
+{
+  m_LocalTransform->Translation = translation;
+  m_LocalTransform->Rotation    = rotation;
+  m_LocalTransform->Scale       = scale;
+}
+
+DirectX::XMVECTOR Ember::Object::GetLocalTranslation() const
+{
+  return m_LocalTransform->Translation;
+}
+
+void Ember::Object::SetLocalTranslation( DirectX::XMVECTOR const& translation ) const
+{
+  m_LocalTransform->Translation = translation;
+}
+
+DirectX::XMVECTOR Ember::Object::GetLocalRotation() const
+{
+  return m_LocalTransform->Rotation;
+}
+
+void Ember::Object::SetLocalRotation( DirectX::XMVECTOR const& rotation ) const
+{
+  m_LocalTransform->Rotation = rotation;
+}
+
+DirectX::XMVECTOR Ember::Object::GetLocalScale() const
+{
+  return m_LocalTransform->Scale;
+}
+
+void Ember::Object::SetLocalScale( DirectX::XMVECTOR const& scale ) const
+{
+  m_LocalTransform->Scale = scale;
 }
 
 Ember::WorldTransform& Ember::Object::GetWorldTransform() const
@@ -23,7 +71,7 @@ Ember::WorldTransform& Ember::Object::GetWorldTransform() const
 
 void Ember::Object::SetWorldTransform( DirectX::XMMATRIX const& transform ) const
 {
-  m_LocalTransform->Transform    = XMMatrixMultiply( transform, m_Parent->GetWorldTransform().InvTransform );
+  SetLocalTransform( XMMatrixMultiply( transform, m_Parent->GetWorldTransform().InvTransform ) );
   m_WorldTransform->Transform    = transform;
   m_WorldTransform->InvTransform = XMMatrixInverse( nullptr, transform );
 }
@@ -41,7 +89,7 @@ void Ember::Object::SetParent( Object* parent )
 void Ember::Object::UpdateWorldTransform()
 {
   m_WorldTransform->Transform =
-      XMMatrixMultiply( m_LocalTransform->Transform, m_Parent->GetWorldTransform().Transform );
+      XMMatrixMultiply( m_LocalTransform->GetTransform(), m_Parent->GetWorldTransform().Transform );
   m_WorldTransform->InvTransform = XMMatrixInverse( nullptr, m_WorldTransform->Transform );
 }
 
@@ -59,6 +107,15 @@ std::span<Ember::Object*> Ember::Node::GetChildren()
 Ember::Node::Node( Object* const parent, std::pmr::polymorphic_allocator<> const& allocator )
   : Object{ parent }, m_Children{ allocator }
 {}
+
+void Ember::Node::AddChild( Object* object )
+{
+  // If something has a child, it must be a Node.
+  Node* parent = ( Node* )object->GetParent();
+  std::erase( parent->m_Children, object );
+  object->SetParent( this );
+  m_Children.push_back( object );
+}
 
 void Ember::Node::UpdateWorldTransform()
 {
@@ -93,36 +150,47 @@ Ember::Node::~Node()
   }
 }
 
-Ember::Model::Model(
-    Object*                     parent,
-    Mesh*                       mesh,
-    std::span<Material*> const& materials,
-    std::span<Primitive> const& primitives,
-    allocator_type const&       allocator )
-  : Object{ parent }
-  , m_Mesh{ mesh }
-  , m_Materials{ materials.begin(), materials.end(), allocator }
-  , m_Primitives{ primitives.begin(), primitives.end(), allocator }
+
+Ember::Model::Model( Object* parent, std::span<Material*> const& materials, allocator_type const& allocator )
+  : Node{ parent, allocator }, m_Materials{ materials.begin(), materials.end(), allocator }
 {}
 
-void Ember::Model::Update( float )
+Ember::Model::Model( Object* parent, allocator_type const& allocator )
+  : Node{ parent, allocator }, m_Materials{ allocator }
 {}
 
-void Ember::Model::Render( RenderCommandQueue* render_queue )
+void Ember::Model::AddMaterial( Material* material )
 {
-  for ( Primitive const& primitive : m_Primitives )
-  {
-    render_queue->Push( GetWorldTransform(), m_Mesh, primitive.Material, primitive.Indexes );
-  }
+  m_Materials.push_back( material );
 }
 
 Ember::Model::~Model()
 {
-  World::MeshManager().Destroy( m_Mesh );
   for ( Material* material : m_Materials )
   {
     World::MaterialManager().Destroy( material );
   }
+}
+
+Ember::Mesh::Mesh(
+    Object* parent, MeshData* mesh_data, std::span<Primitive> const& primitives, allocator_type const& allocator )
+  : Object{ parent }, m_MeshData{ mesh_data }, m_Primitives{ primitives.begin(), primitives.end(), allocator }
+{}
+
+void Ember::Mesh::Update( float )
+{}
+
+void Ember::Mesh::Render( RenderCommandQueue* render_queue )
+{
+  for ( Primitive const& primitive : m_Primitives )
+  {
+    render_queue->Push( GetWorldTransform(), m_MeshData, primitive.Material, primitive.DrawInfo );
+  }
+}
+
+Ember::Mesh::~Mesh()
+{
+  World::MeshManager().Destroy( m_MeshData );
 }
 
 Ember::ObjectPool<Ember::LocalTransform>& Ember::World::LocalTransformManager()
@@ -137,9 +205,9 @@ Ember::ObjectPool<Ember::WorldTransform>& Ember::World::WorldTransformManager()
   return world_transform_manager;
 }
 
-Ember::ObjectPool<Ember::Mesh>& Ember::World::MeshManager()
+Ember::ObjectPool<Ember::MeshData>& Ember::World::MeshManager()
 {
-  static ObjectPool<Mesh> mesh_manager;
+  static ObjectPool<MeshData> mesh_manager;
   return mesh_manager;
 }
 

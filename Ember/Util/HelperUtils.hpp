@@ -10,7 +10,6 @@
 #define DEBUG_BREAK
 #endif
 
-
 #define ERR_FAIL_RET_V( EXPR, RET_VALUE )                                                                              \
   do                                                                                                                   \
   {                                                                                                                    \
@@ -59,3 +58,6 @@
 
 #define ASSERT( x ) assert( x )
 #define ASSERT_M( x, MSG ) ASSERT( ( x ) and ( MSG ) )
+
+#define UNREACHABLE std::terminate()
+#define UNREACHABLE_M( MSG ) std::terminate()

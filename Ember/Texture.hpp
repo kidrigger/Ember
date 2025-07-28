@@ -8,6 +8,33 @@
 namespace Ember
 {
 
+class Sampler
+{
+public:
+  struct SamplerInfoImpl
+  {
+    BindlessManager* Bindless;
+    SamplerHandle    Handle;
+
+    SamplerInfoImpl( BindlessManager* bindless, SamplerHandle handle );
+    SamplerInfoImpl( SamplerInfoImpl const& other ) = delete;
+    SamplerInfoImpl( SamplerInfoImpl&& other ) noexcept;
+    SamplerInfoImpl& operator=( SamplerInfoImpl const& other ) = delete;
+    SamplerInfoImpl& operator=( SamplerInfoImpl&& other ) noexcept;
+    ~SamplerInfoImpl();
+  };
+  using SamplerInfo = std::shared_ptr<SamplerInfoImpl>;
+
+private:
+  SamplerInfo m_SamplerInfo;
+
+public:
+  Sampler() = default;
+  explicit Sampler( SamplerInfo sampler_handle );
+
+  [[nodiscard]] SamplerHandle GetSamplerHandle() const;
+};
+
 class Texture
 {
 public:
@@ -46,14 +73,15 @@ class TextureManager
   std::pmr::synchronized_pool_resource m_MemoryPool;
   BindlessManager*                     m_Bindless{ nullptr };
   ComPtr<ID3D12Device2>                m_Device;
-  ComPtr<D3D12MA::Allocator>           m_GpuAllocator;
+  ComPtr<D3D12MA::Allocator>           m_Allocator;
 
 public:
   TextureManager() = default;
   TextureManager(
-      ComPtr<ID3D12Device2> device, ComPtr<D3D12MA::Allocator> gpu_allocator, BindlessManager* bindless_manager );
+      ComPtr<ID3D12Device2> device, ComPtr<D3D12MA::Allocator> allocator, BindlessManager* bindless_manager );
 
   Texture CreateTexture2D( DXGI_FORMAT format, uint32_t width, uint32_t height );
+  Sampler CreateSampler( D3D12_SAMPLER_DESC const& sampler_desc );
 };
 
 } // namespace Ember

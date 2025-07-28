@@ -4,39 +4,31 @@
 #include "DepthBuffer.hpp"
 #include "IApp.hpp"
 #include "Scene.hpp"
-#include "Texture.hpp"
 #include "Util/DirectXHeaders.hpp"
 #include "Util/Runtime.hpp"
 
 namespace Ember
 {
+class ModelLoader;
 class PerfCounter;
 class RenderDevice;
-class TextureLoader;
 
 class BasicApp final : public IApp
 {
-  struct Vertex
-  {
-    DirectX::XMFLOAT3 Position;
-    DirectX::XMFLOAT3 Color;
-    DirectX::XMFLOAT2 TexCoord0;
-  };
-
   struct Camera
   {
     DirectX::XMMATRIX Projection{ DirectX::XMMatrixIdentity() };
     DirectX::XMMATRIX View{ DirectX::XMMatrixIdentity() };
   };
 
-  HWND                           m_WindowHandle{ nullptr };
-  uint32_t                       m_WindowWidth{ 1280 };
-  uint32_t                       m_WindowHeight{ 720 };
+  HWND                          m_WindowHandle{ nullptr };
+  uint32_t                      m_WindowWidth{ 1280 };
+  uint32_t                      m_WindowHeight{ 720 };
 
-  std::unique_ptr<RenderDevice>  m_RenderDevice;
-  std::unique_ptr<PerfCounter>   m_PerfCounter;
-  std::unique_ptr<TextureLoader> m_TextureLoader;
-  wchar_t                        m_SprintfBuffer[1024]{};
+  std::unique_ptr<RenderDevice> m_RenderDevice;
+  std::unique_ptr<PerfCounter>  m_PerfCounter;
+  std::unique_ptr<ModelLoader>  m_ModelLoader;
+  wchar_t                       m_SprintfBuffer[1024]{};
 
   // Specifics
   ComPtr<ID3D12RootSignature> m_RootSignature;
@@ -52,10 +44,7 @@ class BasicApp final : public IApp
 
 public:
   BasicApp(
-      HWND                           window_handle,
-      std::unique_ptr<RenderDevice>  render_device,
-      std::unique_ptr<PerfCounter>   perf_counter,
-      std::unique_ptr<TextureLoader> texture_loader );
+      HWND window_handle, std::unique_ptr<RenderDevice> render_device, std::unique_ptr<PerfCounter> perf_counter );
 
   void        LoadContent() override;
   void        Update() override;

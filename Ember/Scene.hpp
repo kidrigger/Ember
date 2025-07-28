@@ -13,7 +13,12 @@ namespace Ember
 
 struct LocalTransform
 {
-  DirectX::XMMATRIX Transform{ DirectX::XMMatrixIdentity() };
+  DirectX::XMVECTOR               Translation{ DirectX::XMVectorSet( 0.0f, 0.0f, 0.0f, 1.0f ) };
+  DirectX::XMVECTOR               Rotation{ DirectX::XMQuaternionIdentity() };
+  DirectX::XMVECTOR               Scale{ DirectX::XMVectorSplatOne() };
+
+  [[nodiscard]] DirectX::XMMATRIX GetTransform() const;
+  void                            SetTransform( DirectX::FXMMATRIX const& transform );
 };
 
 struct WorldTransform
@@ -22,16 +27,17 @@ struct WorldTransform
   DirectX::XMMATRIX InvTransform{ DirectX::XMMatrixIdentity() };
 };
 
-struct Mesh
+struct Material
+{
+  DirectX::XMFLOAT4 BaseColor;
+  Texture           Albedo;
+  Sampler           Sampler;
+};
+
+struct MeshData
 {
   Buffer VertexBuffer;
   Buffer IndexBuffer;
-};
-
-struct Material
-{
-  Texture       Albedo;
-  SamplerHandle Sampler;
 };
 
 struct Primitive
@@ -43,13 +49,13 @@ struct Primitive
     uint32_t FirstVertex;
   };
   Material* Material;
-  Data      Indexes;
+  Data      DrawInfo;
 };
 
 struct RenderCommandQueue
 {
   std::vector<WorldTransform>  Transforms;
-  std::vector<Mesh*>           Meshes;
+  std::vector<MeshData*>       Meshes;
   std::vector<Material*>       Materials;
   std::vector<Primitive::Data> Primitives;
 
@@ -66,7 +72,8 @@ struct RenderCommandQueue
     Primitives.clear();
   }
 
-  void Push( WorldTransform const& transform, Mesh* mesh, Material* material, Primitive::Data const& primitive_data )
+  void Push(
+      WorldTransform const& transform, MeshData* mesh, Material* material, Primitive::Data const& primitive_data )
   {
     Transforms.push_back( transform );
     Meshes.push_back( mesh );
@@ -84,17 +91,25 @@ class Object
 
 public:
   explicit Object( Object* parent );
-  [[nodiscard]] DirectX::FXMMATRIX& GetLocalTransform() const;
-  void                              SetLocalTransform( DirectX::XMMATRIX const& transform ) const;
-  [[nodiscard]] WorldTransform&     GetWorldTransform() const;
-  void                              SetWorldTransform( DirectX::XMMATRIX const& transform ) const;
-  [[nodiscard]] Object*             GetParent() const;
-  void                              SetParent( Object* parent );
+  [[nodiscard]] DirectX::FXMMATRIX GetLocalTransform() const;
+  void                             SetLocalTransform( DirectX::XMMATRIX const& transform ) const;
+  void                             SetLocalTransform(
+                                  DirectX::XMVECTOR const& translation, DirectX::XMVECTOR const& rotation, DirectX::XMVECTOR const& scale ) const;
+  DirectX::XMVECTOR             GetLocalTranslation() const;
+  void                          SetLocalTranslation( DirectX::XMVECTOR const& translation ) const;
+  DirectX::XMVECTOR             GetLocalRotation() const;
+  void                          SetLocalRotation( DirectX::XMVECTOR const& rotation ) const;
+  DirectX::XMVECTOR             GetLocalScale() const;
+  void                          SetLocalScale( DirectX::XMVECTOR const& scale ) const;
+  [[nodiscard]] WorldTransform& GetWorldTransform() const;
+  void                          SetWorldTransform( DirectX::XMMATRIX const& transform ) const;
+  [[nodiscard]] Object*         GetParent() const;
+  void                          SetParent( Object* parent );
 
-  virtual void                      Update( float delta_seconds )              = 0;
-  virtual void                      Render( RenderCommandQueue* render_queue ) = 0;
+  virtual void                  Update( float delta_seconds )              = 0;
+  virtual void                  Render( RenderCommandQueue* render_queue ) = 0;
 
-  virtual void                      UpdateWorldTransform();
+  virtual void                  UpdateWorldTransform();
 
   Object( Object const& other )                = delete;
   Object( Object&& other ) noexcept            = delete;
@@ -125,6 +140,8 @@ public:
     return object;
   }
 
+  void AddChild( Object* object );
+
   void UpdateWorldTransform() override;
 
   void Update( float delta_seconds ) override;
@@ -137,30 +154,47 @@ public:
   ~Node() override;
 };
 
-class Model final : public Object
+class Model final : public Node
 {
-  Mesh*                       m_Mesh;
   std::pmr::vector<Material*> m_Materials;
-  std::pmr::vector<Primitive> m_Primitives;
 
 public:
   using allocator_type = std::pmr::polymorphic_allocator<>;
 
-  Model(
-      Object*                     parent,
-      Mesh*                       mesh,
-      std::span<Material*> const& materials,
-      std::span<Primitive> const& primitives,
-      allocator_type const&       allocator = {} );
+  Model( Object* parent, std::span<Material*> const& materials, allocator_type const& allocator = {} );
+  explicit Model( Object* parent, allocator_type const& allocator = {} );
 
-  void Update( float delta_seconds ) override;
-  void Render( RenderCommandQueue* render_queue ) override;
+  void AddMaterial( Material* material );
 
   Model( Model const& other )                = delete;
   Model( Model&& other ) noexcept            = delete;
   Model& operator=( Model const& other )     = delete;
   Model& operator=( Model&& other ) noexcept = delete;
   ~Model() override;
+};
+
+class Mesh final : public Object
+{
+  MeshData*                   m_MeshData;
+  std::pmr::vector<Primitive> m_Primitives;
+
+public:
+  using allocator_type = std::pmr::polymorphic_allocator<>;
+
+  Mesh(
+      Object*                     parent,
+      MeshData*                   mesh_data,
+      std::span<Primitive> const& primitives,
+      allocator_type const&       allocator = {} );
+
+  void Update( float delta_seconds ) override;
+  void Render( RenderCommandQueue* render_queue ) override;
+
+  Mesh( Mesh const& other )                = delete;
+  Mesh( Mesh&& other ) noexcept            = delete;
+  Mesh& operator=( Mesh const& other )     = delete;
+  Mesh& operator=( Mesh&& other ) noexcept = delete;
+  ~Mesh() override;
 };
 
 class World final : public Node
@@ -171,7 +205,7 @@ class World final : public Node
 public:
   static ObjectPool<LocalTransform>& LocalTransformManager();
   static ObjectPool<WorldTransform>& WorldTransformManager();
-  static ObjectPool<Mesh>&           MeshManager();
+  static ObjectPool<MeshData>&       MeshManager();
   static ObjectPool<Material>&       MaterialManager();
 
   World();

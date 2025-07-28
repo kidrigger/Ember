@@ -1,8 +1,10 @@
 cbuffer BindlessIndex : register( b0, space0 )
 {
-  uint g_CameraIndex;
-  uint g_TextureIndex;
-  uint g_SamplerIndex;
+  uint   g_CameraIndex;
+  uint   g_TextureIndex;
+  uint   g_SamplerIndex;
+  uint   g_Padding;
+  float4 g_BaseColor;
 }
 
 struct VSOut

@@ -211,8 +211,10 @@
     <ClCompile Include="BasicApp.cpp" />
     <ClCompile Include="BindlessManager.cpp" />
     <ClCompile Include="Buffer.cpp" />
+    <ClCompile Include="CgltfImpl.cpp" />
     <ClCompile Include="DepthBuffer.cpp" />
     <ClCompile Include="IApp.cpp" />
+    <ClCompile Include="ModelLoader.cpp" />
     <ClCompile Include="ObjectPool.cpp" />
     <ClCompile Include="RenderDevice.cpp" />
     <ClCompile Include="Main.cpp" />
@@ -231,6 +233,7 @@
     <ClInclude Include="Buffer.hpp" />
     <ClInclude Include="DepthBuffer.hpp" />
     <ClInclude Include="IApp.hpp" />
+    <ClInclude Include="ModelLoader.hpp" />
     <ClInclude Include="ObjectPool.hpp" />
     <ClInclude Include="RenderDevice.hpp" />
     <ClInclude Include="Scene.hpp" />
@@ -249,6 +252,24 @@
     <None Include="..\.clang-format" />
     <None Include="..\.gitignore" />
     <None Include="..\vcpkg.json" />
+    <CopyFileToFolders Include="Assets\Box.glb">
+      <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">false</ExcludedFromBuild>
+      <DeploymentContent Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">true</DeploymentContent>
+      <FileType>Document</FileType>
+      <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='RenderDoc_Compat|x64'">false</ExcludedFromBuild>
+      <DeploymentContent Condition="'$(Configuration)|$(Platform)'=='RenderDoc_Compat|x64'">true</DeploymentContent>
+      <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='Release|x64'">false</ExcludedFromBuild>
+      <DeploymentContent Condition="'$(Configuration)|$(Platform)'=='Release|x64'">true</DeploymentContent>
+    </CopyFileToFolders>
+    <CopyFileToFolders Include="Assets\BoxTextured.glb">
+      <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">false</ExcludedFromBuild>
+      <DeploymentContent Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">true</DeploymentContent>
+      <FileType>Document</FileType>
+      <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='RenderDoc_Compat|x64'">false</ExcludedFromBuild>
+      <DeploymentContent Condition="'$(Configuration)|$(Platform)'=='RenderDoc_Compat|x64'">true</DeploymentContent>
+      <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='Release|x64'">false</ExcludedFromBuild>
+      <DeploymentContent Condition="'$(Configuration)|$(Platform)'=='Release|x64'">true</DeploymentContent>
+    </CopyFileToFolders>
     <None Include="PLAN.md">
       <SubType>
       </SubType>

@@ -93,6 +93,12 @@
     <ClCompile Include="TextureLoader.cpp">
       <Filter>Source Files\Resources</Filter>
     </ClCompile>
+    <ClCompile Include="ModelLoader.cpp">
+      <Filter>Source Files\Resources</Filter>
+    </ClCompile>
+    <ClCompile Include="CgltfImpl.cpp">
+      <Filter>Source Files\Util</Filter>
+    </ClCompile>
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="Util\PerfCounter.hpp">
@@ -152,6 +158,9 @@
     <ClInclude Include="TextureLoader.hpp">
       <Filter>Header Files\Resources</Filter>
     </ClInclude>
+    <ClInclude Include="ModelLoader.hpp">
+      <Filter>Header Files\Resources</Filter>
+    </ClInclude>
   </ItemGroup>
   <ItemGroup>
     <None Include="..\.clang-format">
@@ -180,6 +189,12 @@
   </ItemGroup>
   <ItemGroup>
     <CopyFileToFolders Include="Assets\container2.png">
+      <Filter>Resource Files\Assets</Filter>
+    </CopyFileToFolders>
+    <CopyFileToFolders Include="Assets\Box.glb">
+      <Filter>Resource Files\Assets</Filter>
+    </CopyFileToFolders>
+    <CopyFileToFolders Include="Assets\BoxTextured.glb">
       <Filter>Resource Files\Assets</Filter>
     </CopyFileToFolders>
   </ItemGroup>

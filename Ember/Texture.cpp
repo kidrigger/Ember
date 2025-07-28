@@ -4,6 +4,40 @@
 
 #include "Util/HelperUtils.hpp"
 
+Ember::Sampler::SamplerInfoImpl::SamplerInfoImpl( BindlessManager* const bindless, SamplerHandle handle )
+  : Bindless{ bindless }, Handle{ std::move( handle ) }
+{}
+
+Ember::Sampler::SamplerInfoImpl::SamplerInfoImpl( SamplerInfoImpl&& other ) noexcept
+  : Bindless{ other.Bindless }, Handle{ std::move( other.Handle ) }
+{
+  other.Bindless = nullptr;
+  other.Handle   = {};
+}
+
+Ember::Sampler::SamplerInfoImpl& Ember::Sampler::SamplerInfoImpl::operator=( SamplerInfoImpl&& other ) noexcept
+{
+  if ( this == &other ) return *this;
+  std::swap( Bindless, other.Bindless );
+  std::swap( Handle, other.Handle );
+  return *this;
+}
+
+Ember::Sampler::SamplerInfoImpl::~SamplerInfoImpl()
+{
+  if ( not Bindless ) return;
+
+  Bindless->Free( Handle );
+}
+
+Ember::Sampler::Sampler( SamplerInfo sampler_handle ) : m_SamplerInfo{ std::move( sampler_handle ) }
+{}
+
+Ember::SamplerHandle Ember::Sampler::GetSamplerHandle() const
+{
+  return m_SamplerInfo->Handle;
+}
+
 Ember::Texture::TextureInfoImpl::TextureInfoImpl( BindlessManager* const bindless, SRVHandle as_srv, UAVHandle as_uav )
   : Bindless{ bindless }, AsSRV{ std::move( as_srv ) }, AsUAV{ std::move( as_uav ) }
 {}
@@ -46,23 +80,24 @@ ID3D12Resource* Ember::Texture::GetTexture() const
 
 Ember::SRVHandle Ember::Texture::GetSRVHandle() const
 {
+  if ( not m_TextureInfo ) return {};
   return m_TextureInfo->AsSRV;
 }
 
 Ember::UAVHandle Ember::Texture::GetUAVHandle() const
 {
+  if ( not m_TextureInfo ) return {};
   return m_TextureInfo->AsUAV;
 }
 
 Ember::TextureManager::TextureManager(
-    ComPtr<ID3D12Device2> device, ComPtr<D3D12MA::Allocator> gpu_allocator, BindlessManager* const bindless_manager )
-  : m_Bindless{ bindless_manager }, m_Device{ std::move( device ) }, m_GpuAllocator{ std::move( gpu_allocator ) }
+    ComPtr<ID3D12Device2> device, ComPtr<D3D12MA::Allocator> allocator, BindlessManager* const bindless_manager )
+  : m_Bindless{ bindless_manager }, m_Device{ std::move( device ) }, m_Allocator{ std::move( allocator ) }
 {}
 
 Ember::Texture Ember::TextureManager::CreateTexture2D(
     DXGI_FORMAT const format, uint32_t const width, uint32_t const height )
 {
-
   ComPtr<ID3D12Resource>      texture;
   ComPtr<D3D12MA::Allocation> allocation;
 
@@ -74,7 +109,7 @@ Ember::Texture Ember::TextureManager::CreateTexture2D(
     .HeapType = D3D12_HEAP_TYPE_DEFAULT,
   };
 
-  ERR_ABORT( m_GpuAllocator->CreateResource(
+  ERR_ABORT( m_Allocator->CreateResource(
       &allocation_desc,
       &resource_desc,
       D3D12_RESOURCE_STATE_COPY_DEST,
@@ -98,7 +133,15 @@ Ember::Texture Ember::TextureManager::CreateTexture2D(
       texture.Get(), CD3DX12_UNORDERED_ACCESS_VIEW_DESC::Tex2D( DirectX::MakeLinear( format ) ) );
 
   auto texture_info = std::allocate_shared<Texture::TextureInfoImpl>(
-      std::pmr::polymorphic_allocator<byte>{ &m_MemoryPool }, m_Bindless, srv_handle, uav_handle );
+      std::pmr::polymorphic_allocator{ &m_MemoryPool }, m_Bindless, srv_handle, uav_handle );
 
   return Texture{ std::move( texture ), std::move( allocation ), std::move( texture_info ) };
+}
+
+Ember::Sampler Ember::TextureManager::CreateSampler( D3D12_SAMPLER_DESC const& sampler_desc )
+{
+  SamplerHandle handle = m_Bindless->CreateSamplerHandle( sampler_desc );
+
+  return Sampler{ std::allocate_shared<Sampler::SamplerInfoImpl>(
+      std::pmr::polymorphic_allocator{ &m_MemoryPool }, m_Bindless, handle ) };
 }

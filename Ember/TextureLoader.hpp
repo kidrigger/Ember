@@ -2,6 +2,7 @@
 
 #include <filesystem>
 #include <memory_resource>
+#include <span>
 #include <string>
 #include <unordered_map>
 
@@ -14,6 +15,15 @@ namespace Ember
 
 class TextureLoader
 {
+public:
+  enum class ColorSpaceOverride
+  {
+    kNone,
+    kLinear,
+    kSrgb,
+  };
+
+private:
 #if not defined( RENDERDOC_COMPAT )
   using UploadIntermediate = ComPtr<D3D12MA::Allocation>;
 #else
@@ -34,7 +44,7 @@ class TextureLoader
     void ClearResources();
   };
 
-  using TextureCache = std::pmr::unordered_map<std::pmr::wstring, Texture>;
+  using TextureCache = std::pmr::unordered_map<std::pmr::string, Texture>;
 
   ComPtr<ID3D12Device2>                  m_Device;
   ComPtr<D3D12MA::Allocator>             m_Allocator;
@@ -73,7 +83,13 @@ public:
       TextureManager*            texture_manager,
       uint32_t                   upload_frame_count );
 
-  bool             TryLoadTexture( Texture* texture, wchar_t const* filename );
+  bool TryLoadTexture( Texture* texture, char const* filename );
+  bool TryLoadTextureFromData(
+      Texture*           texture,
+      char const*        id,
+      size_t             data_size,
+      byte const*        data,
+      ColorSpaceOverride color_space_override = ColorSpaceOverride::kNone );
   Context::Receipt EndBatch();
 
   void             Update();

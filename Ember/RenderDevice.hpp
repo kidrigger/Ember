@@ -79,6 +79,7 @@ public:
   [[nodiscard]] Buffer      CreateIndexBuffer( uint32_t size, DXGI_FORMAT format );
   [[nodiscard]] Buffer      CreateStorageBuffer( uint32_t size, uint32_t stride );
   [[nodiscard]] Buffer      CreateConstantBuffer( uint32_t size );
+  [[nodiscard]] Sampler     CreateSampler( D3D12_SAMPLER_DESC const& sampler_desc );
 
   [[nodiscard]] DepthBuffer CreateDepthBuffer( uint32_t width, uint32_t height ) const;
 
