@@ -78,7 +78,7 @@ public:
   Context( Context&& other ) noexcept            = default;
   Context& operator=( Context const& other )     = delete;
   Context& operator=( Context&& other ) noexcept = default;
-  ~Context()                                     = default;
+  ~Context();
 };
 
 } // namespace Ember

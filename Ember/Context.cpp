@@ -96,12 +96,13 @@ Ember::Context::Receipt Ember::Context::Submit( CommandList&& command_list )
   m_CommandQueue->ExecuteCommandLists( 1, &p_command_list );
   uint64_t const signal_value = ++m_FenceValue;
   ERR_ABORT( m_CommandQueue->Signal( m_Fence.Get(), signal_value ) );
-  ID3D12CommandAllocator* command_allocator;
-  UINT                    data_size = sizeof( ID3D12CommandAllocator* );
-  ERR_ABORT( command_list->GetPrivateData( _uuidof( ID3D12CommandAllocator ), &data_size, &command_allocator ) );
+  ComPtr<ID3D12CommandAllocator> command_allocator;
+  UINT                           data_size = sizeof( ID3D12CommandAllocator* );
+  ERR_ABORT(
+      command_list->GetPrivateData( _uuidof( ID3D12CommandAllocator ), &data_size, command_allocator.GetAddressOf() ) );
   ERR_ABORT( command_list->SetPrivateDataInterface( _uuidof( ID3D12CommandAllocator ), nullptr ) );
 
-  m_CommandLists.emplace( command_list );
+  m_CommandLists.emplace( std::move( command_list ) );
   m_CommandAllocators.emplace( command_allocator, signal_value );
 
   return { m_Fence.Get(), signal_value };
@@ -161,4 +162,9 @@ void Ember::Context::Create( Context* context, ComPtr<ID3D12Device2> device, D3D
   }
 
   new ( context ) Context{ std::move( device ), std::move( command_queue ), std::move( fence ), fence_event, type };
+}
+
+Ember::Context::~Context()
+{
+  if ( m_CommandQueue ) WaitIdle();
 }

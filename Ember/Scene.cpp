@@ -85,6 +85,14 @@ void Ember::Node::Render( RenderCommandQueue* render_queue )
   }
 }
 
+Ember::Node::~Node()
+{
+  for ( Object* child : m_Children )
+  {
+    m_Children.get_allocator().delete_object( child );
+  }
+}
+
 Ember::Model::Model(
     Object*                     parent,
     Mesh*                       mesh,

@@ -310,14 +310,14 @@ void Ember::BasicApp::LoadContent()
                    .MaxLOD         = 1.0f,
   } );
 
-  Mesh*         mesh                 = World::MeshManager().Construct( vertex_buffer, index_buffer );
-  Material*     material             = World::MaterialManager().Construct( cube_texture, sampler );
-  Primitive     primitive            = {
-                   .Material = material,
-                   .Indexes  = { .FirstIndex = 0, .IndexCount = CountOf( indices ), .FirstVertex = 0 },
-  };
   for ( int i = -2; i <= 2; ++i )
   {
+    Mesh*     mesh      = World::MeshManager().Construct( vertex_buffer, index_buffer );
+    Material* material  = World::MaterialManager().Construct( cube_texture, sampler );
+    Primitive primitive = {
+      .Material = material,
+      .Indexes  = { .FirstIndex = 0, .IndexCount = CountOf( indices ), .FirstVertex = 0 },
+    };
     RotModel* rm = m_World.CreateObject<RotModel>();
     rm->SetLocalTransform( DirectX::XMMatrixTranslation( ( float )i, ( float )i * 0.3f, ( float )i * 0.1f ) );
     rm->AddModel( mesh, std::span{ &material, 1 }, std::span{ &primitive, 1 } );

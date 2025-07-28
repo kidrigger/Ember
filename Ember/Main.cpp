@@ -5,6 +5,8 @@
 #include "Util/HelperUtils.hpp"
 #include "Util/Runtime.hpp"
 
+#pragma comment( lib, "dxguid.lib" )
+
 int CALLBACK wWinMain(
     HINSTANCE const                  instance_handle,
     [[maybe_unused]] HINSTANCE const prev_instance_handle,
@@ -34,7 +36,18 @@ int CALLBACK wWinMain(
 
   app->UnloadContent();
 
+  app->~BasicApp();
+
   delete[] mem;
+
+#if defined( _DEBUG )
+  ComPtr<IDXGIDebug1> debug_device;
+  if ( SUCCEEDED( DXGIGetDebugInterface1( 0, IID_PPV_ARGS( &debug_device ) ) ) )
+  {
+    ERR_ABORT( debug_device->ReportLiveObjects(
+        DXGI_DEBUG_ALL, ( DXGI_DEBUG_RLO_FLAGS )( DXGI_DEBUG_RLO_IGNORE_INTERNAL | DXGI_DEBUG_RLO_SUMMARY ) ) );
+  }
+#endif
 
   return 0;
 }

@@ -129,6 +129,12 @@ public:
 
   void Update( float delta_seconds ) override;
   void Render( RenderCommandQueue* render_queue ) override;
+
+  Node( Node const& other )                = delete;
+  Node( Node&& other ) noexcept            = delete;
+  Node& operator=( Node const& other )     = delete;
+  Node& operator=( Node&& other ) noexcept = delete;
+  ~Node() override;
 };
 
 class Model final : public Object
