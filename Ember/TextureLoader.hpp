@@ -13,17 +13,15 @@
 namespace Ember
 {
 
+enum class ColorSpaceOverride
+{
+  kNone,
+  kLinear,
+  kSrgb,
+};
+
 class TextureLoader
 {
-public:
-  enum class ColorSpaceOverride
-  {
-    kNone,
-    kLinear,
-    kSrgb,
-  };
-
-private:
 #if not defined( RENDERDOC_COMPAT )
   using UploadIntermediate = ComPtr<D3D12MA::Allocation>;
 #else

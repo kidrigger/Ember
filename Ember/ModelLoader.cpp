@@ -35,17 +35,13 @@ void LoadAttribute(
   scratch->clear();
 }
 
-void Ember::ModelLoader::ProcessMesh(
-    Model*                 model,
-    Node*                  parent,
-    MeshData*              mesh_data,
-    std::vector<Vertex>*   vertices,
-    std::vector<uint16_t>* indices,
-    cgltf_mesh const&      mesh )
+void Ember::ModelLoader::ProcessMesh( LoadingContext* context, Node* parent, cgltf_mesh const& mesh )
 {
   using namespace std::string_view_literals;
 
-  cgltf_primitive const* primitives = mesh.primitives;
+  auto [model, mesh_data, vertices, indices] = *context;
+
+  cgltf_primitive const* primitives          = mesh.primitives;
 
   std::vector<Primitive> primitive_acc;
   for ( uint32_t primitive_index = 0; primitive_index < mesh.primitives_count; ++primitive_index )
@@ -181,7 +177,7 @@ void Ember::ModelLoader::ProcessMesh(
 }
 
 bool Ember::ModelLoader::TryLoadTexture(
-    Texture* texture, cgltf_image const& image, TextureLoader::ColorSpaceOverride const color_space_override )
+    Texture* texture, cgltf_image const& image, ColorSpaceOverride const color_space_override )
 {
   byte* data;
   if ( image.buffer_view->data )
@@ -207,15 +203,10 @@ bool Ember::ModelLoader::TryLoadTexture(
   return texture;
 }
 
-void Ember::ModelLoader::ProcessNode(
-    Model*                 model,
-    Node*                  parent,
-    MeshData*              mesh_data,
-    std::vector<Vertex>*   vertices,
-    std::vector<uint16_t>* indices,
-    cgltf_node const&      node )
+void Ember::ModelLoader::ProcessNode( LoadingContext* context, Node* parent, cgltf_node const& node )
 {
-  Node* my_node = parent->CreateChildObject<Node>();
+  auto [model, mesh_data, vertices, indices] = *context;
+  Node* my_node                              = parent->CreateChildObject<Node>();
 
   if ( node.has_matrix )
   {
@@ -235,12 +226,12 @@ void Ember::ModelLoader::ProcessNode(
 
   if ( node.mesh )
   {
-    ProcessMesh( model, my_node, mesh_data, vertices, indices, *node.mesh );
+    ProcessMesh( context, my_node, *node.mesh );
   }
 
   for ( uint32_t child_idx = 0; child_idx < node.children_count; ++child_idx )
   {
-    ProcessNode( model, my_node, mesh_data, vertices, indices, *node.children[child_idx] );
+    ProcessNode( context, my_node, *node.children[child_idx] );
   }
 }
 
@@ -281,7 +272,7 @@ Ember::Material* Ember::ModelLoader::TryProcessMaterial( Model* model, cgltf_mat
   {
     cgltf_image const* base_color_image = material.pbr_metallic_roughness.base_color_texture.texture->image;
 
-    if ( not TryLoadTexture( &base_color_texture, *base_color_image, TextureLoader::ColorSpaceOverride::kSrgb ) )
+    if ( not TryLoadTexture( &base_color_texture, *base_color_image, ColorSpaceOverride::kSrgb ) )
     {
       return nullptr;
     }
@@ -291,7 +282,7 @@ Ember::Material* Ember::ModelLoader::TryProcessMaterial( Model* model, cgltf_mat
   {
     cgltf_image const* metal_rough_image = material.pbr_metallic_roughness.metallic_roughness_texture.texture->image;
 
-    if ( not TryLoadTexture( &metal_rough_texture, *metal_rough_image, TextureLoader::ColorSpaceOverride::kLinear ) )
+    if ( not TryLoadTexture( &metal_rough_texture, *metal_rough_image, ColorSpaceOverride::kLinear ) )
     {
       return nullptr;
     }
@@ -301,7 +292,7 @@ Ember::Material* Ember::ModelLoader::TryProcessMaterial( Model* model, cgltf_mat
   {
     cgltf_image const* normal_image = material.normal_texture.texture->image;
 
-    if ( not TryLoadTexture( &normal_texture, *normal_image, TextureLoader::ColorSpaceOverride::kLinear ) )
+    if ( not TryLoadTexture( &normal_texture, *normal_image, ColorSpaceOverride::kLinear ) )
     {
       return nullptr;
     }
@@ -311,7 +302,7 @@ Ember::Material* Ember::ModelLoader::TryProcessMaterial( Model* model, cgltf_mat
   {
     cgltf_image const* emissive_image = material.emissive_texture.texture->image;
 
-    if ( not TryLoadTexture( &emissive_texture, *emissive_image, TextureLoader::ColorSpaceOverride::kSrgb ) )
+    if ( not TryLoadTexture( &emissive_texture, *emissive_image, ColorSpaceOverride::kSrgb ) )
     {
       return nullptr;
     }
@@ -400,10 +391,12 @@ Ember::Model* Ember::ModelLoader::LoadModel( char const* filename )
 
   Model*                 model         = m_World->CreateObject<Model>( mesh_data );
 
+  LoadingContext         context       = { model, mesh_data, &vertices, &indices };
+
   cgltf_scene const*     current_scene = gltf_model->scene;
   for ( uint32_t node_idx = 0; node_idx < current_scene->nodes_count; ++node_idx )
   {
-    ProcessNode( model, model, mesh_data, &vertices, &indices, *current_scene->nodes[node_idx] );
+    ProcessNode( &context, model, *current_scene->nodes[node_idx] );
   }
 
   auto const vertex_buffer = m_RenderDevice->CreateVertexBuffer( ByteSizeOf( vertices ), sizeof( vertices[0] ) );

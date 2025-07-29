@@ -21,28 +21,22 @@ struct Vertex
 
 class ModelLoader
 {
+  struct LoadingContext
+  {
+    Model*                 Model;
+    MeshData*              MeshData;
+    std::vector<Vertex>*   Vertices;
+    std::vector<uint16_t>* Indices;
+  };
+
   RenderDevice* m_RenderDevice;
   World*        m_World;
   TextureLoader m_TextureLoader;
 
-  void          ProcessNode(
-               Model*                 model,
-               Node*                  parent,
-               MeshData*              mesh_data,
-               std::vector<Vertex>*   vertices,
-               std::vector<uint16_t>* indices,
-               cgltf_node const&      node );
-  void ProcessMesh(
-      Model*                 model,
-      Node*                  parent,
-      MeshData*              mesh_data,
-      std::vector<Vertex>*   vertices,
-      std::vector<uint16_t>* indices,
-      cgltf_mesh const&      mesh );
-
-  bool TryLoadTexture(
-      Texture* texture, cgltf_image const& image, TextureLoader::ColorSpaceOverride color_space_override );
-  Material* TryProcessMaterial( Model* model, cgltf_material const& material );
+  void          ProcessNode( LoadingContext* context, Node* parent, cgltf_node const& node );
+  void          ProcessMesh( LoadingContext* context, Node* parent, cgltf_mesh const& mesh );
+  bool          TryLoadTexture( Texture* texture, cgltf_image const& image, ColorSpaceOverride color_space_override );
+  Material*     TryProcessMaterial( Model* model, cgltf_material const& material );
 
 public:
   Model* LoadModel( char const* filename );
