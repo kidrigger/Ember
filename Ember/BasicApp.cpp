@@ -223,7 +223,7 @@ void Ember::BasicApp::LoadContent()
     .Projection = DirectX::XMMatrixPerspectiveFovLH(
         DirectX::XMConvertToRadians( 70.0f ), ( float )m_WindowWidth / ( float )m_WindowHeight, 0.1f, 100.0f ),
     .View = DirectX::XMMatrixLookAtLH(
-        DirectX::XMVectorSet( 0.0f, 0.0f, -5.0f, 1.0f ),
+        DirectX::XMVectorSet( 0.0f, 15.0f, -15.0f, 1.0f ),
         DirectX::XMVectorSet( 0.0f, 0.0f, 0.0f, 1.0f ),
         DirectX::XMVectorSet( 0.0f, 1.0f, 0.0f, 0.0f ) ),
   };
@@ -245,7 +245,7 @@ void Ember::BasicApp::LoadContent()
   } );
 
   RotModel* rm      = m_World.CreateObject<RotModel>();
-  rm->AddChild( m_ModelLoader->LoadModel( "BoxTextured.glb" ) );
+  rm->AddChild( m_ModelLoader->LoadModel( "OrientationTest.glb" ) );
 
   ComPtr<ID3DBlob> vertex_shader_blob;
   ERR_ABORT( D3DReadFileToBlob( L"TriangleVS.cso", &vertex_shader_blob ) );

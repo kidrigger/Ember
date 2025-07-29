@@ -200,5 +200,8 @@
     <CopyFileToFolders Include="Assets\BoxTextured.glb">
       <Filter>Resource Files\Assets</Filter>
     </CopyFileToFolders>
+    <CopyFileToFolders Include="Assets\OrientationTest.glb">
+      <Filter>Resource Files\Assets</Filter>
+    </CopyFileToFolders>
   </ItemGroup>
 </Project>
