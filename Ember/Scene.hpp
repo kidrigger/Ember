@@ -5,6 +5,7 @@
 #include <span>
 
 #include "Buffer.hpp"
+#include "Color.hpp"
 #include "ObjectPool.hpp"
 #include "Texture.hpp"
 
@@ -29,9 +30,28 @@ struct WorldTransform
 
 struct Material
 {
-  DirectX::XMFLOAT4 BaseColor;
-  Texture           Albedo;
-  Sampler           Sampler;
+  struct alignas( 16 ) GpuRepr
+  {
+    SRVHandle     BaseColorTexture;  // 04
+    SRVHandle     NormalTexture;     // 08
+    SRVHandle     MetalRoughTexture; // 12
+    SRVHandle     EmissiveTexture;   // 16
+    SamplerHandle Sampler;           // 20
+    Color32       BaseColorFactor;   // 24
+    Color32       EmissiveFactor;    // 28
+    float         EmissiveStrength;  // 32
+    float         Metal;             // 36
+    float         Rough;             // 40
+    float         AlphaCutoff;       // 44
+    uint32_t      Padding0;          // 48
+  };
+
+  Texture BaseColorTexture;
+  Texture NormalTexture;
+  Texture MetalRoughTexture;
+  Texture EmissiveTexture;
+  Sampler Sampler;
+  GpuRepr Repr;
 };
 
 struct MeshData

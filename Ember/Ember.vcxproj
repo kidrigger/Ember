@@ -231,6 +231,7 @@
     <ClInclude Include="BindlessHandle.hpp" />
     <ClInclude Include="BindlessManager.hpp" />
     <ClInclude Include="Buffer.hpp" />
+    <ClInclude Include="Color.hpp" />
     <ClInclude Include="DepthBuffer.hpp" />
     <ClInclude Include="IApp.hpp" />
     <ClInclude Include="ModelLoader.hpp" />

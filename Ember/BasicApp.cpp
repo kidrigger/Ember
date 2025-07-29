@@ -269,9 +269,10 @@ void Ember::BasicApp::LoadContent()
       D3D12_ROOT_SIGNATURE_FLAG_DENY_GEOMETRY_SHADER_ROOT_ACCESS |
       D3D12_ROOT_SIGNATURE_FLAG_DENY_DOMAIN_SHADER_ROOT_ACCESS | D3D12_ROOT_SIGNATURE_FLAG_DENY_HULL_SHADER_ROOT_ACCESS;
 
-  CD3DX12_ROOT_PARAMETER1 root_parameters[2];
-  root_parameters[0].InitAsConstants( 8, 0, 0, D3D12_SHADER_VISIBILITY_ALL );
-  root_parameters[1].InitAsConstants( sizeof( DirectX::XMMATRIX ) / 4, 1, 0, D3D12_SHADER_VISIBILITY_VERTEX );
+  CD3DX12_ROOT_PARAMETER1 root_parameters[3];
+  root_parameters[0].InitAsConstants( 1, 0, 0, D3D12_SHADER_VISIBILITY_ALL );
+  root_parameters[1].InitAsConstants( sizeof( DirectX::XMMATRIX ) / 4, 1, 0, D3D12_SHADER_VISIBILITY_ALL );
+  root_parameters[2].InitAsConstants( sizeof( Material::GpuRepr ) / 4, 2, 0, D3D12_SHADER_VISIBILITY_ALL );
 
   CD3DX12_VERSIONED_ROOT_SIGNATURE_DESC root_signature_desc;
   root_signature_desc.Init_1_1(
@@ -435,12 +436,10 @@ void Ember::BasicApp::Render()
     command_list->IASetIndexBuffer( &m_RenderQueue.Meshes[i]->IndexBuffer.GetIndexBufferView() );
     command_list->IASetVertexBuffers( 0, 1, &m_RenderQueue.Meshes[i]->VertexBuffer.GetVertexBufferView() );
     command_list->SetGraphicsRoot32BitConstant( 0, ( UINT )m_CameraBuffer.GetCBVHandle(), 0 );
-    command_list->SetGraphicsRoot32BitConstant( 0, ( UINT )m_RenderQueue.Materials[i]->Albedo.GetSRVHandle(), 1 );
-    command_list->SetGraphicsRoot32BitConstant( 0, ( UINT )m_RenderQueue.Materials[i]->Sampler.GetSamplerHandle(), 2 );
-    command_list->SetGraphicsRoot32BitConstants(
-        0, sizeof( DirectX::XMVECTOR ) / 4, &m_RenderQueue.Materials[i]->BaseColor, 4 );
     command_list->SetGraphicsRoot32BitConstants(
         1, sizeof( DirectX::XMMATRIX ) / 4, &m_RenderQueue.Transforms[i].Transform, 0 );
+    command_list->SetGraphicsRoot32BitConstants(
+        2, sizeof( Material::GpuRepr ) / 4, &m_RenderQueue.Materials[i]->Repr, 0 );
     command_list->DrawIndexedInstanced(
         m_RenderQueue.Primitives[i].IndexCount,
         1,

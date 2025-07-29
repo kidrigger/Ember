@@ -161,6 +161,9 @@
     <ClInclude Include="ModelLoader.hpp">
       <Filter>Header Files\Resources</Filter>
     </ClInclude>
+    <ClInclude Include="Color.hpp">
+      <Filter>Header Files\Graphics</Filter>
+    </ClInclude>
   </ItemGroup>
   <ItemGroup>
     <None Include="..\.clang-format">

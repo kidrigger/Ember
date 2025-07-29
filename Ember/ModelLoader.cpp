@@ -252,13 +252,14 @@ Ember::Material* Ember::ModelLoader::TryProcessMaterial( Model* model, cgltf_mat
     material.emissive_factor[0],
     material.emissive_factor[1],
     material.emissive_factor[2],
-    std::max( material.emissive_strength.emissive_strength, 1.0f ),
+    0.0f,
   };
+  auto const emissive_strength = std::max( material.emissive_strength.emissive_strength, 1.0f );
 
-  Texture base_color_texture;
-  Texture normal_texture;
-  Texture metal_rough_texture;
-  Texture emissive_texture;
+  Texture    base_color_texture;
+  Texture    normal_texture;
+  Texture    metal_rough_texture;
+  Texture    emissive_texture;
 
   D3D12_SAMPLER_DESC constexpr sampler_desc = {
     .Filter         = D3D12_FILTER_ANISOTROPIC,
@@ -318,7 +319,24 @@ Ember::Material* Ember::ModelLoader::TryProcessMaterial( Model* model, cgltf_mat
   float const metallic     = material.pbr_metallic_roughness.metallic_factor;
   float const roughness    = material.pbr_metallic_roughness.roughness_factor;
 
-  Material*   new_material = World::MaterialManager().Construct( base_color_factor, base_color_texture, sampler );
+  Material*   new_material = World::MaterialManager().Construct(
+      base_color_texture,
+      normal_texture,
+      metal_rough_texture,
+      emissive_texture,
+      sampler,
+      Material::GpuRepr{
+            .BaseColorTexture  = base_color_texture.GetSRVHandle(),
+            .NormalTexture     = normal_texture.GetSRVHandle(),
+            .MetalRoughTexture = metal_rough_texture.GetSRVHandle(),
+            .EmissiveTexture   = emissive_texture.GetSRVHandle(),
+            .Sampler           = sampler.GetSamplerHandle(),
+            .BaseColorFactor   = base_color_factor,
+            .EmissiveFactor    = emissive_factor,
+            .EmissiveStrength  = emissive_strength,
+            .Metal             = metallic,
+            .Rough             = roughness,
+      } );
 
   model->AddMaterial( new_material );
 
