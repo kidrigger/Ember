@@ -177,12 +177,17 @@ public:
 class Model final : public Node
 {
   std::pmr::vector<Material*> m_Materials;
+  MeshData*                   m_MeshData;
 
 public:
   using allocator_type = std::pmr::polymorphic_allocator<>;
 
-  Model( Object* parent, std::span<Material*> const& materials, allocator_type const& allocator = {} );
-  explicit Model( Object* parent, allocator_type const& allocator = {} );
+  Model(
+      Object*                     parent,
+      MeshData*                   mesh_data,
+      std::span<Material*> const& materials,
+      allocator_type const&       allocator = {} );
+  Model( Object* parent, MeshData* mesh_data, allocator_type const& allocator = {} );
 
   void AddMaterial( Material* material );
 
@@ -209,12 +214,6 @@ public:
 
   void Update( float delta_seconds ) override;
   void Render( RenderCommandQueue* render_queue ) override;
-
-  Mesh( Mesh const& other )                = delete;
-  Mesh( Mesh&& other ) noexcept            = delete;
-  Mesh& operator=( Mesh const& other )     = delete;
-  Mesh& operator=( Mesh&& other ) noexcept = delete;
-  ~Mesh() override;
 };
 
 class World final : public Node

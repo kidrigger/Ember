@@ -60,7 +60,8 @@ void Ember::ModelLoader::ProcessMesh(
     // Index Buffer
     ASSERT(
         primitive.indices->type == cgltf_type_scalar and
-        primitives->indices->component_type == cgltf_component_type_r_16u );
+        ( primitives->indices->component_type == cgltf_component_type_r_16u or
+          primitives->indices->component_type == cgltf_component_type_r_8u ) );
     size_t const index_start = indices->size();
     size_t const index_count = cgltf_accessor_unpack_indices( primitive.indices, nullptr, sizeof indices->at( 0 ), 0 );
     ASSERT( index_count > 0 );
@@ -397,7 +398,7 @@ Ember::Model* Ember::ModelLoader::LoadModel( char const* filename )
   std::vector<Node*>     nodes;
   MeshData*              mesh_data     = World::MeshManager().Construct();
 
-  Model*                 model         = m_World->CreateObject<Model>();
+  Model*                 model         = m_World->CreateObject<Model>( mesh_data );
 
   cgltf_scene const*     current_scene = gltf_model->scene;
   for ( uint32_t node_idx = 0; node_idx < current_scene->nodes_count; ++node_idx )

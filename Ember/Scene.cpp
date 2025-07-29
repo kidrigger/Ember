@@ -150,13 +150,13 @@ Ember::Node::~Node()
   }
 }
 
-
-Ember::Model::Model( Object* parent, std::span<Material*> const& materials, allocator_type const& allocator )
-  : Node{ parent, allocator }, m_Materials{ materials.begin(), materials.end(), allocator }
+Ember::Model::Model(
+    Object* parent, MeshData* mesh_data, std::span<Material*> const& materials, allocator_type const& allocator )
+  : Node{ parent, allocator }, m_Materials{ materials.begin(), materials.end(), allocator }, m_MeshData{ mesh_data }
 {}
 
-Ember::Model::Model( Object* parent, allocator_type const& allocator )
-  : Node{ parent, allocator }, m_Materials{ allocator }
+Ember::Model::Model( Object* parent, MeshData* mesh_data, allocator_type const& allocator )
+  : Model{ parent, mesh_data, {}, allocator }
 {}
 
 void Ember::Model::AddMaterial( Material* material )
@@ -170,6 +170,7 @@ Ember::Model::~Model()
   {
     World::MaterialManager().Destroy( material );
   }
+  World::MeshManager().Destroy( m_MeshData );
 }
 
 Ember::Mesh::Mesh(
@@ -186,11 +187,6 @@ void Ember::Mesh::Render( RenderCommandQueue* render_queue )
   {
     render_queue->Push( GetWorldTransform(), m_MeshData, primitive.Material, primitive.DrawInfo );
   }
-}
-
-Ember::Mesh::~Mesh()
-{
-  World::MeshManager().Destroy( m_MeshData );
 }
 
 Ember::ObjectPool<Ember::LocalTransform>& Ember::World::LocalTransformManager()
