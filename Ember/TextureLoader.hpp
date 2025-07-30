@@ -1,5 +1,6 @@
 #pragma once
 
+#include <DirectXTex.h>
 #include <filesystem>
 #include <memory_resource>
 #include <span>
@@ -12,6 +13,7 @@
 
 namespace Ember
 {
+class RenderDevice;
 
 enum class ColorSpaceOverride
 {
@@ -29,25 +31,29 @@ class TextureLoader
 #endif
   using UploadIntermediateList = std::pmr::forward_list<UploadIntermediate>;
   using UploadTextureList      = std::pmr::forward_list<ComPtr<ID3D12Resource>>;
+  using UploadAliasList        = std::pmr::forward_list<ComPtr<ID3D12Resource>>;
 
   struct UploadBatch
   {
     UploadIntermediateList Intermediate;
     UploadTextureList      Textures;
+    UploadAliasList        Aliases;
     Context::Receipt       Receipt;
 
     UploadBatch() = default;
     explicit UploadBatch( std::pmr::polymorphic_allocator<> const& pool_allocator );
-    void PushUpload( ComPtr<ID3D12Resource> dest, UploadIntermediate intermediate );
+#if not defined( RENDERDOC_COMPAT )
+    void PushUpload( ComPtr<ID3D12Resource> dest, ComPtr<D3D12MA::Allocation> intermediate );
+#else
+    void PushUpload( ComPtr<ID3D12Resource> dest, ComPtr<ID3D12Resource> intermediate );
+#endif
+    void PushAlias( ComPtr<ID3D12Resource> alias );
     void ClearResources();
   };
 
   using TextureCache = std::pmr::unordered_map<std::pmr::string, Texture>;
 
-  ComPtr<ID3D12Device2>                  m_Device;
-  ComPtr<D3D12MA::Allocator>             m_Allocator;
-  BindlessManager*                       m_BindlessManager;
-  TextureManager*                        m_TextureManager;
+  RenderDevice*                          m_RenderDevice;
   std::pmr::unsynchronized_pool_resource m_CachePool;
   TextureCache                           m_Cache;
   std::mutex                             m_LoadLock;
@@ -62,26 +68,31 @@ class TextureLoader
 
   std::vector<D3D12_RESOURCE_BARRIER>    m_PendingBarriers;
 
+  // Mips
+  ComPtr<ID3D12RootSignature> m_MipMapRootSig;
+  ComPtr<ID3D12PipelineState> m_MipmapPipeline;
+
+  //
+  bool TryGenerateMipMaps( ID3D12GraphicsCommandList* command_list, Texture* texture );
+
 public:
   TextureLoader() = default;
 
   TextureLoader(
-      ComPtr<ID3D12Device2>      device,
-      ComPtr<D3D12MA::Allocator> allocator,
-      BindlessManager*           bindless_manager,
-      TextureManager*            texture_manager,
-      Context                    copy_context,
-      uint32_t                   upload_frame_count );
+      RenderDevice*               render_device,
+      ComPtr<ID3D12RootSignature> mipmap_root_signature,
+      ComPtr<ID3D12PipelineState> mipmap_pipeline,
+      Context                     copy_context,
+      uint32_t                    upload_frame_count );
 
-  static void Create(
-      TextureLoader*             loader,
-      ComPtr<ID3D12Device2>      device,
-      ComPtr<D3D12MA::Allocator> allocator,
-      BindlessManager*           bindless_manager,
-      TextureManager*            texture_manager,
-      uint32_t                   upload_frame_count );
+  static void Create( TextureLoader* loader, RenderDevice* render_device, uint32_t upload_frame_count );
 
-  bool TryLoadTexture( Texture* texture, char const* filename );
+  bool        TryLoadTexture( Texture* texture, char const* filename );
+  bool        TryLoadImpl(
+             Ember::Texture*              texture,
+             char const*                  id,
+             DirectX::TexMetadata const&  metadata,
+             DirectX::ScratchImage const& scratch_image );
   bool TryLoadTextureFromData(
       Texture*           texture,
       char const*        id,

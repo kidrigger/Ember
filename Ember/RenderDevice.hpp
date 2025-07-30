@@ -66,19 +66,21 @@ public:
       Context                             direct_context,
       bool                                is_tearing_supported );
 
-  ComPtr<ID3D12Device2> GetDevice() noexcept;
+  ComPtr<ID3D12Device2>      GetDevice() noexcept;
+  ComPtr<D3D12MA::Allocator> GetAllocator() noexcept;
 
-  static void           Create( RenderDevice* render_device, HWND window_handle, bool use_warp );
+  static void                Create( RenderDevice* render_device, HWND window_handle, bool use_warp );
 
-  void                  ResizeSwapchain( uint32_t width, uint32_t height );
-
-  void                  CreateTextureLoader( TextureLoader* loader );
+  void                       ResizeSwapchain( uint32_t width, uint32_t height );
 
   // Buffer Management
   [[nodiscard]] Buffer      CreateVertexBuffer( uint32_t size, uint32_t stride );
   [[nodiscard]] Buffer      CreateIndexBuffer( uint32_t size, DXGI_FORMAT format );
   [[nodiscard]] Buffer      CreateStorageBuffer( uint32_t size, uint32_t stride );
   [[nodiscard]] Buffer      CreateConstantBuffer( uint32_t size );
+
+  [[nodiscard]] Texture     CreateTexture2D( DXGI_FORMAT format, uint32_t width, uint32_t height );
+
   [[nodiscard]] Sampler     CreateSampler( D3D12_SAMPLER_DESC const& sampler_desc );
 
   [[nodiscard]] DepthBuffer CreateDepthBuffer( uint32_t width, uint32_t height ) const;

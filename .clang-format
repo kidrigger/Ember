@@ -72,3 +72,4 @@ SpacesInConditionalStatement: true
 SpacesInCStyleCastParentheses: false
 AlignArrayOfStructures: Left
 UseTab: Never
+BreakAfterAttributes: Leave

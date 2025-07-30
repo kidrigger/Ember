@@ -33,6 +33,11 @@ Ember::Sampler::SamplerInfoImpl::~SamplerInfoImpl()
 Ember::Sampler::Sampler( SamplerInfo sampler_handle ) : m_SamplerInfo{ std::move( sampler_handle ) }
 {}
 
+Ember::Sampler::operator bool() const
+{
+  return m_SamplerInfo->Handle;
+}
+
 Ember::SamplerHandle Ember::Sampler::GetSamplerHandle() const
 {
   return m_SamplerInfo->Handle;
@@ -73,20 +78,30 @@ Ember::Texture::Texture(
   , m_TextureInfo{ std::move( texture_info ) }
 {}
 
+Ember::Texture::operator bool() const
+{
+  return m_Texture;
+}
+
 ID3D12Resource* Ember::Texture::GetTexture() const
 {
   return m_Texture.Get();
 }
 
+D3D12MA::Allocation* Ember::Texture::GetAllocation() const
+{
+  return m_Allocation.Get();
+}
+
 Ember::SRVHandle Ember::Texture::GetSRVHandle() const
 {
-  if ( not m_TextureInfo ) return {};
+  ASSERT( m_TextureInfo and m_TextureInfo->AsSRV );
   return m_TextureInfo->AsSRV;
 }
 
 Ember::UAVHandle Ember::Texture::GetUAVHandle() const
 {
-  if ( not m_TextureInfo ) return {};
+  ASSERT( m_TextureInfo and m_TextureInfo->AsUAV );
   return m_TextureInfo->AsUAV;
 }
 
@@ -97,6 +112,44 @@ Ember::TextureManager::TextureManager(
 
 Ember::Texture Ember::TextureManager::CreateTexture2D(
     DXGI_FORMAT const format, uint32_t const width, uint32_t const height )
+{
+  ComPtr<ID3D12Resource>      texture;
+  ComPtr<D3D12MA::Allocation> allocation;
+
+  CD3DX12_RESOURCE_DESC       resource_desc = CD3DX12_RESOURCE_DESC::Tex2D( format, width, height );
+#if not defined( RENDERDOC_COMPAT )
+  D3D12MA::ALLOCATION_DESC const allocation_desc = {
+    .Flags    = D3D12MA::ALLOCATION_FLAG_NONE,
+    .HeapType = D3D12_HEAP_TYPE_DEFAULT,
+  };
+
+  ERR_ABORT( m_Allocator->CreateResource(
+      &allocation_desc,
+      &resource_desc,
+      D3D12_RESOURCE_STATE_COPY_DEST,
+      nullptr,
+      &allocation,
+      IID_PPV_ARGS( &texture ) ) );
+#else
+  auto const heap_properties = CD3DX12_HEAP_PROPERTIES{ D3D12_HEAP_TYPE_DEFAULT };
+  ERR_ABORT( m_Device->CreateCommittedResource(
+      &heap_properties,
+      D3D12_HEAP_FLAG_NONE,
+      &resource_desc,
+      D3D12_RESOURCE_STATE_COPY_DEST,
+      nullptr,
+      IID_PPV_ARGS( &texture ) ) );
+#endif
+
+  SRVHandle srv_handle =
+      m_Bindless->CreateDescriptorHandle( texture.Get(), CD3DX12_SHADER_RESOURCE_VIEW_DESC::Tex2D( format ) );
+  auto texture_info = std::allocate_shared<Texture::TextureInfoImpl>(
+      std::pmr::polymorphic_allocator{ &m_MemoryPool }, m_Bindless, srv_handle, UAVHandle{} );
+
+  return Texture{ std::move( texture ), std::move( allocation ), std::move( texture_info ) };
+}
+
+Ember::Texture Ember::TextureManager::CreateReadWriteTexture2D( DXGI_FORMAT format, uint32_t width, uint32_t height )
 {
   ComPtr<ID3D12Resource>      texture;
   ComPtr<D3D12MA::Allocation> allocation;

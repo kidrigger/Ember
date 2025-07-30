@@ -11,6 +11,6 @@ VSOut TriangleVS( VSInput IN )
   pos                           = mul( camera.Projection, pos );
   OUT.Position                  = pos;
   OUT.Color                     = float4( IN.Color, 1.0f );
-  OUT.TexCoord                  = IN.TexCoord0;
+  OUT.TexCoord                  = IN.TexCoord[0];
   return OUT;
 }

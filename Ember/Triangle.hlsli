@@ -53,15 +53,17 @@ cbuffer MaterialInfo : register( b2, space0 )
 struct VSInput
 {
   float3 Position : POSITION;
+  float3 Normal : NORMAL;
+  float4 Tangent : TANGENT;
   float3 Color : COLOR;
-  float2 TexCoord0 : TEX_COORD0;
+  float2 TexCoord[2] : TEXCOORD;
 };
 
 struct VSOut
 {
   float4 Position : SV_POSITION;
   float4 Color : COLOR;
-  float2 TexCoord : TEX_COORD0;
+  float2 TexCoord : TEXCOORD_0;
 };
 
 typedef VSOut FSIn;

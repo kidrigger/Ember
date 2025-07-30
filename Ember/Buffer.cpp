@@ -62,51 +62,12 @@ Ember::Buffer::Buffer(
     ComPtr<D3D12MA::Allocation> allocation,
     uint32_t const              offset,
     uint32_t const              size,
-    D3D12_VERTEX_BUFFER_VIEW    vertex_buffer_view )
+    Views                       view )
   : m_Buffer{ std::move( buffer ) }
   , m_Allocation{ std::move( allocation ) }
-  , m_OffsetAndType{ offset | ( uint32_t )Type::kVertexBuffer }
+  , m_Offset{ offset }
   , m_Size{ size }
-  , m_Views{ vertex_buffer_view }
-{}
-
-Ember::Buffer::Buffer(
-    ComPtr<ID3D12Resource>      buffer,
-    ComPtr<D3D12MA::Allocation> allocation,
-    uint32_t const              offset,
-    uint32_t const              size,
-    D3D12_INDEX_BUFFER_VIEW     index_buffer_view )
-  : m_Buffer{ std::move( buffer ) }
-  , m_Allocation{ std::move( allocation ) }
-  , m_OffsetAndType{ offset | ( uint32_t )Type::kIndexBuffer }
-  , m_Size{ size }
-  , m_Views{ index_buffer_view }
-{}
-
-Ember::Buffer::Buffer(
-    ComPtr<ID3D12Resource>      buffer,
-    ComPtr<D3D12MA::Allocation> allocation,
-    uint32_t const              offset,
-    uint32_t const              size,
-    StorageBufferInfo           storage_buffer_info )
-  : m_Buffer{ std::move( buffer ) }
-  , m_Allocation{ std::move( allocation ) }
-  , m_OffsetAndType{ offset | ( uint32_t )Type::kStorageBuffer }
-  , m_Size{ size }
-  , m_Views{ storage_buffer_info }
-{}
-
-Ember::Buffer::Buffer(
-    ComPtr<ID3D12Resource>      buffer,
-    ComPtr<D3D12MA::Allocation> allocation,
-    uint32_t const              offset,
-    uint32_t const              size,
-    ConstantBufferInfo          constant_buffer_info )
-  : m_Buffer{ std::move( buffer ) }
-  , m_Allocation{ std::move( allocation ) }
-  , m_OffsetAndType{ offset | ( uint32_t )Type::kConstantBuffer }
-  , m_Size{ size }
-  , m_Views{ constant_buffer_info }
+  , m_Views{ std::move( view ) }
 {}
 
 void Ember::Buffer::Write( uint32_t const offset, uint32_t const size, void const* data ) const
@@ -138,13 +99,13 @@ uint32_t Ember::Buffer::GetSize() const noexcept
 uint32_t Ember::Buffer::GetOffset() const noexcept
 {
   ASSERT( m_Buffer );
-  return m_OffsetAndType & kOffsetMask;
+  return m_Offset;
 }
 
 Ember::Buffer::Type Ember::Buffer::GetType() const noexcept
 {
   ASSERT( m_Buffer );
-  return ( Type )( m_OffsetAndType & kBufferTypeMask );
+  return ( Type )( m_Views.index() );
 }
 
 D3D12_VERTEX_BUFFER_VIEW const& Ember::Buffer::GetVertexBufferView() const noexcept
@@ -176,7 +137,10 @@ Ember::UAVHandle Ember::Buffer::GetUAVHandle() const
   ASSERT( m_Buffer );
   ASSERT( GetType() == Type::kStorageBuffer );
 
-  return std::get<StorageBufferInfo>( m_Views )->AsUAV;
+  UAVHandle const handle = std::get<StorageBufferInfo>( m_Views )->AsUAV;
+  ASSERT( handle );
+
+  return handle;
 }
 
 Ember::CBVHandle Ember::Buffer::GetCBVHandle() const
@@ -257,6 +221,25 @@ Ember::Buffer Ember::BufferManager::CreateIndexBuffer( uint32_t const size, DXGI
 }
 
 Ember::Buffer Ember::BufferManager::CreateStorageBuffer( uint32_t const size, uint32_t const stride )
+{
+  ASSERT( size % stride == 0 );
+
+  ComPtr<ID3D12Resource>      buffer;
+  ComPtr<D3D12MA::Allocation> allocation;
+  AllocateBufferImpl( m_Device.Get(), m_GpuAllocator.Get(), size, &allocation, &buffer );
+
+  CD3DX12_SHADER_RESOURCE_VIEW_DESC const srv_desc =
+      CD3DX12_SHADER_RESOURCE_VIEW_DESC::StructuredBuffer( size / stride, stride );
+
+  SRVHandle const srv_handle   = m_Bindless->CreateDescriptorHandle( buffer.Get(), srv_desc );
+
+  auto            storage_info = std::allocate_shared<Buffer::StorageBufferInfoImpl>(
+      std::pmr::polymorphic_allocator<byte>{ &m_MemoryPool }, m_Bindless, srv_handle, UAVHandle{} );
+
+  return Buffer{ std::move( buffer ), std::move( allocation ), 0, size, std::move( storage_info ) };
+}
+
+Ember::Buffer Ember::BufferManager::CreateReadWriteBuffer( uint32_t size, uint32_t stride )
 {
   ASSERT( size % stride == 0 );
 

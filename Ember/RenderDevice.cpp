@@ -62,6 +62,11 @@ ComPtr<ID3D12Device2> Ember::RenderDevice::GetDevice() noexcept
   return m_Device;
 }
 
+ComPtr<D3D12MA::Allocator> Ember::RenderDevice::GetAllocator() noexcept
+{
+  return m_Allocator;
+}
+
 void Ember::RenderDevice::Create( RenderDevice* render_device, HWND window_handle, bool const use_warp )
 {
 #if defined( _DEBUG )
@@ -287,11 +292,6 @@ void Ember::RenderDevice::ResizeSwapchain( uint32_t const width, uint32_t const 
   }
 }
 
-void Ember::RenderDevice::CreateTextureLoader( TextureLoader* loader )
-{
-  TextureLoader::Create( loader, m_Device, m_Allocator, m_Bindless.get(), &m_TextureManager, 3 );
-}
-
 Ember::Buffer Ember::RenderDevice::CreateVertexBuffer( uint32_t const size, uint32_t const stride )
 {
   return m_BufferManager.CreateVertexBuffer( size, stride );
@@ -310,6 +310,12 @@ Ember::Buffer Ember::RenderDevice::CreateStorageBuffer( uint32_t const size, uin
 Ember::Buffer Ember::RenderDevice::CreateConstantBuffer( uint32_t const size )
 {
   return m_BufferManager.CreateConstantBuffer( size );
+}
+
+Ember::Texture Ember::RenderDevice::CreateTexture2D(
+    DXGI_FORMAT const format, uint32_t const width, uint32_t const height )
+{
+  return m_TextureManager.CreateTexture2D( format, width, height );
 }
 
 Ember::Sampler Ember::RenderDevice::CreateSampler( D3D12_SAMPLER_DESC const& sampler_desc )

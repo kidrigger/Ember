@@ -7,7 +7,7 @@ float4 TrianglePS( FSIn IN ) : SV_TARGET0
   {
     Texture2D    texture         = ResourceDescriptorHeap[g_Material.BaseColorTextureIndex];
     SamplerState texture_sampler = SamplerDescriptorHeap[g_Material.SamplerIndex];
-    out_color                    = texture.SampleLevel( texture_sampler, IN.TexCoord, 0 );
+    out_color                    = texture.Sample( texture_sampler, IN.TexCoord );
   }
   out_color *= Unpack( g_Material.BaseColorFactor );
   return pow( out_color, 1.0f / 2.2f );

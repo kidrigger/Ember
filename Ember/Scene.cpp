@@ -86,10 +86,9 @@ void Ember::Object::SetParent( Object* parent )
   m_Parent = parent;
 }
 
-void Ember::Object::UpdateWorldTransform()
+void Ember::Object::UpdateWorldTransform( DirectX::FXMMATRIX& parent_transform )
 {
-  m_WorldTransform->Transform =
-      XMMatrixMultiply( m_LocalTransform->GetTransform(), m_Parent->GetWorldTransform().Transform );
+  m_WorldTransform->Transform    = XMMatrixMultiply( m_LocalTransform->GetTransform(), parent_transform );
   m_WorldTransform->InvTransform = XMMatrixInverse( nullptr, m_WorldTransform->Transform );
 }
 
@@ -117,12 +116,12 @@ void Ember::Node::AddChild( Object* object )
   m_Children.push_back( object );
 }
 
-void Ember::Node::UpdateWorldTransform()
+void Ember::Node::UpdateWorldTransform( DirectX::FXMMATRIX& parent_transform )
 {
-  Object::UpdateWorldTransform();
+  Object::UpdateWorldTransform( parent_transform );
   for ( Object* child : m_Children )
   {
-    child->UpdateWorldTransform();
+    child->UpdateWorldTransform( GetWorldTransform().Transform );
   }
 }
 
@@ -220,7 +219,7 @@ void Ember::World::Update( float const delta_seconds )
 {
   for ( Object* child : GetChildren() )
   {
-    child->UpdateWorldTransform();
+    child->UpdateWorldTransform( DirectX::XMMatrixIdentity() );
   }
   Node::Update( delta_seconds );
 }

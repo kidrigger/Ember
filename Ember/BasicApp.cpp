@@ -245,7 +245,9 @@ void Ember::BasicApp::LoadContent()
   } );
 
   RotModel* rm      = m_World.CreateObject<RotModel>();
-  rm->AddChild( m_ModelLoader->LoadModel( "OrientationTest.glb" ) );
+  Model*    model   = m_ModelLoader->TryLoadModel( "BoxTextured.glb" );
+  ASSERT( model );
+  rm->AddChild( model );
 
   ComPtr<ID3DBlob> vertex_shader_blob;
   ERR_ABORT( D3DReadFileToBlob( L"TriangleVS.cso", &vertex_shader_blob ) );
@@ -308,6 +310,24 @@ void Ember::BasicApp::LoadContent()
      .InstanceDataStepRate = 0,
      },
     {
+     .SemanticName         = "NORMAL",
+     .SemanticIndex        = 0,
+     .Format               = DXGI_FORMAT_R32G32B32_FLOAT,
+     .InputSlot            = 0,
+     .AlignedByteOffset    = D3D12_APPEND_ALIGNED_ELEMENT,
+     .InputSlotClass       = D3D12_INPUT_CLASSIFICATION_PER_VERTEX_DATA,
+     .InstanceDataStepRate = 0,
+     },
+    {
+     .SemanticName         = "TANGENT",
+     .SemanticIndex        = 0,
+     .Format               = DXGI_FORMAT_R32G32B32A32_FLOAT,
+     .InputSlot            = 0,
+     .AlignedByteOffset    = D3D12_APPEND_ALIGNED_ELEMENT,
+     .InputSlotClass       = D3D12_INPUT_CLASSIFICATION_PER_VERTEX_DATA,
+     .InstanceDataStepRate = 0,
+     },
+    {
      .SemanticName         = "COLOR",
      .SemanticIndex        = 0,
      .Format               = DXGI_FORMAT_R32G32B32_FLOAT,
@@ -317,8 +337,17 @@ void Ember::BasicApp::LoadContent()
      .InstanceDataStepRate = 0,
      },
     {
-     .SemanticName         = "TEX_COORD",
+     .SemanticName         = "TEXCOORD",
      .SemanticIndex        = 0,
+     .Format               = DXGI_FORMAT_R32G32_FLOAT,
+     .InputSlot            = 0,
+     .AlignedByteOffset    = D3D12_APPEND_ALIGNED_ELEMENT,
+     .InputSlotClass       = D3D12_INPUT_CLASSIFICATION_PER_VERTEX_DATA,
+     .InstanceDataStepRate = 0,
+     },
+    {
+     .SemanticName         = "TEXCOORD",
+     .SemanticIndex        = 1,
      .Format               = DXGI_FORMAT_R32G32_FLOAT,
      .InputSlot            = 0,
      .AlignedByteOffset    = D3D12_APPEND_ALIGNED_ELEMENT,

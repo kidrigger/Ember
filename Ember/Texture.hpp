@@ -32,6 +32,8 @@ public:
   Sampler() = default;
   explicit Sampler( SamplerInfo sampler_handle );
 
+  operator bool() const;
+
   [[nodiscard]] SamplerHandle GetSamplerHandle() const;
 };
 
@@ -63,9 +65,11 @@ public:
 
   Texture( ComPtr<ID3D12Resource> texture, ComPtr<D3D12MA::Allocation> allocation, TextureInfo texture_info );
 
-  [[nodiscard]] ID3D12Resource* GetTexture() const;
-  [[nodiscard]] SRVHandle       GetSRVHandle() const;
-  [[nodiscard]] UAVHandle       GetUAVHandle() const;
+  operator bool() const;
+  [[nodiscard]] ID3D12Resource*      GetTexture() const;
+  [[nodiscard]] D3D12MA::Allocation* GetAllocation() const;
+  [[nodiscard]] SRVHandle            GetSRVHandle() const;
+  [[nodiscard]] UAVHandle            GetUAVHandle() const;
 };
 
 class TextureManager
@@ -81,6 +85,7 @@ public:
       ComPtr<ID3D12Device2> device, ComPtr<D3D12MA::Allocator> allocator, BindlessManager* bindless_manager );
 
   Texture CreateTexture2D( DXGI_FORMAT format, uint32_t width, uint32_t height );
+  Texture CreateReadWriteTexture2D( DXGI_FORMAT format, uint32_t width, uint32_t height );
   Sampler CreateSampler( D3D12_SAMPLER_DESC const& sampler_desc );
 };
 

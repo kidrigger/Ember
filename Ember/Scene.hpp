@@ -129,7 +129,7 @@ public:
   virtual void                  Update( float delta_seconds )              = 0;
   virtual void                  Render( RenderCommandQueue* render_queue ) = 0;
 
-  virtual void                  UpdateWorldTransform();
+  virtual void                  UpdateWorldTransform( DirectX::FXMMATRIX& parent_transform );
 
   Object( Object const& other )                = delete;
   Object( Object&& other ) noexcept            = delete;
@@ -162,7 +162,7 @@ public:
 
   void AddChild( Object* object );
 
-  void UpdateWorldTransform() override;
+  void UpdateWorldTransform( DirectX::FXMMATRIX& parent_transform ) override;
 
   void Update( float delta_seconds ) override;
   void Render( RenderCommandQueue* render_queue ) override;

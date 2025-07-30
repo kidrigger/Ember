@@ -61,3 +61,6 @@
 
 #define UNREACHABLE std::terminate()
 #define UNREACHABLE_M( MSG ) std::terminate()
+
+#define UNIMPLEMENTED std::terminate()
+#define UNIMPLEMENTED_M( MSG ) std::terminate()

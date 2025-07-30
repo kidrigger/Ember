@@ -15,8 +15,11 @@ class RenderDevice;
 struct Vertex
 {
   DirectX::XMFLOAT3 Position;
+  DirectX::XMFLOAT3 Normal;
+  DirectX::XMFLOAT4 Tangent;
   DirectX::XMFLOAT3 Color;
   DirectX::XMFLOAT2 TexCoord0;
+  DirectX::XMFLOAT2 TexCoord1;
 };
 
 class ModelLoader
@@ -39,7 +42,7 @@ class ModelLoader
   Material*     TryProcessMaterial( Model* model, cgltf_material const& material );
 
 public:
-  Model* LoadModel( char const* filename );
+  Model* TryLoadModel( char const* filename );
   void   Update();
   void   FlushBarriers( ID3D12GraphicsCommandList* command_list );
 

@@ -55,12 +55,9 @@ public:
 private:
   using Views = std::variant<D3D12_VERTEX_BUFFER_VIEW, D3D12_INDEX_BUFFER_VIEW, StorageBufferInfo, ConstantBufferInfo>;
 
-  constexpr static uint32_t   kBufferTypeMask = 0b11;
-  constexpr static uint32_t   kOffsetMask     = ~kBufferTypeMask;
-
   ComPtr<ID3D12Resource>      m_Buffer;
   ComPtr<D3D12MA::Allocation> m_Allocation;
-  uint32_t                    m_OffsetAndType{ 0 };
+  uint32_t                    m_Offset{ 0 };
   uint32_t                    m_Size{ 0 };
   Views                       m_Views;
 
@@ -72,28 +69,7 @@ public:
       ComPtr<D3D12MA::Allocation> allocation,
       uint32_t                    offset,
       uint32_t                    size,
-      D3D12_VERTEX_BUFFER_VIEW    vertex_buffer_view );
-
-  Buffer(
-      ComPtr<ID3D12Resource>      buffer,
-      ComPtr<D3D12MA::Allocation> allocation,
-      uint32_t                    offset,
-      uint32_t                    size,
-      D3D12_INDEX_BUFFER_VIEW     index_buffer_view );
-
-  Buffer(
-      ComPtr<ID3D12Resource>      buffer,
-      ComPtr<D3D12MA::Allocation> allocation,
-      uint32_t                    offset,
-      uint32_t                    size,
-      StorageBufferInfo           storage_buffer_info );
-
-  Buffer(
-      ComPtr<ID3D12Resource>      buffer,
-      ComPtr<D3D12MA::Allocation> allocation,
-      uint32_t                    offset,
-      uint32_t                    size,
-      ConstantBufferInfo          constant_buffer_info );
+      Views                       view );
 
   void                                          Write( uint32_t offset, uint32_t size, void const* data ) const;
   [[nodiscard]] ID3D12Resource*                 GetBuffer() const noexcept;
@@ -123,6 +99,7 @@ public:
   Buffer CreateVertexBuffer( uint32_t size, uint32_t stride );
   Buffer CreateIndexBuffer( uint32_t size, DXGI_FORMAT format );
   Buffer CreateStorageBuffer( uint32_t size, uint32_t stride );
+  Buffer CreateReadWriteBuffer( uint32_t size, uint32_t stride );
   Buffer CreateConstantBuffer( uint32_t size );
 };
 

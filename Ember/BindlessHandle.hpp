@@ -38,6 +38,11 @@ static_assert( sizeof( BindlessHandle ) == sizeof( DWORD32 ) );
       return GetInner();                                                                                               \
     }                                                                                                                  \
                                                                                                                        \
+    operator bool() const                                                                                              \
+    {                                                                                                                  \
+      return not IsNull();                                                                                             \
+    }                                                                                                                  \
+                                                                                                                       \
   protected:                                                                                                           \
     friend class BindlessManager;                                                                                      \
                                                                                                                        \

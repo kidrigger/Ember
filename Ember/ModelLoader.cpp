@@ -99,14 +99,14 @@ void Ember::ModelLoader::ProcessMesh( LoadingContext* context, Node* parent, cgl
 
         LoadAttribute( vertices, vertex_start, &scratch, position_attr, stride, offset, components );
       }
-      /*if ( "NORMAL"sv == attributes[attrib_index].name )
+      if ( "NORMAL"sv == attributes[attrib_index].name )
       {
         cgltf_attribute const& normal_attr = attributes[attrib_index];
         ASSERT( normal_attr.data->component_type == cgltf_component_type_r_32f );
         ASSERT( normal_attr.data->type == cgltf_type_vec3 );
 
         size_t constexpr stride     = sizeof( Vertex );
-        size_t constexpr offset     = offsetof( Vertex, normal );
+        size_t constexpr offset     = offsetof( Vertex, Normal );
         size_t constexpr components = 3;
 
         LoadAttribute( vertices, vertex_start, &scratch, normal_attr, stride, offset, components );
@@ -118,11 +118,11 @@ void Ember::ModelLoader::ProcessMesh( LoadingContext* context, Node* parent, cgl
         ASSERT( tangent_attr.data->type == cgltf_type_vec4 );
 
         size_t constexpr stride     = sizeof( Vertex );
-        size_t constexpr offset     = offsetof( Vertex, tangent );
+        size_t constexpr offset     = offsetof( Vertex, Tangent );
         size_t constexpr components = 4;
 
         LoadAttribute( vertices, vertex_start, &scratch, tangent_attr, stride, offset, components );
-      }*/
+      }
       if ( "TEXCOORD_0"sv == attributes[attrib_index].name )
       {
         cgltf_attribute const& tex_coord_attr = attributes[attrib_index];
@@ -135,18 +135,18 @@ void Ember::ModelLoader::ProcessMesh( LoadingContext* context, Node* parent, cgl
 
         LoadAttribute( vertices, vertex_start, &scratch, tex_coord_attr, stride, offset, components );
       }
-      /*if ( "TEXCOORD_1"sv == attributes[attrib_index].name )
+      if ( "TEXCOORD_1"sv == attributes[attrib_index].name )
       {
         cgltf_attribute const& tex_coord_attr = attributes[attrib_index];
         ASSERT( tex_coord_attr.data->component_type == cgltf_component_type_r_32f );
         ASSERT( tex_coord_attr.data->type == cgltf_type_vec2 );
 
         size_t constexpr stride     = sizeof( Vertex );
-        size_t constexpr offset     = offsetof( Vertex, texCoord1 );
+        size_t constexpr offset     = offsetof( Vertex, TexCoord1 );
         size_t constexpr components = 2;
 
         LoadAttribute( vertices, vertex_start, &scratch, tex_coord_attr, stride, offset, components );
-      }*/
+      }
       if ( "COLOR_0"sv == attributes[attrib_index].name )
       {
         cgltf_attribute const& color_attr = attributes[attrib_index];
@@ -205,8 +205,7 @@ bool Ember::ModelLoader::TryLoadTexture(
 
 void Ember::ModelLoader::ProcessNode( LoadingContext* context, Node* parent, cgltf_node const& node )
 {
-  auto [model, mesh_data, vertices, indices] = *context;
-  Node* my_node                              = parent->CreateChildObject<Node>();
+  Node* my_node = parent->CreateChildObject<Node>();
 
   if ( node.has_matrix )
   {
@@ -318,11 +317,11 @@ Ember::Material* Ember::ModelLoader::TryProcessMaterial( Model* model, cgltf_mat
       emissive_texture,
       sampler,
       Material::GpuRepr{
-            .BaseColorTexture  = base_color_texture.GetSRVHandle(),
-            .NormalTexture     = normal_texture.GetSRVHandle(),
-            .MetalRoughTexture = metal_rough_texture.GetSRVHandle(),
-            .EmissiveTexture   = emissive_texture.GetSRVHandle(),
-            .Sampler           = sampler.GetSamplerHandle(),
+            .BaseColorTexture  = base_color_texture ? base_color_texture.GetSRVHandle() : SRVHandle{},
+            .NormalTexture     = normal_texture ? normal_texture.GetSRVHandle() : SRVHandle{},
+            .MetalRoughTexture = metal_rough_texture ? metal_rough_texture.GetSRVHandle() : SRVHandle{},
+            .EmissiveTexture   = emissive_texture ? emissive_texture.GetSRVHandle() : SRVHandle{},
+            .Sampler           = sampler ? sampler.GetSamplerHandle() : SamplerHandle{},
             .BaseColorFactor   = base_color_factor,
             .EmissiveFactor    = emissive_factor,
             .EmissiveStrength  = emissive_strength,
@@ -338,10 +337,10 @@ Ember::Material* Ember::ModelLoader::TryProcessMaterial( Model* model, cgltf_mat
 Ember::ModelLoader::ModelLoader( RenderDevice* render_device, World* world )
   : m_RenderDevice{ render_device }, m_World{ world }
 {
-  m_RenderDevice->CreateTextureLoader( &m_TextureLoader );
+  TextureLoader::Create( &m_TextureLoader, m_RenderDevice, 3 );
 }
 
-Ember::Model* Ember::ModelLoader::LoadModel( char const* filename )
+Ember::Model* Ember::ModelLoader::TryLoadModel( char const* filename )
 {
   cgltf_data*   gltf_model = nullptr;
   cgltf_options options    = {};
