@@ -245,7 +245,7 @@ void Ember::BasicApp::LoadContent()
   } );
 
   RotModel* rm      = m_World.CreateObject<RotModel>();
-  Model*    model   = m_ModelLoader->TryLoadModel( "BoxTextured.glb" );
+  Model*    model   = m_ModelLoader->TryLoadModel( "DamagedHelmet.glb" );
   ASSERT( model );
   rm->AddChild( model );
 
