@@ -385,6 +385,21 @@ std::array<ID3D12DescriptorHeap*, 2> Ember::RenderDevice::GetBindlessDescriptorH
   return m_Bindless->GetBindlessDescriptorHeaps();
 }
 
+void Ember::RenderDevice::FreeHandle( SRVHandle const handle ) const
+{
+  return m_Bindless->Free( handle );
+}
+
+void Ember::RenderDevice::FreeHandle( UAVHandle const handle ) const
+{
+  m_Bindless->Free( handle );
+}
+
+void Ember::RenderDevice::FreeHandle( SamplerHandle const handle ) const
+{
+  m_Bindless->Free( handle );
+}
+
 void Ember::RenderDevice::WaitOn( Context::Receipt const receipt ) const
 {
   m_DirectContext.WaitOn( receipt );

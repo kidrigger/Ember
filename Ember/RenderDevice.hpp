@@ -94,6 +94,9 @@ public:
       ID3D12Resource* resource, D3D12_UNORDERED_ACCESS_VIEW_DESC const& uav_desc ) const noexcept;
   [[nodiscard]] SamplerHandle CreateSamplerHandle( D3D12_SAMPLER_DESC const& sampler_desc ) const noexcept;
   [[nodiscard]] std::array<ID3D12DescriptorHeap*, 2> GetBindlessDescriptorHeaps() const;
+  void                                               FreeHandle( SRVHandle handle ) const;
+  void                                               FreeHandle( UAVHandle handle ) const;
+  void                                               FreeHandle( SamplerHandle handle ) const;
 
   // Wait until the all queues have finished all commands.
   void WaitOn( Context::Receipt receipt ) const;

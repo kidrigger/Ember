@@ -32,22 +32,27 @@ class TextureLoader
   using UploadIntermediateList = std::pmr::forward_list<UploadIntermediate>;
   using UploadTextureList      = std::pmr::forward_list<ComPtr<ID3D12Resource>>;
   using UploadAliasList        = std::pmr::forward_list<ComPtr<ID3D12Resource>>;
+  using UploadHandleList       = std::vector<std::variant<SRVHandle, UAVHandle>>;
 
   struct UploadBatch
   {
+    RenderDevice*          Device;
     UploadIntermediateList Intermediate;
     UploadTextureList      Textures;
     UploadAliasList        Aliases;
+    UploadHandleList       Handles;
     Context::Receipt       Receipt;
 
     UploadBatch() = default;
-    explicit UploadBatch( std::pmr::polymorphic_allocator<> const& pool_allocator );
+    explicit UploadBatch( RenderDevice* render_device, std::pmr::polymorphic_allocator<> const& pool_allocator );
 #if not defined( RENDERDOC_COMPAT )
     void PushUpload( ComPtr<ID3D12Resource> dest, ComPtr<D3D12MA::Allocation> intermediate );
 #else
     void PushUpload( ComPtr<ID3D12Resource> dest, ComPtr<ID3D12Resource> intermediate );
 #endif
     void PushAlias( ComPtr<ID3D12Resource> alias );
+    void PushHandle( SRVHandle handle );
+    void PushHandles( std::span<UAVHandle> handles );
     void ClearResources();
   };
 
@@ -74,6 +79,12 @@ class TextureLoader
 
   //
   bool TryGenerateMipMaps( ID3D12GraphicsCommandList* command_list, Texture* texture );
+  bool TryLoadImpl(
+      Ember::Texture*              texture,
+      char const*                  id,
+      DirectX::TexMetadata const&  metadata,
+      DirectX::ScratchImage const& scratch_image,
+      ColorSpaceOverride           color_space_override );
 
 public:
   TextureLoader() = default;
@@ -87,12 +98,8 @@ public:
 
   static void Create( TextureLoader* loader, RenderDevice* render_device, uint32_t upload_frame_count );
 
-  bool        TryLoadTexture( Texture* texture, char const* filename );
-  bool        TryLoadImpl(
-             Ember::Texture*              texture,
-             char const*                  id,
-             DirectX::TexMetadata const&  metadata,
-             DirectX::ScratchImage const& scratch_image );
+  bool        TryLoadTexture(
+             Texture* texture, char const* filename, ColorSpaceOverride color_space_override = ColorSpaceOverride::kNone );
   bool TryLoadTextureFromData(
       Texture*           texture,
       char const*        id,
