@@ -24,12 +24,7 @@ enum class ColorSpaceOverride
 
 class TextureLoader
 {
-#if not defined( RENDERDOC_COMPAT )
-  using UploadIntermediate = ComPtr<D3D12MA::Allocation>;
-#else
-  using UploadIntermediate = ComPtr<ID3D12Resource>;
-#endif
-  using UploadIntermediateList = std::pmr::forward_list<UploadIntermediate>;
+  using UploadIntermediateList = std::pmr::forward_list<ComPtr<IUnknown>>;
   using UploadTextureList      = std::pmr::forward_list<ComPtr<ID3D12Resource>>;
   using UploadAliasList        = std::pmr::forward_list<ComPtr<ID3D12Resource>>;
   using UploadHandleList       = std::vector<std::variant<SRVHandle, UAVHandle>>;
@@ -45,11 +40,8 @@ class TextureLoader
 
     UploadBatch() = default;
     explicit UploadBatch( RenderDevice* render_device, std::pmr::polymorphic_allocator<> const& pool_allocator );
-#if not defined( RENDERDOC_COMPAT )
     void PushUpload( ComPtr<ID3D12Resource> dest, ComPtr<D3D12MA::Allocation> intermediate );
-#else
     void PushUpload( ComPtr<ID3D12Resource> dest, ComPtr<ID3D12Resource> intermediate );
-#endif
     void PushAlias( ComPtr<ID3D12Resource> alias );
     void PushHandle( SRVHandle handle );
     void PushHandles( std::span<UAVHandle> handles );

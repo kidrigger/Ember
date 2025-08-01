@@ -38,6 +38,11 @@ void Ember::BindlessManager::RabbitPullingFreeList::Free( uint32_t const index )
   m_Recycled.push( index );
 }
 
+uint32_t Ember::BindlessManager::RabbitPullingFreeList::InUse() const
+{
+  return m_MaxReached - ( uint32_t )m_Recycled.size();
+}
+
 Ember::BindlessManager::BindlessManager(
     ComPtr<ID3D12Device2>        device,
     ComPtr<ID3D12DescriptorHeap> resource_descriptor_heap,
@@ -196,4 +201,10 @@ void Ember::BindlessManager::Free( SamplerHandle const handle )
 std::array<ID3D12DescriptorHeap*, 2> Ember::BindlessManager::GetBindlessDescriptorHeaps() const
 {
   return { m_ResourceDescriptorHeap.Get(), m_SamplerDescriptorHeap.Get() };
+}
+
+Ember::BindlessManager::~BindlessManager()
+{
+  ASSERT( m_ResourceFreeList.InUse() == 0 );
+  ASSERT( m_SamplerFreeList.InUse() == 0 );
 }

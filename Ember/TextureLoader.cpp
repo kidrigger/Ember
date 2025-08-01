@@ -11,8 +11,10 @@
 struct MipMapRootSigInfo
 {
   DirectX::XMFLOAT2 TexelSize;
-  Ember::UAVHandle  Src;
+  Ember::SRVHandle  Src;
   Ember::UAVHandle  Dst;
+  uint32_t          SrcMipLevel;
+  uint32_t          IsSrgb;
 };
 
 Ember::TextureLoader::UploadBatch::UploadBatch(
@@ -20,15 +22,26 @@ Ember::TextureLoader::UploadBatch::UploadBatch(
   : Device{ device }, Intermediate{ pool_allocator }
 {}
 
-#if not defined( RENDERDOC_COMPAT )
 void Ember::TextureLoader::UploadBatch::PushUpload(
-    ComPtr<ID3D12Resource> dest, ComPtr<D3D12MA::Allocation> intermediate )
-#else
-void Ember::TextureLoader::UploadBatch::PushUpload( ComPtr<ID3D12Resource> dest, ComPtr<ID3D12Resource> intermediate )
-#endif
+    [[maybe_unused]] ComPtr<ID3D12Resource> dest, [[maybe_unused]] ComPtr<D3D12MA::Allocation> intermediate )
 {
+#if defined( RENDERDOC_COMPAT )
+  UNREACHABLE;
+#else
   Textures.push_front( std::move( dest ) );
   Intermediate.push_front( std::move( intermediate ) );
+#endif
+}
+
+void Ember::TextureLoader::UploadBatch::PushUpload(
+    [[maybe_unused]] ComPtr<ID3D12Resource> dest, [[maybe_unused]] ComPtr<ID3D12Resource> intermediate )
+{
+#if not defined( RENDERDOC_COMPAT )
+  UNREACHABLE;
+#else
+  Textures.push_front( std::move( dest ) );
+  Intermediate.push_front( std::move( intermediate ) );
+#endif
 }
 
 void Ember::TextureLoader::UploadBatch::PushAlias( ComPtr<ID3D12Resource> alias )
@@ -98,6 +111,8 @@ bool Ember::TextureLoader::TryGenerateMipMaps( ID3D12GraphicsCommandList* comman
   desc.Flags               &= ~( D3D12_RESOURCE_FLAG_ALLOW_RENDER_TARGET | D3D12_RESOURCE_FLAG_ALLOW_DEPTH_STENCIL );
   desc.Flags               |= D3D12_RESOURCE_FLAG_ALLOW_UNORDERED_ACCESS;
 
+  DXGI_FORMAT in_format     = desc.Format;
+
   desc.Format               = MakeUAVCompat( desc.Format );
 
 #if not defined( RENDERDOC_COMPAT )
@@ -130,13 +145,21 @@ bool Ember::TextureLoader::TryGenerateMipMaps( ID3D12GraphicsCommandList* comman
 
   command_list->CopyResource( alias.Get(), resource );
 
-  std::vector<UAVHandle> mip_handles;
+  SRVHandle              mip_src_handle;
+  std::vector<UAVHandle> mip_dst_handles;
+
+  {
+    CD3DX12_SHADER_RESOURCE_VIEW_DESC srv_desc = CD3DX12_SHADER_RESOURCE_VIEW_DESC::Tex2D( in_format );
+    mip_src_handle                             = m_RenderDevice->CreateBindlessHandle( alias.Get(), srv_desc );
+  }
+  m_UploadBatches[m_CurrentUploadBatch].PushHandle( mip_src_handle );
+
   for ( int level = 0; level < desc.MipLevels; level++ )
   {
     CD3DX12_UNORDERED_ACCESS_VIEW_DESC uav_desc = CD3DX12_UNORDERED_ACCESS_VIEW_DESC::Tex2D( desc.Format, level );
-    mip_handles.push_back( m_RenderDevice->CreateBindlessHandle( alias.Get(), uav_desc ) );
+    mip_dst_handles.push_back( m_RenderDevice->CreateBindlessHandle( alias.Get(), uav_desc ) );
   }
-  m_UploadBatches[m_CurrentUploadBatch].PushHandles( mip_handles );
+  m_UploadBatches[m_CurrentUploadBatch].PushHandles( mip_dst_handles );
 
   uint64_t tex_width  = desc.Width;
   uint64_t tex_height = desc.Height;
@@ -154,17 +177,19 @@ bool Ember::TextureLoader::TryGenerateMipMaps( ID3D12GraphicsCommandList* comman
   command_list->SetComputeRootSignature( m_MipMapRootSig.Get() );
   command_list->SetDescriptorHeaps( CountOf( bindless_desc_heaps ), DataOf( bindless_desc_heaps ) );
 
-  MipMapRootSigInfo        mip_map_info;
+  MipMapRootSigInfo mip_map_info;
+  mip_map_info.Src                           = mip_src_handle;
+  mip_map_info.IsSrgb                        = DirectX::IsSRGB( in_format );
 
   CD3DX12_RESOURCE_BARRIER inter_mip_barrier = CD3DX12_RESOURCE_BARRIER::UAV( alias.Get() );
   for ( int write_lvl = 1; write_lvl < desc.MipLevels; write_lvl++ )
   {
-    tex_width              = std::max( tex_width / 2, 1llu );
-    tex_height             = std::max( tex_height / 2, 1llu );
+    tex_width                = std::max( tex_width / 2, 1llu );
+    tex_height               = std::max( tex_height / 2, 1llu );
 
-    mip_map_info.TexelSize = { 1.0f / ( float )tex_width, 1.0f / ( float )tex_height };
-    mip_map_info.Src       = mip_handles[write_lvl - 1];
-    mip_map_info.Dst       = mip_handles[write_lvl];
+    mip_map_info.TexelSize   = { 1.0f / ( float )tex_width, 1.0f / ( float )tex_height };
+    mip_map_info.Dst         = mip_dst_handles[write_lvl];
+    mip_map_info.SrcMipLevel = write_lvl - 1;
 
     command_list->SetComputeRoot32BitConstants( 0, sizeof( MipMapRootSigInfo ) / 4, &mip_map_info, 0 );
     command_list->Dispatch(
@@ -217,11 +242,9 @@ void Ember::TextureLoader::Create( TextureLoader* loader, RenderDevice* render_d
 {
   ComPtr<ID3D12Device2> device = render_device->GetDevice();
 
-  Context               transfer_context;
-  // TODO: This shouldn't be a compute context.
-  // We need this due to the mip-mapping.
+  // We need COMPUTE instead of COPY due to the mip-mapping.
   // Ideally, we want to kick the job to an async compute queue.
-  // Effectively TYPE_COPY (transfer) -> TYPE_COMPUTE (mipmap) -> TYPE_DIRECT (actual use)
+  Context transfer_context;
   Context::Create( &transfer_context, device, D3D12_COMMAND_LIST_TYPE_COMPUTE );
 
   ComPtr<ID3DBlob> mipmap_shader_blob;
@@ -450,9 +473,6 @@ bool Ember::TextureLoader::TryLoadTextureFromData(
 
 Ember::Context::Receipt Ember::TextureLoader::EndBatch()
 {
-  // TODO:
-  // This is no good.
-  // The 3 frame delay isn't a good system.
   ERR_ABORT( m_CurrentCommandList->Close() );
 
   m_UploadBatches[m_CurrentUploadBatch].Receipt = m_CopyContext.Submit( std::move( m_CurrentCommandList ) );

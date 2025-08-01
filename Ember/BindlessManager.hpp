@@ -25,6 +25,8 @@ class BindlessManager
 
     uint32_t Allocate();
     void     Free( uint32_t index );
+
+    uint32_t InUse() const;
   };
 
   ComPtr<ID3D12Device2>        m_Device;
@@ -69,5 +71,11 @@ public:
   void                                               Free( SamplerHandle handle );
 
   [[nodiscard]] std::array<ID3D12DescriptorHeap*, 2> GetBindlessDescriptorHeaps() const;
+
+  BindlessManager( BindlessManager const& other )                = delete;
+  BindlessManager( BindlessManager&& other ) noexcept            = delete;
+  BindlessManager& operator=( BindlessManager const& other )     = delete;
+  BindlessManager& operator=( BindlessManager&& other ) noexcept = delete;
+  ~BindlessManager();
 };
 } // namespace Ember
