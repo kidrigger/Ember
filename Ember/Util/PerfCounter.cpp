@@ -1,5 +1,7 @@
 #include "PerfCounter.hpp"
 
+#include <algorithm>
+
 void Ember::PerfCounter::Tick()
 {
   LARGE_INTEGER perf_counter, freq;
@@ -23,5 +25,5 @@ double Ember::PerfCounter::GetAvgFrameTime() const
 
 double Ember::PerfCounter::GetDeltaMilliSeconds() const
 {
-  return m_FrameTimeMs;
+  return std::clamp( m_FrameTimeMs, 0.0, kMaxDeltaMs );
 }

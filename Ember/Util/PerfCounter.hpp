@@ -7,7 +7,8 @@ namespace Ember
 
 class PerfCounter
 {
-  double static constexpr kSampleCount = 256.0;
+  double constexpr static kSampleCount = 256.0;
+  double constexpr static kMaxDeltaMs  = 1000.0 / 24.0; // Below 24fps, I'd rather slow down than jump.
 
   LARGE_INTEGER m_PrevQueryPerfCounter{};
   double        m_FrameTimeMs{ 0.0f };
