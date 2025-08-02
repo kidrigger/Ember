@@ -61,7 +61,7 @@ float2 GetMetalRough( float2 in_texcoord, SamplerState texture_sampler )
 
 float3 GetEmissive( float2 in_texcoord, SamplerState texture_sampler )
 {
-  float3 emissive = UnpackColor32( g_Material.EmissiveFactor ) * g_Material.EmissiveStrength;
+  float3 emissive = UnpackColor32( g_Material.EmissiveFactor ).rgb * g_Material.EmissiveStrength;
   if ( IsValidHandle( g_Material.EmissiveTextureIndex ) )
   {
     Texture2D texture = g_Material.GetEmissiveTexture();

@@ -22,17 +22,17 @@ class BasicApp final : public IApp
   {
     DirectX::XMMATRIX Projection{ DirectX::XMMatrixIdentity() };
     DirectX::XMMATRIX View{ DirectX::XMMatrixIdentity() };
-    DirectX::XMVECTOR Position;
+    DirectX::XMVECTOR Position{ DirectX::XMVectorZero() };
   };
 
   struct PointLight
   {
-    DirectX::XMFLOAT3 Position;    // 12
-    float             Range;       // 16
-    Color32           Color;       // 20
-    float             Intensity;   // 24
-    float             Attenuation; // 28
-    float             Padding0;    // 32
+    DirectX::XMFLOAT3 Position{ 0.0f, 0.0f, 0.0f }; // 12
+    float             Range{ -1.0f };               // 16
+    Color32           Color;                        // 20
+    float             Intensity{ 1.0f };            // 24
+    float             Attenuation{ 1.0f };          // 28
+    float             Padding0{};                   // 32
   };
 
   HWND                          m_WindowHandle{ nullptr };
@@ -55,8 +55,8 @@ class BasicApp final : public IApp
 
   PointLight                  m_PointLights[kMaxPointLights];
   Buffer                      m_PointLightBuffer[RenderDevice::kNumFrames];
-  uint32_t                    m_PointLightCount;
-  uint32_t                    m_PointLightDirty;
+  uint32_t                    m_PointLightCount{ 0 };
+  uint32_t                    m_PointLightDirty{ 3 };
 
   World                       m_World;
   RenderCommandQueue          m_RenderQueue;

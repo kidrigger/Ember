@@ -12,7 +12,7 @@ VSOut TriangleVS( VSInput IN )
 
   float4 tangent                    = select(
       IN.Tangent.w == 0,
-      0.0f.xxxx,
+      0.0f,
       float4( normalize( mul( float4( IN.Tangent.xyz, 0.0f ), g_InvModel ).xyz ), IN.Tangent.w ) );
 
   OUT.ScreenPosition = screen_pos;

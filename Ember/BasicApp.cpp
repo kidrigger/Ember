@@ -244,7 +244,7 @@ void Ember::BasicApp::LoadContent()
     camera_buffer.Write( 0, sizeof( m_Camera ), &m_Camera );
   }
 
-  m_PointLightCount = 1;
+  m_PointLightCount = 3;
   m_PointLights[0]  = {
      .Position    = { 1.0f, 1.0f, -1.0f },
      .Range       = 15.0f,
@@ -252,6 +252,22 @@ void Ember::BasicApp::LoadContent()
      .Intensity   = 5.0f,
      .Attenuation = 1.0f,
      .Padding0    = 1.0f,
+  };
+  m_PointLights[1] = {
+    .Position    = { -1.0f, 1.0f, -1.0f },
+    .Range       = 15.0f,
+    .Color       = Color32::Green(),
+    .Intensity   = 5.0f,
+    .Attenuation = 1.0f,
+    .Padding0    = 1.0f,
+  };
+  m_PointLights[2] = {
+    .Position    = { 0.0f, 1.0f, 0.0f },
+    .Range       = 15.0f,
+    .Color       = Color32::Red(),
+    .Intensity   = 5.0f,
+    .Attenuation = 1.0f,
+    .Padding0    = 1.0f,
   };
   m_PointLightDirty = 3;
 
@@ -497,10 +513,12 @@ void Ember::BasicApp::Render()
 
     command_list->IASetIndexBuffer( &m_RenderQueue.Meshes[i]->IndexBuffer.GetIndexBufferView() );
     command_list->IASetVertexBuffers( 0, 1, &m_RenderQueue.Meshes[i]->VertexBuffer.GetVertexBufferView() );
+
     command_list->SetGraphicsRoot32BitConstants( 0, sizeof( PerFrameConstants ) / 4, &constants, 0 );
     command_list->SetGraphicsRoot32BitConstants( 1, sizeof( WorldTransform ) / 4, &m_RenderQueue.Transforms[i], 0 );
     command_list->SetGraphicsRoot32BitConstants(
         2, sizeof( Material::GpuRepr ) / 4, &m_RenderQueue.Materials[i]->Repr, 0 );
+
     command_list->DrawIndexedInstanced(
         m_RenderQueue.Primitives[i].IndexCount,
         1,
