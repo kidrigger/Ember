@@ -106,6 +106,7 @@ public:
   // Per Frame getters.
   [[nodiscard]] ID3D12Resource*                   GetCurrentBackbuffer() const noexcept;
   [[nodiscard]] ComPtr<ID3D12GraphicsCommandList> GetGraphicsCommandList() noexcept;
+  [[nodiscard]] uint32_t                          GetCurrentFrameIndex() const noexcept;
   [[nodiscard]] CD3DX12_CPU_DESCRIPTOR_HANDLE     GetCurrentRTVCpuDescriptorHandle() const noexcept;
   [[nodiscard]] CD3DX12_CPU_DESCRIPTOR_HANDLE     GetCurrentDSVCpuDescriptorHandle() const noexcept;
   void                                            ExecuteCommandList( Context::CommandList&& command_list );

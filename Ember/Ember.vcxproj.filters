@@ -181,6 +181,12 @@
     <None Include="Triangle.hlsli">
       <Filter>Shaders</Filter>
     </None>
+    <None Include="ColorSpace.hlsli">
+      <Filter>Shaders</Filter>
+    </None>
+    <None Include="PBR.hlsli">
+      <Filter>Shaders</Filter>
+    </None>
   </ItemGroup>
   <ItemGroup>
     <FxCompile Include="TriangleVS.hlsl">
@@ -209,5 +215,10 @@
     <CopyFileToFolders Include="Assets\DamagedHelmet.glb">
       <Filter>Resource Files\Assets</Filter>
     </CopyFileToFolders>
+  </ItemGroup>
+  <ItemGroup>
+    <Image Include="Assets\checkerboard.png">
+      <Filter>Resource Files</Filter>
+    </Image>
   </ItemGroup>
 </Project>

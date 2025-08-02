@@ -3,6 +3,7 @@
 #include "Buffer.hpp"
 #include "DepthBuffer.hpp"
 #include "IApp.hpp"
+#include "RenderDevice.hpp"
 #include "Scene.hpp"
 #include "Util/DirectXHeaders.hpp"
 #include "Util/Runtime.hpp"
@@ -15,10 +16,23 @@ class RenderDevice;
 
 class BasicApp final : public IApp
 {
+  size_t constexpr static kMaxPointLights = 32;
+
   struct Camera
   {
     DirectX::XMMATRIX Projection{ DirectX::XMMatrixIdentity() };
     DirectX::XMMATRIX View{ DirectX::XMMatrixIdentity() };
+    DirectX::XMVECTOR Position;
+  };
+
+  struct PointLight
+  {
+    DirectX::XMFLOAT3 Position;    // 12
+    float             Range;       // 16
+    Color32           Color;       // 20
+    float             Intensity;   // 24
+    float             Attenuation; // 28
+    float             Padding0;    // 32
   };
 
   HWND                          m_WindowHandle{ nullptr };
@@ -37,7 +51,12 @@ class BasicApp final : public IApp
   DepthBuffer                 m_DepthBuffer;
 
   Camera                      m_Camera;
-  Buffer                      m_CameraBuffer;
+  Buffer                      m_CameraBuffer[RenderDevice::kNumFrames];
+
+  PointLight                  m_PointLights[kMaxPointLights];
+  Buffer                      m_PointLightBuffer[RenderDevice::kNumFrames];
+  uint32_t                    m_PointLightCount;
+  uint32_t                    m_PointLightDirty;
 
   World                       m_World;
   RenderCommandQueue          m_RenderQueue;

@@ -168,6 +168,13 @@ public:
   }
 };
 
+struct PerFrameConstants
+{
+  Ember::CBVHandle Camera;
+  Ember::SRVHandle PointLights;
+  uint32_t         PointLightCount;
+};
+
 Ember::BasicApp::BasicApp(
     HWND const window_handle, std::unique_ptr<RenderDevice> render_device, std::unique_ptr<PerfCounter> perf_counter )
   : IApp{ nullptr }
@@ -219,33 +226,42 @@ void Ember::BasicApp::LoadContent()
 {
   ERR_ABORT( ::ShowWindow( m_WindowHandle, SW_SHOW ) );
 
-  m_Camera = {
-    .Projection = DirectX::XMMatrixPerspectiveFovLH(
+  auto camera_position = DirectX::XMVectorSet( 0.0f, 3.0f, -3.0f, 1.0f );
+
+  m_Camera             = {
+                .Projection = DirectX::XMMatrixPerspectiveFovLH(
         DirectX::XMConvertToRadians( 70.0f ), ( float )m_WindowWidth / ( float )m_WindowHeight, 0.1f, 100.0f ),
-    .View = DirectX::XMMatrixLookAtLH(
-        DirectX::XMVectorSet( 0.0f, 15.0f, -15.0f, 1.0f ),
+                .View = DirectX::XMMatrixLookAtLH(
+        camera_position,
         DirectX::XMVectorSet( 0.0f, 0.0f, 0.0f, 1.0f ),
         DirectX::XMVectorSet( 0.0f, 1.0f, 0.0f, 0.0f ) ),
+                .Position = camera_position,
   };
 
-  m_CameraBuffer = m_RenderDevice->CreateConstantBuffer( sizeof( m_Camera ) );
-  m_CameraBuffer.Write( 0, sizeof( m_Camera ), &m_Camera );
+  for ( auto& camera_buffer : m_CameraBuffer )
+  {
+    camera_buffer = m_RenderDevice->CreateConstantBuffer( sizeof( m_Camera ) );
+    camera_buffer.Write( 0, sizeof( m_Camera ), &m_Camera );
+  }
 
-  Sampler   sampler = m_RenderDevice->CreateSampler( {
-        .Filter         = D3D12_FILTER_ANISOTROPIC,
-        .AddressU       = D3D12_TEXTURE_ADDRESS_MODE_WRAP,
-        .AddressV       = D3D12_TEXTURE_ADDRESS_MODE_WRAP,
-        .AddressW       = D3D12_TEXTURE_ADDRESS_MODE_WRAP,
-        .MipLODBias     = 0.0f,
-        .MaxAnisotropy  = D3D12_DEFAULT_MAX_ANISOTROPY,
-        .ComparisonFunc = D3D12_COMPARISON_FUNC_NONE,
-        .BorderColor    = D3D12_STATIC_BORDER_COLOR_OPAQUE_BLACK,
-        .MinLOD         = 0.0f,
-        .MaxLOD         = INFINITY,
-  } );
+  m_PointLightCount = 1;
+  m_PointLights[0]  = {
+     .Position    = { 1.0f, 1.0f, -1.0f },
+     .Range       = 15.0f,
+     .Color       = Color32::White(),
+     .Intensity   = 5.0f,
+     .Attenuation = 1.0f,
+     .Padding0    = 1.0f,
+  };
+  m_PointLightDirty = 3;
 
-  RotModel* rm      = m_World.CreateObject<RotModel>();
-  Model*    model   = m_ModelLoader->TryLoadModel( "DamagedHelmet.glb" );
+  for ( auto& point_light_buffer : m_PointLightBuffer )
+  {
+    point_light_buffer = m_RenderDevice->CreateStorageBuffer( ByteSizeOf( m_PointLights ), sizeof( PointLight ) );
+  }
+
+  RotModel* rm    = m_World.CreateObject<RotModel>();
+  Model*    model = m_ModelLoader->TryLoadModel( "DamagedHelmet.glb" );
   ASSERT( model );
   rm->AddChild( model );
 
@@ -272,8 +288,8 @@ void Ember::BasicApp::LoadContent()
       D3D12_ROOT_SIGNATURE_FLAG_DENY_DOMAIN_SHADER_ROOT_ACCESS | D3D12_ROOT_SIGNATURE_FLAG_DENY_HULL_SHADER_ROOT_ACCESS;
 
   CD3DX12_ROOT_PARAMETER1 root_parameters[3];
-  root_parameters[0].InitAsConstants( 1, 0, 0, D3D12_SHADER_VISIBILITY_ALL );
-  root_parameters[1].InitAsConstants( sizeof( DirectX::XMMATRIX ) / 4, 1, 0, D3D12_SHADER_VISIBILITY_ALL );
+  root_parameters[0].InitAsConstants( sizeof( PerFrameConstants ) / 4, 0, 0, D3D12_SHADER_VISIBILITY_ALL );
+  root_parameters[1].InitAsConstants( sizeof( WorldTransform ) / 4, 1, 0, D3D12_SHADER_VISIBILITY_ALL );
   root_parameters[2].InitAsConstants( sizeof( Material::GpuRepr ) / 4, 2, 0, D3D12_SHADER_VISIBILITY_ALL );
 
   CD3DX12_VERSIONED_ROOT_SIGNATURE_DESC root_signature_desc;
@@ -297,7 +313,7 @@ void Ember::BasicApp::LoadContent()
   rtv_formats.RTFormats[0] = DXGI_FORMAT_R8G8B8A8_UNORM;
 
   CD3DX12_RASTERIZER_DESC2 rasterizer_desc{ D3D12_DEFAULT };
-  rasterizer_desc.CullMode                  = D3D12_CULL_MODE_NONE;
+  rasterizer_desc.CullMode                  = D3D12_CULL_MODE_BACK;
 
   D3D12_INPUT_ELEMENT_DESC input_elements[] = {
     {
@@ -418,16 +434,27 @@ void Ember::BasicApp::Render()
   m_RenderQueue.Clear();
   m_World.Render( &m_RenderQueue );
 
-  ID3D12Resource*                   backbuffer   = m_RenderDevice->GetCurrentBackbuffer();
-  ComPtr<ID3D12GraphicsCommandList> command_list = m_RenderDevice->GetGraphicsCommandList();
+  ID3D12Resource*                   backbuffer         = m_RenderDevice->GetCurrentBackbuffer();
+  ComPtr<ID3D12GraphicsCommandList> command_list       = m_RenderDevice->GetGraphicsCommandList();
+  uint32_t                          frame_idx          = m_RenderDevice->GetCurrentFrameIndex();
+  Buffer*                           camera_buffer      = &m_CameraBuffer[frame_idx];
+  Buffer*                           point_light_buffer = &m_PointLightBuffer[frame_idx];
 
-  D3D12_VIEWPORT const              viewport     = {
-                     .TopLeftX = 0,
-                     .TopLeftY = 0,
-                     .Width    = ( FLOAT )m_WindowWidth,
-                     .Height   = ( FLOAT )m_WindowHeight,
-                     .MinDepth = 0,
-                     .MaxDepth = 1,
+  // All resources for this frame are guaranteed to be available for CPU modification at this time.
+  camera_buffer->Write( 0, sizeof( Camera ), &m_Camera );
+
+  if ( ( m_PointLightDirty-- ) > 0 )
+  {
+    point_light_buffer->Write( 0, ByteSizeOf( m_PointLights ), DataOf( m_PointLights ) );
+  }
+
+  D3D12_VIEWPORT const viewport = {
+    .TopLeftX = 0,
+    .TopLeftY = 0,
+    .Width    = ( FLOAT )m_WindowWidth,
+    .Height   = ( FLOAT )m_WindowHeight,
+    .MinDepth = 0,
+    .MaxDepth = 1,
   };
   D3D12_RECT const scissor = {
     .left   = 0,
@@ -462,11 +489,16 @@ void Ember::BasicApp::Render()
   size_t const count = m_RenderQueue.Count();
   for ( size_t i = 0; i < count; ++i )
   {
+    PerFrameConstants constants = {
+      .Camera          = camera_buffer->GetCBVHandle(),
+      .PointLights     = point_light_buffer->GetSRVHandle(),
+      .PointLightCount = m_PointLightCount,
+    };
+
     command_list->IASetIndexBuffer( &m_RenderQueue.Meshes[i]->IndexBuffer.GetIndexBufferView() );
     command_list->IASetVertexBuffers( 0, 1, &m_RenderQueue.Meshes[i]->VertexBuffer.GetVertexBufferView() );
-    command_list->SetGraphicsRoot32BitConstant( 0, ( UINT )m_CameraBuffer.GetCBVHandle(), 0 );
-    command_list->SetGraphicsRoot32BitConstants(
-        1, sizeof( DirectX::XMMATRIX ) / 4, &m_RenderQueue.Transforms[i].Transform, 0 );
+    command_list->SetGraphicsRoot32BitConstants( 0, sizeof( PerFrameConstants ) / 4, &constants, 0 );
+    command_list->SetGraphicsRoot32BitConstants( 1, sizeof( WorldTransform ) / 4, &m_RenderQueue.Transforms[i], 0 );
     command_list->SetGraphicsRoot32BitConstants(
         2, sizeof( Material::GpuRepr ) / 4, &m_RenderQueue.Materials[i]->Repr, 0 );
     command_list->DrawIndexedInstanced(

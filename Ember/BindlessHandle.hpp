@@ -38,7 +38,7 @@ static_assert( sizeof( BindlessHandle ) == sizeof( DWORD32 ) );
       return GetInner();                                                                                               \
     }                                                                                                                  \
                                                                                                                        \
-    operator bool() const                                                                                              \
+    explicit operator bool() const                                                                                     \
     {                                                                                                                  \
       return not IsNull();                                                                                             \
     }                                                                                                                  \

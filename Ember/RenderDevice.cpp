@@ -425,6 +425,11 @@ ComPtr<ID3D12GraphicsCommandList> Ember::RenderDevice::GetGraphicsCommandList() 
   return m_DirectContext.GetCommandList();
 }
 
+uint32_t Ember::RenderDevice::GetCurrentFrameIndex() const noexcept
+{
+  return m_CurrentBackbufferIndex;
+}
+
 CD3DX12_CPU_DESCRIPTOR_HANDLE Ember::RenderDevice::GetCurrentRTVCpuDescriptorHandle() const noexcept
 {
   return CD3DX12_CPU_DESCRIPTOR_HANDLE(

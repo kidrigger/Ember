@@ -35,7 +35,7 @@ Ember::Sampler::Sampler( SamplerInfo sampler_handle ) : m_SamplerInfo{ std::move
 
 Ember::Sampler::operator bool() const
 {
-  return m_SamplerInfo->Handle;
+  return ( bool )m_SamplerInfo->Handle;
 }
 
 Ember::SamplerHandle Ember::Sampler::GetSamplerHandle() const
