@@ -71,7 +71,7 @@ struct BRDFCookTorranceGGX
     float3 specular       = numerator / ( denominator + 0.00001f );
 
     float3 specular_part  = fresnel;
-    float3 diffuse_part   = 1.0f.xxx - specular_part;
+    float3 diffuse_part   = 1.0f - specular_part;
 
     diffuse_part         *= 1.0f - Metallic;
 

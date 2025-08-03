@@ -115,21 +115,21 @@ public:
   void                             SetLocalTransform( DirectX::XMMATRIX const& transform ) const;
   void                             SetLocalTransform(
                                   DirectX::XMVECTOR const& translation, DirectX::XMVECTOR const& rotation, DirectX::XMVECTOR const& scale ) const;
-  DirectX::XMVECTOR             GetLocalTranslation() const;
-  void                          SetLocalTranslation( DirectX::XMVECTOR const& translation ) const;
-  DirectX::XMVECTOR             GetLocalRotation() const;
-  void                          SetLocalRotation( DirectX::XMVECTOR const& rotation ) const;
-  DirectX::XMVECTOR             GetLocalScale() const;
-  void                          SetLocalScale( DirectX::XMVECTOR const& scale ) const;
-  [[nodiscard]] WorldTransform& GetWorldTransform() const;
-  void                          SetWorldTransform( DirectX::XMMATRIX const& transform ) const;
-  [[nodiscard]] Object*         GetParent() const;
-  void                          SetParent( Object* parent );
+  [[nodiscard]] DirectX::XMVECTOR GetLocalTranslation() const;
+  void                            SetLocalTranslation( DirectX::XMVECTOR const& translation ) const;
+  [[nodiscard]] DirectX::XMVECTOR GetLocalRotation() const;
+  void                            SetLocalRotation( DirectX::XMVECTOR const& rotation ) const;
+  [[nodiscard]] DirectX::XMVECTOR GetLocalScale() const;
+  void                            SetLocalScale( DirectX::XMVECTOR const& scale ) const;
+  [[nodiscard]] WorldTransform&   GetWorldTransform() const;
+  void                            SetWorldTransform( DirectX::XMMATRIX const& transform ) const;
+  [[nodiscard]] Object*           GetParent() const;
+  void                            SetParent( Object* parent );
 
-  virtual void                  Update( float delta_seconds )              = 0;
-  virtual void                  Render( RenderCommandQueue* render_queue ) = 0;
+  virtual void                    Update( float delta_seconds )              = 0;
+  virtual void                    Render( RenderCommandQueue* render_queue ) = 0;
 
-  virtual void                  UpdateWorldTransform( DirectX::FXMMATRIX& parent_transform );
+  virtual void                    UpdateWorldTransform( DirectX::FXMMATRIX& parent_transform );
 
   Object( Object const& other )                = delete;
   Object( Object&& other ) noexcept            = delete;

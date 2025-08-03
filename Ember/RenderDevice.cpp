@@ -313,9 +313,15 @@ Ember::Buffer Ember::RenderDevice::CreateConstantBuffer( uint32_t const size )
 }
 
 Ember::Texture Ember::RenderDevice::CreateTexture2D(
-    DXGI_FORMAT const format, uint32_t const width, uint32_t const height )
+    DXGI_FORMAT const format, uint32_t const width, uint32_t const height, TextureUsage const usage )
 {
-  return m_TextureManager.CreateTexture2D( format, width, height );
+  return m_TextureManager.CreateTexture2D( format, width, height, usage );
+}
+
+Ember::Texture Ember::RenderDevice::CreateTextureCube(
+    DXGI_FORMAT const format, uint32_t const side, TextureUsage const usage )
+{
+  return m_TextureManager.CreateTextureCube( format, side, usage );
 }
 
 Ember::Sampler Ember::RenderDevice::CreateSampler( D3D12_SAMPLER_DESC const& sampler_desc )

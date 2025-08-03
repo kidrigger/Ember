@@ -57,7 +57,7 @@
   while ( false )
 
 #define ASSERT( x ) assert( x )
-#define ASSERT_M( x, MSG ) ASSERT( ( x ) and ( MSG ) )
+#define ASSERT_M( x, MSG ) assert( x )
 
 #define UNREACHABLE std::terminate()
 #define UNREACHABLE_M( MSG ) std::terminate()

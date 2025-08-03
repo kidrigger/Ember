@@ -42,6 +42,7 @@ class TextureLoader
     explicit UploadBatch( RenderDevice* render_device, std::pmr::polymorphic_allocator<> const& pool_allocator );
     void PushUpload( ComPtr<ID3D12Resource> dest, ComPtr<D3D12MA::Allocation> intermediate );
     void PushUpload( ComPtr<ID3D12Resource> dest, ComPtr<ID3D12Resource> intermediate );
+    void PushAllocation( ComPtr<D3D12MA::Allocation> intermediate );
     void PushAlias( ComPtr<ID3D12Resource> alias );
     void PushHandle( SRVHandle handle );
     void PushHandles( std::span<UAVHandle> handles );
@@ -72,7 +73,7 @@ class TextureLoader
   //
   bool TryGenerateMipMaps( ID3D12GraphicsCommandList* command_list, Texture* texture );
   bool TryLoadImpl(
-      Ember::Texture*              texture,
+      Texture*                     texture,
       char const*                  id,
       DirectX::TexMetadata const&  metadata,
       DirectX::ScratchImage const& scratch_image,

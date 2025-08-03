@@ -1,4 +1,4 @@
-#include "ColorSpace.hlsli"
+#include "Colors.hlsli"
 
 #define NUMTHREADS( X, Y, Z ) [numthreads( X, Y, Z )]
 

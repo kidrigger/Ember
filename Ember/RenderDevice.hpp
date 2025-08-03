@@ -79,7 +79,8 @@ public:
   [[nodiscard]] Buffer      CreateStorageBuffer( uint32_t size, uint32_t stride );
   [[nodiscard]] Buffer      CreateConstantBuffer( uint32_t size );
 
-  [[nodiscard]] Texture     CreateTexture2D( DXGI_FORMAT format, uint32_t width, uint32_t height );
+  [[nodiscard]] Texture     CreateTexture2D( DXGI_FORMAT format, uint32_t width, uint32_t height, TextureUsage usage );
+  [[nodiscard]] Texture     CreateTextureCube( DXGI_FORMAT format, uint32_t side, TextureUsage usage );
 
   [[nodiscard]] Sampler     CreateSampler( D3D12_SAMPLER_DESC const& sampler_desc );
 

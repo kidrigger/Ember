@@ -46,6 +46,9 @@
     <Filter Include="Header Files\Resources">
       <UniqueIdentifier>{703a95d3-f874-457e-8d9a-08207f4f1b83}</UniqueIdentifier>
     </Filter>
+    <Filter Include="Shaders\IBL">
+      <UniqueIdentifier>{0cf9a7d1-17b5-47ca-a7bf-1487b3801c13}</UniqueIdentifier>
+    </Filter>
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="Main.cpp">
@@ -181,11 +184,17 @@
     <None Include="Triangle.hlsli">
       <Filter>Shaders</Filter>
     </None>
-    <None Include="ColorSpace.hlsli">
+    <None Include="Colors.hlsli">
       <Filter>Shaders</Filter>
     </None>
     <None Include="PBR.hlsli">
       <Filter>Shaders</Filter>
+    </None>
+    <None Include="Bindless.hlsli">
+      <Filter>Shaders</Filter>
+    </None>
+    <None Include="IBLCommon.hlsli">
+      <Filter>Shaders\IBL</Filter>
     </None>
   </ItemGroup>
   <ItemGroup>
@@ -197,6 +206,9 @@
     </FxCompile>
     <FxCompile Include="MipMap.hlsl">
       <Filter>Shaders</Filter>
+    </FxCompile>
+    <FxCompile Include="EqrectToCube.hlsl">
+      <Filter>Shaders\IBL</Filter>
     </FxCompile>
   </ItemGroup>
   <ItemGroup>
@@ -213,6 +225,9 @@
       <Filter>Resource Files\Assets</Filter>
     </CopyFileToFolders>
     <CopyFileToFolders Include="Assets\DamagedHelmet.glb">
+      <Filter>Resource Files\Assets</Filter>
+    </CopyFileToFolders>
+    <CopyFileToFolders Include="Assets\PhotoStudioLoft.hdr">
       <Filter>Resource Files\Assets</Filter>
     </CopyFileToFolders>
   </ItemGroup>

@@ -198,7 +198,7 @@ bool Ember::ModelLoader::TryLoadTexture(
     id                  += std::to_string( hash );
   }
 
-  m_TextureLoader.TryLoadTextureFromData( texture, id.c_str(), size, data, color_space_override );
+  m_TextureLoader->TryLoadTextureFromData( texture, id.c_str(), size, data, color_space_override );
 
   return texture;
 }
@@ -334,11 +334,9 @@ Ember::Material* Ember::ModelLoader::TryProcessMaterial( Model* model, cgltf_mat
   return new_material;
 }
 
-Ember::ModelLoader::ModelLoader( RenderDevice* render_device, World* world )
-  : m_RenderDevice{ render_device }, m_World{ world }
-{
-  TextureLoader::Create( &m_TextureLoader, m_RenderDevice, 3 );
-}
+Ember::ModelLoader::ModelLoader( RenderDevice* render_device, World* world, TextureLoader* texture_loader )
+  : m_RenderDevice{ render_device }, m_World{ world }, m_TextureLoader{ texture_loader }
+{}
 
 Ember::Model* Ember::ModelLoader::TryLoadModel( char const* filename )
 {
@@ -409,18 +407,14 @@ Ember::Model* Ember::ModelLoader::TryLoadModel( char const* filename )
 
   cgltf_free( gltf_model );
 
-  Context::Receipt receipt = m_TextureLoader.EndBatch();
+  Context::Receipt receipt = m_TextureLoader->EndBatch();
   m_RenderDevice->WaitOn( receipt );
 
   return model;
 }
 
 void Ember::ModelLoader::Update()
-{
-  m_TextureLoader.Update();
-}
+{}
 
 void Ember::ModelLoader::FlushBarriers( ID3D12GraphicsCommandList* command_list )
-{
-  m_TextureLoader.FlushBarriers( command_list );
-}
+{}

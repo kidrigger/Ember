@@ -72,6 +72,12 @@ public:
   [[nodiscard]] UAVHandle            GetUAVHandle() const;
 };
 
+enum class TextureUsage
+{
+  kReadonly,
+  kReadWrite,
+};
+
 class TextureManager
 {
   std::pmr::synchronized_pool_resource m_MemoryPool;
@@ -79,13 +85,17 @@ class TextureManager
   ComPtr<ID3D12Device2>                m_Device;
   ComPtr<D3D12MA::Allocator>           m_Allocator;
 
+  //
+  void CreateResourceImpl(
+      ID3D12Resource** texture, D3D12MA::Allocation** allocation, CD3DX12_RESOURCE_DESC const& resource_desc );
+
 public:
   TextureManager() = default;
   TextureManager(
       ComPtr<ID3D12Device2> device, ComPtr<D3D12MA::Allocator> allocator, BindlessManager* bindless_manager );
 
-  Texture CreateTexture2D( DXGI_FORMAT format, uint32_t width, uint32_t height );
-  Texture CreateReadWriteTexture2D( DXGI_FORMAT format, uint32_t width, uint32_t height );
+  Texture CreateTexture2D( DXGI_FORMAT format, uint32_t width, uint32_t height, TextureUsage usage );
+  Texture CreateTextureCube( DXGI_FORMAT format, uint32_t side, TextureUsage usage );
   Sampler CreateSampler( D3D12_SAMPLER_DESC const& sampler_desc );
 };
 

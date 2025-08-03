@@ -203,7 +203,7 @@
     <FxCompile>
       <ShaderModel>6.6</ShaderModel>
       <SuppressStartupBanner>false</SuppressStartupBanner>
-      <EntryPointName>$(FileName)</EntryPointName>
+      <EntryPointName>%(Filename)</EntryPointName>
       <ShaderType>Library</ShaderType>
     </FxCompile>
   </ItemDefinitionGroup>
@@ -289,7 +289,18 @@
       <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='Release|x64'">false</ExcludedFromBuild>
       <DeploymentContent Condition="'$(Configuration)|$(Platform)'=='Release|x64'">true</DeploymentContent>
     </CopyFileToFolders>
-    <None Include="ColorSpace.hlsli" />
+    <CopyFileToFolders Include="Assets\PhotoStudioLoft.hdr">
+      <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">false</ExcludedFromBuild>
+      <DeploymentContent Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">true</DeploymentContent>
+      <FileType>Document</FileType>
+      <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='RenderDoc_Compat|x64'">false</ExcludedFromBuild>
+      <DeploymentContent Condition="'$(Configuration)|$(Platform)'=='RenderDoc_Compat|x64'">true</DeploymentContent>
+      <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='Release|x64'">false</ExcludedFromBuild>
+      <DeploymentContent Condition="'$(Configuration)|$(Platform)'=='Release|x64'">true</DeploymentContent>
+    </CopyFileToFolders>
+    <None Include="Bindless.hlsli" />
+    <None Include="Colors.hlsli" />
+    <None Include="IBLCommon.hlsli" />
     <None Include="PBR.hlsli" />
     <None Include="PLAN.md">
       <SubType>
@@ -298,6 +309,17 @@
     <None Include="Triangle.hlsli" />
   </ItemGroup>
   <ItemGroup>
+    <FxCompile Include="EqrectToCube.hlsl">
+      <ShaderType Condition="'$(Configuration)|$(Platform)'=='RenderDoc_Compat|x64'">Compute</ShaderType>
+      <ShaderType Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'">Compute</ShaderType>
+      <ShaderModel Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'">4.0</ShaderModel>
+      <ShaderType Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">Compute</ShaderType>
+      <ShaderType Condition="'$(Configuration)|$(Platform)'=='Release|Win32'">Compute</ShaderType>
+      <ShaderModel Condition="'$(Configuration)|$(Platform)'=='Release|Win32'">4.0</ShaderModel>
+      <ShaderType Condition="'$(Configuration)|$(Platform)'=='Release|x64'">Compute</ShaderType>
+      <ShaderType Condition="'$(Configuration)|$(Platform)'=='RenderDoc_Compat|Win32'">Compute</ShaderType>
+      <ShaderModel Condition="'$(Configuration)|$(Platform)'=='RenderDoc_Compat|Win32'">4.0</ShaderModel>
+    </FxCompile>
     <FxCompile Include="MipMap.hlsl">
       <ShaderType Condition="'$(Configuration)|$(Platform)'=='RenderDoc_Compat|x64'">Compute</ShaderType>
       <ShaderType Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'">Compute</ShaderType>

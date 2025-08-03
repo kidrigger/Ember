@@ -92,7 +92,9 @@ Ember::Context::CommandList Ember::Context::GetCommandList()
 
 Ember::Context::Receipt Ember::Context::Submit( CommandList&& command_list )
 {
+  ERR_ABORT( command_list->Close() );
   ID3D12CommandList* p_command_list = command_list.Get();
+
   m_CommandQueue->ExecuteCommandLists( 1, &p_command_list );
   uint64_t const signal_value = ++m_FenceValue;
   ERR_ABORT( m_CommandQueue->Signal( m_Fence.Get(), signal_value ) );

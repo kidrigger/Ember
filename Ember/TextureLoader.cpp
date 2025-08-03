@@ -44,6 +44,11 @@ void Ember::TextureLoader::UploadBatch::PushUpload(
 #endif
 }
 
+void Ember::TextureLoader::UploadBatch::PushAllocation( ComPtr<D3D12MA::Allocation> intermediate )
+{
+  Intermediate.push_front( std::move( intermediate ) );
+}
+
 void Ember::TextureLoader::UploadBatch::PushAlias( ComPtr<ID3D12Resource> alias )
 {
   Aliases.emplace_front( std::move( alias ) );
@@ -88,6 +93,10 @@ DXGI_FORMAT MakeUAVCompat( DXGI_FORMAT const format )
     case DXGI_FORMAT_R8G8B8A8_UNORM_SRGB:
       return DXGI_FORMAT_R8G8B8A8_UNORM;
     case DXGI_FORMAT_R8G8B8A8_UNORM:
+    case DXGI_FORMAT_R32_FLOAT:
+    case DXGI_FORMAT_R32G32_FLOAT:
+    case DXGI_FORMAT_R32G32B32_FLOAT:
+    case DXGI_FORMAT_R32G32B32A32_FLOAT:
       return format;
     default:
       UNIMPLEMENTED_M( "Add formats as used/required" );
@@ -107,19 +116,36 @@ bool Ember::TextureLoader::TryGenerateMipMaps( ID3D12GraphicsCommandList* comman
   ID3D12Resource* resource = texture->GetTexture();
 #endif
 
-  D3D12_RESOURCE_DESC desc  = resource->GetDesc();
-  desc.Flags               &= ~( D3D12_RESOURCE_FLAG_ALLOW_RENDER_TARGET | D3D12_RESOURCE_FLAG_ALLOW_DEPTH_STENCIL );
-  desc.Flags               |= D3D12_RESOURCE_FLAG_ALLOW_UNORDERED_ACCESS;
+  D3D12_RESOURCE_DESC desc      = resource->GetDesc();
+  DXGI_FORMAT         in_format = desc.Format;
 
-  DXGI_FORMAT in_format     = desc.Format;
-
-  desc.Format               = MakeUAVCompat( desc.Format );
+  desc.Flags  &= ~( D3D12_RESOURCE_FLAG_ALLOW_RENDER_TARGET | D3D12_RESOURCE_FLAG_ALLOW_DEPTH_STENCIL );
+  desc.Flags  |= D3D12_RESOURCE_FLAG_ALLOW_UNORDERED_ACCESS;
+  desc.Format  = MakeUAVCompat( desc.Format );
 
 #if not defined( RENDERDOC_COMPAT )
-  ERR_FAIL_RET_V(
-      m_RenderDevice->GetAllocator()->CreateAliasingResource(
-          allocation, 0, &desc, D3D12_RESOURCE_STATE_COPY_DEST, nullptr, IID_PPV_ARGS( &alias ) ),
-      false );
+  bool const is_aliased = allocation->GetHeap() != nullptr;
+  if ( is_aliased )
+  {
+    // Placed resource can be aliased.
+    ERR_FAIL_RET_V(
+        m_RenderDevice->GetAllocator()->CreateAliasingResource(
+            allocation, 0, &desc, D3D12_RESOURCE_STATE_COPY_DEST, nullptr, IID_PPV_ARGS( &alias ) ),
+        false );
+  }
+  else
+  {
+    D3D12MA::ALLOCATION_DESC allocation_desc{
+      .Flags    = D3D12MA::ALLOCATION_FLAG_CAN_ALIAS,
+      .HeapType = D3D12_HEAP_TYPE_DEFAULT,
+    };
+    ComPtr<D3D12MA::Allocation> aliased_alloc;
+    ERR_FAIL_RET_V(
+        m_RenderDevice->GetAllocator()->CreateResource(
+            &allocation_desc, &desc, D3D12_RESOURCE_STATE_COPY_DEST, nullptr, &aliased_alloc, IID_PPV_ARGS( &alias ) ),
+        false );
+    m_UploadBatches[m_CurrentUploadBatch].PushAllocation( std::move( aliased_alloc ) );
+  }
 #else
   CD3DX12_HEAP_PROPERTIES properties{ D3D12_HEAP_TYPE_DEFAULT };
   ERR_FAIL_RET_V(
@@ -136,6 +162,7 @@ bool Ember::TextureLoader::TryGenerateMipMaps( ID3D12GraphicsCommandList* comman
   }
 
 #if not defined( RENDERDOC_COMPAT )
+  if ( is_aliased )
   {
     CD3DX12_RESOURCE_BARRIER aliasing_barrier =
         CD3DX12_RESOURCE_BARRIER::Aliasing( allocation->GetResource(), alias.Get() );
@@ -209,6 +236,7 @@ bool Ember::TextureLoader::TryGenerateMipMaps( ID3D12GraphicsCommandList* comman
   command_list->CopyResource( resource, alias.Get() );
 
 #if not defined( RENDERDOC_COMPAT )
+  if ( is_aliased )
   {
     CD3DX12_RESOURCE_BARRIER reverse_aliasing = CD3DX12_RESOURCE_BARRIER::Aliasing( alias.Get(), resource );
     command_list->ResourceBarrier( 1, &reverse_aliasing );
@@ -276,7 +304,7 @@ void Ember::TextureLoader::Create( TextureLoader* loader, RenderDevice* render_d
       D3D12_ROOT_SIGNATURE_FLAG_DENY_DOMAIN_SHADER_ROOT_ACCESS | D3D12_ROOT_SIGNATURE_FLAG_DENY_HULL_SHADER_ROOT_ACCESS;
 
   CD3DX12_ROOT_PARAMETER1 root_parameters[1];
-  root_parameters[0].InitAsConstants( sizeof( MipMapRootSigInfo ) / 4, 0, 0, D3D12_SHADER_VISIBILITY_ALL );
+  root_parameters[0].InitAsConstants( sizeof( MipMapRootSigInfo ) / 4, 0 );
 
   CD3DX12_VERSIONED_ROOT_SIGNATURE_DESC root_signature_desc;
   root_signature_desc.Init_1_1(
@@ -340,8 +368,8 @@ bool Ember::TextureLoader::TryLoadImpl(
       break;
   }
 
-  new ( texture )
-      Texture{ m_RenderDevice->CreateTexture2D( format, ( uint32_t )metadata.width, ( uint32_t )metadata.height ) };
+  new ( texture ) Texture{ m_RenderDevice->CreateTexture2D(
+      format, ( uint32_t )metadata.width, ( uint32_t )metadata.height, TextureUsage::kReadonly ) };
 
   wchar_t wide_id[512];
   MultiByteToWideChar( CP_UTF8, MB_ERR_INVALID_CHARS, id, -1, wide_id, 512 );
@@ -419,12 +447,12 @@ bool Ember::TextureLoader::TryLoadImpl(
 
   if ( not TryGenerateMipMaps( m_CurrentCommandList.Get(), texture ) )
   {
-    return true;
+    return false;
   }
 
   m_Cache[id] = *texture;
 
-  return false;
+  return true;
 }
 
 bool Ember::TextureLoader::TryLoadTexture(
@@ -438,14 +466,23 @@ bool Ember::TextureLoader::TryLoadTexture(
 
   std::filesystem::path const file_path( filename );
   if ( not exists( file_path ) ) return false;
+  if ( not file_path.has_extension() ) return false;
 
   wchar_t wide_filename[512];
   MultiByteToWideChar( CP_UTF8, MB_ERR_INVALID_CHARS, filename, -1, wide_filename, 512 );
 
-  DirectX::TexMetadata     metadata;
-  DirectX::ScratchImage    scratch_image;
-  DirectX::WIC_FLAGS const flags = DirectX::WIC_FLAGS_DEFAULT_SRGB | DirectX::WIC_FLAGS_FORCE_RGB;
-  ERR_FAIL_RET_V( LoadFromWICFile( wide_filename, flags, &metadata, scratch_image ), false );
+  DirectX::TexMetadata  metadata;
+  DirectX::ScratchImage scratch_image;
+
+  if ( file_path.extension() == ".hdr" )
+  {
+    ERR_FAIL_RET_V( DirectX::LoadFromHDRFile( wide_filename, &metadata, scratch_image ), false );
+  }
+  else
+  {
+    DirectX::WIC_FLAGS const flags = DirectX::WIC_FLAGS_DEFAULT_SRGB | DirectX::WIC_FLAGS_FORCE_RGB;
+    ERR_FAIL_RET_V( LoadFromWICFile( wide_filename, flags, &metadata, scratch_image ), false );
+  }
 
   return TryLoadImpl( texture, filename, metadata, scratch_image, color_space_override );
 }
@@ -473,8 +510,6 @@ bool Ember::TextureLoader::TryLoadTextureFromData(
 
 Ember::Context::Receipt Ember::TextureLoader::EndBatch()
 {
-  ERR_ABORT( m_CurrentCommandList->Close() );
-
   m_UploadBatches[m_CurrentUploadBatch].Receipt = m_CopyContext.Submit( std::move( m_CurrentCommandList ) );
 
   Context::Receipt const batch_receipt          = m_UploadBatches[m_CurrentUploadBatch].Receipt;
@@ -504,6 +539,8 @@ void Ember::TextureLoader::Update()
   // TODO: Ideally, I don't want this as a check on 'Update' but instead it should be a task on a thread pool.
   for ( auto& batch : m_UploadBatches )
   {
+    ASSERT_M(
+        batch.Textures.empty() or batch.Receipt.IsValid(), "Either no textures in the batch, or the batch is ended." );
     if ( not batch.Textures.empty() and batch.Receipt.IsComplete() )
     {
       auto lock_guard = std::lock_guard( m_LoadLock );

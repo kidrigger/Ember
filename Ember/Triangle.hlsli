@@ -1,24 +1,5 @@
-#include "ColorSpace.hlsli"
-
-const static uint kInvalidIndex = 0xFFFFFFFF;
-
-bool              IsValidHandle( uint handle )
-{
-  return handle != kInvalidIndex;
-}
-
-typedef uint Color32;
-typedef uint RID;
-typedef uint SamplerID;
-
-float4       UnpackColor32( Color32 value )
-{
-  uint a = ( value & 0xFF000000 ) >> 24;
-  uint b = ( value & 0x00FF0000 ) >> 16;
-  uint g = ( value & 0x0000FF00 ) >> 8;
-  uint r = value & 0x000000FF;
-  return float4( r, g, b, a ) / 255.0f;
-}
+#include "Bindless.hlsli"
+#include "Colors.hlsli"
 
 struct Camera
 {
@@ -29,30 +10,30 @@ struct Camera
 
 struct PointLight
 {
-  float3  Position;    // 12
-  float   Range;       // 16
-  Color32 Color;       // 20
-  float   Intensity;   // 24
-  float   Attenuation; // 28
-  float   Padding0;    // 32
+  float3        Position;    // 12
+  float         Range;       // 16
+  PackedColor32 Color;       // 20
+  float         Intensity;   // 24
+  float         Attenuation; // 28
+  float         Padding0;    // 32
 };
 
 struct Material
 {
-  RID       BaseColorTextureIndex;  // 04
-  RID       NormalTextureIndex;     // 08
-  RID       MetalRoughTextureIndex; // 12
-  RID       EmissiveTextureIndex;   // 16
-  SamplerID SamplerIndex;           // 20
-  Color32   BaseColorFactor;        // 24
-  Color32   EmissiveFactor;         // 28
-  float     EmissiveStrength;       // 32
-  float     Metal;                  // 36
-  float     Rough;                  // 40
-  float     AlphaCutoff;            // 44
-  float     Pad0;                   // 48
+  RID           BaseColorTextureIndex;  // 04
+  RID           NormalTextureIndex;     // 08
+  RID           MetalRoughTextureIndex; // 12
+  RID           EmissiveTextureIndex;   // 16
+  SamplerID     SamplerIndex;           // 20
+  PackedColor32 BaseColorFactor;        // 24
+  PackedColor32 EmissiveFactor;         // 28
+  float         EmissiveStrength;       // 32
+  float         Metal;                  // 36
+  float         Rough;                  // 40
+  float         AlphaCutoff;            // 44
+  float         Pad0;                   // 48
 
-  Texture2D GetBaseColorTexture()
+  Texture2D     GetBaseColorTexture()
   {
     return ResourceDescriptorHeap[BaseColorTextureIndex];
   }

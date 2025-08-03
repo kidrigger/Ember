@@ -110,13 +110,11 @@ Ember::TextureManager::TextureManager(
   : m_Bindless{ bindless_manager }, m_Device{ std::move( device ) }, m_Allocator{ std::move( allocator ) }
 {}
 
-Ember::Texture Ember::TextureManager::CreateTexture2D(
-    DXGI_FORMAT const format, uint32_t const width, uint32_t const height )
+void Ember::TextureManager::CreateResourceImpl(
+    ID3D12Resource**                       texture,
+    [[maybe_unused]] D3D12MA::Allocation** allocation,
+    CD3DX12_RESOURCE_DESC const&           resource_desc )
 {
-  ComPtr<ID3D12Resource>      texture;
-  ComPtr<D3D12MA::Allocation> allocation;
-
-  CD3DX12_RESOURCE_DESC       resource_desc = CD3DX12_RESOURCE_DESC::Tex2D( format, width, height );
 #if not defined( RENDERDOC_COMPAT )
   D3D12MA::ALLOCATION_DESC const allocation_desc = {
     .Flags    = D3D12MA::ALLOCATION_FLAG_NONE,
@@ -128,8 +126,8 @@ Ember::Texture Ember::TextureManager::CreateTexture2D(
       &resource_desc,
       D3D12_RESOURCE_STATE_COPY_DEST,
       nullptr,
-      &allocation,
-      IID_PPV_ARGS( &texture ) ) );
+      allocation,
+      IID_PPV_ARGS( texture ) ) );
 #else
   auto const heap_properties = CD3DX12_HEAP_PROPERTIES{ D3D12_HEAP_TYPE_DEFAULT };
   ERR_ABORT( m_Device->CreateCommittedResource(
@@ -138,52 +136,57 @@ Ember::Texture Ember::TextureManager::CreateTexture2D(
       &resource_desc,
       D3D12_RESOURCE_STATE_COPY_DEST,
       nullptr,
-      IID_PPV_ARGS( &texture ) ) );
+      IID_PPV_ARGS( texture ) ) );
 #endif
+}
+
+Ember::Texture Ember::TextureManager::CreateTexture2D(
+    DXGI_FORMAT const format, uint32_t const width, uint32_t const height, TextureUsage const usage )
+{
+  ComPtr<ID3D12Resource>      texture;
+  ComPtr<D3D12MA::Allocation> allocation;
+
+  CD3DX12_RESOURCE_DESC       resource_desc = CD3DX12_RESOURCE_DESC::Tex2D( format, width, height );
+
+  if ( usage == TextureUsage::kReadWrite ) resource_desc.Flags |= D3D12_RESOURCE_FLAG_ALLOW_UNORDERED_ACCESS;
+
+  CreateResourceImpl( &texture, &allocation, resource_desc );
 
   SRVHandle srv_handle =
       m_Bindless->CreateDescriptorHandle( texture.Get(), CD3DX12_SHADER_RESOURCE_VIEW_DESC::Tex2D( format ) );
+  UAVHandle uav_handle{};
+  if ( usage == TextureUsage::kReadWrite )
+  {
+    uav_handle = m_Bindless->CreateDescriptorHandle(
+        texture.Get(), CD3DX12_UNORDERED_ACCESS_VIEW_DESC::Tex2D( DirectX::MakeLinear( format ) ) );
+  }
+
   auto texture_info = std::allocate_shared<Texture::TextureInfoImpl>(
-      std::pmr::polymorphic_allocator{ &m_MemoryPool }, m_Bindless, srv_handle, UAVHandle{} );
+      std::pmr::polymorphic_allocator{ &m_MemoryPool }, m_Bindless, srv_handle, uav_handle );
 
   return Texture{ std::move( texture ), std::move( allocation ), std::move( texture_info ) };
 }
 
-Ember::Texture Ember::TextureManager::CreateReadWriteTexture2D( DXGI_FORMAT format, uint32_t width, uint32_t height )
+Ember::Texture Ember::TextureManager::CreateTextureCube(
+    DXGI_FORMAT const format, uint32_t const side, TextureUsage usage )
 {
   ComPtr<ID3D12Resource>      texture;
   ComPtr<D3D12MA::Allocation> allocation;
 
-  CD3DX12_RESOURCE_DESC       resource_desc = CD3DX12_RESOURCE_DESC::Tex2D( format, width, height );
-  resource_desc.Flags                       = D3D12_RESOURCE_FLAG_ALLOW_UNORDERED_ACCESS;
-#if not defined( RENDERDOC_COMPAT )
-  D3D12MA::ALLOCATION_DESC const allocation_desc = {
-    .Flags    = D3D12MA::ALLOCATION_FLAG_NONE,
-    .HeapType = D3D12_HEAP_TYPE_DEFAULT,
-  };
+  CD3DX12_RESOURCE_DESC       resource_desc = CD3DX12_RESOURCE_DESC::Tex2D( format, side, side, 6 );
+  if ( usage == TextureUsage::kReadWrite ) resource_desc.Flags |= D3D12_RESOURCE_FLAG_ALLOW_UNORDERED_ACCESS;
 
-  ERR_ABORT( m_Allocator->CreateResource(
-      &allocation_desc,
-      &resource_desc,
-      D3D12_RESOURCE_STATE_COPY_DEST,
-      nullptr,
-      &allocation,
-      IID_PPV_ARGS( &texture ) ) );
-#else
-  auto const heap_properties = CD3DX12_HEAP_PROPERTIES{ D3D12_HEAP_TYPE_DEFAULT };
-  ERR_ABORT( m_Device->CreateCommittedResource(
-      &heap_properties,
-      D3D12_HEAP_FLAG_NONE,
-      &resource_desc,
-      D3D12_RESOURCE_STATE_COPY_DEST,
-      nullptr,
-      IID_PPV_ARGS( &texture ) ) );
-#endif
+  CreateResourceImpl( &texture, &allocation, resource_desc );
 
   SRVHandle srv_handle =
-      m_Bindless->CreateDescriptorHandle( texture.Get(), CD3DX12_SHADER_RESOURCE_VIEW_DESC::Tex2D( format ) );
-  UAVHandle uav_handle = m_Bindless->CreateDescriptorHandle(
-      texture.Get(), CD3DX12_UNORDERED_ACCESS_VIEW_DESC::Tex2D( DirectX::MakeLinear( format ) ) );
+      m_Bindless->CreateDescriptorHandle( texture.Get(), CD3DX12_SHADER_RESOURCE_VIEW_DESC::TexCube( format ) );
+
+  UAVHandle uav_handle{};
+  if ( usage == TextureUsage::kReadWrite )
+  {
+    uav_handle = m_Bindless->CreateDescriptorHandle(
+        texture.Get(), CD3DX12_UNORDERED_ACCESS_VIEW_DESC::Tex2DArray( DirectX::MakeLinear( format ) ) );
+  }
 
   auto texture_info = std::allocate_shared<Texture::TextureInfoImpl>(
       std::pmr::polymorphic_allocator{ &m_MemoryPool }, m_Bindless, srv_handle, uav_handle );
