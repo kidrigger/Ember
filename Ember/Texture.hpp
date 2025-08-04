@@ -70,12 +70,42 @@ public:
   [[nodiscard]] D3D12MA::Allocation* GetAllocation() const;
   [[nodiscard]] SRVHandle            GetSRVHandle() const;
   [[nodiscard]] UAVHandle            GetUAVHandle() const;
+  void                               SetName( LPCWSTR name ) const;
 };
 
 enum class TextureUsage
 {
   kReadonly,
   kReadWrite,
+};
+
+class MipLevels
+{
+  uint16_t m_Value;
+
+public:
+  MipLevels( uint16_t levels = 0 );
+
+  constexpr static uint16_t kAuto = 0;
+  constexpr static uint16_t kBase = 1;
+  operator UINT16() const;
+};
+
+struct Texture2DCreateInfo
+{
+  DXGI_FORMAT  Format;
+  uint32_t     Width;
+  uint32_t     Height;
+  TextureUsage Usage{ TextureUsage::kReadonly };
+  MipLevels    MipLevels{ MipLevels::kAuto };
+};
+
+struct TextureCubeCreateInfo
+{
+  DXGI_FORMAT  Format;
+  uint32_t     Side;
+  TextureUsage Usage{ TextureUsage::kReadonly };
+  MipLevels    MipLevels{ MipLevels::kAuto };
 };
 
 class TextureManager
@@ -94,8 +124,8 @@ public:
   TextureManager(
       ComPtr<ID3D12Device2> device, ComPtr<D3D12MA::Allocator> allocator, BindlessManager* bindless_manager );
 
-  Texture CreateTexture2D( DXGI_FORMAT format, uint32_t width, uint32_t height, TextureUsage usage );
-  Texture CreateTextureCube( DXGI_FORMAT format, uint32_t side, TextureUsage usage );
+  Texture CreateTexture2D( Texture2DCreateInfo const& create_info );
+  Texture CreateTextureCube( TextureCubeCreateInfo const& create_info );
   Sampler CreateSampler( D3D12_SAMPLER_DESC const& sampler_desc );
 };
 

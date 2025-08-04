@@ -1,3 +1,5 @@
+#ifndef BINDLESS_HLSLI_
+#define BINDLESS_HLSLI_
 
 const static uint kInvalidIndex = 0xFFFFFFFF;
 
@@ -8,3 +10,5 @@ bool              IsValidHandle( uint handle )
 
 typedef uint RID;
 typedef uint SamplerID;
+
+#endif

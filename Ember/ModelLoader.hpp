@@ -59,9 +59,9 @@ class ModelLoader
   TextureLoader* m_TextureLoader;
 
   void           ProcessNode( LoadingContext* context, Node* parent, cgltf_node const& node );
-  void           ProcessMesh( LoadingContext* context, Node* parent, cgltf_mesh const& mesh );
-  bool           TryLoadTexture( Texture* texture, cgltf_image const& image, ColorSpaceOverride color_space_override );
-  Material*      TryProcessMaterial( Model* model, cgltf_material const& material );
+  void           ProcessMesh( LoadingContext* context, Node* parent, cgltf_mesh const& mesh ) const;
+  bool           TryLoadTexture( Texture* texture, cgltf_image const& image, ColorSpaceOverride color_space_override ) const;
+  Material*      TryProcessMaterial( Model* model, cgltf_material const& material ) const;
 
 public:
   Model* TryLoadModel( char const* filename );
@@ -70,6 +70,5 @@ public:
 
   ModelLoader( RenderDevice* render_device, World* world, TextureLoader* texture_loader );
 };
-
 
 } // namespace Ember

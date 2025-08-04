@@ -1,3 +1,5 @@
+#ifndef COLORS_HLSLI_
+#define COLORS_HLSLI_
 
 typedef uint PackedColor32;
 
@@ -19,3 +21,5 @@ float3 LinearToSrgb( float3 color )
 {
   return select( color < 0.0031308, 12.92 * color, 1.055 * pow( abs( color ), 1.0 / 2.4 ) - 0.055 );
 }
+
+#endif

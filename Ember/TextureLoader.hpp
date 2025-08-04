@@ -9,6 +9,7 @@
 
 #include "BindlessManager.hpp"
 #include "Context.hpp"
+#include "ResourceTracker.hpp"
 #include "Texture.hpp"
 
 namespace Ember
@@ -31,22 +32,20 @@ class TextureLoader
 
   struct UploadBatch
   {
-    RenderDevice*          Device;
-    UploadIntermediateList Intermediate;
-    UploadTextureList      Textures;
-    UploadAliasList        Aliases;
-    UploadHandleList       Handles;
-    Context::Receipt       Receipt;
+    ResourceTracker  Tracker;
+    Context::Receipt Receipt;
 
     UploadBatch() = default;
-    explicit UploadBatch( RenderDevice* render_device, std::pmr::polymorphic_allocator<> const& pool_allocator );
-    void PushUpload( ComPtr<ID3D12Resource> dest, ComPtr<D3D12MA::Allocation> intermediate );
-    void PushUpload( ComPtr<ID3D12Resource> dest, ComPtr<ID3D12Resource> intermediate );
+    explicit UploadBatch(
+        RenderDevice*                            render_device,
+        Context::Receipt                         receipt,
+        std::pmr::polymorphic_allocator<> const& pool_allocator );
+    void PushUpload( ComPtr<ID3D12Resource> dest, ComPtr<IUnknown> intermediate );
     void PushAllocation( ComPtr<D3D12MA::Allocation> intermediate );
     void PushAlias( ComPtr<ID3D12Resource> alias );
     void PushHandle( SRVHandle handle );
-    void PushHandles( std::span<UAVHandle> handles );
-    void ClearResources();
+    void PushHandles( std::span<UAVHandle> const& handles );
+    void ClearResources( std::vector<D3D12_RESOURCE_BARRIER>* barriers );
   };
 
   using TextureCache = std::pmr::unordered_map<std::pmr::string, Texture>;
@@ -60,7 +59,7 @@ class TextureLoader
   std::pmr::unsynchronized_pool_resource m_InFlightPool;
   Context                                m_CopyContext;
   std::vector<UploadBatch>               m_UploadBatches;
-  uint32_t                               m_CurrentUploadBatch{ 0 };
+  uint32_t                               m_CurrentUploadBatch_{ 0 };
   Context::CommandList                   m_CurrentCommandList;
   uint32_t                               m_CurrentUploadBatchSize{ 0 };
 
@@ -69,9 +68,9 @@ class TextureLoader
   // Mips
   ComPtr<ID3D12RootSignature> m_MipMapRootSig;
   ComPtr<ID3D12PipelineState> m_MipmapPipeline;
+  ComPtr<ID3D12PipelineState> m_MipmapCubePipeline;
 
   //
-  bool TryGenerateMipMaps( ID3D12GraphicsCommandList* command_list, Texture* texture );
   bool TryLoadImpl(
       Texture*                     texture,
       char const*                  id,
@@ -86,6 +85,7 @@ public:
       RenderDevice*               render_device,
       ComPtr<ID3D12RootSignature> mipmap_root_signature,
       ComPtr<ID3D12PipelineState> mipmap_pipeline,
+      ComPtr<ID3D12PipelineState> mipmap_cube_pipeline,
       Context                     copy_context,
       uint32_t                    upload_frame_count );
 
@@ -99,6 +99,9 @@ public:
       size_t             data_size,
       byte const*        data,
       ColorSpaceOverride color_space_override = ColorSpaceOverride::kNone );
+  bool TryGenerateMipMaps( ID3D12GraphicsCommandList* command_list, Texture* texture, ResourceTracker* tracker ) const;
+  bool TryGenerateMipMapCube(
+      ID3D12GraphicsCommandList* command_list, Texture* texture, ResourceTracker* tracker ) const;
   Context::Receipt EndBatch();
 
   void             Update();

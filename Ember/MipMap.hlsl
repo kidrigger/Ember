@@ -1,6 +1,5 @@
+#include "Utility.hlsli"
 #include "Colors.hlsli"
-
-#define NUMTHREADS( X, Y, Z ) [numthreads( X, Y, Z )]
 
 SamplerState g_BilinearSampler : register( s0, space0 );
 

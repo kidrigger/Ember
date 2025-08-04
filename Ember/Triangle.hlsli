@@ -1,10 +1,15 @@
+#ifndef TRIANGLE_HLSLI_
+#define TRIANGLE_HLSLI_
+
 #include "Bindless.hlsli"
 #include "Colors.hlsli"
 
 struct Camera
 {
   float4x4 Projection;
+  float4x4 InvProj;
   float4x4 View;
+  float4x4 InvView;
   float4   Position;
 };
 
@@ -59,23 +64,39 @@ struct Material
   }
 };
 
-cbuffer BindlessIndex : register( b0, space0 )
+struct Environment
+{
+  RID Skybox;
+  RID DiffuseIrradiance;
+  RID PrefilterMap;
+  RID BrdfLUT;
+};
+
+cbuffer Transform : register( b0, space0 )
+{
+  float4x4 g_Model;
+  float4x4 g_InvModel;
+}
+
+cbuffer MaterialInfo : register( b1, space0 )
+{
+  Material g_Material;
+}
+
+cbuffer BindlessIndex : register( b2, space0 )
 {
   RID  g_Camera;
   RID  g_PointLights;
   uint g_PointLightCount;
 }
 
-cbuffer Transform : register( b1, space0 )
+cbuffer EnvironmentBlock : register( b3, space0 )
 {
-  float4x4 g_Model;
-  float4x4 g_InvModel;
+  Environment g_Env;
 }
 
-cbuffer MaterialInfo : register( b2, space0 )
-{
-  Material g_Material;
-}
+SamplerState g_DefaultSampler : register( s0, space0 );
+SamplerState g_ClampedSampler : register( s1, space0 );
 
 struct VSInput
 {
@@ -97,3 +118,5 @@ struct VSOut
 };
 
 typedef VSOut FSIn;
+
+#endif

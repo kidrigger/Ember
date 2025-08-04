@@ -21,8 +21,13 @@ class BasicApp final : public IApp
   struct Camera
   {
     DirectX::XMMATRIX Projection{ DirectX::XMMatrixIdentity() };
+    DirectX::XMMATRIX InvProj{ DirectX::XMMatrixIdentity() };
     DirectX::XMMATRIX View{ DirectX::XMMatrixIdentity() };
+    DirectX::XMMATRIX InvView{ DirectX::XMMatrixIdentity() };
     DirectX::XMVECTOR Position{ DirectX::XMVectorZero() };
+
+    void              SetProjection( DirectX::FXMMATRIX const& proj );
+    void              SetView( DirectX::FXMMATRIX const& view );
   };
 
   struct PointLight
@@ -33,6 +38,26 @@ class BasicApp final : public IApp
     float             Intensity{ 1.0f };            // 24
     float             Attenuation{ 1.0f };          // 28
     float             Padding0{};                   // 32
+  };
+
+  struct Environment
+  {
+    struct GpuRepr
+    {
+      SRVHandle Skybox;
+      SRVHandle DiffuseIrradiance;
+      SRVHandle Prefilter;
+      SRVHandle BrdfLUT;
+    };
+
+    RenderDevice* Device;
+    Texture       Skybox;
+    Texture       DiffuseIrradiance;
+    Texture       Prefilter;
+    Texture       BrdfLUT;
+    GpuRepr       Repr;
+
+    void          InitRepr();
   };
 
   HWND                           m_WindowHandle{ nullptr };
@@ -49,7 +74,8 @@ class BasicApp final : public IApp
 
   // PBR Pipeline
   ComPtr<ID3D12RootSignature> m_RootSignature;
-  ComPtr<ID3D12PipelineState> m_PipelineState;
+  ComPtr<ID3D12PipelineState> m_MainPipeline;
+  ComPtr<ID3D12PipelineState> m_BackgroundPipeline;
 
   DepthBuffer                 m_DepthBuffer;
 
@@ -62,6 +88,7 @@ class BasicApp final : public IApp
   uint32_t                    m_PointLightDirty{ 3 };
 
   World                       m_World;
+  Environment                 m_Environment{};
   RenderCommandQueue          m_RenderQueue;
 
   void                        SetupRenderPipeline();

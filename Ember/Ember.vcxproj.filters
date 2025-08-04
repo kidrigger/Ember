@@ -49,6 +49,9 @@
     <Filter Include="Shaders\IBL">
       <UniqueIdentifier>{0cf9a7d1-17b5-47ca-a7bf-1487b3801c13}</UniqueIdentifier>
     </Filter>
+    <Filter Include="Resource Files\Assets\Environment">
+      <UniqueIdentifier>{80e73104-2be7-41de-aa80-443053321e2d}</UniqueIdentifier>
+    </Filter>
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="Main.cpp">
@@ -101,6 +104,9 @@
     </ClCompile>
     <ClCompile Include="CgltfImpl.cpp">
       <Filter>Source Files\Util</Filter>
+    </ClCompile>
+    <ClCompile Include="ResourceTracker.cpp">
+      <Filter>Source Files\Graphics</Filter>
     </ClCompile>
   </ItemGroup>
   <ItemGroup>
@@ -167,6 +173,9 @@
     <ClInclude Include="Color.hpp">
       <Filter>Header Files\Graphics</Filter>
     </ClInclude>
+    <ClInclude Include="ResourceTracker.hpp">
+      <Filter>Header Files\Graphics</Filter>
+    </ClInclude>
   </ItemGroup>
   <ItemGroup>
     <None Include="..\.clang-format">
@@ -196,6 +205,9 @@
     <None Include="IBLCommon.hlsli">
       <Filter>Shaders\IBL</Filter>
     </None>
+    <None Include="Utility.hlsli">
+      <Filter>Shaders</Filter>
+    </None>
   </ItemGroup>
   <ItemGroup>
     <FxCompile Include="TriangleVS.hlsl">
@@ -209,6 +221,24 @@
     </FxCompile>
     <FxCompile Include="EqrectToCube.hlsl">
       <Filter>Shaders\IBL</Filter>
+    </FxCompile>
+    <FxCompile Include="DiffuseIrradiance.hlsl">
+      <Filter>Shaders\IBL</Filter>
+    </FxCompile>
+    <FxCompile Include="Prefilter.hlsl">
+      <Filter>Shaders\IBL</Filter>
+    </FxCompile>
+    <FxCompile Include="BrdfLUT.hlsl">
+      <Filter>Shaders\IBL</Filter>
+    </FxCompile>
+    <FxCompile Include="MipMapCube.hlsl">
+      <Filter>Shaders</Filter>
+    </FxCompile>
+    <FxCompile Include="BackgroundPS.hlsl">
+      <Filter>Shaders</Filter>
+    </FxCompile>
+    <FxCompile Include="BackgroundVS.hlsl">
+      <Filter>Shaders</Filter>
     </FxCompile>
   </ItemGroup>
   <ItemGroup>
@@ -227,8 +257,29 @@
     <CopyFileToFolders Include="Assets\DamagedHelmet.glb">
       <Filter>Resource Files\Assets</Filter>
     </CopyFileToFolders>
-    <CopyFileToFolders Include="Assets\PhotoStudioLoft.hdr">
+    <CopyFileToFolders Include="Assets\CompareRoughness.glb">
       <Filter>Resource Files\Assets</Filter>
+    </CopyFileToFolders>
+    <CopyFileToFolders Include="Assets\BoomBoxWithAxes.glb">
+      <Filter>Resource Files\Assets</Filter>
+    </CopyFileToFolders>
+    <CopyFileToFolders Include="Assets\MetalRoughSpheres.glb">
+      <Filter>Resource Files\Assets</Filter>
+    </CopyFileToFolders>
+    <CopyFileToFolders Include="Assets\PhotoStudioLoft.hdr">
+      <Filter>Resource Files\Assets\Environment</Filter>
+    </CopyFileToFolders>
+    <CopyFileToFolders Include="Assets\DresdenStationNight.hdr">
+      <Filter>Resource Files\Assets\Environment</Filter>
+    </CopyFileToFolders>
+    <CopyFileToFolders Include="Assets\OvercastSoil.hdr">
+      <Filter>Resource Files\Assets\Environment</Filter>
+    </CopyFileToFolders>
+    <CopyFileToFolders Include="Assets\PrellerDrive.hdr">
+      <Filter>Resource Files\Assets\Environment</Filter>
+    </CopyFileToFolders>
+    <CopyFileToFolders Include="Assets\ShanghaiBund.hdr">
+      <Filter>Resource Files\Assets\Environment</Filter>
     </CopyFileToFolders>
   </ItemGroup>
   <ItemGroup>

@@ -79,8 +79,8 @@ public:
   [[nodiscard]] Buffer      CreateStorageBuffer( uint32_t size, uint32_t stride );
   [[nodiscard]] Buffer      CreateConstantBuffer( uint32_t size );
 
-  [[nodiscard]] Texture     CreateTexture2D( DXGI_FORMAT format, uint32_t width, uint32_t height, TextureUsage usage );
-  [[nodiscard]] Texture     CreateTextureCube( DXGI_FORMAT format, uint32_t side, TextureUsage usage );
+  [[nodiscard]] Texture     CreateTexture2D( Texture2DCreateInfo const& create_info );
+  [[nodiscard]] Texture     CreateTextureCube( TextureCubeCreateInfo const& create_info );
 
   [[nodiscard]] Sampler     CreateSampler( D3D12_SAMPLER_DESC const& sampler_desc );
 
@@ -95,6 +95,7 @@ public:
       ID3D12Resource* resource, D3D12_UNORDERED_ACCESS_VIEW_DESC const& uav_desc ) const noexcept;
   [[nodiscard]] SamplerHandle CreateSamplerHandle( D3D12_SAMPLER_DESC const& sampler_desc ) const noexcept;
   [[nodiscard]] std::array<ID3D12DescriptorHeap*, 2> GetBindlessDescriptorHeaps() const;
+  void                                               FreeHandle( CBVHandle handle ) const;
   void                                               FreeHandle( SRVHandle handle ) const;
   void                                               FreeHandle( UAVHandle handle ) const;
   void                                               FreeHandle( SamplerHandle handle ) const;
@@ -105,16 +106,16 @@ public:
   void WaitIdle();
 
   // Per Frame getters.
-  [[nodiscard]] ID3D12Resource*                   GetCurrentBackbuffer() const noexcept;
-  [[nodiscard]] ComPtr<ID3D12GraphicsCommandList> GetGraphicsCommandList() noexcept;
-  [[nodiscard]] uint32_t                          GetCurrentFrameIndex() const noexcept;
-  [[nodiscard]] CD3DX12_CPU_DESCRIPTOR_HANDLE     GetCurrentRTVCpuDescriptorHandle() const noexcept;
-  [[nodiscard]] CD3DX12_CPU_DESCRIPTOR_HANDLE     GetCurrentDSVCpuDescriptorHandle() const noexcept;
-  void                                            ExecuteCommandList( Context::CommandList&& command_list );
-  void                                            Present();
+  [[nodiscard]] ID3D12Resource*               GetCurrentBackbuffer() const noexcept;
+  [[nodiscard]] Context::CommandList          GetGraphicsCommandList() noexcept;
+  [[nodiscard]] uint32_t                      GetCurrentFrameIndex() const noexcept;
+  [[nodiscard]] CD3DX12_CPU_DESCRIPTOR_HANDLE GetCurrentRTVCpuDescriptorHandle() const noexcept;
+  [[nodiscard]] CD3DX12_CPU_DESCRIPTOR_HANDLE GetCurrentDSVCpuDescriptorHandle() const noexcept;
+  void                                        ExecuteCommandList( Context::CommandList&& command_list );
+  void                                        Present();
 
-  [[nodiscard]] bool                              IsVsyncEnabled() const;
-  [[nodiscard]] bool                              IsTearingSupported() const;
+  [[nodiscard]] bool                          IsVsyncEnabled() const;
+  [[nodiscard]] bool                          IsTearingSupported() const;
 
   RenderDevice( RenderDevice const& other )                = delete;
   RenderDevice( RenderDevice&& other ) noexcept            = delete;

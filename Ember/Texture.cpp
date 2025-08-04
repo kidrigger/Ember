@@ -105,6 +105,19 @@ Ember::UAVHandle Ember::Texture::GetUAVHandle() const
   return m_TextureInfo->AsUAV;
 }
 
+void Ember::Texture::SetName( LPCWSTR const name ) const
+{
+  ERR_ABORT( m_Texture->SetName( name ) );
+}
+
+Ember::MipLevels::MipLevels( uint16_t const levels ) : m_Value{ levels }
+{}
+
+Ember::MipLevels::operator UINT16() const
+{
+  return m_Value;
+}
+
 Ember::TextureManager::TextureManager(
     ComPtr<ID3D12Device2> device, ComPtr<D3D12MA::Allocator> allocator, BindlessManager* const bindless_manager )
   : m_Bindless{ bindless_manager }, m_Device{ std::move( device ) }, m_Allocator{ std::move( allocator ) }
@@ -122,31 +135,27 @@ void Ember::TextureManager::CreateResourceImpl(
   };
 
   ERR_ABORT( m_Allocator->CreateResource(
-      &allocation_desc,
-      &resource_desc,
-      D3D12_RESOURCE_STATE_COPY_DEST,
-      nullptr,
-      allocation,
-      IID_PPV_ARGS( texture ) ) );
+      &allocation_desc, &resource_desc, D3D12_RESOURCE_STATE_COMMON, nullptr, allocation, IID_PPV_ARGS( texture ) ) );
 #else
   auto const heap_properties = CD3DX12_HEAP_PROPERTIES{ D3D12_HEAP_TYPE_DEFAULT };
   ERR_ABORT( m_Device->CreateCommittedResource(
       &heap_properties,
       D3D12_HEAP_FLAG_NONE,
       &resource_desc,
-      D3D12_RESOURCE_STATE_COPY_DEST,
+      D3D12_RESOURCE_STATE_COMMON,
       nullptr,
       IID_PPV_ARGS( texture ) ) );
 #endif
 }
 
-Ember::Texture Ember::TextureManager::CreateTexture2D(
-    DXGI_FORMAT const format, uint32_t const width, uint32_t const height, TextureUsage const usage )
+Ember::Texture Ember::TextureManager::CreateTexture2D( Texture2DCreateInfo const& create_info )
 {
+  auto [format, width, height, usage, levels] = create_info;
+
   ComPtr<ID3D12Resource>      texture;
   ComPtr<D3D12MA::Allocation> allocation;
 
-  CD3DX12_RESOURCE_DESC       resource_desc = CD3DX12_RESOURCE_DESC::Tex2D( format, width, height );
+  CD3DX12_RESOURCE_DESC       resource_desc = CD3DX12_RESOURCE_DESC::Tex2D( format, width, height, 1, levels );
 
   if ( usage == TextureUsage::kReadWrite ) resource_desc.Flags |= D3D12_RESOURCE_FLAG_ALLOW_UNORDERED_ACCESS;
 
@@ -167,13 +176,14 @@ Ember::Texture Ember::TextureManager::CreateTexture2D(
   return Texture{ std::move( texture ), std::move( allocation ), std::move( texture_info ) };
 }
 
-Ember::Texture Ember::TextureManager::CreateTextureCube(
-    DXGI_FORMAT const format, uint32_t const side, TextureUsage usage )
+Ember::Texture Ember::TextureManager::CreateTextureCube( TextureCubeCreateInfo const& create_info )
 {
+  auto [format, side, usage, levels] = create_info;
+
   ComPtr<ID3D12Resource>      texture;
   ComPtr<D3D12MA::Allocation> allocation;
 
-  CD3DX12_RESOURCE_DESC       resource_desc = CD3DX12_RESOURCE_DESC::Tex2D( format, side, side, 6 );
+  CD3DX12_RESOURCE_DESC       resource_desc = CD3DX12_RESOURCE_DESC::Tex2D( format, side, side, 6, levels );
   if ( usage == TextureUsage::kReadWrite ) resource_desc.Flags |= D3D12_RESOURCE_FLAG_ALLOW_UNORDERED_ACCESS;
 
   CreateResourceImpl( &texture, &allocation, resource_desc );

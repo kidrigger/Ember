@@ -35,7 +35,7 @@ void LoadAttribute(
   scratch->clear();
 }
 
-void Ember::ModelLoader::ProcessMesh( LoadingContext* context, Node* parent, cgltf_mesh const& mesh )
+void Ember::ModelLoader::ProcessMesh( LoadingContext* context, Node* parent, cgltf_mesh const& mesh ) const
 {
   using namespace std::string_view_literals;
 
@@ -177,7 +177,7 @@ void Ember::ModelLoader::ProcessMesh( LoadingContext* context, Node* parent, cgl
 }
 
 bool Ember::ModelLoader::TryLoadTexture(
-    Texture* texture, cgltf_image const& image, ColorSpaceOverride const color_space_override )
+    Texture* texture, cgltf_image const& image, ColorSpaceOverride const color_space_override ) const
 {
   byte* data;
   if ( image.buffer_view->data )
@@ -234,7 +234,7 @@ void Ember::ModelLoader::ProcessNode( LoadingContext* context, Node* parent, cgl
   }
 }
 
-Ember::Material* Ember::ModelLoader::TryProcessMaterial( Model* model, cgltf_material const& material )
+Ember::Material* Ember::ModelLoader::TryProcessMaterial( Model* model, cgltf_material const& material ) const
 {
   ASSERT( material.has_pbr_metallic_roughness );
 
@@ -413,8 +413,10 @@ Ember::Model* Ember::ModelLoader::TryLoadModel( char const* filename )
   return model;
 }
 
+// TODO: Remove -> Replaced by Trackers.
 void Ember::ModelLoader::Update()
 {}
 
-void Ember::ModelLoader::FlushBarriers( ID3D12GraphicsCommandList* command_list )
+// TODO: Remove -> Replaced by Trackers.
+void Ember::ModelLoader::FlushBarriers( ID3D12GraphicsCommandList* )
 {}

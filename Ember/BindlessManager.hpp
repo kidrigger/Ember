@@ -15,7 +15,7 @@ class BindlessManager
 {
   class RabbitPullingFreeList
   {
-    std::queue<uint32_t> m_Recycled{};
+    std::deque<uint32_t> m_Recycled{};
     uint32_t             m_MaxReached{ 0 };
     uint32_t             m_MaxAllowed{ 0 };
 

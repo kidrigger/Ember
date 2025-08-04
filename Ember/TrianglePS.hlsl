@@ -70,6 +70,73 @@ float3 GetEmissive( float2 in_texcoord, SamplerState texture_sampler )
   return emissive;
 }
 
+float3 SampleIrradiance( float3 direction )
+{
+  if ( IsValidHandle( g_Env.DiffuseIrradiance ) )
+  {
+    TextureCube diff_irr = ResourceDescriptorHeap[g_Env.DiffuseIrradiance];
+    return diff_irr.Sample( g_DefaultSampler, direction ).rgb;
+  }
+  return 0.04f;
+}
+
+float3 SamplePrefiltered( float3 direction, float roughness )
+{
+  const static float kMaxMipLevel = 5.0f;
+  if ( IsValidHandle( g_Env.PrefilterMap ) )
+  {
+    float       mip       = kMaxMipLevel * roughness;
+    TextureCube prefilter = ResourceDescriptorHeap[g_Env.PrefilterMap];
+    return prefilter.SampleLevel( g_DefaultSampler, direction, mip ).rgb;
+  }
+  return 0.0f;
+}
+
+float2 SampleBrdfLut( float n_dot_v, float roughness )
+{
+  if ( IsValidHandle( g_Env.BrdfLUT ) )
+  {
+    Texture2D<float2> brdf_lut = ResourceDescriptorHeap[g_Env.BrdfLUT];
+    return brdf_lut.Sample( g_ClampedSampler, float2( n_dot_v, roughness ) );
+  }
+  return 0.0f;
+}
+
+float3 GetAmbientInfluence( BRDFCookTorranceGGX brdf, float3 view_dir )
+{
+  float cosine_factor =
+      max( dot( brdf.Normal, view_dir ), 0.0f ); // Normal instead of Halfway since there's no halfway in ambient.
+
+  float3 f_0                 = 0.04f;
+  f_0                        = lerp( f_0, brdf.Albedo, brdf.Metallic );
+  float3 specular_part       = FresnelSchlickRoughness( cosine_factor, f_0, brdf.Roughness );
+  float3 diffuse_part        = 1.0f - specular_part;
+
+  diffuse_part              *= 1.0f - brdf.Metallic; // Metals don't have diffuse/refractions.
+
+  float3 reflection_dir      = reflect( -view_dir, brdf.Normal );
+
+  float  n_dot_v             = max( dot( brdf.Normal, view_dir ), 0.0f );
+  float3 prefiltered_color   = SamplePrefiltered( reflection_dir, brdf.Roughness ).rgb;
+  float2 env_brdf            = SampleBrdfLut( n_dot_v, brdf.Roughness );
+  float3 specular            = prefiltered_color * ( specular_part * env_brdf.x + env_brdf.y );
+
+  float3 diffuse  = brdf.Albedo * SampleIrradiance( brdf.Normal );
+  // #ifdef _DEBUG
+  //   if ( ( PushConstant.DebugFlags & USE_DIFFUSE_BIT ) == 0 )
+  //   {
+  //     DiffuseIrradiance = 0.0f.xxx;
+  //   }
+  //   if ( ( PushConstant.DebugFlags & USE_SPECULAR_BIT ) == 0 )
+  //   {
+  //     Specular = 0.0f.xxx;
+  //   }
+  // #endif
+
+  return ( diffuse_part * diffuse + specular ) * brdf.Occlusion;
+}
+
+
 float4 TrianglePS( FSIn IN ) : SV_TARGET0
 {
   if ( !IsValidHandle( g_Material.SamplerIndex ) )
@@ -84,7 +151,7 @@ float4 TrianglePS( FSIn IN ) : SV_TARGET0
   float3                 emissive    = GetEmissive( IN.TexCoord[0], texture_sampler );
 
   ConstantBuffer<Camera> camera      = ResourceDescriptorHeap[g_Camera];
-  float3                 view_dir    = camera.Position.xyz - IN.Position.xyz;
+  float3                 view_dir    = normalize( camera.Position.xyz - IN.Position.xyz );
 
   BRDFCookTorranceGGX    brdf;
   brdf.Albedo          = albedo.xyz;
@@ -92,6 +159,7 @@ float4 TrianglePS( FSIn IN ) : SV_TARGET0
   brdf.Normal          = normal.xyz;
   brdf.Roughness       = metal_rough.g;
   brdf.F0              = lerp( 0.04f, albedo.rgb, metal_rough.x );
+  brdf.Occlusion       = 1.0f;
 
   float3 point_contrib = 0.0f;
   if ( IsValidHandle( g_PointLights ) )
@@ -114,7 +182,9 @@ float4 TrianglePS( FSIn IN ) : SV_TARGET0
     }
   }
 
-  float3 total_contrib = emissive + point_contrib;
+  float3 ambient_contrib = GetAmbientInfluence( brdf, view_dir );
+
+  float3 total_contrib   = emissive + point_contrib + ambient_contrib;
 
   return float4( LinearToSrgb( total_contrib ), albedo.a );
 }

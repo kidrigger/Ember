@@ -177,6 +177,29 @@ void Ember::RenderDevice::Create( RenderDevice* render_device, HWND window_handl
 #endif
   }
 
+  {
+    D3D12_FEATURE_DATA_D3D12_OPTIONS feature_data;
+    ZeroMemory( &feature_data, sizeof( feature_data ) );
+    if ( SUCCEEDED(
+             device->CheckFeatureSupport( D3D12_FEATURE_D3D12_OPTIONS, &feature_data, sizeof( feature_data ) ) ) )
+    {
+      if ( feature_data.TypedUAVLoadAdditionalFormats )
+      {
+        D3D12_FEATURE_DATA_FORMAT_SUPPORT format_support = { DXGI_FORMAT_R11G11B10_FLOAT,
+                                                             D3D12_FORMAT_SUPPORT1_NONE,
+                                                             D3D12_FORMAT_SUPPORT2_NONE };
+        if ( SUCCEEDED( device->CheckFeatureSupport(
+                 D3D12_FEATURE_FORMAT_SUPPORT, &format_support, sizeof( format_support ) ) ) )
+        {
+
+          ASSERT(
+              format_support.Support2 &
+              ( D3D12_FORMAT_SUPPORT2_UAV_TYPED_LOAD | D3D12_FORMAT_SUPPORT2_UAV_TYPED_STORE ) );
+        }
+      }
+    }
+  }
+
   ComPtr<D3D12MA::Allocator> allocator;
   {
     D3D12MA::ALLOCATOR_DESC allocator_desc = {
@@ -312,16 +335,14 @@ Ember::Buffer Ember::RenderDevice::CreateConstantBuffer( uint32_t const size )
   return m_BufferManager.CreateConstantBuffer( size );
 }
 
-Ember::Texture Ember::RenderDevice::CreateTexture2D(
-    DXGI_FORMAT const format, uint32_t const width, uint32_t const height, TextureUsage const usage )
+Ember::Texture Ember::RenderDevice::CreateTexture2D( Texture2DCreateInfo const& create_info )
 {
-  return m_TextureManager.CreateTexture2D( format, width, height, usage );
+  return m_TextureManager.CreateTexture2D( create_info );
 }
 
-Ember::Texture Ember::RenderDevice::CreateTextureCube(
-    DXGI_FORMAT const format, uint32_t const side, TextureUsage const usage )
+Ember::Texture Ember::RenderDevice::CreateTextureCube( TextureCubeCreateInfo const& create_info )
 {
-  return m_TextureManager.CreateTextureCube( format, side, usage );
+  return m_TextureManager.CreateTextureCube( create_info );
 }
 
 Ember::Sampler Ember::RenderDevice::CreateSampler( D3D12_SAMPLER_DESC const& sampler_desc )
@@ -391,6 +412,11 @@ std::array<ID3D12DescriptorHeap*, 2> Ember::RenderDevice::GetBindlessDescriptorH
   return m_Bindless->GetBindlessDescriptorHeaps();
 }
 
+void Ember::RenderDevice::FreeHandle( CBVHandle const handle ) const
+{
+  m_Bindless->Free( handle );
+}
+
 void Ember::RenderDevice::FreeHandle( SRVHandle const handle ) const
 {
   return m_Bindless->Free( handle );
@@ -426,7 +452,7 @@ ID3D12Resource* Ember::RenderDevice::GetCurrentBackbuffer() const noexcept
   return m_Backbuffers[m_CurrentBackbufferIndex].Get();
 }
 
-ComPtr<ID3D12GraphicsCommandList> Ember::RenderDevice::GetGraphicsCommandList() noexcept
+Ember::Context::CommandList Ember::RenderDevice::GetGraphicsCommandList() noexcept
 {
   return m_DirectContext.GetCommandList();
 }

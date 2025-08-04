@@ -22,7 +22,7 @@ uint32_t Ember::BindlessManager::RabbitPullingFreeList::Allocate()
   if ( not m_Recycled.empty() )
   {
     uint32_t const index = m_Recycled.front();
-    m_Recycled.pop();
+    m_Recycled.pop_back();
     return index;
   }
 
@@ -35,7 +35,10 @@ uint32_t Ember::BindlessManager::RabbitPullingFreeList::Allocate()
 
 void Ember::BindlessManager::RabbitPullingFreeList::Free( uint32_t const index )
 {
-  m_Recycled.push( index );
+#if defined( _DEBUG )
+  ASSERT( std::ranges::find( m_Recycled, index ) == m_Recycled.end() );
+#endif
+  m_Recycled.push_back( index );
 }
 
 uint32_t Ember::BindlessManager::RabbitPullingFreeList::InUse() const

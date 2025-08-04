@@ -226,12 +226,36 @@ Ember::BasicApp::~BasicApp() // NOLINT(modernize-use-equals-default)
   m_RenderDevice->WaitIdle();
 }
 
+void Ember::BasicApp::Camera::SetProjection( DirectX::FXMMATRIX& proj )
+{
+  Projection = proj;
+  InvProj    = XMMatrixInverse( nullptr, proj );
+}
+
+void Ember::BasicApp::Camera::SetView( DirectX::FXMMATRIX& view )
+{
+  View    = view;
+  InvView = XMMatrixInverse( nullptr, view );
+}
+
+void Ember::BasicApp::Environment::InitRepr()
+{
+  Repr.Skybox            = Skybox.GetSRVHandle();
+  Repr.DiffuseIrradiance = DiffuseIrradiance.GetSRVHandle();
+  Repr.Prefilter         = Prefilter.GetSRVHandle();
+  Repr.BrdfLUT           = BrdfLUT.GetSRVHandle();
+}
+
 void Ember::BasicApp::SetupRenderPipeline()
 {
   ComPtr<ID3DBlob> vertex_shader_blob;
   ERR_ABORT( D3DReadFileToBlob( L"TriangleVS.cso", &vertex_shader_blob ) );
   ComPtr<ID3DBlob> pixel_shader_blob;
   ERR_ABORT( D3DReadFileToBlob( L"TrianglePS.cso", &pixel_shader_blob ) );
+  ComPtr<ID3DBlob> bg_vertex_shader_blob;
+  ERR_ABORT( D3DReadFileToBlob( L"BackgroundVS.cso", &bg_vertex_shader_blob ) );
+  ComPtr<ID3DBlob> bg_pixel_shader_blob;
+  ERR_ABORT( D3DReadFileToBlob( L"BackgroundPS.cso", &bg_pixel_shader_blob ) );
 
   ComPtr<ID3D12Device2>             device = m_RenderDevice->GetDevice();
 
@@ -242,6 +266,13 @@ void Ember::BasicApp::SetupRenderPipeline()
     feature_data.HighestVersion = D3D_ROOT_SIGNATURE_VERSION_1_0;
   }
 
+  CD3DX12_STATIC_SAMPLER_DESC static_sampler_desc[] = {
+    CD3DX12_STATIC_SAMPLER_DESC{ 0 },
+    CD3DX12_STATIC_SAMPLER_DESC{ 1,
+                                D3D12_FILTER_ANISOTROPIC, D3D12_TEXTURE_ADDRESS_MODE_CLAMP,
+                                D3D12_TEXTURE_ADDRESS_MODE_CLAMP, D3D12_TEXTURE_ADDRESS_MODE_CLAMP },
+  };
+
   D3D12_ROOT_SIGNATURE_FLAGS const root_signature_flags =
       D3D12_ROOT_SIGNATURE_FLAG_ALLOW_INPUT_ASSEMBLER_INPUT_LAYOUT |
       D3D12_ROOT_SIGNATURE_FLAG_CBV_SRV_UAV_HEAP_DIRECTLY_INDEXED |
@@ -250,14 +281,19 @@ void Ember::BasicApp::SetupRenderPipeline()
       D3D12_ROOT_SIGNATURE_FLAG_DENY_GEOMETRY_SHADER_ROOT_ACCESS |
       D3D12_ROOT_SIGNATURE_FLAG_DENY_DOMAIN_SHADER_ROOT_ACCESS | D3D12_ROOT_SIGNATURE_FLAG_DENY_HULL_SHADER_ROOT_ACCESS;
 
-  CD3DX12_ROOT_PARAMETER1 root_parameters[3];
-  root_parameters[0].InitAsConstants( sizeof( PerFrameConstants ) / 4, 0 );
-  root_parameters[1].InitAsConstants( sizeof( WorldTransform ) / 4, 1 );
-  root_parameters[2].InitAsConstants( sizeof( Material::GpuRepr ) / 4, 2 );
+  CD3DX12_ROOT_PARAMETER1 root_parameters[4];
+  root_parameters[0].InitAsConstants( sizeof( WorldTransform ) / 4, 0 );
+  root_parameters[1].InitAsConstants( sizeof( Material::GpuRepr ) / 4, 1 );
+  root_parameters[2].InitAsConstants( sizeof( PerFrameConstants ) / 4, 2 );
+  root_parameters[3].InitAsConstants( sizeof( Environment::GpuRepr ) / 4, 3 );
 
   CD3DX12_VERSIONED_ROOT_SIGNATURE_DESC root_signature_desc;
   root_signature_desc.Init_1_1(
-      CountOf( root_parameters ), DataOf( root_parameters ), 0, nullptr, root_signature_flags );
+      CountOf( root_parameters ),
+      DataOf( root_parameters ),
+      CountOf( static_sampler_desc ),
+      DataOf( static_sampler_desc ),
+      root_signature_flags );
 
   ComPtr<ID3DBlob> root_signature_blob;
   ComPtr<ID3DBlob> error_blob;
@@ -276,14 +312,18 @@ void Ember::BasicApp::SetupRenderPipeline()
   rtv_formats.RTFormats[0] = DXGI_FORMAT_R8G8B8A8_UNORM;
 
   CD3DX12_RASTERIZER_DESC2 rasterizer_desc{ D3D12_DEFAULT };
-  rasterizer_desc.CullMode             = D3D12_CULL_MODE_BACK;
+  rasterizer_desc.CullMode = D3D12_CULL_MODE_BACK;
+
+  CD3DX12_DEPTH_STENCIL_DESC depth_stencil_desc{ D3D12_DEFAULT };
+  depth_stencil_desc.DepthEnable       = true;
+  depth_stencil_desc.DepthFunc         = D3D12_COMPARISON_FUNC_LESS;
 
   D3D12_INPUT_LAYOUT_DESC input_layout = {
     .pInputElementDescs = DataOf( Vertex::kInputElementDesc ),
     .NumElements        = CountOf( Vertex::kInputElementDesc ),
   };
 
-  struct PipelineStateStream
+  struct MainPipelineStream
   {
     CD3DX12_PIPELINE_STATE_STREAM_INPUT_LAYOUT          InputLayout;
     CD3DX12_PIPELINE_STATE_STREAM_ROOT_SIGNATURE        RootSignature;
@@ -295,7 +335,7 @@ void Ember::BasicApp::SetupRenderPipeline()
     CD3DX12_PIPELINE_STATE_STREAM_DEPTH_STENCIL_FORMAT  DSVFormat;
   };
 
-  PipelineStateStream pipeline_stream = {
+  MainPipelineStream pipeline_stream = {
     .InputLayout           = input_layout,
     .RootSignature         = m_RootSignature.Get(),
     .PrimitiveTopologyType = D3D12_PRIMITIVE_TOPOLOGY_TYPE_TRIANGLE,
@@ -306,12 +346,42 @@ void Ember::BasicApp::SetupRenderPipeline()
     .DSVFormat             = DXGI_FORMAT_D32_FLOAT,
   };
 
+  struct BackgroundPipelineStream
+  {
+    CD3DX12_PIPELINE_STATE_STREAM_ROOT_SIGNATURE        RootSignature;
+    CD3DX12_PIPELINE_STATE_STREAM_PRIMITIVE_TOPOLOGY    PrimitiveTopologyType;
+    CD3DX12_PIPELINE_STATE_STREAM_VS                    VS;
+    CD3DX12_PIPELINE_STATE_STREAM_PS                    PS;
+    CD3DX12_PIPELINE_STATE_STREAM_RASTERIZER2           Rasterizer;
+    CD3DX12_PIPELINE_STATE_STREAM_DEPTH_STENCIL         DepthStencil;
+    CD3DX12_PIPELINE_STATE_STREAM_RENDER_TARGET_FORMATS RTVFormats;
+    CD3DX12_PIPELINE_STATE_STREAM_DEPTH_STENCIL_FORMAT  DSVFormat;
+  };
+
+  depth_stencil_desc.DepthFunc                = D3D12_COMPARISON_FUNC_LESS_EQUAL;
+  BackgroundPipelineStream bg_pipeline_stream = {
+    .RootSignature         = m_RootSignature.Get(),
+    .PrimitiveTopologyType = D3D12_PRIMITIVE_TOPOLOGY_TYPE_TRIANGLE,
+    .VS                    = CD3DX12_SHADER_BYTECODE( bg_vertex_shader_blob.Get() ),
+    .PS                    = CD3DX12_SHADER_BYTECODE( bg_pixel_shader_blob.Get() ),
+    .Rasterizer            = rasterizer_desc,
+    .DepthStencil          = depth_stencil_desc,
+    .RTVFormats            = rtv_formats,
+    .DSVFormat             = DXGI_FORMAT_D32_FLOAT,
+  };
+
   D3D12_PIPELINE_STATE_STREAM_DESC const pipeline_state_stream_desc = {
     .SizeInBytes                   = sizeof pipeline_stream,
     .pPipelineStateSubobjectStream = &pipeline_stream,
   };
 
-  ERR_ABORT( device->CreatePipelineState( &pipeline_state_stream_desc, IID_PPV_ARGS( &m_PipelineState ) ) );
+  ERR_ABORT( device->CreatePipelineState( &pipeline_state_stream_desc, IID_PPV_ARGS( &m_MainPipeline ) ) );
+
+  D3D12_PIPELINE_STATE_STREAM_DESC const bg_pipeline_state_stream_desc = {
+    .SizeInBytes                   = sizeof bg_pipeline_stream,
+    .pPipelineStateSubobjectStream = &bg_pipeline_stream,
+  };
+  ERR_ABORT( device->CreatePipelineState( &bg_pipeline_state_stream_desc, IID_PPV_ARGS( &m_BackgroundPipeline ) ) );
 }
 
 void Ember::BasicApp::LoadContent()
@@ -319,17 +389,15 @@ void Ember::BasicApp::LoadContent()
   ERR_ABORT( ::ShowWindow( m_WindowHandle, SW_SHOW ) );
 
   // Setup Camera
-  auto camera_position = DirectX::XMVectorSet( 0.0f, 3.0f, -3.0f, 1.0f );
+  auto camera_position = DirectX::XMVectorSet( 0.0f, 0.0f, 2.0f, 1.0f );
 
-  m_Camera             = {
-                .Projection = DirectX::XMMatrixPerspectiveFovLH(
-        DirectX::XMConvertToRadians( 70.0f ), ( float )m_WindowWidth / ( float )m_WindowHeight, 0.1f, 100.0f ),
-                .View = DirectX::XMMatrixLookAtLH(
-        camera_position,
-        DirectX::XMVectorSet( 0.0f, 0.0f, 0.0f, 1.0f ),
-        DirectX::XMVectorSet( 0.0f, 1.0f, 0.0f, 0.0f ) ),
-                .Position = camera_position,
-  };
+  m_Camera.SetProjection( DirectX::XMMatrixPerspectiveFovLH(
+      DirectX::XMConvertToRadians( 70.0f ), ( float )m_WindowWidth / ( float )m_WindowHeight, 0.1f, 100.0f ) );
+  m_Camera.SetView( DirectX::XMMatrixLookAtLH(
+      camera_position,
+      DirectX::XMVectorSet( 0.0f, 0.0f, 0.0f, 1.0f ),
+      DirectX::XMVectorSet( 0.0f, 1.0f, 0.0f, 0.0f ) ) );
+  m_Camera.Position = camera_position;
 
   for ( auto& camera_buffer : m_CameraBuffer )
   {
@@ -338,7 +406,7 @@ void Ember::BasicApp::LoadContent()
   }
 
   // Setup Lights
-  m_PointLightCount = 3;
+  m_PointLightCount = 0;
   m_PointLights[0]  = {
      .Position    = { 1.0f, 1.0f, -1.0f },
      .Range       = 15.0f,
@@ -363,7 +431,7 @@ void Ember::BasicApp::LoadContent()
     .Attenuation = 1.0f,
     .Padding0    = 1.0f,
   };
-  m_PointLightDirty = 3;
+  m_PointLightDirty = 0;
 
   for ( auto& point_light_buffer : m_PointLightBuffer )
   {
@@ -371,32 +439,88 @@ void Ember::BasicApp::LoadContent()
   }
 
   // Setup Scene Geometry
-  RotModel* rm    = m_World.CreateObject<RotModel>();
-  Model*    model = m_ModelLoader->TryLoadModel( "DamagedHelmet.glb" );
+  // RotModel* rm    = m_World.CreateObject<RotModel>();
+  Model* model = m_ModelLoader->TryLoadModel( "DamagedHelmet.glb" );
+  // model->SetLocalScale( DirectX::XMVectorSet( -40.0f, 40.0f, 40.0f, 1.0f ) );
   ASSERT( model );
-  rm->AddChild( model );
+  // rm->AddChild( model );
 
   // Setup Environment
-  uint32_t constexpr kEnvCubeSide = 256;
-  Texture env_cube =
-      m_RenderDevice->CreateTextureCube( DXGI_FORMAT_R16G16B16A16_FLOAT, kEnvCubeSide, TextureUsage::kReadWrite );
-  {
+  uint32_t constexpr kEnvCubeSide       = 256;
+  uint32_t constexpr kDiffuseCubeSide   = 256;
+  uint32_t constexpr kPrefilterCubeSide = 512;
+  uint32_t constexpr kPrefilterMaxLoD   = 5;
+  uint32_t constexpr kBrdfLutSize       = 512;
 
+  //
+  m_Environment.Device = m_RenderDevice.get();
+  m_Environment.Skybox = m_RenderDevice->CreateTextureCube( {
+      .Format    = DXGI_FORMAT_R11G11B10_FLOAT,
+      .Side      = kEnvCubeSide,
+      .Usage     = TextureUsage::kReadWrite,
+      .MipLevels = MipLevels::kBase,
+  } );
+  m_Environment.Skybox.SetName( L"Skybox" );
+
+  m_Environment.DiffuseIrradiance = m_RenderDevice->CreateTextureCube( {
+      .Format    = DXGI_FORMAT_R11G11B10_FLOAT,
+      .Side      = kDiffuseCubeSide,
+      .Usage     = TextureUsage::kReadWrite,
+      .MipLevels = MipLevels::kBase,
+  } );
+  m_Environment.DiffuseIrradiance.SetName( L"Diffuse Irradiance Map" );
+
+  m_Environment.Prefilter = m_RenderDevice->CreateTextureCube( {
+      .Format    = DXGI_FORMAT_R11G11B10_FLOAT,
+      .Side      = kPrefilterCubeSide,
+      .Usage     = TextureUsage::kReadWrite,
+      .MipLevels = kPrefilterMaxLoD + 1, // accounting for mip0
+  } );
+  m_Environment.Prefilter.SetName( L"Prefiltered Cube" );
+
+  m_Environment.BrdfLUT = m_RenderDevice->CreateTexture2D( {
+      .Format    = DXGI_FORMAT_R16G16_FLOAT,
+      .Width     = kBrdfLutSize,
+      .Height    = kBrdfLutSize,
+      .Usage     = TextureUsage::kReadWrite,
+      .MipLevels = MipLevels::kBase,
+  } );
+  m_Environment.BrdfLUT.SetName( L"BRDF LUT" );
+
+  {
     Texture environment;
     ASSERT( m_TextureLoader->TryLoadTexture( &environment, "PhotoStudioLoft.hdr" ) );
     m_RenderDevice->WaitOn( m_TextureLoader->EndBatch() );
 
-    struct EnvCubeRootConstant
+    struct EnvRootConstant
     {
-      SRVHandle EqrectHandle;
-      UAVHandle OutputCubemapHandle;
+      SRVHandle InputTextureHandle;
+      UAVHandle OutputTextureHandle;
       uint32_t  CubeSide;
     };
 
-    CD3DX12_ROOT_PARAMETER1 root_parameters[1];
-    root_parameters[0].InitAsConstants( sizeof( EnvCubeRootConstant ) / 4, 0 );
+    struct PrefilterConstant
+    {
+      SRVHandle Skybox;
+      uint32_t  SkyboxSide;
+      UAVHandle OutputTextureHandle;
+      uint32_t  OutputSide;
+      float     Roughness;
+    };
 
-    CD3DX12_STATIC_SAMPLER_DESC      static_sampler_desc{ 0 };
+    struct BrdfLUTConstant
+    {
+      UAVHandle OutputTextureHandle;
+      uint32_t  Width;
+      uint32_t  Height;
+    };
+
+    CD3DX12_ROOT_PARAMETER1 root_parameters[1];
+    root_parameters[0].InitAsConstants( 5, 0 );
+
+    CD3DX12_STATIC_SAMPLER_DESC static_sampler_desc[] = {
+      CD3DX12_STATIC_SAMPLER_DESC{ 0 },
+    };
 
     D3D12_ROOT_SIGNATURE_FLAGS const root_signature_flags =
         D3D12_ROOT_SIGNATURE_FLAG_ALLOW_INPUT_ASSEMBLER_INPUT_LAYOUT |
@@ -413,8 +537,18 @@ void Ember::BasicApp::LoadContent()
     uint32_t constexpr kThreadGroupX = 16;
     uint32_t constexpr kThreadGroupY = 16;
     uint32_t constexpr kThreadGroupZ = 1;
-    ComPtr<ID3DBlob> eqrect_to_cube;
-    ERR_ABORT( D3DReadFileToBlob( L"EqrectToCube.cso", &eqrect_to_cube ) );
+
+    ComPtr<ID3DBlob> eqrect_to_cube_shader;
+    ERR_ABORT( D3DReadFileToBlob( L"EqrectToCube.cso", &eqrect_to_cube_shader ) );
+
+    ComPtr<ID3DBlob> diffuse_irradiance_shader;
+    ERR_ABORT( D3DReadFileToBlob( L"DiffuseIrradiance.cso", &diffuse_irradiance_shader ) );
+
+    ComPtr<ID3DBlob> prefilter_shader;
+    ERR_ABORT( D3DReadFileToBlob( L"Prefilter.cso", &prefilter_shader ) );
+
+    ComPtr<ID3DBlob> brdf_lut_shader;
+    ERR_ABORT( D3DReadFileToBlob( L"BrdfLUT.cso", &brdf_lut_shader ) );
 
     ComPtr<ID3D12Device2> device = m_RenderDevice->GetDevice();
 
@@ -423,7 +557,11 @@ void Ember::BasicApp::LoadContent()
 
     CD3DX12_VERSIONED_ROOT_SIGNATURE_DESC versioned_root_signature_desc;
     versioned_root_signature_desc.Init_1_1(
-        CountOf( root_parameters ), DataOf( root_parameters ), 1, &static_sampler_desc, root_signature_flags );
+        CountOf( root_parameters ),
+        DataOf( root_parameters ),
+        CountOf( static_sampler_desc ),
+        DataOf( static_sampler_desc ),
+        root_signature_flags );
 
     D3D12_FEATURE_DATA_ROOT_SIGNATURE feature_data;
     feature_data.HighestVersion = D3D_ROOT_SIGNATURE_VERSION_1_1;
@@ -452,7 +590,6 @@ void Ember::BasicApp::LoadContent()
 
     EnvPipelineStream pipeline_stream{
       .RootSignature = root_signature.Get(),
-      .ComputeShader = CD3DX12_SHADER_BYTECODE( eqrect_to_cube.Get() ),
     };
 
     D3D12_PIPELINE_STATE_STREAM_DESC desc{
@@ -460,27 +597,125 @@ void Ember::BasicApp::LoadContent()
       .pPipelineStateSubobjectStream = &pipeline_stream,
     };
 
+    pipeline_stream.ComputeShader = CD3DX12_SHADER_BYTECODE( eqrect_to_cube_shader.Get() );
     ComPtr<ID3D12PipelineState> eqrect_to_cube_pipeline;
     ERR_ABORT( device->CreatePipelineState( &desc, IID_PPV_ARGS( &eqrect_to_cube_pipeline ) ) );
+    ERR_ABORT( eqrect_to_cube_pipeline->SetName( L"Eqrect -> Cube Pipeline" ) );
 
-    auto                desc_heaps = m_RenderDevice->GetBindlessDescriptorHeaps();
+    pipeline_stream.ComputeShader = CD3DX12_SHADER_BYTECODE( diffuse_irradiance_shader.Get() );
+    ComPtr<ID3D12PipelineState> diffuse_irradiance_pipeline;
+    ERR_ABORT( device->CreatePipelineState( &desc, IID_PPV_ARGS( &diffuse_irradiance_pipeline ) ) );
+    ERR_ABORT( diffuse_irradiance_pipeline->SetName( L"Diffuse Irradiance Pipeline" ) );
 
-    EnvCubeRootConstant root_constant{
-      .EqrectHandle        = environment.GetSRVHandle(),
-      .OutputCubemapHandle = env_cube.GetUAVHandle(),
+    pipeline_stream.ComputeShader = CD3DX12_SHADER_BYTECODE( prefilter_shader.Get() );
+    ComPtr<ID3D12PipelineState> prefilter_pipeline;
+    ERR_ABORT( device->CreatePipelineState( &desc, IID_PPV_ARGS( &prefilter_pipeline ) ) );
+    ERR_ABORT( prefilter_pipeline->SetName( L"Prefilter Pipeline" ) );
+
+    pipeline_stream.ComputeShader = CD3DX12_SHADER_BYTECODE( brdf_lut_shader.Get() );
+    ComPtr<ID3D12PipelineState> brdf_lut_pipeline;
+    ERR_ABORT( device->CreatePipelineState( &desc, IID_PPV_ARGS( &brdf_lut_pipeline ) ) );
+    ERR_ABORT( brdf_lut_pipeline->SetName( L"BRDF LUT Pipeline" ) );
+
+    D3D12_RESOURCE_DESC prefilter_desc = m_Environment.Prefilter.GetTexture()->GetDesc();
+    ASSERT( prefilter_desc.MipLevels == kPrefilterMaxLoD + 1 /* Accounting for mip0 */ );
+
+    std::vector<UAVHandle> prefilter_write_handles;
+    for ( uint32_t i = 0; i <= kPrefilterMaxLoD; i++ )
+    {
+      auto uav_desc = CD3DX12_UNORDERED_ACCESS_VIEW_DESC::Tex2DArray( prefilter_desc.Format, ( UINT )-1, 0, i );
+      prefilter_write_handles.push_back(
+          m_RenderDevice->CreateBindlessHandle( m_Environment.Prefilter.GetTexture(), uav_desc ) );
+    }
+
+    auto            desc_heaps = m_RenderDevice->GetBindlessDescriptorHeaps();
+
+    EnvRootConstant env_cube_root_constant{
+      .InputTextureHandle  = environment.GetSRVHandle(),
+      .OutputTextureHandle = m_Environment.Skybox.GetUAVHandle(),
       .CubeSide            = kEnvCubeSide,
     };
 
+    EnvRootConstant diffuse_irradiance_root_constant{
+      .InputTextureHandle  = m_Environment.Skybox.GetSRVHandle(),
+      .OutputTextureHandle = m_Environment.DiffuseIrradiance.GetUAVHandle(),
+      .CubeSide            = kDiffuseCubeSide,
+    };
+
+    PrefilterConstant prefilter_constant{
+      .Skybox              = m_Environment.Skybox.GetSRVHandle(),
+      .SkyboxSide          = kEnvCubeSide,
+      .OutputTextureHandle = m_Environment.Prefilter.GetUAVHandle(),
+      .OutputSide          = kPrefilterCubeSide,
+      .Roughness           = 0.0f,
+    };
+
+    BrdfLUTConstant brdf_lut_constant{
+      .OutputTextureHandle = m_Environment.BrdfLUT.GetUAVHandle(),
+      .Width               = kBrdfLutSize,
+      .Height              = kBrdfLutSize,
+    };
+
     auto command_list = context.GetCommandList();
-    command_list->SetPipelineState( eqrect_to_cube_pipeline.Get() );
+
     command_list->SetComputeRootSignature( root_signature.Get() );
     command_list->SetDescriptorHeaps( CountOf( desc_heaps ), DataOf( desc_heaps ) );
-    command_list->SetComputeRoot32BitConstants( 0, sizeof( EnvCubeRootConstant ) / 4, &root_constant, 0 );
+
+    command_list->SetPipelineState( eqrect_to_cube_pipeline.Get() );
+    command_list->SetComputeRoot32BitConstants( 0, sizeof( EnvRootConstant ) / 4, &env_cube_root_constant, 0 );
     command_list->Dispatch( kEnvCubeSide / kThreadGroupX, kEnvCubeSide / kThreadGroupY, 6 / kThreadGroupZ );
+
+    byte                                buffer[2048];
+    std::pmr::monotonic_buffer_resource mbr{ DataOf( buffer ), ByteSizeOf( buffer ), std::pmr::null_memory_resource() };
+    ResourceTracker                     tracker{ m_RenderDevice.get(), &mbr };
+    {
+      auto barrier = CD3DX12_RESOURCE_BARRIER::UAV( m_Environment.Skybox.GetTexture() );
+      command_list->ResourceBarrier( 1, &barrier );
+    }
+
+    ASSERT( m_TextureLoader->TryGenerateMipMapCube( command_list.Get(), &m_Environment.Skybox, &tracker ) );
+
+    {
+      auto barrier = CD3DX12_RESOURCE_BARRIER::UAV( m_Environment.Skybox.GetTexture() );
+      command_list->ResourceBarrier( 1, &barrier );
+    }
+
+    command_list->SetComputeRootSignature( root_signature.Get() );
+    command_list->SetPipelineState( diffuse_irradiance_pipeline.Get() );
+    command_list->SetComputeRoot32BitConstants(
+        0, sizeof( EnvRootConstant ) / 4, &diffuse_irradiance_root_constant, 0 );
+    command_list->Dispatch( kDiffuseCubeSide / kThreadGroupX, kDiffuseCubeSide / kThreadGroupY, 6 / kThreadGroupZ );
+
+    for ( uint32_t i = 0; i <= kPrefilterMaxLoD; i++ )
+    {
+      prefilter_constant.OutputTextureHandle = prefilter_write_handles[i];
+      prefilter_constant.Roughness           = ( float )i / ( float )kPrefilterMaxLoD;
+
+      command_list->SetPipelineState( prefilter_pipeline.Get() );
+      command_list->SetComputeRoot32BitConstants( 0, sizeof( PrefilterConstant ) / 4, &prefilter_constant, 0 );
+      command_list->Dispatch(
+          std::max<uint32_t>( prefilter_constant.OutputSide / kThreadGroupX, 1 ),
+          std::max<uint32_t>( prefilter_constant.OutputSide / kThreadGroupY, 1 ),
+          6 / kThreadGroupZ );
+
+      prefilter_constant.OutputSide = std::max<uint32_t>( prefilter_constant.OutputSide / 2, 1 );
+    }
+
+    command_list->SetPipelineState( brdf_lut_pipeline.Get() );
+    command_list->SetComputeRoot32BitConstants( 0, sizeof( BrdfLUTConstant ) / 4, &brdf_lut_constant, 0 );
+    command_list->Dispatch( kBrdfLutSize / kThreadGroupX, kBrdfLutSize / kThreadGroupY, 1 );
 
     Context::Receipt receipt = context.Submit( std::move( command_list ) );
     context.WaitOn( receipt );
+
+    for ( auto& uav_handle : prefilter_write_handles )
+    {
+      m_RenderDevice->FreeHandle( uav_handle );
+    }
+
+    tracker.Clear( nullptr );
   }
+  m_Environment.InitRepr();
 
   SetupRenderPipeline();
 
@@ -503,6 +738,17 @@ void Ember::BasicApp::Update()
   m_ModelLoader->Update();
   m_TextureLoader->Update();
 
+  /*
+  m_Camera.Position = DirectX::XMVector3Rotate(
+      m_Camera.Position,
+      DirectX::XMQuaternionRotationRollPitchYaw( 0.0f, DirectX::XMConvertToRadians( 10 ) * delta_seconds, 0.0f ) );
+
+  m_Camera.SetView( DirectX::XMMatrixLookAtLH(
+      m_Camera.Position,
+      DirectX::XMVectorSet( 0.0f, 0.0f, 0.0f, 1.0f ),
+      DirectX::XMVectorSet( 0.0f, 1.0f, 0.0f, 0.0f ) ) );
+      */
+
   m_World.Update( delta_seconds );
 }
 
@@ -511,11 +757,11 @@ void Ember::BasicApp::Render()
   m_RenderQueue.Clear();
   m_World.Render( &m_RenderQueue );
 
-  ID3D12Resource*                   backbuffer         = m_RenderDevice->GetCurrentBackbuffer();
-  ComPtr<ID3D12GraphicsCommandList> command_list       = m_RenderDevice->GetGraphicsCommandList();
-  uint32_t                          frame_idx          = m_RenderDevice->GetCurrentFrameIndex();
-  Buffer*                           camera_buffer      = &m_CameraBuffer[frame_idx];
-  Buffer*                           point_light_buffer = &m_PointLightBuffer[frame_idx];
+  ID3D12Resource*      backbuffer         = m_RenderDevice->GetCurrentBackbuffer();
+  Context::CommandList command_list       = m_RenderDevice->GetGraphicsCommandList();
+  uint32_t             frame_idx          = m_RenderDevice->GetCurrentFrameIndex();
+  Buffer*              camera_buffer      = &m_CameraBuffer[frame_idx];
+  Buffer*              point_light_buffer = &m_PointLightBuffer[frame_idx];
 
   // All resources for this frame are guaranteed to be available for CPU modification at this time.
   camera_buffer->Write( 0, sizeof( Camera ), &m_Camera );
@@ -554,7 +800,7 @@ void Ember::BasicApp::Render()
   command_list->ClearRenderTargetView( rtv, cornflower_blue, 0, nullptr );
   command_list->ClearDepthStencilView( dsv, D3D12_CLEAR_FLAG_DEPTH, 1.0f, 0, 0, nullptr );
 
-  command_list->SetPipelineState( m_PipelineState.Get() );
+  command_list->SetPipelineState( m_MainPipeline.Get() );
   command_list->SetGraphicsRootSignature( m_RootSignature.Get() );
   command_list->IASetPrimitiveTopology( D3D_PRIMITIVE_TOPOLOGY_TRIANGLELIST );
 
@@ -564,22 +810,24 @@ void Ember::BasicApp::Render()
   command_list->RSSetScissorRects( 1, &scissor );
   command_list->OMSetRenderTargets( 1, &rtv, FALSE, &dsv );
 
+  PerFrameConstants constants = {
+    .Camera          = camera_buffer->GetCBVHandle(),
+    .PointLights     = point_light_buffer->GetSRVHandle(),
+    .PointLightCount = m_PointLightCount,
+  };
+
+  command_list->SetGraphicsRoot32BitConstants( 2, sizeof( PerFrameConstants ) / 4, &constants, 0 );
+  command_list->SetGraphicsRoot32BitConstants( 3, sizeof( Environment::GpuRepr ) / 4, &m_Environment.Repr, 0 );
+
   size_t const count = m_RenderQueue.Count();
   for ( size_t i = 0; i < count; ++i )
   {
-    PerFrameConstants constants = {
-      .Camera          = camera_buffer->GetCBVHandle(),
-      .PointLights     = point_light_buffer->GetSRVHandle(),
-      .PointLightCount = m_PointLightCount,
-    };
-
     command_list->IASetIndexBuffer( &m_RenderQueue.Meshes[i]->IndexBuffer.GetIndexBufferView() );
     command_list->IASetVertexBuffers( 0, 1, &m_RenderQueue.Meshes[i]->VertexBuffer.GetVertexBufferView() );
 
-    command_list->SetGraphicsRoot32BitConstants( 0, sizeof( PerFrameConstants ) / 4, &constants, 0 );
-    command_list->SetGraphicsRoot32BitConstants( 1, sizeof( WorldTransform ) / 4, &m_RenderQueue.Transforms[i], 0 );
+    command_list->SetGraphicsRoot32BitConstants( 0, sizeof( WorldTransform ) / 4, &m_RenderQueue.Transforms[i], 0 );
     command_list->SetGraphicsRoot32BitConstants(
-        2, sizeof( Material::GpuRepr ) / 4, &m_RenderQueue.Materials[i]->Repr, 0 );
+        1, sizeof( Material::GpuRepr ) / 4, &m_RenderQueue.Materials[i]->Repr, 0 );
 
     command_list->DrawIndexedInstanced(
         m_RenderQueue.Primitives[i].IndexCount,
@@ -588,6 +836,9 @@ void Ember::BasicApp::Render()
         m_RenderQueue.Primitives[i].FirstVertex,
         0 );
   }
+
+  command_list->SetPipelineState( m_BackgroundPipeline.Get() );
+  command_list->DrawInstanced( 3, 1, 0, 0 );
 
   barrier = CD3DX12_RESOURCE_BARRIER::Transition(
       backbuffer, D3D12_RESOURCE_STATE_RENDER_TARGET, D3D12_RESOURCE_STATE_PRESENT );
@@ -612,4 +863,7 @@ void Ember::BasicApp::Resize()
   m_RenderDevice->ResizeSwapchain( m_WindowWidth, m_WindowHeight );
   m_DepthBuffer = m_RenderDevice->CreateDepthBuffer( m_WindowWidth, m_WindowHeight );
   m_RenderDevice->SetDepthBuffer( m_DepthBuffer );
+
+  m_Camera.SetProjection( DirectX::XMMatrixPerspectiveFovLH(
+      DirectX::XMConvertToRadians( 70.0f ), ( float )m_WindowWidth / ( float )m_WindowHeight, 0.1f, 100.0f ) );
 }

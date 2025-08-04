@@ -1,20 +1,22 @@
-static const float PI = 3.14159265f;
+#ifndef PBR_HLSLI_
+#define PBR_HLSLI_
 
-float              TrowbridgeReitzGGX( float3 normal, float3 halfway, float roughness )
+#include "Utility.hlsli"
+
+float TrowbridgeReitzGGX( float n_dot_h, float roughness )
 {
   float alpha       = roughness * roughness;
   float alpha2      = alpha * alpha;
-  float n_dot_h     = max( dot( normal, halfway ), 0.0f );
   float n_dot_h_2   = n_dot_h * n_dot_h;
 
   float numerator   = alpha2;
   float denominator = n_dot_h_2 * ( alpha2 - 1.0f ) + 1.0f;
-  denominator       = PI * denominator * denominator;
+  denominator       = kPi * denominator * denominator;
 
   return numerator / denominator;
 }
 
-float GeometrySchlickGGX( float n_dot_v, float roughness )
+float PBRGeometrySchlickGGX( float n_dot_v, float roughness )
 {
   float r           = roughness + 1.0f;
   float k           = ( r * r ) / 8.0f;
@@ -25,10 +27,31 @@ float GeometrySchlickGGX( float n_dot_v, float roughness )
   return numerator / denominator;
 }
 
-float GeometrySmith( float n_dot_v, float n_dot_l, float roughness )
+float IBLGeometrySchlickGGX( float n_dot_v, float roughness )
 {
-  float ggx1 = GeometrySchlickGGX( n_dot_v, roughness );
-  float ggx2 = GeometrySchlickGGX( n_dot_l, roughness );
+  float r = roughness;
+  // (Rough + 1)^2 / 8 for Punctual Lights
+  // Rough^2 / 2 for IBL
+  float k           = ( r * r ) / 2.0f;
+
+  float numerator   = n_dot_v;
+  float denominator = n_dot_v * ( 1.0f - k ) + k;
+
+  return numerator / denominator;
+}
+
+float IBLGeometrySmith( float n_dot_v, float n_dot_l, float roughness )
+{
+  float ggx1 = IBLGeometrySchlickGGX( n_dot_v, roughness );
+  float ggx2 = IBLGeometrySchlickGGX( n_dot_l, roughness );
+
+  return ggx1 * ggx2;
+}
+
+float PBRGeometrySmith( float n_dot_v, float n_dot_l, float roughness )
+{
+  float ggx1 = PBRGeometrySchlickGGX( n_dot_v, roughness );
+  float ggx2 = PBRGeometrySchlickGGX( n_dot_l, roughness );
 
   return ggx1 * ggx2;
 }
@@ -53,17 +76,19 @@ struct BRDFCookTorranceGGX
   float3 Normal;
   float  Roughness;
   float3 F0;
+  float  Occlusion;
 
   float3 Evaluate( float3 radiance, float3 view_dir, float3 light_dir )
   {
     float3 halfway        = normalize( view_dir + light_dir );
 
     float  cosine_factor  = max( dot( halfway, view_dir ), 0.0f );
+    float  n_dot_h        = max( dot( Normal, halfway ), 0.0f );
     float  n_dot_v        = max( dot( Normal, view_dir ), 0.0f );
     float  n_dot_l        = max( dot( Normal, light_dir ), 0.0f );
 
-    float  normal_dist    = TrowbridgeReitzGGX( Normal, halfway, Roughness );
-    float  geometry       = GeometrySmith( n_dot_v, n_dot_l, Roughness );
+    float  normal_dist    = TrowbridgeReitzGGX( n_dot_h, Roughness );
+    float  geometry       = PBRGeometrySmith( n_dot_v, n_dot_l, Roughness );
     float3 fresnel        = FresnelSchlickRoughness( cosine_factor, F0, Roughness );
 
     float3 numerator      = ( normal_dist * geometry ) * fresnel;
@@ -75,6 +100,8 @@ struct BRDFCookTorranceGGX
 
     diffuse_part         *= 1.0f - Metallic;
 
-    return n_dot_l * radiance * ( diffuse_part * Albedo / PI + specular );
+    return n_dot_l * radiance * ( diffuse_part * Albedo / kPi + specular ) * Occlusion;
   }
 };
+
+#endif
