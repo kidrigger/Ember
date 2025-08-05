@@ -13,7 +13,7 @@ SamplerState g_EqrectSampler : register( s0, space0 );
 float2       SampleSphericalMap( float3 v )
 {
   const float2 inv_tan  = float2( 0.1591f, 0.3183f );                // (1/2PI, 1/PI)
-  float2       uv       = float2( atan2( v.x, v.z ), asin( -v.y ) ); // (-PI, -PI/2) to (PI, PI/2)
+  float2       uv       = float2( atan2( v.x, -v.z ), asin( -v.y ) ); // (-PI, -PI/2) to (PI, PI/2)
   uv                   *= inv_tan;                                   // (-1/2, -1/2) to (1/2, 1/2)
   uv                   += 0.5f;                                      // (0, 0) to (1, 1)
   return uv;

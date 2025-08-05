@@ -308,7 +308,8 @@ void Ember::BasicApp::SetupRenderPipeline()
   rtv_formats.RTFormats[0] = DXGI_FORMAT_R8G8B8A8_UNORM;
 
   CD3DX12_RASTERIZER_DESC2 rasterizer_desc{ D3D12_DEFAULT };
-  rasterizer_desc.CullMode = D3D12_CULL_MODE_BACK;
+  rasterizer_desc.FrontCounterClockwise = true;
+  rasterizer_desc.CullMode              = D3D12_CULL_MODE_BACK;
 
   CD3DX12_DEPTH_STENCIL_DESC depth_stencil_desc{ D3D12_DEFAULT };
   depth_stencil_desc.DepthEnable       = true;
@@ -387,9 +388,9 @@ void Ember::BasicApp::LoadContent()
   // Setup Camera
   auto camera_position = DirectX::XMVectorSet( 0.0f, 0.5f, 3.0f, 1.0f );
 
-  m_Camera.SetProjection( DirectX::XMMatrixPerspectiveFovLH(
-      DirectX::XMConvertToRadians( 70.0f ), ( float )m_WindowWidth / ( float )m_WindowHeight, 0.1f, 100.0f ) );
-  m_Camera.SetView( DirectX::XMMatrixLookAtLH(
+  m_Camera.SetProjection( DirectX::XMMatrixPerspectiveFovRH(
+      DirectX::XMConvertToRadians( 50.0f ), ( float )m_WindowWidth / ( float )m_WindowHeight, 0.1f, 100.0f ) );
+  m_Camera.SetView( DirectX::XMMatrixLookAtRH(
       camera_position,
       DirectX::XMVectorSet( 0.0f, 0.0f, 0.0f, 1.0f ),
       DirectX::XMVectorSet( 0.0f, 1.0f, 0.0f, 0.0f ) ) );
@@ -585,6 +586,6 @@ void Ember::BasicApp::Resize()
   m_DepthBuffer = m_RenderDevice->CreateDepthBuffer( m_WindowWidth, m_WindowHeight );
   m_RenderDevice->SetDepthBuffer( m_DepthBuffer );
 
-  m_Camera.SetProjection( DirectX::XMMatrixPerspectiveFovLH(
-      DirectX::XMConvertToRadians( 70.0f ), ( float )m_WindowWidth / ( float )m_WindowHeight, 0.1f, 100.0f ) );
+  m_Camera.SetProjection( DirectX::XMMatrixPerspectiveFovRH(
+      DirectX::XMConvertToRadians( 50.0f ), ( float )m_WindowWidth / ( float )m_WindowHeight, 0.1f, 100.0f ) );
 }
