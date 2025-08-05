@@ -13,7 +13,7 @@ SamplerState g_Sampler : register( s0, space0 );
 NUMTHREADS( 16, 16, 1 )
 void DiffuseIrradiance( uint3 global_invocation_id : SV_DispatchThreadID )
 {
-  float3 forward = GetCubeDir(float2(global_invocation_id.xy), global_invocation_id.z, 1.0f / g_CubeSide);
+  float3 forward = GetCubeDir( float2( global_invocation_id.xy ), global_invocation_id.z, 1.0f / g_CubeSide );
   float3 up      = abs( forward.y ) < 1.0f ? float3( 0.0f, 1.0f, 0.0f ) : float3( 1.0f, 0.0f, 0.0f ); // 0.01f offset to
   float3 right   = normalize( cross( up, forward ) );
   up             = normalize( cross( forward, right ) );

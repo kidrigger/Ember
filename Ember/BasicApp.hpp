@@ -2,6 +2,7 @@
 
 #include "Buffer.hpp"
 #include "DepthBuffer.hpp"
+#include "Environment.hpp"
 #include "IApp.hpp"
 #include "RenderDevice.hpp"
 #include "Scene.hpp"
@@ -40,26 +41,6 @@ class BasicApp final : public IApp
     float             Padding0{};                   // 32
   };
 
-  struct Environment
-  {
-    struct GpuRepr
-    {
-      SRVHandle Skybox;
-      SRVHandle DiffuseIrradiance;
-      SRVHandle Prefilter;
-      SRVHandle BrdfLUT;
-    };
-
-    RenderDevice* Device;
-    Texture       Skybox;
-    Texture       DiffuseIrradiance;
-    Texture       Prefilter;
-    Texture       BrdfLUT;
-    GpuRepr       Repr;
-
-    void          InitRepr();
-  };
-
   HWND                           m_WindowHandle{ nullptr };
   uint32_t                       m_WindowWidth{ 1280 };
   uint32_t                       m_WindowHeight{ 720 };
@@ -88,7 +69,7 @@ class BasicApp final : public IApp
   uint32_t                    m_PointLightDirty{ 3 };
 
   World                       m_World;
-  Environment                 m_Environment{};
+  Environment                 m_Environment;
   RenderCommandQueue          m_RenderQueue;
 
   void                        SetupRenderPipeline();

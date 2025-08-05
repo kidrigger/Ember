@@ -30,7 +30,7 @@ float        GetSampleMipLevel( float n_dot_h, float h_dot_v, float sample_count
 NUMTHREADS( 16, 16, 1 )
 void Prefilter( uint3 global_invocation_id : SV_DispatchThreadID )
 {
-  float3                   normal          = GetCubeDir( global_invocation_id.xy, global_invocation_id.z, 1.0f / g_OutputSide );
+  float3                   normal = GetCubeDir( global_invocation_id.xy, global_invocation_id.z, 1.0f / g_OutputSide );
   float3                   view_dir        = normal;
 
   TextureCube              skybox          = ResourceDescriptorHeap[g_Skybox];

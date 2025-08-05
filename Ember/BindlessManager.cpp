@@ -22,7 +22,7 @@ uint32_t Ember::BindlessManager::RabbitPullingFreeList::Allocate()
   if ( not m_Recycled.empty() )
   {
     uint32_t const index = m_Recycled.front();
-    m_Recycled.pop_back();
+    m_Recycled.pop_front();
     return index;
   }
 

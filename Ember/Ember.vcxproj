@@ -213,6 +213,7 @@
     <ClCompile Include="Buffer.cpp" />
     <ClCompile Include="CgltfImpl.cpp" />
     <ClCompile Include="DepthBuffer.cpp" />
+    <ClCompile Include="Environment.cpp" />
     <ClCompile Include="IApp.cpp" />
     <ClCompile Include="ModelLoader.cpp" />
     <ClCompile Include="ObjectPool.cpp" />
@@ -234,6 +235,7 @@
     <ClInclude Include="Buffer.hpp" />
     <ClInclude Include="Color.hpp" />
     <ClInclude Include="DepthBuffer.hpp" />
+    <ClInclude Include="Environment.hpp" />
     <ClInclude Include="IApp.hpp" />
     <ClInclude Include="ModelLoader.hpp" />
     <ClInclude Include="ObjectPool.hpp" />

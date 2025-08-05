@@ -3,6 +3,7 @@
 #include <cstdint>
 #include <utility>
 
+#include "Environment.hpp"
 #include "ModelLoader.hpp"
 #include "RenderDevice.hpp"
 #include "TextureLoader.hpp"
@@ -153,15 +154,18 @@ HWND CreateWindow(
 
 class RotModel final : public Ember::Node
 {
+  float m_Speed;
+
 public:
-  explicit RotModel( Object* parent, allocator_type const& allocator = {} ) : Node{ parent, allocator }
+  explicit RotModel( Object* parent, float speed, allocator_type const& allocator = {} )
+    : Node{ parent, allocator }, m_Speed{ speed }
   {}
 
   void Update( float const delta_seconds ) override
   {
     auto transform = GetLocalTransform();
     transform      = XMMatrixMultiply(
-        DirectX::XMMatrixRotationY( DirectX::XMConvertToRadians( 20.0f ) * delta_seconds ), transform );
+        DirectX::XMMatrixRotationY( DirectX::XMConvertToRadians( m_Speed ) * delta_seconds ), transform );
     SetLocalTransform( transform );
 
     Node::Update( delta_seconds );
@@ -236,14 +240,6 @@ void Ember::BasicApp::Camera::SetView( DirectX::FXMMATRIX& view )
 {
   View    = view;
   InvView = XMMatrixInverse( nullptr, view );
-}
-
-void Ember::BasicApp::Environment::InitRepr()
-{
-  Repr.Skybox            = Skybox.GetSRVHandle();
-  Repr.DiffuseIrradiance = DiffuseIrradiance.GetSRVHandle();
-  Repr.Prefilter         = Prefilter.GetSRVHandle();
-  Repr.BrdfLUT           = BrdfLUT.GetSRVHandle();
 }
 
 void Ember::BasicApp::SetupRenderPipeline()
@@ -389,7 +385,7 @@ void Ember::BasicApp::LoadContent()
   ERR_ABORT( ::ShowWindow( m_WindowHandle, SW_SHOW ) );
 
   // Setup Camera
-  auto camera_position = DirectX::XMVectorSet( 0.0f, 0.0f, 2.0f, 1.0f );
+  auto camera_position = DirectX::XMVectorSet( 0.0f, 0.5f, 3.0f, 1.0f );
 
   m_Camera.SetProjection( DirectX::XMMatrixPerspectiveFovLH(
       DirectX::XMConvertToRadians( 70.0f ), ( float )m_WindowWidth / ( float )m_WindowHeight, 0.1f, 100.0f ) );
@@ -439,284 +435,14 @@ void Ember::BasicApp::LoadContent()
   }
 
   // Setup Scene Geometry
-  // RotModel* rm    = m_World.CreateObject<RotModel>();
-  Model* model = m_ModelLoader->TryLoadModel( "DamagedHelmet.glb" );
-  // model->SetLocalScale( DirectX::XMVectorSet( -40.0f, 40.0f, 40.0f, 1.0f ) );
+  RotModel* rm    = m_World.CreateObject<RotModel>( 20.0f );
+  Model*    model = m_ModelLoader->TryLoadModel( "DamagedHelmet.glb" );
   ASSERT( model );
-  // rm->AddChild( model );
+  rm->AddChild( model );
 
-  // Setup Environment
-  uint32_t constexpr kEnvCubeSide       = 256;
-  uint32_t constexpr kDiffuseCubeSide   = 256;
-  uint32_t constexpr kPrefilterCubeSide = 512;
-  uint32_t constexpr kPrefilterMaxLoD   = 5;
-  uint32_t constexpr kBrdfLutSize       = 512;
+  constexpr char const* kEnvMapFile = "OvercastSoil.hdr";
 
-  //
-  m_Environment.Device = m_RenderDevice.get();
-  m_Environment.Skybox = m_RenderDevice->CreateTextureCube( {
-      .Format    = DXGI_FORMAT_R11G11B10_FLOAT,
-      .Side      = kEnvCubeSide,
-      .Usage     = TextureUsage::kReadWrite,
-      .MipLevels = MipLevels::kBase,
-  } );
-  m_Environment.Skybox.SetName( L"Skybox" );
-
-  m_Environment.DiffuseIrradiance = m_RenderDevice->CreateTextureCube( {
-      .Format    = DXGI_FORMAT_R11G11B10_FLOAT,
-      .Side      = kDiffuseCubeSide,
-      .Usage     = TextureUsage::kReadWrite,
-      .MipLevels = MipLevels::kBase,
-  } );
-  m_Environment.DiffuseIrradiance.SetName( L"Diffuse Irradiance Map" );
-
-  m_Environment.Prefilter = m_RenderDevice->CreateTextureCube( {
-      .Format    = DXGI_FORMAT_R11G11B10_FLOAT,
-      .Side      = kPrefilterCubeSide,
-      .Usage     = TextureUsage::kReadWrite,
-      .MipLevels = kPrefilterMaxLoD + 1, // accounting for mip0
-  } );
-  m_Environment.Prefilter.SetName( L"Prefiltered Cube" );
-
-  m_Environment.BrdfLUT = m_RenderDevice->CreateTexture2D( {
-      .Format    = DXGI_FORMAT_R16G16_FLOAT,
-      .Width     = kBrdfLutSize,
-      .Height    = kBrdfLutSize,
-      .Usage     = TextureUsage::kReadWrite,
-      .MipLevels = MipLevels::kBase,
-  } );
-  m_Environment.BrdfLUT.SetName( L"BRDF LUT" );
-
-  {
-    Texture environment;
-    ASSERT( m_TextureLoader->TryLoadTexture( &environment, "PhotoStudioLoft.hdr" ) );
-    m_RenderDevice->WaitOn( m_TextureLoader->EndBatch() );
-
-    struct EnvRootConstant
-    {
-      SRVHandle InputTextureHandle;
-      UAVHandle OutputTextureHandle;
-      uint32_t  CubeSide;
-    };
-
-    struct PrefilterConstant
-    {
-      SRVHandle Skybox;
-      uint32_t  SkyboxSide;
-      UAVHandle OutputTextureHandle;
-      uint32_t  OutputSide;
-      float     Roughness;
-    };
-
-    struct BrdfLUTConstant
-    {
-      UAVHandle OutputTextureHandle;
-      uint32_t  Width;
-      uint32_t  Height;
-    };
-
-    CD3DX12_ROOT_PARAMETER1 root_parameters[1];
-    root_parameters[0].InitAsConstants( 5, 0 );
-
-    CD3DX12_STATIC_SAMPLER_DESC static_sampler_desc[] = {
-      CD3DX12_STATIC_SAMPLER_DESC{ 0 },
-    };
-
-    D3D12_ROOT_SIGNATURE_FLAGS const root_signature_flags =
-        D3D12_ROOT_SIGNATURE_FLAG_ALLOW_INPUT_ASSEMBLER_INPUT_LAYOUT |
-        D3D12_ROOT_SIGNATURE_FLAG_CBV_SRV_UAV_HEAP_DIRECTLY_INDEXED |
-        D3D12_ROOT_SIGNATURE_FLAG_SAMPLER_HEAP_DIRECTLY_INDEXED |
-        D3D12_ROOT_SIGNATURE_FLAG_DENY_MESH_SHADER_ROOT_ACCESS |
-        D3D12_ROOT_SIGNATURE_FLAG_DENY_AMPLIFICATION_SHADER_ROOT_ACCESS |
-        D3D12_ROOT_SIGNATURE_FLAG_DENY_GEOMETRY_SHADER_ROOT_ACCESS |
-        D3D12_ROOT_SIGNATURE_FLAG_DENY_DOMAIN_SHADER_ROOT_ACCESS |
-        D3D12_ROOT_SIGNATURE_FLAG_DENY_HULL_SHADER_ROOT_ACCESS |
-        D3D12_ROOT_SIGNATURE_FLAG_DENY_VERTEX_SHADER_ROOT_ACCESS |
-        D3D12_ROOT_SIGNATURE_FLAG_DENY_PIXEL_SHADER_ROOT_ACCESS;
-
-    uint32_t constexpr kThreadGroupX = 16;
-    uint32_t constexpr kThreadGroupY = 16;
-    uint32_t constexpr kThreadGroupZ = 1;
-
-    ComPtr<ID3DBlob> eqrect_to_cube_shader;
-    ERR_ABORT( D3DReadFileToBlob( L"EqrectToCube.cso", &eqrect_to_cube_shader ) );
-
-    ComPtr<ID3DBlob> diffuse_irradiance_shader;
-    ERR_ABORT( D3DReadFileToBlob( L"DiffuseIrradiance.cso", &diffuse_irradiance_shader ) );
-
-    ComPtr<ID3DBlob> prefilter_shader;
-    ERR_ABORT( D3DReadFileToBlob( L"Prefilter.cso", &prefilter_shader ) );
-
-    ComPtr<ID3DBlob> brdf_lut_shader;
-    ERR_ABORT( D3DReadFileToBlob( L"BrdfLUT.cso", &brdf_lut_shader ) );
-
-    ComPtr<ID3D12Device2> device = m_RenderDevice->GetDevice();
-
-    Context               context;
-    Context::Create( &context, device, D3D12_COMMAND_LIST_TYPE_COMPUTE );
-
-    CD3DX12_VERSIONED_ROOT_SIGNATURE_DESC versioned_root_signature_desc;
-    versioned_root_signature_desc.Init_1_1(
-        CountOf( root_parameters ),
-        DataOf( root_parameters ),
-        CountOf( static_sampler_desc ),
-        DataOf( static_sampler_desc ),
-        root_signature_flags );
-
-    D3D12_FEATURE_DATA_ROOT_SIGNATURE feature_data;
-    feature_data.HighestVersion = D3D_ROOT_SIGNATURE_VERSION_1_1;
-    if ( FAILED( device->CheckFeatureSupport( D3D12_FEATURE_ROOT_SIGNATURE, &feature_data, sizeof( feature_data ) ) ) )
-    {
-      feature_data.HighestVersion = D3D_ROOT_SIGNATURE_VERSION_1_0;
-    }
-
-    ComPtr<ID3DBlob> root_signature_blob;
-    ComPtr<ID3DBlob> error_blob;
-    ERR_ABORT( D3DX12SerializeVersionedRootSignature(
-        &versioned_root_signature_desc, feature_data.HighestVersion, &root_signature_blob, &error_blob ) );
-
-    ComPtr<ID3D12RootSignature> root_signature;
-    ERR_ABORT( device->CreateRootSignature(
-        0,
-        root_signature_blob->GetBufferPointer(),
-        root_signature_blob->GetBufferSize(),
-        IID_PPV_ARGS( &root_signature ) ) );
-
-    struct EnvPipelineStream
-    {
-      CD3DX12_PIPELINE_STATE_STREAM_ROOT_SIGNATURE RootSignature;
-      CD3DX12_PIPELINE_STATE_STREAM_CS             ComputeShader;
-    };
-
-    EnvPipelineStream pipeline_stream{
-      .RootSignature = root_signature.Get(),
-    };
-
-    D3D12_PIPELINE_STATE_STREAM_DESC desc{
-      .SizeInBytes                   = sizeof pipeline_stream,
-      .pPipelineStateSubobjectStream = &pipeline_stream,
-    };
-
-    pipeline_stream.ComputeShader = CD3DX12_SHADER_BYTECODE( eqrect_to_cube_shader.Get() );
-    ComPtr<ID3D12PipelineState> eqrect_to_cube_pipeline;
-    ERR_ABORT( device->CreatePipelineState( &desc, IID_PPV_ARGS( &eqrect_to_cube_pipeline ) ) );
-    ERR_ABORT( eqrect_to_cube_pipeline->SetName( L"Eqrect -> Cube Pipeline" ) );
-
-    pipeline_stream.ComputeShader = CD3DX12_SHADER_BYTECODE( diffuse_irradiance_shader.Get() );
-    ComPtr<ID3D12PipelineState> diffuse_irradiance_pipeline;
-    ERR_ABORT( device->CreatePipelineState( &desc, IID_PPV_ARGS( &diffuse_irradiance_pipeline ) ) );
-    ERR_ABORT( diffuse_irradiance_pipeline->SetName( L"Diffuse Irradiance Pipeline" ) );
-
-    pipeline_stream.ComputeShader = CD3DX12_SHADER_BYTECODE( prefilter_shader.Get() );
-    ComPtr<ID3D12PipelineState> prefilter_pipeline;
-    ERR_ABORT( device->CreatePipelineState( &desc, IID_PPV_ARGS( &prefilter_pipeline ) ) );
-    ERR_ABORT( prefilter_pipeline->SetName( L"Prefilter Pipeline" ) );
-
-    pipeline_stream.ComputeShader = CD3DX12_SHADER_BYTECODE( brdf_lut_shader.Get() );
-    ComPtr<ID3D12PipelineState> brdf_lut_pipeline;
-    ERR_ABORT( device->CreatePipelineState( &desc, IID_PPV_ARGS( &brdf_lut_pipeline ) ) );
-    ERR_ABORT( brdf_lut_pipeline->SetName( L"BRDF LUT Pipeline" ) );
-
-    D3D12_RESOURCE_DESC prefilter_desc = m_Environment.Prefilter.GetTexture()->GetDesc();
-    ASSERT( prefilter_desc.MipLevels == kPrefilterMaxLoD + 1 /* Accounting for mip0 */ );
-
-    std::vector<UAVHandle> prefilter_write_handles;
-    for ( uint32_t i = 0; i <= kPrefilterMaxLoD; i++ )
-    {
-      auto uav_desc = CD3DX12_UNORDERED_ACCESS_VIEW_DESC::Tex2DArray( prefilter_desc.Format, ( UINT )-1, 0, i );
-      prefilter_write_handles.push_back(
-          m_RenderDevice->CreateBindlessHandle( m_Environment.Prefilter.GetTexture(), uav_desc ) );
-    }
-
-    auto            desc_heaps = m_RenderDevice->GetBindlessDescriptorHeaps();
-
-    EnvRootConstant env_cube_root_constant{
-      .InputTextureHandle  = environment.GetSRVHandle(),
-      .OutputTextureHandle = m_Environment.Skybox.GetUAVHandle(),
-      .CubeSide            = kEnvCubeSide,
-    };
-
-    EnvRootConstant diffuse_irradiance_root_constant{
-      .InputTextureHandle  = m_Environment.Skybox.GetSRVHandle(),
-      .OutputTextureHandle = m_Environment.DiffuseIrradiance.GetUAVHandle(),
-      .CubeSide            = kDiffuseCubeSide,
-    };
-
-    PrefilterConstant prefilter_constant{
-      .Skybox              = m_Environment.Skybox.GetSRVHandle(),
-      .SkyboxSide          = kEnvCubeSide,
-      .OutputTextureHandle = m_Environment.Prefilter.GetUAVHandle(),
-      .OutputSide          = kPrefilterCubeSide,
-      .Roughness           = 0.0f,
-    };
-
-    BrdfLUTConstant brdf_lut_constant{
-      .OutputTextureHandle = m_Environment.BrdfLUT.GetUAVHandle(),
-      .Width               = kBrdfLutSize,
-      .Height              = kBrdfLutSize,
-    };
-
-    auto command_list = context.GetCommandList();
-
-    command_list->SetComputeRootSignature( root_signature.Get() );
-    command_list->SetDescriptorHeaps( CountOf( desc_heaps ), DataOf( desc_heaps ) );
-
-    command_list->SetPipelineState( eqrect_to_cube_pipeline.Get() );
-    command_list->SetComputeRoot32BitConstants( 0, sizeof( EnvRootConstant ) / 4, &env_cube_root_constant, 0 );
-    command_list->Dispatch( kEnvCubeSide / kThreadGroupX, kEnvCubeSide / kThreadGroupY, 6 / kThreadGroupZ );
-
-    byte                                buffer[2048];
-    std::pmr::monotonic_buffer_resource mbr{ DataOf( buffer ), ByteSizeOf( buffer ), std::pmr::null_memory_resource() };
-    ResourceTracker                     tracker{ m_RenderDevice.get(), &mbr };
-    {
-      auto barrier = CD3DX12_RESOURCE_BARRIER::UAV( m_Environment.Skybox.GetTexture() );
-      command_list->ResourceBarrier( 1, &barrier );
-    }
-
-    ASSERT( m_TextureLoader->TryGenerateMipMapCube( command_list.Get(), &m_Environment.Skybox, &tracker ) );
-
-    {
-      auto barrier = CD3DX12_RESOURCE_BARRIER::UAV( m_Environment.Skybox.GetTexture() );
-      command_list->ResourceBarrier( 1, &barrier );
-    }
-
-    command_list->SetComputeRootSignature( root_signature.Get() );
-    command_list->SetPipelineState( diffuse_irradiance_pipeline.Get() );
-    command_list->SetComputeRoot32BitConstants(
-        0, sizeof( EnvRootConstant ) / 4, &diffuse_irradiance_root_constant, 0 );
-    command_list->Dispatch( kDiffuseCubeSide / kThreadGroupX, kDiffuseCubeSide / kThreadGroupY, 6 / kThreadGroupZ );
-
-    for ( uint32_t i = 0; i <= kPrefilterMaxLoD; i++ )
-    {
-      prefilter_constant.OutputTextureHandle = prefilter_write_handles[i];
-      prefilter_constant.Roughness           = ( float )i / ( float )kPrefilterMaxLoD;
-
-      command_list->SetPipelineState( prefilter_pipeline.Get() );
-      command_list->SetComputeRoot32BitConstants( 0, sizeof( PrefilterConstant ) / 4, &prefilter_constant, 0 );
-      command_list->Dispatch(
-          std::max<uint32_t>( prefilter_constant.OutputSide / kThreadGroupX, 1 ),
-          std::max<uint32_t>( prefilter_constant.OutputSide / kThreadGroupY, 1 ),
-          6 / kThreadGroupZ );
-
-      prefilter_constant.OutputSide = std::max<uint32_t>( prefilter_constant.OutputSide / 2, 1 );
-    }
-
-    command_list->SetPipelineState( brdf_lut_pipeline.Get() );
-    command_list->SetComputeRoot32BitConstants( 0, sizeof( BrdfLUTConstant ) / 4, &brdf_lut_constant, 0 );
-    command_list->Dispatch( kBrdfLutSize / kThreadGroupX, kBrdfLutSize / kThreadGroupY, 1 );
-
-    Context::Receipt receipt = context.Submit( std::move( command_list ) );
-    context.WaitOn( receipt );
-
-    for ( auto& uav_handle : prefilter_write_handles )
-    {
-      m_RenderDevice->FreeHandle( uav_handle );
-    }
-
-    tracker.Clear( nullptr );
-  }
-  m_Environment.InitRepr();
-
+  ASSERT( Environment::TryLoadFrom( m_RenderDevice.get(), m_TextureLoader.get(), &m_Environment, kEnvMapFile ) );
   SetupRenderPipeline();
 
   m_DepthBuffer = m_RenderDevice->CreateDepthBuffer( m_WindowWidth, m_WindowHeight );
@@ -729,7 +455,13 @@ void Ember::BasicApp::Update()
 
   double const avg_delta_ms = m_PerfCounter->GetAvgFrameTime();
   double const avg_fps      = 1000.0f / avg_delta_ms;
-  swprintf_s( m_SprintfBuffer, L"Ember | frame time: %.2lf ms (%.2lf fps)", avg_delta_ms, avg_fps );
+  swprintf_s(
+      m_SprintfBuffer,
+      L"Ember %ux%u | frame time: %.2lf ms (%.2lf fps)",
+      m_WindowWidth,
+      m_WindowHeight,
+      avg_delta_ms,
+      avg_fps );
 
   SetWindowText( m_WindowHandle, m_SprintfBuffer );
 
@@ -737,17 +469,6 @@ void Ember::BasicApp::Update()
 
   m_ModelLoader->Update();
   m_TextureLoader->Update();
-
-  /*
-  m_Camera.Position = DirectX::XMVector3Rotate(
-      m_Camera.Position,
-      DirectX::XMQuaternionRotationRollPitchYaw( 0.0f, DirectX::XMConvertToRadians( 10 ) * delta_seconds, 0.0f ) );
-
-  m_Camera.SetView( DirectX::XMMatrixLookAtLH(
-      m_Camera.Position,
-      DirectX::XMVectorSet( 0.0f, 0.0f, 0.0f, 1.0f ),
-      DirectX::XMVectorSet( 0.0f, 1.0f, 0.0f, 0.0f ) ) );
-      */
 
   m_World.Update( delta_seconds );
 }
@@ -817,7 +538,7 @@ void Ember::BasicApp::Render()
   };
 
   command_list->SetGraphicsRoot32BitConstants( 2, sizeof( PerFrameConstants ) / 4, &constants, 0 );
-  command_list->SetGraphicsRoot32BitConstants( 3, sizeof( Environment::GpuRepr ) / 4, &m_Environment.Repr, 0 );
+  command_list->SetGraphicsRoot32BitConstants( 3, sizeof( Environment::GpuRepr ) / 4, &m_Environment.Repr(), 0 );
 
   size_t const count = m_RenderQueue.Count();
   for ( size_t i = 0; i < count; ++i )

@@ -1,5 +1,5 @@
-#include "Utility.hlsli"
 #include "Colors.hlsli"
+#include "Utility.hlsli"
 
 SamplerState g_BilinearSampler : register( s0, space0 );
 

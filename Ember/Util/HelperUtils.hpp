@@ -25,6 +25,21 @@
   }                                                                                                                    \
   while ( false )
 
+#define ERR_FAIL_RET_F( EXPR )                                                                                         \
+  do                                                                                                                   \
+  {                                                                                                                    \
+    HRESULT hres = ( EXPR );                                                                                           \
+    if ( auto x = FAILED( hres ) )                                                                                     \
+    {                                                                                                                  \
+      _com_error err( hres );                                                                                          \
+      LPCTSTR    err_msg = err.ErrorMessage();                                                                         \
+      MessageBox( nullptr, L"Warn: " #EXPR, err_msg, MB_OK | MB_ICONWARNING );                                         \
+      DEBUG_BREAK;                                                                                                     \
+      return false;                                                                                                    \
+    }                                                                                                                  \
+  }                                                                                                                    \
+  while ( false )
+
 #define ERR_FAIL_RET( EXPR )                                                                                           \
   do                                                                                                                   \
   {                                                                                                                    \

@@ -60,8 +60,8 @@ class ModelLoader
 
   void           ProcessNode( LoadingContext* context, Node* parent, cgltf_node const& node );
   void           ProcessMesh( LoadingContext* context, Node* parent, cgltf_mesh const& mesh ) const;
-  bool           TryLoadTexture( Texture* texture, cgltf_image const& image, ColorSpaceOverride color_space_override ) const;
-  Material*      TryProcessMaterial( Model* model, cgltf_material const& material ) const;
+  bool      TryLoadTexture( Texture* texture, cgltf_image const& image, ColorSpaceOverride color_space_override ) const;
+  Material* TryProcessMaterial( Model* model, cgltf_material const& material ) const;
 
 public:
   Model* TryLoadModel( char const* filename );
