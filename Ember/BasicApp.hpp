@@ -1,7 +1,5 @@
 #pragma once
 
-#include "Buffer.hpp"
-#include "Camera.hpp"
 #include "DepthBuffer.hpp"
 #include "Environment.hpp"
 #include "IApp.hpp"
@@ -15,21 +13,11 @@ namespace Ember
 class ModelLoader;
 class PerfCounter;
 class RenderDevice;
+class Camera;
+class LightManager;
 
 class BasicApp final : public IApp
 {
-  size_t constexpr static kMaxPointLights = 32;
-
-  struct PointLight
-  {
-    DirectX::XMFLOAT3 Position{ 0.0f, 0.0f, 0.0f }; // 12
-    float             Range{ -1.0f };               // 16
-    Color32           Color;                        // 20
-    float             Intensity{ 1.0f };            // 24
-    float             Attenuation{ 1.0f };          // 28
-    float             Padding0{};                   // 32
-  };
-
   HWND                           m_WindowHandle{ nullptr };
   uint32_t                       m_WindowWidth{ 1280 };
   uint32_t                       m_WindowHeight{ 720 };
@@ -43,27 +31,23 @@ class BasicApp final : public IApp
   // Specifics
 
   // PBR Pipeline
-  ComPtr<ID3D12RootSignature> m_RootSignature;
-  ComPtr<ID3D12PipelineState> m_MainPipeline;
-  ComPtr<ID3D12PipelineState> m_BackgroundPipeline;
+  ComPtr<ID3D12RootSignature>   m_RootSignature;
+  ComPtr<ID3D12PipelineState>   m_MainPipeline;
+  ComPtr<ID3D12PipelineState>   m_BackgroundPipeline;
 
-  DepthBuffer                 m_DepthBuffer;
+  DepthBuffer                   m_DepthBuffer;
 
-  Camera                      m_Camera;
-  Buffer                      m_CameraBuffer[RenderDevice::kNumFrames];
-  uint32_t                    m_PrevMouseX{ 0 };
-  uint32_t                    m_PrevMouseY{ 0 };
+  std::unique_ptr<Camera>       m_Camera;
+  uint32_t                      m_PrevMouseX{ 0 };
+  uint32_t                      m_PrevMouseY{ 0 };
 
-  PointLight                  m_PointLights[kMaxPointLights];
-  Buffer                      m_PointLightBuffer[RenderDevice::kNumFrames];
-  uint32_t                    m_PointLightCount{ 0 };
-  uint32_t                    m_PointLightDirty{ 3 };
+  std::unique_ptr<LightManager> m_LightManager;
 
-  World                       m_World;
-  Environment                 m_Environment;
-  RenderCommandQueue          m_RenderQueue;
+  std::unique_ptr<World>        m_World;
+  std::unique_ptr<Environment>  m_Environment;
+  RenderCommandQueue            m_RenderQueue;
 
-  void                        SetupRenderPipeline();
+  void                          SetupRenderPipeline();
 
 public:
   BasicApp(

@@ -216,6 +216,7 @@
     <ClCompile Include="DepthBuffer.cpp" />
     <ClCompile Include="Environment.cpp" />
     <ClCompile Include="IApp.cpp" />
+    <ClCompile Include="LightManager.cpp" />
     <ClCompile Include="ModelLoader.cpp" />
     <ClCompile Include="ObjectPool.cpp" />
     <ClCompile Include="RenderDevice.cpp" />
@@ -239,6 +240,7 @@
     <ClInclude Include="DepthBuffer.hpp" />
     <ClInclude Include="Environment.hpp" />
     <ClInclude Include="IApp.hpp" />
+    <ClInclude Include="LightManager.hpp" />
     <ClInclude Include="ModelLoader.hpp" />
     <ClInclude Include="ObjectPool.hpp" />
     <ClInclude Include="RenderDevice.hpp" />

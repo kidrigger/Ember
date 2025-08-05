@@ -2,6 +2,8 @@
 
 #include <algorithm>
 
+#include "RenderDevice.hpp"
+
 void Ember::Camera::UpdateRepr()
 {
   if ( m_DirtyFlags & kViewDirtyBit )
@@ -22,10 +24,17 @@ void Ember::Camera::UpdateRepr()
   m_DirtyFlags = 0;
 }
 
-Ember::Camera::GpuRepr const& Ember::Camera::Repr()
+Ember::Camera::Camera( std::vector<Buffer> camera_buffer ) : m_CameraBuffer{ std::move( camera_buffer ) }
+{}
+
+void Ember::Camera::Create( Camera* camera, RenderDevice* render_device, uint32_t num_frames )
 {
-  if ( m_DirtyFlags ) UpdateRepr();
-  return m_Repr;
+  std::vector<Buffer> buffers;
+  for ( uint32_t i = 0; i < num_frames; i++ )
+  {
+    buffers.push_back( render_device->CreateConstantBuffer( sizeof( GpuRepr ) ) );
+  }
+  new ( camera ) Camera{ std::move( buffers ) };
 }
 
 DirectX::FXMVECTOR& Ember::Camera::GetPosition() const
@@ -74,4 +83,13 @@ void Ember::Camera::SetHorizontalFoV( float const fov )
 {
   m_HorizontalFoV  = fov;
   m_DirtyFlags    |= kProjDirtyBit;
+}
+
+Ember::CBVHandle Ember::Camera::PrepareFrame( uint32_t const frame_index )
+{
+  UpdateRepr();
+
+  m_CameraBuffer[frame_index].Write( 0, sizeof( m_Repr ), &m_Repr );
+
+  return m_CameraBuffer[frame_index].GetCBVHandle();
 }

@@ -24,7 +24,7 @@ Ember::Environment::GpuRepr const& Ember::Environment::Repr() const
 }
 
 bool Ember::Environment::TryLoadFrom(
-    RenderDevice* render_device, TextureLoader* texture_loader, Environment* env, char const* const env_map_file )
+    Environment* env, RenderDevice* render_device, TextureLoader* texture_loader, char const* const env_map_file )
 {
   // Setup Environment
   uint32_t constexpr kEnvCubeSide       = 512;

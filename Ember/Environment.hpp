@@ -33,7 +33,7 @@ public:
 
   //
   static bool TryLoadFrom(
-      RenderDevice* render_device, TextureLoader* texture_loader, Environment* env, char const* env_map_file );
+      Environment* env, RenderDevice* render_device, TextureLoader* texture_loader, char const* env_map_file );
 };
 
 } // namespace Ember

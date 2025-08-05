@@ -3,7 +3,9 @@
 #include <cstdint>
 #include <utility>
 
+#include "Camera.hpp"
 #include "Environment.hpp"
+#include "LightManager.hpp"
 #include "ModelLoader.hpp"
 #include "RenderDevice.hpp"
 #include "TextureLoader.hpp"
@@ -232,9 +234,8 @@ public:
 
 struct PerFrameConstants
 {
-  Ember::CBVHandle Camera;
-  Ember::SRVHandle PointLights;
-  uint32_t         PointLightCount;
+  Ember::CBVHandle               Camera;
+  Ember::LightManager::FrameInfo Lights;
 };
 
 Ember::BasicApp::BasicApp(
@@ -243,11 +244,15 @@ Ember::BasicApp::BasicApp(
   , m_WindowHandle{ window_handle }
   , m_RenderDevice{ std::move( render_device ) }
   , m_PerfCounter{ std::move( perf_counter ) }
+  , m_Camera{ std::make_unique<Camera>() }
+  , m_LightManager{ std::make_unique<LightManager>() }
+  , m_World{ std::make_unique<World>() }
+  , m_Environment{ std::make_unique<Environment>() }
 {
   m_TextureLoader = std::make_unique_for_overwrite<TextureLoader>();
   TextureLoader::Create( m_TextureLoader.get(), m_RenderDevice.get(), 3 );
 
-  m_ModelLoader = std::make_unique<ModelLoader>( m_RenderDevice.get(), &m_World, m_TextureLoader.get() );
+  m_ModelLoader = std::make_unique<ModelLoader>( m_RenderDevice.get(), m_World.get(), m_TextureLoader.get() );
 }
 
 void Ember::BasicApp::Create( BasicApp* app, HINSTANCE const instance_handle )
@@ -432,61 +437,30 @@ void Ember::BasicApp::LoadContent()
   ERR_ABORT( ::ShowWindow( m_WindowHandle, SW_SHOW ) );
 
   // Setup Camera
-  auto camera_position = DirectX::XMVectorSet( 0.0f, 2.0f, 0.0f, 1.0f );
+  Camera::Create( m_Camera.get(), m_RenderDevice.get(), RenderDevice::kNumFrames );
 
-  m_Camera.SetHorizontalFoV( DirectX::XMConvertToRadians( 70.0f ) );
-  m_Camera.SetAspectRatio( ( float )m_WindowWidth / ( float )m_WindowHeight );
-  m_Camera.SetYawPitch( DirectX::XM_PI, 0.0f );
-  m_Camera.SetPosition( camera_position );
-
-  for ( auto& camera_buffer : m_CameraBuffer )
-  {
-    camera_buffer = m_RenderDevice->CreateConstantBuffer( sizeof( Camera::GpuRepr ) );
-    camera_buffer.Write( 0, sizeof( Camera::GpuRepr ), &m_Camera.Repr() );
-  }
+  m_Camera->SetHorizontalFoV( DirectX::XMConvertToRadians( 70.0f ) );
+  m_Camera->SetAspectRatio( ( float )m_WindowWidth / ( float )m_WindowHeight );
+  m_Camera->SetYawPitch( DirectX::XM_PI, 0.0f );
+  m_Camera->SetPosition( DirectX::XMVectorSet( 0.0f, 2.0f, 0.0f, 1.0f ) );
 
   // Setup Lights
-  m_PointLightCount = 0;
-  m_PointLights[0]  = {
-     .Position    = { 1.0f, 1.0f, -1.0f },
-     .Range       = 15.0f,
-     .Color       = Color32::White(),
-     .Intensity   = 5.0f,
-     .Attenuation = 1.0f,
-     .Padding0    = 1.0f,
-  };
-  m_PointLights[1] = {
-    .Position    = { -1.0f, 1.0f, -1.0f },
-    .Range       = 15.0f,
-    .Color       = Color32::Green(),
-    .Intensity   = 5.0f,
-    .Attenuation = 1.0f,
-    .Padding0    = 1.0f,
-  };
-  m_PointLights[2] = {
-    .Position    = { 0.0f, 1.0f, 0.0f },
-    .Range       = 15.0f,
-    .Color       = Color32::Red(),
-    .Intensity   = 5.0f,
-    .Attenuation = 1.0f,
-    .Padding0    = 1.0f,
-  };
-  m_PointLightDirty = 0;
-
-  for ( auto& point_light_buffer : m_PointLightBuffer )
-  {
-    point_light_buffer = m_RenderDevice->CreateStorageBuffer( ByteSizeOf( m_PointLights ), sizeof( PointLight ) );
-  }
+  LightManager::Create( m_LightManager.get(), m_RenderDevice.get(), RenderDevice::kNumFrames );
+  m_LightManager->AddPointLight( { 1.0f, 1.0f, -1.0f }, 15.0f, Color32::White(), 15.0f );
+  m_LightManager->AddPointLight( { -1.0f, 1.0f, -1.0f }, 15.0f, Color32::Green(), 15.0f );
+  m_LightManager->AddPointLight( { 0.0f, 1.0f, 0.0f }, 15.0f, Color32::Red(), 15.0f );
 
   // Setup Scene Geometry
-  RotModel* rm    = m_World.CreateObject<RotModel>( 0.0f );
+  RotModel* rm    = m_World->CreateObject<RotModel>( 0.0f );
   Model*    model = m_ModelLoader->TryLoadModel( "Sponza.glb" );
   ASSERT( model );
   rm->AddChild( model );
 
   constexpr char const* kEnvMapFile = "OvercastSoil.hdr";
 
-  ASSERT( Environment::TryLoadFrom( m_RenderDevice.get(), m_TextureLoader.get(), &m_Environment, kEnvMapFile ) );
+  /*
+  ASSERT( Environment::TryLoadFrom( m_Environment.get(), m_RenderDevice.get(), m_TextureLoader.get(), kEnvMapFile ) );
+  */
   SetupRenderPipeline();
 
   m_DepthBuffer = m_RenderDevice->CreateDepthBuffer( m_WindowWidth, m_WindowHeight );
@@ -523,27 +497,27 @@ void Ember::BasicApp::Update()
   m_PrevMouseY   = g_Input.MousePosY;
 
   if ( g_Input.IsRightMouseDown )
-    m_Camera.SetYawPitch(
-        m_Camera.GetYaw() - DirectX::XM_PI * mouse_dx, m_Camera.GetPitch() - DirectX::XM_PIDIV2 * mouse_dy );
+    m_Camera->SetYawPitch(
+        m_Camera->GetYaw() - DirectX::XM_PI * mouse_dx, m_Camera->GetPitch() - DirectX::XM_PIDIV2 * mouse_dy );
 
   if ( g_Input.IsPressed( 'R' ) )
   {
-    m_Camera.LocalTranslate( -5 * delta_seconds, 0, 0 );
+    m_Camera->LocalTranslate( -5 * delta_seconds, 0, 0 );
   }
   if ( g_Input.IsPressed( 'F' ) )
   {
-    m_Camera.LocalTranslate( 0, 0, -5 * delta_seconds );
+    m_Camera->LocalTranslate( 0, 0, -5 * delta_seconds );
   }
   if ( g_Input.IsPressed( 'S' ) )
   {
-    m_Camera.LocalTranslate( 0, 0, 5 * delta_seconds );
+    m_Camera->LocalTranslate( 0, 0, 5 * delta_seconds );
   }
   if ( g_Input.IsPressed( 'T' ) )
   {
-    m_Camera.LocalTranslate( 5 * delta_seconds, 0, 0 );
+    m_Camera->LocalTranslate( 5 * delta_seconds, 0, 0 );
   }
 
-  m_World.Update( delta_seconds );
+  m_World->Update( delta_seconds );
 
   g_Input.Update();
 }
@@ -551,22 +525,17 @@ void Ember::BasicApp::Update()
 void Ember::BasicApp::Render()
 {
   m_RenderQueue.Clear();
-  m_World.Render( &m_RenderQueue );
+  m_World->Render( &m_RenderQueue );
 
-  ID3D12Resource*      backbuffer         = m_RenderDevice->GetCurrentBackbuffer();
-  Context::CommandList command_list       = m_RenderDevice->GetGraphicsCommandList();
-  uint32_t             frame_idx          = m_RenderDevice->GetCurrentFrameIndex();
-  Buffer*              camera_buffer      = &m_CameraBuffer[frame_idx];
-  Buffer*              point_light_buffer = &m_PointLightBuffer[frame_idx];
+  ID3D12Resource*      backbuffer   = m_RenderDevice->GetCurrentBackbuffer();
+  Context::CommandList command_list = m_RenderDevice->GetGraphicsCommandList();
+  uint32_t             frame_idx    = m_RenderDevice->GetCurrentFrameIndex();
 
   // All resources for this frame are guaranteed to be available for CPU modification at this time.
-  camera_buffer->Write( 0, sizeof( Camera::GpuRepr ), &m_Camera.Repr() );
+  CBVHandle const               camera_cbv = m_Camera->PrepareFrame( frame_idx );
+  LightManager::FrameInfo const light_info = m_LightManager->PrepareFrame( frame_idx );
 
-  if ( ( m_PointLightDirty-- ) > 0 )
-  {
-    point_light_buffer->Write( 0, ByteSizeOf( m_PointLights ), DataOf( m_PointLights ) );
-  }
-
+  // Viewport and scissor
   D3D12_VIEWPORT const viewport = {
     .TopLeftX = 0,
     .TopLeftY = 0,
@@ -606,14 +575,13 @@ void Ember::BasicApp::Render()
   command_list->RSSetScissorRects( 1, &scissor );
   command_list->OMSetRenderTargets( 1, &rtv, FALSE, &dsv );
 
-  PerFrameConstants constants = {
-    .Camera          = camera_buffer->GetCBVHandle(),
-    .PointLights     = point_light_buffer->GetSRVHandle(),
-    .PointLightCount = m_PointLightCount,
+  PerFrameConstants const constants = {
+    .Camera = camera_cbv,
+    .Lights = light_info,
   };
 
   command_list->SetGraphicsRoot32BitConstants( 2, sizeof( PerFrameConstants ) / 4, &constants, 0 );
-  command_list->SetGraphicsRoot32BitConstants( 3, sizeof( Environment::GpuRepr ) / 4, &m_Environment.Repr(), 0 );
+  command_list->SetGraphicsRoot32BitConstants( 3, sizeof( Environment::GpuRepr ) / 4, &m_Environment->Repr(), 0 );
 
   size_t const count = m_RenderQueue.Count();
   for ( size_t i = 0; i < count; ++i )
@@ -660,5 +628,5 @@ void Ember::BasicApp::Resize()
   m_DepthBuffer = m_RenderDevice->CreateDepthBuffer( m_WindowWidth, m_WindowHeight );
   m_RenderDevice->SetDepthBuffer( m_DepthBuffer );
 
-  m_Camera.SetAspectRatio( ( float )m_WindowWidth / ( float )m_WindowHeight );
+  m_Camera->SetAspectRatio( ( float )m_WindowWidth / ( float )m_WindowHeight );
 }
