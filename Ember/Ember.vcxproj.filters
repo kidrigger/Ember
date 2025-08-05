@@ -52,6 +52,9 @@
     <Filter Include="Resource Files\Assets\Environment">
       <UniqueIdentifier>{80e73104-2be7-41de-aa80-443053321e2d}</UniqueIdentifier>
     </Filter>
+    <Filter Include="Resource Files\Assets\Scenes">
+      <UniqueIdentifier>{3f1b6069-d8a4-48b7-a470-d65aa5217a43}</UniqueIdentifier>
+    </Filter>
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="Main.cpp">
@@ -109,6 +112,9 @@
       <Filter>Source Files\Graphics</Filter>
     </ClCompile>
     <ClCompile Include="Environment.cpp">
+      <Filter>Source Files\Scene</Filter>
+    </ClCompile>
+    <ClCompile Include="Camera.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
   </ItemGroup>
@@ -180,6 +186,9 @@
       <Filter>Header Files\Graphics</Filter>
     </ClInclude>
     <ClInclude Include="Environment.hpp">
+      <Filter>Header Files\Scene</Filter>
+    </ClInclude>
+    <ClInclude Include="Camera.hpp">
       <Filter>Header Files</Filter>
     </ClInclude>
   </ItemGroup>
@@ -251,27 +260,6 @@
     <CopyFileToFolders Include="Assets\container2.png">
       <Filter>Resource Files\Assets</Filter>
     </CopyFileToFolders>
-    <CopyFileToFolders Include="Assets\Box.glb">
-      <Filter>Resource Files\Assets</Filter>
-    </CopyFileToFolders>
-    <CopyFileToFolders Include="Assets\BoxTextured.glb">
-      <Filter>Resource Files\Assets</Filter>
-    </CopyFileToFolders>
-    <CopyFileToFolders Include="Assets\OrientationTest.glb">
-      <Filter>Resource Files\Assets</Filter>
-    </CopyFileToFolders>
-    <CopyFileToFolders Include="Assets\DamagedHelmet.glb">
-      <Filter>Resource Files\Assets</Filter>
-    </CopyFileToFolders>
-    <CopyFileToFolders Include="Assets\CompareRoughness.glb">
-      <Filter>Resource Files\Assets</Filter>
-    </CopyFileToFolders>
-    <CopyFileToFolders Include="Assets\BoomBoxWithAxes.glb">
-      <Filter>Resource Files\Assets</Filter>
-    </CopyFileToFolders>
-    <CopyFileToFolders Include="Assets\MetalRoughSpheres.glb">
-      <Filter>Resource Files\Assets</Filter>
-    </CopyFileToFolders>
     <CopyFileToFolders Include="Assets\PhotoStudioLoft.hdr">
       <Filter>Resource Files\Assets\Environment</Filter>
     </CopyFileToFolders>
@@ -286,6 +274,30 @@
     </CopyFileToFolders>
     <CopyFileToFolders Include="Assets\ShanghaiBund.hdr">
       <Filter>Resource Files\Assets\Environment</Filter>
+    </CopyFileToFolders>
+    <CopyFileToFolders Include="Assets\BoomBoxWithAxes.glb">
+      <Filter>Resource Files\Assets\Scenes</Filter>
+    </CopyFileToFolders>
+    <CopyFileToFolders Include="Assets\Box.glb">
+      <Filter>Resource Files\Assets\Scenes</Filter>
+    </CopyFileToFolders>
+    <CopyFileToFolders Include="Assets\BoxTextured.glb">
+      <Filter>Resource Files\Assets\Scenes</Filter>
+    </CopyFileToFolders>
+    <CopyFileToFolders Include="Assets\CompareRoughness.glb">
+      <Filter>Resource Files\Assets\Scenes</Filter>
+    </CopyFileToFolders>
+    <CopyFileToFolders Include="Assets\DamagedHelmet.glb">
+      <Filter>Resource Files\Assets\Scenes</Filter>
+    </CopyFileToFolders>
+    <CopyFileToFolders Include="Assets\MetalRoughSpheres.glb">
+      <Filter>Resource Files\Assets\Scenes</Filter>
+    </CopyFileToFolders>
+    <CopyFileToFolders Include="Assets\OrientationTest.glb">
+      <Filter>Resource Files\Assets\Scenes</Filter>
+    </CopyFileToFolders>
+    <CopyFileToFolders Include="Assets\Sponza.glb">
+      <Filter>Resource Files\Assets\Scenes</Filter>
     </CopyFileToFolders>
   </ItemGroup>
   <ItemGroup>

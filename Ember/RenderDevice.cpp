@@ -271,7 +271,7 @@ void Ember::RenderDevice::Create( RenderDevice* render_device, HWND window_handl
   }
 
   auto bindless_manager = std::make_unique_for_overwrite<BindlessManager>();
-  BindlessManager::Create( bindless_manager.get(), device, 10'000, 100 );
+  BindlessManager::Create( bindless_manager.get(), device, 10'000, 1000 );
 
   new ( render_device ) RenderDevice{
     std::move( device ),

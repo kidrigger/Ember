@@ -1,6 +1,7 @@
 #pragma once
 
 #include "Buffer.hpp"
+#include "Camera.hpp"
 #include "DepthBuffer.hpp"
 #include "Environment.hpp"
 #include "IApp.hpp"
@@ -18,18 +19,6 @@ class RenderDevice;
 class BasicApp final : public IApp
 {
   size_t constexpr static kMaxPointLights = 32;
-
-  struct Camera
-  {
-    DirectX::XMMATRIX Projection{ DirectX::XMMatrixIdentity() };
-    DirectX::XMMATRIX InvProj{ DirectX::XMMatrixIdentity() };
-    DirectX::XMMATRIX View{ DirectX::XMMatrixIdentity() };
-    DirectX::XMMATRIX InvView{ DirectX::XMMatrixIdentity() };
-    DirectX::XMVECTOR Position{ DirectX::XMVectorZero() };
-
-    void              SetProjection( DirectX::FXMMATRIX const& proj );
-    void              SetView( DirectX::FXMMATRIX const& view );
-  };
 
   struct PointLight
   {
@@ -62,6 +51,8 @@ class BasicApp final : public IApp
 
   Camera                      m_Camera;
   Buffer                      m_CameraBuffer[RenderDevice::kNumFrames];
+  uint32_t                    m_PrevMouseX{ 0 };
+  uint32_t                    m_PrevMouseY{ 0 };
 
   PointLight                  m_PointLights[kMaxPointLights];
   Buffer                      m_PointLightBuffer[RenderDevice::kNumFrames];

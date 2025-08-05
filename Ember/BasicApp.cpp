@@ -39,6 +39,46 @@ void ParseArguments( bool* use_warp, uint32_t* client_width, uint32_t* client_he
   }
 }
 
+namespace
+{
+struct Input
+{
+  uint32_t MousePosX;
+  uint32_t MousePosY;
+  bool     IsRightMouseDown;
+
+  uint32_t constexpr static kPressedBit     = 0x1;
+  uint32_t constexpr static kPrevPressedBit = 0x2;
+  std::unordered_map<char, uint8_t> KeyPress;
+
+  bool                              IsPressed( char c )
+  {
+    return KeyPress[c] & kPressedBit;
+  }
+
+  bool IsJustPressed( char c )
+  {
+    uint8_t val = KeyPress[c];
+    return val & kPressedBit and not( val & kPrevPressedBit );
+  }
+
+  bool IsJustReleased( char c )
+  {
+    uint8_t val = KeyPress[c];
+    return val & kPrevPressedBit and not( val & kPressedBit );
+  }
+
+  void Update()
+  {
+    for ( auto& v : KeyPress | std::views::values )
+    {
+      v = ( v << 1 ) | v;
+    }
+  }
+} g_Input;
+
+} // namespace
+
 // Window callback function.
 LRESULT CALLBACK WndProc( HWND const window_handle, UINT const message, WPARAM const w_param, LPARAM const l_param )
 {
@@ -54,24 +94,42 @@ LRESULT CALLBACK WndProc( HWND const window_handle, UINT const message, WPARAM c
     {
       // bool alt = (::GetAsyncKeyState(VK_MENU) & 0x8000) != 0;
 
-      switch ( w_param )
+      if ( w_param == VK_ESCAPE )
       {
-          /*case 'V':
-            g_VSync = !g_VSync;
-            break;*/
-        case VK_ESCAPE:
-          ::PostQuitMessage( 0 );
-          break;
-          /*case VK_RETURN:
-            if (alt)
-            {
-          case VK_F11:
-            SetFullscreen(!g_Fullscreen);
-            }
-            break;*/
+        ::PostQuitMessage( 0 );
+      }
+      else if ( w_param >= 'A' and w_param <= 'Z' )
+      {
+        g_Input.KeyPress[( char )w_param] |= Input::kPressedBit;
       }
     }
     break;
+    case WM_KEYUP:
+    {
+      // bool alt = (::GetAsyncKeyState(VK_MENU) & 0x8000) != 0;
+      if ( w_param >= 'A' and w_param <= 'Z' )
+      {
+        g_Input.KeyPress[( char )w_param] &= ~Input::kPressedBit;
+      }
+    }
+    break;
+    case WM_MOUSEMOVE:
+    {
+      g_Input.MousePosX = LOWORD( l_param );
+      g_Input.MousePosY = HIWORD( l_param );
+
+      // Handle mouse movement, potentially updating a drawing
+    }
+    break;
+    case WM_RBUTTONDOWN:
+    {
+      g_Input.IsRightMouseDown = true;
+    }
+    break;
+    case WM_RBUTTONUP:
+    {
+      g_Input.IsRightMouseDown = false;
+    }
     // The default window procedure will play a system notification sound
     // when pressing the Alt+Enter keyboard combination if this message is
     // not handled.
@@ -230,18 +288,6 @@ Ember::BasicApp::~BasicApp() // NOLINT(modernize-use-equals-default)
   m_RenderDevice->WaitIdle();
 }
 
-void Ember::BasicApp::Camera::SetProjection( DirectX::FXMMATRIX& proj )
-{
-  Projection = proj;
-  InvProj    = XMMatrixInverse( nullptr, proj );
-}
-
-void Ember::BasicApp::Camera::SetView( DirectX::FXMMATRIX& view )
-{
-  View    = view;
-  InvView = XMMatrixInverse( nullptr, view );
-}
-
 void Ember::BasicApp::SetupRenderPipeline()
 {
   ComPtr<ID3DBlob> vertex_shader_blob;
@@ -386,20 +432,17 @@ void Ember::BasicApp::LoadContent()
   ERR_ABORT( ::ShowWindow( m_WindowHandle, SW_SHOW ) );
 
   // Setup Camera
-  auto camera_position = DirectX::XMVectorSet( 0.0f, 0.5f, 3.0f, 1.0f );
+  auto camera_position = DirectX::XMVectorSet( 0.0f, 2.0f, 0.0f, 1.0f );
 
-  m_Camera.SetProjection( DirectX::XMMatrixPerspectiveFovRH(
-      DirectX::XMConvertToRadians( 50.0f ), ( float )m_WindowWidth / ( float )m_WindowHeight, 0.1f, 100.0f ) );
-  m_Camera.SetView( DirectX::XMMatrixLookAtRH(
-      camera_position,
-      DirectX::XMVectorSet( 0.0f, 0.0f, 0.0f, 1.0f ),
-      DirectX::XMVectorSet( 0.0f, 1.0f, 0.0f, 0.0f ) ) );
-  m_Camera.Position = camera_position;
+  m_Camera.SetHorizontalFoV( DirectX::XMConvertToRadians( 70.0f ) );
+  m_Camera.SetAspectRatio( ( float )m_WindowWidth / ( float )m_WindowHeight );
+  m_Camera.SetYawPitch( DirectX::XM_PI, 0.0f );
+  m_Camera.SetPosition( camera_position );
 
   for ( auto& camera_buffer : m_CameraBuffer )
   {
-    camera_buffer = m_RenderDevice->CreateConstantBuffer( sizeof( m_Camera ) );
-    camera_buffer.Write( 0, sizeof( m_Camera ), &m_Camera );
+    camera_buffer = m_RenderDevice->CreateConstantBuffer( sizeof( Camera::GpuRepr ) );
+    camera_buffer.Write( 0, sizeof( Camera::GpuRepr ), &m_Camera.Repr() );
   }
 
   // Setup Lights
@@ -436,8 +479,8 @@ void Ember::BasicApp::LoadContent()
   }
 
   // Setup Scene Geometry
-  RotModel* rm    = m_World.CreateObject<RotModel>( 20.0f );
-  Model*    model = m_ModelLoader->TryLoadModel( "DamagedHelmet.glb" );
+  RotModel* rm    = m_World.CreateObject<RotModel>( 0.0f );
+  Model*    model = m_ModelLoader->TryLoadModel( "Sponza.glb" );
   ASSERT( model );
   rm->AddChild( model );
 
@@ -448,6 +491,9 @@ void Ember::BasicApp::LoadContent()
 
   m_DepthBuffer = m_RenderDevice->CreateDepthBuffer( m_WindowWidth, m_WindowHeight );
   m_RenderDevice->SetDepthBuffer( m_DepthBuffer );
+
+  m_PrevMouseX = g_Input.MousePosX;
+  m_PrevMouseY = g_Input.MousePosY;
 }
 
 void Ember::BasicApp::Update()
@@ -471,7 +517,35 @@ void Ember::BasicApp::Update()
   m_ModelLoader->Update();
   m_TextureLoader->Update();
 
+  float mouse_dx = ( ( float )g_Input.MousePosX - ( float )m_PrevMouseX ) / ( float )m_WindowWidth;
+  float mouse_dy = ( ( float )g_Input.MousePosY - ( float )m_PrevMouseY ) / ( float )m_WindowHeight;
+  m_PrevMouseX   = g_Input.MousePosX;
+  m_PrevMouseY   = g_Input.MousePosY;
+
+  if ( g_Input.IsRightMouseDown )
+    m_Camera.SetYawPitch(
+        m_Camera.GetYaw() - DirectX::XM_PI * mouse_dx, m_Camera.GetPitch() - DirectX::XM_PIDIV2 * mouse_dy );
+
+  if ( g_Input.IsPressed( 'R' ) )
+  {
+    m_Camera.LocalTranslate( -5 * delta_seconds, 0, 0 );
+  }
+  if ( g_Input.IsPressed( 'F' ) )
+  {
+    m_Camera.LocalTranslate( 0, 0, -5 * delta_seconds );
+  }
+  if ( g_Input.IsPressed( 'S' ) )
+  {
+    m_Camera.LocalTranslate( 0, 0, 5 * delta_seconds );
+  }
+  if ( g_Input.IsPressed( 'T' ) )
+  {
+    m_Camera.LocalTranslate( 5 * delta_seconds, 0, 0 );
+  }
+
   m_World.Update( delta_seconds );
+
+  g_Input.Update();
 }
 
 void Ember::BasicApp::Render()
@@ -486,7 +560,7 @@ void Ember::BasicApp::Render()
   Buffer*              point_light_buffer = &m_PointLightBuffer[frame_idx];
 
   // All resources for this frame are guaranteed to be available for CPU modification at this time.
-  camera_buffer->Write( 0, sizeof( Camera ), &m_Camera );
+  camera_buffer->Write( 0, sizeof( Camera::GpuRepr ), &m_Camera.Repr() );
 
   if ( ( m_PointLightDirty-- ) > 0 )
   {
@@ -586,6 +660,5 @@ void Ember::BasicApp::Resize()
   m_DepthBuffer = m_RenderDevice->CreateDepthBuffer( m_WindowWidth, m_WindowHeight );
   m_RenderDevice->SetDepthBuffer( m_DepthBuffer );
 
-  m_Camera.SetProjection( DirectX::XMMatrixPerspectiveFovRH(
-      DirectX::XMConvertToRadians( 50.0f ), ( float )m_WindowWidth / ( float )m_WindowHeight, 0.1f, 100.0f ) );
+  m_Camera.SetAspectRatio( ( float )m_WindowWidth / ( float )m_WindowHeight );
 }
