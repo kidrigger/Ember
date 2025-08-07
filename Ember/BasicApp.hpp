@@ -1,9 +1,9 @@
 #pragma once
 
-#include "DepthBuffer.hpp"
 #include "Environment.hpp"
 #include "IApp.hpp"
 #include "RenderDevice.hpp"
+#include "RenderTargetManager.hpp"
 #include "Scene.hpp"
 #include "Util/DirectXHeaders.hpp"
 #include "Util/Runtime.hpp"
@@ -31,27 +31,33 @@ class BasicApp final : public IApp
   // Specifics
 
   // PBR Pipeline
-  ComPtr<ID3D12RootSignature>   m_RootSignature;
-  ComPtr<ID3D12PipelineState>   m_MainPipeline;
-  ComPtr<ID3D12PipelineState>   m_BackgroundPipeline;
+  ComPtr<ID3D12RootSignature>          m_RootSignature;
+  ComPtr<ID3D12PipelineState>          m_MainPipeline;
+  ComPtr<ID3D12PipelineState>          m_BackgroundPipeline;
 
-  DepthBuffer                   m_DepthBuffer;
+  std::unique_ptr<RenderTargetManager> m_RenderTargetManager{};
+  Texture                              m_RenderTexture;
+  Texture                              m_DepthTexture;
+  DXGI_FORMAT                          m_SwapchainFormat;
 
-  std::unique_ptr<Camera>       m_Camera;
-  uint32_t                      m_PrevMouseX{ 0 };
-  uint32_t                      m_PrevMouseY{ 0 };
+  std::unique_ptr<Camera>              m_Camera;
+  uint32_t                             m_PrevMouseX{ 0 };
+  uint32_t                             m_PrevMouseY{ 0 };
 
-  std::unique_ptr<LightManager> m_LightManager;
+  std::unique_ptr<LightManager>        m_LightManager;
 
-  std::unique_ptr<World>        m_World;
-  std::unique_ptr<Environment>  m_Environment;
-  RenderCommandQueue            m_RenderQueue;
+  std::unique_ptr<World>               m_World;
+  std::unique_ptr<Environment>         m_Environment;
+  RenderCommandQueue                   m_RenderQueue;
 
-  void                          SetupRenderPipeline();
+  void                                 SetupRenderPipeline();
 
 public:
   BasicApp(
-      HWND window_handle, std::unique_ptr<RenderDevice> render_device, std::unique_ptr<PerfCounter> perf_counter );
+      HWND                                 window_handle,
+      std::unique_ptr<RenderDevice>        render_device,
+      std::unique_ptr<PerfCounter>         perf_counter,
+      std::unique_ptr<RenderTargetManager> render_target_manager );
 
   void        LoadContent() override;
   void        Update() override;

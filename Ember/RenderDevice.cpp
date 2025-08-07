@@ -4,7 +4,6 @@
 
 #include "BindlessManager.hpp"
 #include "Buffer.hpp"
-#include "DepthBuffer.hpp"
 #include "Util/DataUtil.hpp"
 #include "Util/DirectXHeaders.hpp"
 #include "Util/HelperUtils.hpp"
@@ -65,6 +64,13 @@ ComPtr<ID3D12Device2> Ember::RenderDevice::GetDevice() noexcept
 ComPtr<D3D12MA::Allocator> Ember::RenderDevice::GetAllocator() noexcept
 {
   return m_Allocator;
+}
+
+DXGI_FORMAT Ember::RenderDevice::FetchSwapchainFormat() const
+{
+  DXGI_SWAP_CHAIN_DESC desc;
+  ERR_ABORT( m_Swapchain->GetDesc( &desc ) );
+  return desc.BufferDesc.Format;
 }
 
 void Ember::RenderDevice::Create( RenderDevice* render_device, HWND window_handle, bool const use_warp )
@@ -348,46 +354,6 @@ Ember::Texture Ember::RenderDevice::CreateTextureCube( TextureCubeCreateInfo con
 Ember::Sampler Ember::RenderDevice::CreateSampler( D3D12_SAMPLER_DESC const& sampler_desc )
 {
   return m_TextureManager.CreateSampler( sampler_desc );
-}
-
-Ember::DepthBuffer Ember::RenderDevice::CreateDepthBuffer( uint32_t const width, uint32_t const height ) const
-{
-  D3D12MA::ALLOCATION_DESC const allocation_desc = {
-    .Flags    = D3D12MA::ALLOCATION_FLAG_COMMITTED,
-    .HeapType = D3D12_HEAP_TYPE_DEFAULT,
-  };
-
-  D3D12_CLEAR_VALUE constexpr clear_value = {
-    .Format       = DXGI_FORMAT_D32_FLOAT,
-    .DepthStencil = { 1.0f, 0 },
-  };
-
-  CD3DX12_RESOURCE_DESC const resource_desc = CD3DX12_RESOURCE_DESC::Tex2D(
-      DXGI_FORMAT_D32_FLOAT, width, height, 1, 0, 1, 0, D3D12_RESOURCE_FLAG_ALLOW_DEPTH_STENCIL );
-
-  ComPtr<ID3D12Resource>      depth_stencil_res;
-  ComPtr<D3D12MA::Allocation> allocation;
-  ERR_ABORT( m_Allocator->CreateResource(
-      &allocation_desc,
-      &resource_desc,
-      D3D12_RESOURCE_STATE_DEPTH_WRITE,
-      &clear_value,
-      &allocation,
-      IID_PPV_ARGS( &depth_stencil_res ) ) );
-
-  return { std::move( depth_stencil_res ), std::move( allocation ) };
-}
-
-void Ember::RenderDevice::SetDepthBuffer( DepthBuffer const& depth_buffer ) const
-{
-  D3D12_DEPTH_STENCIL_VIEW_DESC const desc = {
-    .Format        = DXGI_FORMAT_D32_FLOAT,
-    .ViewDimension = D3D12_DSV_DIMENSION_TEXTURE2D,
-  };
-
-  auto const dsv_handle = m_DSVDescriptorHeap->GetCPUDescriptorHandleForHeapStart();
-
-  m_Device->CreateDepthStencilView( depth_buffer.GetBuffer(), &desc, dsv_handle );
 }
 
 Ember::SRVHandle Ember::RenderDevice::CreateBindlessHandle(

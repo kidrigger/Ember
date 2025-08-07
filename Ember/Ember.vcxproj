@@ -213,7 +213,6 @@
     <ClCompile Include="Buffer.cpp" />
     <ClCompile Include="Camera.cpp" />
     <ClCompile Include="CgltfImpl.cpp" />
-    <ClCompile Include="DepthBuffer.cpp" />
     <ClCompile Include="Environment.cpp" />
     <ClCompile Include="IApp.cpp" />
     <ClCompile Include="LightManager.cpp" />
@@ -221,6 +220,7 @@
     <ClCompile Include="ObjectPool.cpp" />
     <ClCompile Include="RenderDevice.cpp" />
     <ClCompile Include="Main.cpp" />
+    <ClCompile Include="RenderTargetManager.cpp" />
     <ClCompile Include="ResourceTracker.cpp" />
     <ClCompile Include="Scene.cpp" />
     <ClCompile Include="Texture.cpp" />
@@ -237,13 +237,13 @@
     <ClInclude Include="Buffer.hpp" />
     <ClInclude Include="Camera.hpp" />
     <ClInclude Include="Color.hpp" />
-    <ClInclude Include="DepthBuffer.hpp" />
     <ClInclude Include="Environment.hpp" />
     <ClInclude Include="IApp.hpp" />
     <ClInclude Include="LightManager.hpp" />
     <ClInclude Include="ModelLoader.hpp" />
     <ClInclude Include="ObjectPool.hpp" />
     <ClInclude Include="RenderDevice.hpp" />
+    <ClInclude Include="RenderTargetManager.hpp" />
     <ClInclude Include="ResourceTracker.hpp" />
     <ClInclude Include="Scene.hpp" />
     <ClInclude Include="Texture.hpp" />

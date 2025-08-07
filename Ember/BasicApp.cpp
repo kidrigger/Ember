@@ -239,11 +239,16 @@ struct PerFrameConstants
 };
 
 Ember::BasicApp::BasicApp(
-    HWND const window_handle, std::unique_ptr<RenderDevice> render_device, std::unique_ptr<PerfCounter> perf_counter )
+    HWND                                 window_handle,
+    std::unique_ptr<RenderDevice>        render_device,
+    std::unique_ptr<PerfCounter>         perf_counter,
+    std::unique_ptr<RenderTargetManager> render_target_manager )
   : IApp{ nullptr }
   , m_WindowHandle{ window_handle }
   , m_RenderDevice{ std::move( render_device ) }
   , m_PerfCounter{ std::move( perf_counter ) }
+  , m_RenderTargetManager{ std::move( render_target_manager ) }
+  , m_SwapchainFormat{ m_RenderDevice->FetchSwapchainFormat() }
   , m_Camera{ std::make_unique<Camera>() }
   , m_LightManager{ std::make_unique<LightManager>() }
   , m_World{ std::make_unique<World>() }
@@ -279,12 +284,16 @@ void Ember::BasicApp::Create( BasicApp* app, HINSTANCE const instance_handle )
   auto render_device = std::make_unique_for_overwrite<RenderDevice>();
   RenderDevice::Create( render_device.get(), window_handle, use_warp );
 
-  auto perf_counter = std::make_unique<PerfCounter>();
+  auto perf_counter          = std::make_unique<PerfCounter>();
+
+  auto render_target_manager = std::make_unique_for_overwrite<RenderTargetManager>();
+  RenderTargetManager::Create( render_target_manager.get(), render_device.get() );
 
   new ( app ) BasicApp{
     window_handle,
     std::move( render_device ),
     std::move( perf_counter ),
+    std::move( render_target_manager ),
   };
 }
 
@@ -463,8 +472,21 @@ void Ember::BasicApp::LoadContent()
   */
   SetupRenderPipeline();
 
-  m_DepthBuffer = m_RenderDevice->CreateDepthBuffer( m_WindowWidth, m_WindowHeight );
-  m_RenderDevice->SetDepthBuffer( m_DepthBuffer );
+  m_RenderTexture = m_RenderDevice->CreateTexture2D( {
+      .Format    = m_SwapchainFormat,
+      .Width     = m_WindowWidth,
+      .Height    = m_WindowHeight,
+      .Usage     = TextureUsage::kRenderTarget,
+      .MipLevels = MipLevels::kBase,
+  } );
+  m_DepthTexture  = m_RenderDevice->CreateTexture2D( {
+       .Format    = DXGI_FORMAT_D32_FLOAT,
+       .Width     = m_WindowWidth,
+       .Height    = m_WindowHeight,
+       .Usage     = TextureUsage::kDepthSample,
+       .MipLevels = MipLevels::kBase,
+  } );
+  // m_RenderDevice->SetDepthBuffer( m_DepthTexture );
 
   m_PrevMouseX = g_Input.MousePosX;
   m_PrevMouseY = g_Input.MousePosY;
@@ -552,18 +574,17 @@ void Ember::BasicApp::Render()
   };
 
   // Clear Backbuffer
-  CD3DX12_RESOURCE_BARRIER barrier = CD3DX12_RESOURCE_BARRIER::Transition(
-      backbuffer, D3D12_RESOURCE_STATE_PRESENT, D3D12_RESOURCE_STATE_RENDER_TARGET );
+  CD3DX12_RESOURCE_BARRIER top_of_renderpass_barriers[] = {
+    CD3DX12_RESOURCE_BARRIER::Transition( backbuffer, D3D12_RESOURCE_STATE_PRESENT, D3D12_RESOURCE_STATE_COPY_DEST ),
+  };
 
-  command_list->ResourceBarrier( 1, &barrier );
+  command_list->ResourceBarrier( CountOf( top_of_renderpass_barriers ), DataOf( top_of_renderpass_barriers ) );
   m_ModelLoader->FlushBarriers( command_list.Get() );
   m_TextureLoader->FlushBarriers( command_list.Get() );
 
-  FLOAT constexpr cornflower_blue[]       = { 0.4f, 0.6f, 0.9f, 1.0f };
-  CD3DX12_CPU_DESCRIPTOR_HANDLE const rtv = m_RenderDevice->GetCurrentRTVCpuDescriptorHandle();
-  CD3DX12_CPU_DESCRIPTOR_HANDLE const dsv = m_RenderDevice->GetCurrentDSVCpuDescriptorHandle();
-  command_list->ClearRenderTargetView( rtv, cornflower_blue, 0, nullptr );
-  command_list->ClearDepthStencilView( dsv, D3D12_CLEAR_FLAG_DEPTH, 1.0f, 0, 0, nullptr );
+  FLOAT constexpr cornflower_blue[] = { 0.4f, 0.6f, 0.9f, 1.0f };
+  m_RenderTargetManager->ClearRenderTargetView( command_list.Get(), m_RenderTexture, cornflower_blue );
+  m_RenderTargetManager->ClearDepthStencilView( command_list.Get(), m_DepthTexture, D3D12_CLEAR_FLAG_DEPTH, 1.0f, 0 );
 
   command_list->SetPipelineState( m_MainPipeline.Get() );
   command_list->SetGraphicsRootSignature( m_RootSignature.Get() );
@@ -573,7 +594,7 @@ void Ember::BasicApp::Render()
   command_list->SetDescriptorHeaps( CountOf( bindless_desc_heaps ), DataOf( bindless_desc_heaps ) );
   command_list->RSSetViewports( 1, &viewport );
   command_list->RSSetScissorRects( 1, &scissor );
-  command_list->OMSetRenderTargets( 1, &rtv, FALSE, &dsv );
+  m_RenderTargetManager->OMSetRenderTargets( command_list.Get(), 1, &m_RenderTexture, &m_DepthTexture );
 
   PerFrameConstants const constants = {
     .Camera = camera_cbv,
@@ -604,9 +625,20 @@ void Ember::BasicApp::Render()
   command_list->SetPipelineState( m_BackgroundPipeline.Get() );
   command_list->DrawInstanced( 3, 1, 0, 0 );
 
-  barrier = CD3DX12_RESOURCE_BARRIER::Transition(
-      backbuffer, D3D12_RESOURCE_STATE_RENDER_TARGET, D3D12_RESOURCE_STATE_PRESENT );
-  command_list->ResourceBarrier( 1, &barrier );
+  CD3DX12_RESOURCE_BARRIER post_render_barriers[] = {
+    CD3DX12_RESOURCE_BARRIER::Transition(
+        m_RenderTexture.GetTexture(), D3D12_RESOURCE_STATE_RENDER_TARGET, D3D12_RESOURCE_STATE_COPY_SOURCE ),
+  };
+  command_list->ResourceBarrier( CountOf( post_render_barriers ), DataOf( post_render_barriers ) );
+
+  command_list->CopyResource( backbuffer, m_RenderTexture.GetTexture() );
+
+  CD3DX12_RESOURCE_BARRIER bottom_of_renderpass_barriers[] = {
+    CD3DX12_RESOURCE_BARRIER::Transition( backbuffer, D3D12_RESOURCE_STATE_COPY_DEST, D3D12_RESOURCE_STATE_PRESENT ),
+    CD3DX12_RESOURCE_BARRIER::Transition(
+        m_RenderTexture.GetTexture(), D3D12_RESOURCE_STATE_COPY_SOURCE, D3D12_RESOURCE_STATE_RENDER_TARGET ),
+  };
+  command_list->ResourceBarrier( CountOf( bottom_of_renderpass_barriers ), DataOf( bottom_of_renderpass_barriers ) );
 
   m_RenderDevice->ExecuteCommandList( std::move( command_list ) );
 
@@ -625,8 +657,20 @@ void Ember::BasicApp::Resize()
   m_WindowHeight = rect.bottom - rect.top;
 
   m_RenderDevice->ResizeSwapchain( m_WindowWidth, m_WindowHeight );
-  m_DepthBuffer = m_RenderDevice->CreateDepthBuffer( m_WindowWidth, m_WindowHeight );
-  m_RenderDevice->SetDepthBuffer( m_DepthBuffer );
+  m_RenderTexture = m_RenderDevice->CreateTexture2D( {
+      .Format    = m_SwapchainFormat,
+      .Width     = m_WindowWidth,
+      .Height    = m_WindowHeight,
+      .Usage     = TextureUsage::kRenderTarget,
+      .MipLevels = MipLevels::kBase,
+  } );
+  m_DepthTexture  = m_RenderDevice->CreateTexture2D( {
+       .Format    = DXGI_FORMAT_D32_FLOAT,
+       .Width     = m_WindowWidth,
+       .Height    = m_WindowHeight,
+       .Usage     = TextureUsage::kDepthSample,
+       .MipLevels = MipLevels::kBase,
+  } );
 
   m_Camera->SetAspectRatio( ( float )m_WindowWidth / ( float )m_WindowHeight );
 }

@@ -5,7 +5,6 @@
 #include "BindlessHandle.hpp"
 #include "BindlessManager.hpp"
 #include "Buffer.hpp"
-#include "DepthBuffer.hpp"
 #include "Texture.hpp"
 #include "TextureLoader.hpp"
 #include "Util/DirectXHeaders.hpp"
@@ -68,25 +67,22 @@ public:
 
   ComPtr<ID3D12Device2>      GetDevice() noexcept;
   ComPtr<D3D12MA::Allocator> GetAllocator() noexcept;
+  DXGI_FORMAT                FetchSwapchainFormat() const;
 
   static void                Create( RenderDevice* render_device, HWND window_handle, bool use_warp );
 
   void                       ResizeSwapchain( uint32_t width, uint32_t height );
 
   // Buffer Management
-  [[nodiscard]] Buffer      CreateVertexBuffer( uint32_t size, uint32_t stride );
-  [[nodiscard]] Buffer      CreateIndexBuffer( uint32_t size, DXGI_FORMAT format );
-  [[nodiscard]] Buffer      CreateStorageBuffer( uint32_t size, uint32_t stride );
-  [[nodiscard]] Buffer      CreateConstantBuffer( uint32_t size );
+  [[nodiscard]] Buffer  CreateVertexBuffer( uint32_t size, uint32_t stride );
+  [[nodiscard]] Buffer  CreateIndexBuffer( uint32_t size, DXGI_FORMAT format );
+  [[nodiscard]] Buffer  CreateStorageBuffer( uint32_t size, uint32_t stride );
+  [[nodiscard]] Buffer  CreateConstantBuffer( uint32_t size );
 
-  [[nodiscard]] Texture     CreateTexture2D( Texture2DCreateInfo const& create_info );
-  [[nodiscard]] Texture     CreateTextureCube( TextureCubeCreateInfo const& create_info );
+  [[nodiscard]] Texture CreateTexture2D( Texture2DCreateInfo const& create_info );
+  [[nodiscard]] Texture CreateTextureCube( TextureCubeCreateInfo const& create_info );
 
-  [[nodiscard]] Sampler     CreateSampler( D3D12_SAMPLER_DESC const& sampler_desc );
-
-  [[nodiscard]] DepthBuffer CreateDepthBuffer( uint32_t width, uint32_t height ) const;
-
-  void                      SetDepthBuffer( DepthBuffer const& depth_buffer ) const;
+  [[nodiscard]] Sampler CreateSampler( D3D12_SAMPLER_DESC const& sampler_desc );
 
   // Descriptor Management
   [[nodiscard]] SRVHandle CreateBindlessHandle(

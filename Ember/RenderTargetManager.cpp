@@ -1,0 +1,95 @@
+#include "RenderTargetManager.hpp"
+
+#include "RenderDevice.hpp"
+#include "Util/HelperUtils.hpp"
+
+void Ember::RenderTargetManager::Create( RenderTargetManager* render_target_manager, RenderDevice* device )
+{
+  D3D12_DESCRIPTOR_HEAP_DESC const rtv_desc{
+    .Type           = D3D12_DESCRIPTOR_HEAP_TYPE_RTV,
+    .NumDescriptors = D3D12_SIMULTANEOUS_RENDER_TARGET_COUNT,
+    .Flags          = D3D12_DESCRIPTOR_HEAP_FLAG_NONE,
+  };
+  D3D12_DESCRIPTOR_HEAP_DESC const dsv_desc{
+    .Type           = D3D12_DESCRIPTOR_HEAP_TYPE_DSV,
+    .NumDescriptors = 1,
+    .Flags          = D3D12_DESCRIPTOR_HEAP_FLAG_NONE,
+  };
+
+  ComPtr<ID3D12DescriptorHeap> rtv_heap;
+  ComPtr<ID3D12DescriptorHeap> dsv_heap;
+
+  ComPtr<ID3D12Device>         d3d_device = device->GetDevice();
+
+  ERR_ABORT( d3d_device->CreateDescriptorHeap( &rtv_desc, IID_PPV_ARGS( &rtv_heap ) ) );
+  ERR_ABORT( d3d_device->CreateDescriptorHeap( &dsv_desc, IID_PPV_ARGS( &dsv_heap ) ) );
+
+  uint32_t const rtv_descriptor_size = d3d_device->GetDescriptorHandleIncrementSize( D3D12_DESCRIPTOR_HEAP_TYPE_RTV );
+  uint32_t const dsv_descriptor_size = d3d_device->GetDescriptorHandleIncrementSize( D3D12_DESCRIPTOR_HEAP_TYPE_DSV );
+
+  new ( render_target_manager ) RenderTargetManager{
+    std::move( d3d_device ), std::move( rtv_heap ), rtv_descriptor_size, std::move( dsv_heap ), dsv_descriptor_size,
+  };
+}
+
+Ember::RenderTargetManager::RenderTargetManager(
+    ComPtr<ID3D12Device>         d3d12_device,
+    ComPtr<ID3D12DescriptorHeap> rtv_descriptor_heap,
+    uint32_t const               rtv_descriptor_size,
+    ComPtr<ID3D12DescriptorHeap> dsv_descriptor_heap,
+    uint32_t const               dsv_descriptor_size )
+  : m_D3D12Device{ std::move( d3d12_device ) }
+  , m_RTVDescriptorHeap{ std::move( rtv_descriptor_heap ) }
+  , m_DSVDescriptorHeap{ std::move( dsv_descriptor_heap ) }
+  , m_RTVDescriptorSize{ rtv_descriptor_size }
+  , m_DSVDescriptorSize{ dsv_descriptor_size }
+{}
+
+void Ember::RenderTargetManager::ClearRenderTargetView(
+    ID3D12GraphicsCommandList* command_list, Texture const& render_target, float const color[] ) const
+{
+  D3D12_CPU_DESCRIPTOR_HANDLE const rtv_handle = m_RTVDescriptorHeap->GetCPUDescriptorHandleForHeapStart();
+  m_D3D12Device->CreateRenderTargetView( render_target.GetTexture(), render_target.GetRenderTargetView(), rtv_handle );
+
+  command_list->ClearRenderTargetView( rtv_handle, color, 0, nullptr );
+}
+
+void Ember::RenderTargetManager::ClearDepthStencilView(
+    ID3D12GraphicsCommandList* command_list,
+    Texture const&             depth_stencil,
+    D3D12_CLEAR_FLAGS const    flags,
+    float const                depth,
+    uint8_t const              stencil ) const
+{
+  D3D12_CPU_DESCRIPTOR_HANDLE const dsv_descriptor = m_DSVDescriptorHeap->GetCPUDescriptorHandleForHeapStart();
+  m_D3D12Device->CreateDepthStencilView(
+      depth_stencil.GetTexture(), depth_stencil.GetDepthStencilView(), dsv_descriptor );
+
+  command_list->ClearDepthStencilView( dsv_descriptor, flags, depth, stencil, 0, nullptr );
+}
+
+void Ember::RenderTargetManager::OMSetRenderTargets(
+    ID3D12GraphicsCommandList* command_list,
+    uint8_t const              count,
+    Texture const*             render_targets,
+    Texture const*             depth_stencil ) const
+{
+  auto const rtv_start  = m_RTVDescriptorHeap->GetCPUDescriptorHandleForHeapStart();
+  auto       rtv_handle = CD3DX12_CPU_DESCRIPTOR_HANDLE{ rtv_start, 0, m_RTVDescriptorSize };
+
+  for ( int i = 0; i < count; i++ )
+  {
+    m_D3D12Device->CreateRenderTargetView(
+        render_targets[i].GetTexture(), render_targets[i].GetRenderTargetView(), rtv_handle );
+    rtv_handle.Offset( ( INT )m_RTVDescriptorSize );
+  }
+
+  D3D12_CPU_DESCRIPTOR_HANDLE const dsv_descriptor = m_DSVDescriptorHeap->GetCPUDescriptorHandleForHeapStart();
+  if ( depth_stencil )
+  {
+    m_D3D12Device->CreateDepthStencilView(
+        depth_stencil->GetTexture(), depth_stencil->GetDepthStencilView(), dsv_descriptor );
+  }
+
+  command_list->OMSetRenderTargets( count, &rtv_start, TRUE, depth_stencil ? &dsv_descriptor : nullptr );
+}
