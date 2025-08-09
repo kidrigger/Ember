@@ -73,6 +73,17 @@ DXGI_FORMAT Ember::RenderDevice::FetchSwapchainFormat() const
   return desc.BufferDesc.Format;
 }
 
+D3D_ROOT_SIGNATURE_VERSION Ember::RenderDevice::FetchHighestRootSignatureVersion() const
+{
+  D3D12_FEATURE_DATA_ROOT_SIGNATURE feature_data;
+  feature_data.HighestVersion = D3D_ROOT_SIGNATURE_VERSION_1_1;
+  if ( FAILED( m_Device->CheckFeatureSupport( D3D12_FEATURE_ROOT_SIGNATURE, &feature_data, sizeof( feature_data ) ) ) )
+  {
+    feature_data.HighestVersion = D3D_ROOT_SIGNATURE_VERSION_1_0;
+  }
+  return feature_data.HighestVersion;
+}
+
 void Ember::RenderDevice::Create( RenderDevice* render_device, HWND window_handle, bool const use_warp )
 {
 #if defined( _DEBUG )

@@ -1,5 +1,8 @@
 #pragma once
 
+#include <optional>
+
+
 #include "BindlessHandle.hpp"
 #include "BindlessManager.hpp"
 #include "Util/DirectXHeaders.hpp"
@@ -156,19 +159,21 @@ public:
 
 struct Texture2DCreateInfo
 {
-  DXGI_FORMAT  Format;
-  uint32_t     Width;
-  uint32_t     Height;
-  TextureUsage Usage{ TextureUsage::kReadonly };
-  MipLevels    MipLevels{ MipLevels::kAuto };
+  DXGI_FORMAT                          Format;
+  uint32_t                             Width;
+  uint32_t                             Height;
+  TextureUsage                         Usage{ TextureUsage::kReadonly };
+  MipLevels                            MipLevels{ MipLevels::kAuto };
+  std::optional<D3D12_RESOURCE_STATES> InitState;
 };
 
 struct TextureCubeCreateInfo
 {
-  DXGI_FORMAT  Format;
-  uint32_t     Side;
-  TextureUsage Usage{ TextureUsage::kReadonly };
-  MipLevels    MipLevels{ MipLevels::kAuto };
+  DXGI_FORMAT                          Format;
+  uint32_t                             Side;
+  TextureUsage                         Usage{ TextureUsage::kReadonly };
+  MipLevels                            MipLevels{ MipLevels::kAuto };
+  std::optional<D3D12_RESOURCE_STATES> InitState;
 };
 
 class TextureManager

@@ -166,19 +166,43 @@ float4 TrianglePS( FSIn IN ) : SV_TARGET0
   {
     StructuredBuffer<PointLight> point_lights = ResourceDescriptorHeap[g_PointLights];
 
-    for ( int i = 0; i < g_PointLightCount; i++ )
+    int                          light_idx    = 0;
+    for ( ; light_idx < g_ShadowPointLightCount; light_idx++ )
     {
-      float3 light_dir   = float3( point_lights[i].Position ) - IN.Position.xyz;
-      float  light_dist2 = dot( light_dir, light_dir );
+      float3 light_dir  = float3( point_lights[light_idx].Position ) - IN.Position.xyz;
+      float  light_dist = length( light_dir );
 
-      if ( light_dist2 > point_lights[i].Range ) continue;
+      if ( light_dist > point_lights[light_idx].Range ) continue;
 
-      light_dir          /= sqrt( light_dist2 ); // Normalization
+      light_dir /= light_dist; // Normalization
 
-      float  attenuation  = 1.0f / light_dist2;  // TODO: Controlled Attenuation
-      float3 radiance     = UnpackColor32( point_lights[i].Color ).rgb * attenuation;
+      // Shadow test
+      TextureCube<float> shadow_map = ResourceDescriptorHeap[point_lights[light_idx].ShadowIdx];
+      float              depth      = shadow_map.Sample( g_DefaultSampler, -light_dir ) * point_lights[light_idx].Range;
 
-      point_contrib      += brdf.Evaluate( radiance, view_dir, light_dir );
+      if ( light_dist > depth ) continue;
+
+      float  attenuation = 1.0f / ( light_dist * light_dist ); // TODO: Controlled Attenuation
+      float3 radiance =
+          point_lights[light_idx].Intensity * UnpackColor32( point_lights[light_idx].Color ).rgb * attenuation;
+
+      point_contrib += brdf.Evaluate( radiance, view_dir, light_dir );
+    }
+
+    for ( ; light_idx < g_PointLightCount; light_idx++ )
+    {
+      float3 light_dir  = float3( point_lights[light_idx].Position ) - IN.Position.xyz;
+      float  light_dist = length( light_dir );
+
+      if ( light_dist > point_lights[light_idx].Range ) continue;
+
+      light_dir          /= light_dist;                         // Normalization
+
+      float  attenuation  = 1.0f / ( light_dist * light_dist ); // TODO: Controlled Attenuation
+      float3 radiance =
+          point_lights[light_idx].Intensity * UnpackColor32( point_lights[light_idx].Color ).rgb * attenuation;
+
+      point_contrib += brdf.Evaluate( radiance, view_dir, light_dir );
     }
   }
 

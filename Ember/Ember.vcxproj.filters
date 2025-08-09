@@ -55,6 +55,9 @@
     <Filter Include="Resource Files\Assets\Scenes">
       <UniqueIdentifier>{3f1b6069-d8a4-48b7-a470-d65aa5217a43}</UniqueIdentifier>
     </Filter>
+    <Filter Include="Shaders\Shadows">
+      <UniqueIdentifier>{19b95aa5-3537-429c-84f2-4fd0eea82243}</UniqueIdentifier>
+    </Filter>
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="Main.cpp">
@@ -229,6 +232,9 @@
     <None Include="Utility.hlsli">
       <Filter>Shaders</Filter>
     </None>
+    <None Include="OmniShader.hlsli">
+      <Filter>Shaders\Shadows</Filter>
+    </None>
   </ItemGroup>
   <ItemGroup>
     <FxCompile Include="TriangleVS.hlsl">
@@ -260,6 +266,12 @@
     </FxCompile>
     <FxCompile Include="BackgroundVS.hlsl">
       <Filter>Shaders</Filter>
+    </FxCompile>
+    <FxCompile Include="OmniShadowVS.hlsl">
+      <Filter>Shaders\Shadows</Filter>
+    </FxCompile>
+    <FxCompile Include="OmniShadowPS.hlsl">
+      <Filter>Shaders\Shadows</Filter>
     </FxCompile>
   </ItemGroup>
   <ItemGroup>

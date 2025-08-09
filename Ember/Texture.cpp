@@ -257,7 +257,7 @@ DXGI_FORMAT MakeSRVCompat( DXGI_FORMAT const format )
 
 Ember::Texture Ember::TextureManager::CreateDepthTexture2D( Texture2DCreateInfo const& create_info )
 {
-  auto [format, width, height, usage, levels] = create_info;
+  auto [format, width, height, usage, levels, init_state] = create_info;
   ASSERT( usage == TextureUsage::kDepthSample );
 
   ComPtr<ID3D12Resource>      texture;
@@ -272,7 +272,8 @@ Ember::Texture Ember::TextureManager::CreateDepthTexture2D( Texture2DCreateInfo 
     .DepthStencil = { .Depth = 1.0f, .Stencil = 0 },
   };
 
-  CreateResourceImpl( &texture, &allocation, resource_desc, &clear_value, D3D12_RESOURCE_STATE_DEPTH_WRITE );
+  CreateResourceImpl(
+      &texture, &allocation, resource_desc, &clear_value, init_state.value_or( D3D12_RESOURCE_STATE_DEPTH_WRITE ) );
 
   DXGI_FORMAT srv_format = MakeSRVCompat( format );
   SRVHandle   srv_handle =
@@ -293,7 +294,7 @@ Ember::Texture Ember::TextureManager::CreateDepthTexture2D( Texture2DCreateInfo 
 
 Ember::Texture Ember::TextureManager::CreateRenderTexture2D( Texture2DCreateInfo const& create_info )
 {
-  auto [format, width, height, usage, levels] = create_info;
+  auto [format, width, height, usage, levels, init_state] = create_info;
   ASSERT( usage == TextureUsage::kRenderTarget );
 
   ComPtr<ID3D12Resource>      texture;
@@ -308,7 +309,8 @@ Ember::Texture Ember::TextureManager::CreateRenderTexture2D( Texture2DCreateInfo
     .Color  = { 0.0f, 0.0f, 0.0f, 0.0f },
   };
 
-  CreateResourceImpl( &texture, &allocation, resource_desc, &clear_value, D3D12_RESOURCE_STATE_RENDER_TARGET );
+  CreateResourceImpl(
+      &texture, &allocation, resource_desc, &clear_value, init_state.value_or( D3D12_RESOURCE_STATE_RENDER_TARGET ) );
 
   SRVHandle srv_handle =
       m_Bindless->CreateDescriptorHandle( texture.Get(), CD3DX12_SHADER_RESOURCE_VIEW_DESC::Tex2D( format ) );
@@ -349,7 +351,7 @@ void Ember::TextureManager::CreateResourceImpl(
 
 Ember::Texture Ember::TextureManager::CreateTexture2D( Texture2DCreateInfo const& create_info )
 {
-  auto [format, width, height, usage, levels] = create_info;
+  auto [format, width, height, usage, levels, init_state] = create_info;
   if ( create_info.Usage == TextureUsage::kDepthSample )
   {
     return CreateDepthTexture2D( create_info );
@@ -367,7 +369,8 @@ Ember::Texture Ember::TextureManager::CreateTexture2D( Texture2DCreateInfo const
   if ( usage == TextureUsage::kReadWrite ) resource_desc.Flags |= D3D12_RESOURCE_FLAG_ALLOW_UNORDERED_ACCESS;
   if ( usage == TextureUsage::kDepthSample ) resource_desc.Flags |= D3D12_RESOURCE_FLAG_ALLOW_DEPTH_STENCIL;
 
-  CreateResourceImpl( &texture, &allocation, resource_desc );
+  CreateResourceImpl(
+      &texture, &allocation, resource_desc, nullptr, init_state.value_or( D3D12_RESOURCE_STATE_COMMON ) );
 
   SRVHandle srv_handle =
       m_Bindless->CreateDescriptorHandle( texture.Get(), CD3DX12_SHADER_RESOURCE_VIEW_DESC::Tex2D( format ) );
@@ -424,7 +427,7 @@ Ember::Texture Ember::TextureManager::CreateTexture2D( Texture2DCreateInfo const
 
 Ember::Texture Ember::TextureManager::CreateDepthTextureCube( TextureCubeCreateInfo const& create_info )
 {
-  auto [format, side, usage, levels] = create_info;
+  auto [format, side, usage, levels, init_state] = create_info;
   ASSERT( usage == TextureUsage::kDepthSample );
 
   ComPtr<ID3D12Resource>      texture;
@@ -439,7 +442,8 @@ Ember::Texture Ember::TextureManager::CreateDepthTextureCube( TextureCubeCreateI
     .DepthStencil = { .Depth = 1.0f, .Stencil = 0 },
   };
 
-  CreateResourceImpl( &texture, &allocation, resource_desc, &clear_value, D3D12_RESOURCE_STATE_DEPTH_WRITE );
+  CreateResourceImpl(
+      &texture, &allocation, resource_desc, &clear_value, init_state.value_or( D3D12_RESOURCE_STATE_COMMON ) );
 
   DXGI_FORMAT srv_format = MakeSRVCompat( format );
   SRVHandle   srv_handle =
@@ -460,7 +464,7 @@ Ember::Texture Ember::TextureManager::CreateDepthTextureCube( TextureCubeCreateI
 
 Ember::Texture Ember::TextureManager::CreateTextureCube( TextureCubeCreateInfo const& create_info )
 {
-  auto [format, side, usage, levels] = create_info;
+  auto [format, side, usage, levels, init_state] = create_info;
   if ( usage == TextureUsage::kDepthSample )
   {
     return CreateDepthTextureCube( create_info );
@@ -474,7 +478,8 @@ Ember::Texture Ember::TextureManager::CreateTextureCube( TextureCubeCreateInfo c
   if ( usage == TextureUsage::kReadWrite ) resource_desc.Flags |= D3D12_RESOURCE_FLAG_ALLOW_UNORDERED_ACCESS;
   if ( usage == TextureUsage::kDepthSample ) resource_desc.Flags |= D3D12_RESOURCE_FLAG_ALLOW_DEPTH_STENCIL;
 
-  CreateResourceImpl( &texture, &allocation, resource_desc );
+  CreateResourceImpl(
+      &texture, &allocation, resource_desc, nullptr, init_state.value_or( D3D12_RESOURCE_STATE_COMMON ) );
 
   SRVHandle srv_handle =
       m_Bindless->CreateDescriptorHandle( texture.Get(), CD3DX12_SHADER_RESOURCE_VIEW_DESC::TexCube( format ) );

@@ -444,12 +444,7 @@ void Ember::TextureLoader::Create( TextureLoader* loader, RenderDevice* render_d
   ComPtr<ID3DBlob> mipmap_cube_shader;
   ERR_ABORT( D3DReadFileToBlob( L"MipMapCube.cso", &mipmap_cube_shader ) );
 
-  D3D12_FEATURE_DATA_ROOT_SIGNATURE feature_data;
-  feature_data.HighestVersion = D3D_ROOT_SIGNATURE_VERSION_1_1;
-  if ( FAILED( device->CheckFeatureSupport( D3D12_FEATURE_ROOT_SIGNATURE, &feature_data, sizeof( feature_data ) ) ) )
-  {
-    feature_data.HighestVersion = D3D_ROOT_SIGNATURE_VERSION_1_0;
-  }
+  D3D_ROOT_SIGNATURE_VERSION  highest_root_signature_version = render_device->FetchHighestRootSignatureVersion();
 
   CD3DX12_STATIC_SAMPLER_DESC static_sampler_desc;
   static_sampler_desc.Init(
@@ -479,7 +474,7 @@ void Ember::TextureLoader::Create( TextureLoader* loader, RenderDevice* render_d
   ComPtr<ID3DBlob> root_signature_blob;
   ComPtr<ID3DBlob> error_blob;
   ERR_ABORT( D3DX12SerializeVersionedRootSignature(
-      &root_signature_desc, feature_data.HighestVersion, &root_signature_blob, &error_blob ) );
+      &root_signature_desc, highest_root_signature_version, &root_signature_blob, &error_blob ) );
 
   ComPtr<ID3D12RootSignature> root_signature;
   ERR_ABORT( device->CreateRootSignature(

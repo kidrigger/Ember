@@ -20,7 +20,7 @@ struct PointLight
   PackedColor32 Color;       // 20
   float         Intensity;   // 24
   float         Attenuation; // 28
-  float         Padding0;    // 32
+  RID           ShadowIdx;   // 32
 };
 
 struct Material
@@ -88,6 +88,7 @@ cbuffer BindlessIndex : register( b2, space0 )
   RID  g_Camera;
   RID  g_PointLights;
   uint g_PointLightCount;
+  uint g_ShadowPointLightCount;
 }
 
 cbuffer EnvironmentBlock : register( b3, space0 )

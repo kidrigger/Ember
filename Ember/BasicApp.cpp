@@ -234,8 +234,10 @@ public:
 
 struct PerFrameConstants
 {
-  Ember::CBVHandle               Camera;
-  Ember::LightManager::FrameInfo Lights;
+  Ember::CBVHandle Camera;
+  Ember::SRVHandle PointLightBuffer;
+  uint32_t         PointLightCount;
+  uint32_t         ShadowLightCount;
 };
 
 Ember::BasicApp::BasicApp(
@@ -313,16 +315,11 @@ void Ember::BasicApp::SetupRenderPipeline()
   ComPtr<ID3DBlob> bg_pixel_shader_blob;
   ERR_ABORT( D3DReadFileToBlob( L"BackgroundPS.cso", &bg_pixel_shader_blob ) );
 
-  ComPtr<ID3D12Device2>             device = m_RenderDevice->GetDevice();
+  ComPtr<ID3D12Device2>       device                 = m_RenderDevice->GetDevice();
 
-  D3D12_FEATURE_DATA_ROOT_SIGNATURE feature_data;
-  feature_data.HighestVersion = D3D_ROOT_SIGNATURE_VERSION_1_1;
-  if ( FAILED( device->CheckFeatureSupport( D3D12_FEATURE_ROOT_SIGNATURE, &feature_data, sizeof( feature_data ) ) ) )
-  {
-    feature_data.HighestVersion = D3D_ROOT_SIGNATURE_VERSION_1_0;
-  }
+  D3D_ROOT_SIGNATURE_VERSION  root_signature_version = m_RenderDevice->FetchHighestRootSignatureVersion();
 
-  CD3DX12_STATIC_SAMPLER_DESC static_sampler_desc[] = {
+  CD3DX12_STATIC_SAMPLER_DESC static_sampler_desc[]  = {
     CD3DX12_STATIC_SAMPLER_DESC{ 0 },
     CD3DX12_STATIC_SAMPLER_DESC{ 1,
                                 D3D12_FILTER_ANISOTROPIC, D3D12_TEXTURE_ADDRESS_MODE_CLAMP,
@@ -354,7 +351,7 @@ void Ember::BasicApp::SetupRenderPipeline()
   ComPtr<ID3DBlob> root_signature_blob;
   ComPtr<ID3DBlob> error_blob;
   ERR_ABORT( D3DX12SerializeVersionedRootSignature(
-      &root_signature_desc, feature_data.HighestVersion, &root_signature_blob, &error_blob ) );
+      &root_signature_desc, root_signature_version, &root_signature_blob, &error_blob ) );
 
   ERR_ABORT( device->CreateRootSignature(
       0,
@@ -455,9 +452,9 @@ void Ember::BasicApp::LoadContent()
 
   // Setup Lights
   LightManager::Create( m_LightManager.get(), m_RenderDevice.get(), RenderDevice::kNumFrames );
-  m_LightManager->AddPointLight( { 1.0f, 1.0f, -1.0f }, 15.0f, Color32::White(), 15.0f );
-  m_LightManager->AddPointLight( { -1.0f, 1.0f, -1.0f }, 15.0f, Color32::Green(), 15.0f );
-  m_LightManager->AddPointLight( { 0.0f, 1.0f, 0.0f }, 15.0f, Color32::Red(), 15.0f );
+  m_LightManager->AddShadowingPointLight( { -1.0f, 2.0f, 0.0f }, 15.0f, Color32::Blue(), 15.0f );
+  m_LightManager->AddShadowingPointLight( { 0.0f, 2.0f, 0.0f }, 15.0f, Color32::Green(), 15.0f );
+  m_LightManager->AddShadowingPointLight( { 1.0f, 2.0f, 0.0f }, 15.0f, Color32::Red(), 15.0f );
 
   // Setup Scene Geometry
   RotModel* rm    = m_World->CreateObject<RotModel>( 0.0f );
@@ -465,11 +462,17 @@ void Ember::BasicApp::LoadContent()
   ASSERT( model );
   rm->AddChild( model );
 
-  constexpr char const* kEnvMapFile = "OvercastSoil.hdr";
+  rm    = m_World->CreateObject<RotModel>( 20.0f );
+  model = m_ModelLoader->TryLoadModel( "DamagedHelmet.glb" );
+  model->SetLocalScale( DirectX::XMVectorSet( 0.3f, 0.3f, 0.3f, 0.0f ) );
+  model->SetLocalTranslation( DirectX::XMVectorSet( 0.0f, 1.0f, 0.0f, 1.0f ) );
+  ASSERT( model );
+  rm->AddChild( model );
 
-  /*
-  ASSERT( Environment::TryLoadFrom( m_Environment.get(), m_RenderDevice.get(), m_TextureLoader.get(), kEnvMapFile ) );
-  */
+  // constexpr char const* kEnvMapFile = "OvercastSoil.hdr";
+  // ASSERT( Environment::TryLoadFrom( m_Environment.get(), m_RenderDevice.get(), m_TextureLoader.get(), kEnvMapFile )
+  // );
+
   SetupRenderPipeline();
 
   m_RenderTexture = m_RenderDevice->CreateTexture2D( {
@@ -544,18 +547,10 @@ void Ember::BasicApp::Update()
   g_Input.Update();
 }
 
-void Ember::BasicApp::Render()
+void Ember::BasicApp::RenderScene( ID3D12GraphicsCommandList* command_list, uint32_t frame_idx ) const
 {
-  m_RenderQueue.Clear();
-  m_World->Render( &m_RenderQueue );
-
-  ID3D12Resource*      backbuffer   = m_RenderDevice->GetCurrentBackbuffer();
-  Context::CommandList command_list = m_RenderDevice->GetGraphicsCommandList();
-  uint32_t             frame_idx    = m_RenderDevice->GetCurrentFrameIndex();
-
-  // All resources for this frame are guaranteed to be available for CPU modification at this time.
-  CBVHandle const               camera_cbv = m_Camera->PrepareFrame( frame_idx );
-  LightManager::FrameInfo const light_info = m_LightManager->PrepareFrame( frame_idx );
+  CBVHandle const camera_cbv = m_Camera->PrepareFrame( frame_idx );
+  SRVHandle const light_srv  = m_LightManager->PrepareFrame( frame_idx );
 
   // Viewport and scissor
   D3D12_VIEWPORT const viewport = {
@@ -573,19 +568,6 @@ void Ember::BasicApp::Render()
     .bottom = ( LONG )m_WindowHeight,
   };
 
-  // Clear Backbuffer
-  CD3DX12_RESOURCE_BARRIER top_of_renderpass_barriers[] = {
-    CD3DX12_RESOURCE_BARRIER::Transition( backbuffer, D3D12_RESOURCE_STATE_PRESENT, D3D12_RESOURCE_STATE_COPY_DEST ),
-  };
-
-  command_list->ResourceBarrier( CountOf( top_of_renderpass_barriers ), DataOf( top_of_renderpass_barriers ) );
-  m_ModelLoader->FlushBarriers( command_list.Get() );
-  m_TextureLoader->FlushBarriers( command_list.Get() );
-
-  FLOAT constexpr cornflower_blue[] = { 0.4f, 0.6f, 0.9f, 1.0f };
-  m_RenderTargetManager->ClearRenderTargetView( command_list.Get(), m_RenderTexture, cornflower_blue );
-  m_RenderTargetManager->ClearDepthStencilView( command_list.Get(), m_DepthTexture, D3D12_CLEAR_FLAG_DEPTH, 1.0f, 0 );
-
   command_list->SetPipelineState( m_MainPipeline.Get() );
   command_list->SetGraphicsRootSignature( m_RootSignature.Get() );
   command_list->IASetPrimitiveTopology( D3D_PRIMITIVE_TOPOLOGY_TRIANGLELIST );
@@ -594,11 +576,13 @@ void Ember::BasicApp::Render()
   command_list->SetDescriptorHeaps( CountOf( bindless_desc_heaps ), DataOf( bindless_desc_heaps ) );
   command_list->RSSetViewports( 1, &viewport );
   command_list->RSSetScissorRects( 1, &scissor );
-  m_RenderTargetManager->OMSetRenderTargets( command_list.Get(), 1, &m_RenderTexture, &m_DepthTexture );
+  m_RenderTargetManager->OMSetRenderTargets( command_list, 1, &m_RenderTexture, &m_DepthTexture );
 
   PerFrameConstants const constants = {
-    .Camera = camera_cbv,
-    .Lights = light_info,
+    .Camera           = camera_cbv,
+    .PointLightBuffer = light_srv,
+    .PointLightCount  = m_LightManager->GetPointLightCount(),
+    .ShadowLightCount = m_LightManager->GetShadowingPointLightCount(),
   };
 
   command_list->SetGraphicsRoot32BitConstants( 2, sizeof( PerFrameConstants ) / 4, &constants, 0 );
@@ -621,6 +605,34 @@ void Ember::BasicApp::Render()
         m_RenderQueue.Primitives[i].FirstVertex,
         0 );
   }
+}
+
+void Ember::BasicApp::Render()
+{
+  m_RenderQueue.Clear();
+  m_World->Render( &m_RenderQueue );
+
+  ID3D12Resource*      backbuffer   = m_RenderDevice->GetCurrentBackbuffer();
+  Context::CommandList command_list = m_RenderDevice->GetGraphicsCommandList();
+  uint32_t const       frame_idx    = m_RenderDevice->GetCurrentFrameIndex();
+
+  // All resources for this frame are guaranteed to be available for CPU modification at this time.
+  // Clear Backbuffer
+  CD3DX12_RESOURCE_BARRIER top_of_renderpass_barriers[] = {
+    CD3DX12_RESOURCE_BARRIER::Transition( backbuffer, D3D12_RESOURCE_STATE_PRESENT, D3D12_RESOURCE_STATE_COPY_DEST ),
+  };
+
+  command_list->ResourceBarrier( CountOf( top_of_renderpass_barriers ), DataOf( top_of_renderpass_barriers ) );
+  m_ModelLoader->FlushBarriers( command_list.Get() );
+  m_TextureLoader->FlushBarriers( command_list.Get() );
+
+  m_LightManager->RenderAllShadows( command_list.Get(), m_RenderQueue, *m_RenderTargetManager );
+
+  FLOAT constexpr cornflower_blue[] = { 0.4f, 0.6f, 0.9f, 1.0f };
+  m_RenderTargetManager->ClearRenderTargetView( command_list.Get(), m_RenderTexture, cornflower_blue );
+  m_RenderTargetManager->ClearDepthStencilView( command_list.Get(), m_DepthTexture, D3D12_CLEAR_FLAG_DEPTH, 1.0f, 0 );
+
+  RenderScene( command_list.Get(), frame_idx );
 
   command_list->SetPipelineState( m_BackgroundPipeline.Get() );
   command_list->DrawInstanced( 3, 1, 0, 0 );

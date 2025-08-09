@@ -32,15 +32,23 @@ public:
   void ClearDepthStencilView(
       ID3D12GraphicsCommandList* command_list,
       Texture const&             depth_stencil,
-      D3D12_CLEAR_FLAGS const    flags,
-      float const                depth,
-      uint8_t const              stencil ) const;
+      D3D12_CLEAR_FLAGS          flags,
+      float                      depth,
+      uint8_t                    stencil ) const;
 
   void OMSetRenderTargets(
       ID3D12GraphicsCommandList* command_list,
       uint8_t                    count,
       Texture const*             render_targets,
       Texture const*             depth_stencil ) const;
+
+  void OMSetRenderTargets(
+      ID3D12GraphicsCommandList*           command_list,
+      uint8_t                              count,
+      Texture const*                       render_targets,
+      D3D12_RENDER_TARGET_VIEW_DESC const* rtv_desc,
+      Texture const*                       depth_stencil,
+      D3D12_DEPTH_STENCIL_VIEW_DESC const* dsv_desc ) const;
 };
 
 } // namespace Ember
