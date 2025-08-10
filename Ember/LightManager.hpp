@@ -5,6 +5,7 @@
 #include "Color.hpp"
 #include "RenderDevice.hpp"
 #include "RenderTargetManager.hpp"
+#include "Scene.hpp"
 #include "Util/DataUtil.hpp"
 #include "Util/DirectXHeaders.hpp"
 
@@ -96,11 +97,14 @@ public:
 
   //
   void RenderAllShadows(
-      ID3D12GraphicsCommandList* command_list, RenderCommandQueue const& rcq, RenderTargetManager const& rtm ) const;
+      ID3D12GraphicsCommandList*      command_list,
+      World const&                    world,
+      RenderTargetManager const&      rtm,
+      DirectX::BoundingFrustum const& camera_frustum ) const;
 
   static void RenderOmniShadow(
       ID3D12GraphicsCommandList* command_list,
-      RenderCommandQueue const&  rcq,
+      World const&               world,
       RenderTargetManager const& rtm,
       OmniLight const&           point_light,
       Texture const&             texture );

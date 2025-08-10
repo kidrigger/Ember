@@ -1,6 +1,5 @@
 #pragma once
 
-#include <DirectXMath.h>
 #include <memory_resource>
 #include <span>
 
@@ -8,6 +7,7 @@
 #include "Color.hpp"
 #include "ObjectPool.hpp"
 #include "Texture.hpp"
+#include "Util/DirectXHeaders.hpp"
 
 namespace Ember
 {
@@ -28,29 +28,33 @@ struct WorldTransform
   DirectX::XMMATRIX InvTransform{ DirectX::XMMatrixIdentity() };
 };
 
+struct BoundingBox
+{
+  DirectX::BoundingBox AABB;
+};
+
 struct Material
 {
   struct alignas( 16 ) GpuRepr
   {
-    SRVHandle     BaseColorTexture;  // 04
-    SRVHandle     NormalTexture;     // 08
-    SRVHandle     MetalRoughTexture; // 12
-    SRVHandle     EmissiveTexture;   // 16
-    SamplerHandle Sampler;           // 20
-    Color32       BaseColorFactor;   // 24
-    Color32       EmissiveFactor;    // 28
-    float         EmissiveStrength;  // 32
-    float         Metal;             // 36
-    float         Rough;             // 40
-    float         AlphaCutoff;       // 44
-    uint32_t      Padding0;          // 48
+    SRVHandle BaseColorTexture;  // 04
+    SRVHandle NormalTexture;     // 08
+    SRVHandle MetalRoughTexture; // 12
+    SRVHandle EmissiveTexture;   // 16
+    Color32   BaseColorFactor;   // 20
+    Color32   EmissiveFactor;    // 24
+    float     EmissiveStrength;  // 28
+    float     Metal;             // 32
+    float     Rough;             // 36
+    float     AlphaCutoff;       // 40
+    uint32_t  Padding0;          // 44
+    uint32_t  Padding1;          // 48
   };
 
   Texture BaseColorTexture;
   Texture NormalTexture;
   Texture MetalRoughTexture;
   Texture EmissiveTexture;
-  Sampler Sampler;
   GpuRepr Repr;
 };
 
@@ -68,8 +72,31 @@ struct Primitive
     uint32_t IndexCount;
     uint32_t FirstVertex;
   };
-  Material* Material;
-  Data      DrawInfo;
+  Material*    Material{ nullptr };
+  BoundingBox* BoundingBox{ nullptr };
+  Data         DrawInfo;
+
+  Primitive() = default;
+  Primitive( Ember::Material* const material, Ember::BoundingBox* const bounding_box, Data draw_info )
+    : Material{ material }, BoundingBox{ bounding_box }, DrawInfo{ std::move( draw_info ) }
+  {}
+  Primitive( Primitive const& other ) = default;
+  Primitive( Primitive&& other ) noexcept
+    : Material{ other.Material }, BoundingBox{ other.BoundingBox }, DrawInfo{ std::move( other.DrawInfo ) }
+  {
+    other.Material    = nullptr;
+    other.BoundingBox = nullptr;
+  }
+  Primitive& operator=( Primitive const& other ) = default;
+  Primitive& operator=( Primitive&& other ) noexcept
+  {
+    if ( this == &other ) return *this;
+    std::swap( Material, other.Material );
+    std::swap( BoundingBox, other.BoundingBox );
+    std::swap( DrawInfo, other.DrawInfo );
+    return *this;
+  }
+  ~Primitive();
 };
 
 struct RenderCommandQueue
@@ -78,6 +105,7 @@ struct RenderCommandQueue
   std::vector<MeshData*>       Meshes;
   std::vector<Material*>       Materials;
   std::vector<Primitive::Data> Primitives;
+  std::vector<uint64_t>        Cull;
 
   [[nodiscard]] size_t         Count() const
   {
@@ -90,15 +118,21 @@ struct RenderCommandQueue
     Meshes.clear();
     Materials.clear();
     Primitives.clear();
+    Cull.clear();
   }
 
   void Push(
-      WorldTransform const& transform, MeshData* mesh, Material* material, Primitive::Data const& primitive_data )
+      WorldTransform const&  transform,
+      MeshData*              mesh,
+      Material*              material,
+      Primitive::Data const& primitive_data,
+      uint64_t const         cull_layers )
   {
     Transforms.push_back( transform );
     Meshes.push_back( mesh );
     Materials.push_back( material );
     Primitives.push_back( primitive_data );
+    Cull.push_back( cull_layers );
   }
 };
 
@@ -106,30 +140,45 @@ class Object
 {
   LocalTransform* m_LocalTransform;
   WorldTransform* m_WorldTransform;
+  BoundingBox*    m_LocalBoundingBox;
+  BoundingBox*    m_WorldBoundingBox;
 
   Object*         m_Parent;
 
 public:
   explicit Object( Object* parent );
+
   [[nodiscard]] DirectX::FXMMATRIX GetLocalTransform() const;
   void                             SetLocalTransform( DirectX::XMMATRIX const& transform ) const;
   void                             SetLocalTransform(
                                   DirectX::XMVECTOR const& translation, DirectX::XMVECTOR const& rotation, DirectX::XMVECTOR const& scale ) const;
-  [[nodiscard]] DirectX::XMVECTOR GetLocalTranslation() const;
-  void                            SetLocalTranslation( DirectX::XMVECTOR const& translation ) const;
-  [[nodiscard]] DirectX::XMVECTOR GetLocalRotation() const;
-  void                            SetLocalRotation( DirectX::XMVECTOR const& rotation ) const;
-  [[nodiscard]] DirectX::XMVECTOR GetLocalScale() const;
-  void                            SetLocalScale( DirectX::XMVECTOR const& scale ) const;
-  [[nodiscard]] WorldTransform&   GetWorldTransform() const;
-  void                            SetWorldTransform( DirectX::XMMATRIX const& transform ) const;
-  [[nodiscard]] Object*           GetParent() const;
-  void                            SetParent( Object* parent );
+  [[nodiscard]] DirectX::XMVECTOR  GetLocalTranslation() const;
+  void                             SetLocalTranslation( DirectX::XMVECTOR const& translation ) const;
+  [[nodiscard]] DirectX::XMVECTOR  GetLocalRotation() const;
+  void                             SetLocalRotation( DirectX::XMVECTOR const& rotation ) const;
+  [[nodiscard]] DirectX::XMVECTOR  GetLocalScale() const;
+  void                             SetLocalScale( DirectX::XMVECTOR const& scale ) const;
 
-  virtual void                    Update( float delta_seconds )              = 0;
-  virtual void                    Render( RenderCommandQueue* render_queue ) = 0;
+  [[nodiscard]] WorldTransform&    GetWorldTransform() const;
+  void                             SetWorldTransform( DirectX::XMMATRIX const& transform ) const;
 
-  virtual void                    UpdateWorldTransform( DirectX::FXMMATRIX& parent_transform );
+  [[nodiscard]] BoundingBox&       GetLocalBoundingBox() const;
+  void                             SetLocalBoundingBox( DirectX::FXMVECTOR& low, DirectX::FXMVECTOR& high ) const;
+
+  [[nodiscard]] BoundingBox const& GetWorldBoundingBox() const;
+  void                             SetWorldBoundingBox( DirectX::BoundingBox const& bounding_box ) const;
+
+  [[nodiscard]] Object*            GetParent() const;
+  void                             SetParent( Object* parent );
+
+  bool                             IsCulled( DirectX::BoundingFrustum const& frustum ) const;
+  virtual void                     Update( float delta_seconds )                                                = 0;
+  virtual void Render( ID3D12GraphicsCommandList* command_list, DirectX::BoundingFrustum const& frustum ) const = 0;
+  virtual void RenderShadow(
+      ID3D12GraphicsCommandList* command_list, DirectX::BoundingFrustum const& frustum ) const = 0;
+
+  virtual void                 UpdateWorldTransform( DirectX::FXMMATRIX& parent_transform );
+  virtual DirectX::BoundingBox UpdateWorldBoundingBox();
 
   Object( Object const& other )                = delete;
   Object( Object&& other ) noexcept            = delete;
@@ -160,12 +209,14 @@ public:
     return object;
   }
 
-  void AddChild( Object* object );
+  void                 AddChild( Object* object );
 
-  void UpdateWorldTransform( DirectX::FXMMATRIX& parent_transform ) override;
+  void                 UpdateWorldTransform( DirectX::FXMMATRIX& parent_transform ) override;
+  DirectX::BoundingBox UpdateWorldBoundingBox() override;
 
-  void Update( float delta_seconds ) override;
-  void Render( RenderCommandQueue* render_queue ) override;
+  void                 Update( float delta_seconds ) override;
+  void Render( ID3D12GraphicsCommandList* command_list, DirectX::BoundingFrustum const& frustum ) const override;
+  void RenderShadow( ID3D12GraphicsCommandList* command_list, DirectX::BoundingFrustum const& frustum ) const override;
 
   Node( Node const& other )                = delete;
   Node( Node&& other ) noexcept            = delete;
@@ -213,7 +264,8 @@ public:
       allocator_type const&       allocator = {} );
 
   void Update( float delta_seconds ) override;
-  void Render( RenderCommandQueue* render_queue ) override;
+  void Render( ID3D12GraphicsCommandList* command_list, DirectX::BoundingFrustum const& frustum ) const override;
+  void RenderShadow( ID3D12GraphicsCommandList* command_list, DirectX::BoundingFrustum const& frustum ) const override;
 };
 
 class World final : public Node
@@ -224,6 +276,8 @@ class World final : public Node
 public:
   static ObjectPool<LocalTransform>& LocalTransformManager();
   static ObjectPool<WorldTransform>& WorldTransformManager();
+  static ObjectPool<BoundingBox>&    LocalBoundingBoxManager();
+  static ObjectPool<BoundingBox>&    WorldBoundingBoxManager();
   static ObjectPool<MeshData>&       MeshManager();
   static ObjectPool<Material>&       MaterialManager();
 

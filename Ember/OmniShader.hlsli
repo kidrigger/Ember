@@ -3,8 +3,8 @@
 
 cbuffer QuickTransforms : register( b0 )
 {
-  float4x4 g_ProjView;
   float4x4 g_Transform;
+  float4x4 g_ProjView;
   float3   g_LightPosition;
   float    g_FarPlane;
 }

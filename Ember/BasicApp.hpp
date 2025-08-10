@@ -48,7 +48,6 @@ class BasicApp final : public IApp
 
   std::unique_ptr<World>               m_World;
   std::unique_ptr<Environment>         m_Environment;
-  RenderCommandQueue                   m_RenderQueue;
 
   void                                 SetupRenderPipeline();
 

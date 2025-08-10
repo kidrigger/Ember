@@ -43,6 +43,9 @@ void Ember::ModelLoader::ProcessMesh( LoadingContext* context, Node* parent, cgl
 
   cgltf_primitive const* primitives          = mesh.primitives;
 
+  DirectX::XMVECTOR      bb_min              = DirectX::XMVectorSplatInfinity();
+  DirectX::XMVECTOR      bb_max              = DirectX::XMVectorNegate( DirectX::XMVectorSplatInfinity() );
+
   std::vector<Primitive> primitive_acc;
   for ( uint32_t primitive_index = 0; primitive_index < mesh.primitives_count; ++primitive_index )
   {
@@ -56,7 +59,8 @@ void Ember::ModelLoader::ProcessMesh( LoadingContext* context, Node* parent, cgl
     // Index Buffer
     ASSERT(
         primitive.indices->type == cgltf_type_scalar and
-        ( primitives->indices->component_type == cgltf_component_type_r_16u or
+        ( primitives->indices->component_type == cgltf_component_type_r_32u or
+          primitives->indices->component_type == cgltf_component_type_r_16u or
           primitives->indices->component_type == cgltf_component_type_r_8u ) );
     size_t const index_start = indices->size();
     size_t const index_count = cgltf_accessor_unpack_indices( primitive.indices, nullptr, sizeof indices->at( 0 ), 0 );
@@ -73,14 +77,16 @@ void Ember::ModelLoader::ProcessMesh( LoadingContext* context, Node* parent, cgl
       material = TryProcessMaterial( model, *primitive.material );
     }
 
-    primitive_acc.push_back( {
-        .Material = material,
-        .DrawInfo = {
-                     .FirstIndex  = ( uint32_t )index_start,
-                     .IndexCount  = ( uint32_t )index_count,
-                     .FirstVertex = ( uint32_t )vertex_start,
-                     }
-    } );
+    BoundingBox* prim_bb = World::LocalBoundingBoxManager().Construct();
+
+    primitive_acc.emplace_back(
+        material,
+        prim_bb,
+        Primitive::Data{
+            .FirstIndex  = ( uint32_t )index_start,
+            .IndexCount  = ( uint32_t )index_count,
+            .FirstVertex = ( uint32_t )vertex_start,
+        } );
 
     std::vector<float>     scratch;
 
@@ -93,11 +99,27 @@ void Ember::ModelLoader::ProcessMesh( LoadingContext* context, Node* parent, cgl
         ASSERT( position_attr.data->component_type == cgltf_component_type_r_32f );
         ASSERT( position_attr.data->type == cgltf_type_vec3 );
 
+        auto              pos_min_v3 = DirectX::XMFLOAT3( position_attr.data->min );
+        DirectX::XMVECTOR pos_min    = XMLoadFloat3( &pos_min_v3 );
+        auto              pos_max_v3 = DirectX::XMFLOAT3( position_attr.data->max );
+        auto              pos_max    = XMLoadFloat3( &pos_max_v3 );
+        DirectX::BoundingBox::CreateFromPoints( prim_bb->AABB, pos_min, pos_max );
+
+        bb_min                      = DirectX::XMVectorMin( bb_min, pos_min );
+        bb_max                      = DirectX::XMVectorMax( bb_max, pos_max );
+
         size_t constexpr stride     = sizeof( Vertex );
         size_t constexpr offset     = offsetof( Vertex, Position );
         size_t constexpr components = 3;
 
         LoadAttribute( vertices, vertex_start, &scratch, position_attr, stride, offset, components );
+
+        for ( int i = 0; i < position_attr.data->count; i++ )
+        {
+          ASSERT( vertices->at( vertex_start + i ).Position.x >= bb_min.m128_f32[0] );
+          ASSERT( vertices->at( vertex_start + i ).Position.y >= bb_min.m128_f32[1] );
+          ASSERT( vertices->at( vertex_start + i ).Position.z >= bb_min.m128_f32[2] );
+        }
       }
       if ( "NORMAL"sv == attributes[attrib_index].name )
       {
@@ -173,7 +195,8 @@ void Ember::ModelLoader::ProcessMesh( LoadingContext* context, Node* parent, cgl
     }
   }
 
-  parent->CreateChildObject<Mesh>( mesh_data, primitive_acc );
+  Mesh const* my_mesh = parent->CreateChildObject<Mesh>( mesh_data, primitive_acc );
+  my_mesh->SetLocalBoundingBox( bb_min, bb_max );
 }
 
 bool Ember::ModelLoader::TryLoadTexture(
@@ -239,33 +262,23 @@ Ember::Material* Ember::ModelLoader::TryProcessMaterial( Model* model, cgltf_mat
   ASSERT( material.has_pbr_metallic_roughness );
 
   auto const base_color_factor = DirectX::XMFLOAT4{ material.pbr_metallic_roughness.base_color_factor };
-  auto const emissive_factor   = DirectX::XMFLOAT4{
-    material.emissive_factor[0],
-    material.emissive_factor[1],
-    material.emissive_factor[2],
+  float      max_em            = std::max(
+      1.0f,
+      std::max( material.emissive_factor[0], std::max( material.emissive_factor[1], material.emissive_factor[2] ) ) );
+
+  auto const emissive_factor = DirectX::XMFLOAT4{
+    material.emissive_factor[0] / max_em,
+    material.emissive_factor[1] / max_em,
+    material.emissive_factor[2] / max_em,
     0.0f,
   };
-  auto const emissive_strength = std::max( material.emissive_strength.emissive_strength, 1.0f );
+
+  auto const emissive_strength = std::max( material.emissive_strength.emissive_strength, 1.0f ) * max_em;
 
   Texture    base_color_texture;
   Texture    normal_texture;
   Texture    metal_rough_texture;
   Texture    emissive_texture;
-
-  D3D12_SAMPLER_DESC constexpr sampler_desc = {
-    .Filter         = D3D12_FILTER_ANISOTROPIC,
-    .AddressU       = D3D12_TEXTURE_ADDRESS_MODE_WRAP,
-    .AddressV       = D3D12_TEXTURE_ADDRESS_MODE_WRAP,
-    .AddressW       = D3D12_TEXTURE_ADDRESS_MODE_WRAP,
-    .MipLODBias     = 0.0f,
-    .MaxAnisotropy  = D3D12_DEFAULT_MAX_ANISOTROPY,
-    .ComparisonFunc = D3D12_COMPARISON_FUNC_NONE,
-    .BorderColor    = D3D12_STATIC_BORDER_COLOR_OPAQUE_BLACK,
-    .MinLOD         = 0.0f,
-    .MaxLOD         = INFINITY,
-  };
-
-  Sampler sampler = m_RenderDevice->CreateSampler( sampler_desc );
 
   if ( material.pbr_metallic_roughness.base_color_texture.texture )
   {
@@ -315,13 +328,11 @@ Ember::Material* Ember::ModelLoader::TryProcessMaterial( Model* model, cgltf_mat
       normal_texture,
       metal_rough_texture,
       emissive_texture,
-      sampler,
       Material::GpuRepr{
             .BaseColorTexture  = base_color_texture ? base_color_texture.GetSRVHandle() : SRVHandle{},
             .NormalTexture     = normal_texture ? normal_texture.GetSRVHandle() : SRVHandle{},
             .MetalRoughTexture = metal_rough_texture ? metal_rough_texture.GetSRVHandle() : SRVHandle{},
             .EmissiveTexture   = emissive_texture ? emissive_texture.GetSRVHandle() : SRVHandle{},
-            .Sampler           = sampler ? sampler.GetSamplerHandle() : SamplerHandle{},
             .BaseColorFactor   = base_color_factor,
             .EmissiveFactor    = emissive_factor,
             .EmissiveStrength  = emissive_strength,
@@ -379,7 +390,7 @@ Ember::Model* Ember::ModelLoader::TryLoadModel( char const* filename )
 
   // Output data
   std::vector<Vertex>    vertices;
-  std::vector<uint16_t>  indices;
+  std::vector<uint32_t>  indices;
   std::vector<Mesh*>     meshes;
   std::vector<Material*> materials;
   std::vector<Primitive> primitives;
@@ -399,7 +410,7 @@ Ember::Model* Ember::ModelLoader::TryLoadModel( char const* filename )
   auto const vertex_buffer = m_RenderDevice->CreateVertexBuffer( ByteSizeOf( vertices ), sizeof( vertices[0] ) );
   vertex_buffer.Write( 0, ByteSizeOf( vertices ), DataOf( vertices ) );
 
-  auto const index_buffer = m_RenderDevice->CreateIndexBuffer( ByteSizeOf( indices ), DXGI_FORMAT_R16_UINT );
+  auto const index_buffer = m_RenderDevice->CreateIndexBuffer( ByteSizeOf( indices ), DXGI_FORMAT_R32_UINT );
   index_buffer.Write( 0, ByteSizeOf( indices ), DataOf( indices ) );
 
   mesh_data->VertexBuffer = vertex_buffer;

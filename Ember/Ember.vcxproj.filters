@@ -317,6 +317,9 @@
     <CopyFileToFolders Include="Assets\Sponza.glb">
       <Filter>Resource Files\Assets\Scenes</Filter>
     </CopyFileToFolders>
+    <CopyFileToFolders Include="Assets\Bistro.glb">
+      <Filter>Resource Files\Assets\Scenes</Filter>
+    </CopyFileToFolders>
   </ItemGroup>
   <ItemGroup>
     <Image Include="Assets\checkerboard.png">

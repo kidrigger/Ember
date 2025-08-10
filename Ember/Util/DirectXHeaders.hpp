@@ -8,6 +8,7 @@
 #include <dxgi1_6.h>
 #include <dxgidebug.h>
 
+#include <DirectXCollision.h>
 #include <DirectXMath.h>
 #include <d3dcompiler.h>
 

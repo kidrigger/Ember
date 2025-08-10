@@ -452,9 +452,9 @@ void Ember::BasicApp::LoadContent()
 
   // Setup Lights
   LightManager::Create( m_LightManager.get(), m_RenderDevice.get(), RenderDevice::kNumFrames );
-  m_LightManager->AddShadowingOmniLight( { -1.0f, 2.0f, 0.0f }, 15.0f, Color32::Blue(), 15.0f );
-  m_LightManager->AddShadowingOmniLight( { 0.0f, 2.0f, 0.0f }, 15.0f, Color32::Green(), 15.0f );
-  m_LightManager->AddShadowingOmniLight( { 1.0f, 2.0f, 0.0f }, 15.0f, Color32::Red(), 15.0f );
+  m_LightManager->AddShadowingOmniLight( { -1.0f, 2.0f, -1.0f }, 10.0f, Color32::Blue(), 15.0f );
+  m_LightManager->AddShadowingOmniLight( { 0.0f, 2.0f, 0.0f }, 10.0f, Color32::Green(), 15.0f );
+  m_LightManager->AddShadowingOmniLight( { 1.0f, 2.0f, 0.0f }, 10.0f, Color32::Red(), 15.0f );
 
   // Setup Scene Geometry
   RotModel* rm    = m_World->CreateObject<RotModel>( 0.0f );
@@ -465,13 +465,13 @@ void Ember::BasicApp::LoadContent()
   rm    = m_World->CreateObject<RotModel>( 20.0f );
   model = m_ModelLoader->TryLoadModel( "DamagedHelmet.glb" );
   model->SetLocalScale( DirectX::XMVectorSet( 0.3f, 0.3f, 0.3f, 0.0f ) );
-  model->SetLocalTranslation( DirectX::XMVectorSet( 0.0f, 1.0f, 0.0f, 1.0f ) );
+  rm->SetLocalTranslation( DirectX::XMVectorSet( 0.0f, 1.0f, 0.0f, 1.0f ) );
   ASSERT( model );
   rm->AddChild( model );
 
   // constexpr char const* kEnvMapFile = "OvercastSoil.hdr";
   // ASSERT( Environment::TryLoadFrom( m_Environment.get(), m_RenderDevice.get(), m_TextureLoader.get(), kEnvMapFile )
-  // );
+  //);
 
   SetupRenderPipeline();
 
@@ -549,8 +549,10 @@ void Ember::BasicApp::Update()
 
 void Ember::BasicApp::RenderScene( ID3D12GraphicsCommandList* command_list, uint32_t frame_idx ) const
 {
-  CBVHandle const camera_cbv = m_Camera->PrepareFrame( frame_idx );
-  SRVHandle const light_srv  = m_LightManager->PrepareFrame( frame_idx );
+  CBVHandle const          camera_cbv     = m_Camera->PrepareFrame( frame_idx );
+  SRVHandle const          light_srv      = m_LightManager->PrepareFrame( frame_idx );
+
+  DirectX::BoundingFrustum camera_frustum = m_Camera->GetFrustum();
 
   // Viewport and scissor
   D3D12_VIEWPORT const viewport = {
@@ -588,33 +590,16 @@ void Ember::BasicApp::RenderScene( ID3D12GraphicsCommandList* command_list, uint
   command_list->SetGraphicsRoot32BitConstants( 2, sizeof( PerFrameConstants ) / 4, &constants, 0 );
   command_list->SetGraphicsRoot32BitConstants( 3, sizeof( Environment::GpuRepr ) / 4, &m_Environment->Repr(), 0 );
 
-  size_t const count = m_RenderQueue.Count();
-  for ( size_t i = 0; i < count; ++i )
-  {
-    command_list->IASetIndexBuffer( &m_RenderQueue.Meshes[i]->IndexBuffer.GetIndexBufferView() );
-    command_list->IASetVertexBuffers( 0, 1, &m_RenderQueue.Meshes[i]->VertexBuffer.GetVertexBufferView() );
-
-    command_list->SetGraphicsRoot32BitConstants( 0, sizeof( WorldTransform ) / 4, &m_RenderQueue.Transforms[i], 0 );
-    command_list->SetGraphicsRoot32BitConstants(
-        1, sizeof( Material::GpuRepr ) / 4, &m_RenderQueue.Materials[i]->Repr, 0 );
-
-    command_list->DrawIndexedInstanced(
-        m_RenderQueue.Primitives[i].IndexCount,
-        1,
-        m_RenderQueue.Primitives[i].FirstIndex,
-        m_RenderQueue.Primitives[i].FirstVertex,
-        0 );
-  }
+  m_World->Render( command_list, camera_frustum );
 }
 
 void Ember::BasicApp::Render()
 {
-  m_RenderQueue.Clear();
-  m_World->Render( &m_RenderQueue );
+  ID3D12Resource*          backbuffer     = m_RenderDevice->GetCurrentBackbuffer();
+  Context::CommandList     command_list   = m_RenderDevice->GetGraphicsCommandList();
+  uint32_t const           frame_idx      = m_RenderDevice->GetCurrentFrameIndex();
 
-  ID3D12Resource*      backbuffer   = m_RenderDevice->GetCurrentBackbuffer();
-  Context::CommandList command_list = m_RenderDevice->GetGraphicsCommandList();
-  uint32_t const       frame_idx    = m_RenderDevice->GetCurrentFrameIndex();
+  DirectX::BoundingFrustum camera_frustum = m_Camera->GetFrustum();
 
   // All resources for this frame are guaranteed to be available for CPU modification at this time.
   // Clear Backbuffer
@@ -626,7 +611,7 @@ void Ember::BasicApp::Render()
   m_ModelLoader->FlushBarriers( command_list.Get() );
   m_TextureLoader->FlushBarriers( command_list.Get() );
 
-  m_LightManager->RenderAllShadows( command_list.Get(), m_RenderQueue, *m_RenderTargetManager );
+  m_LightManager->RenderAllShadows( command_list.Get(), *m_World.get(), *m_RenderTargetManager, camera_frustum );
 
   FLOAT constexpr cornflower_blue[] = { 0.4f, 0.6f, 0.9f, 1.0f };
   m_RenderTargetManager->ClearRenderTargetView( command_list.Get(), m_RenderTexture, cornflower_blue );

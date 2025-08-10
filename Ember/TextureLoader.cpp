@@ -77,6 +77,7 @@ DXGI_FORMAT MakeUAVCompat( DXGI_FORMAT const format )
     case DXGI_FORMAT_R32G32B32_FLOAT:
     case DXGI_FORMAT_R32G32B32A32_FLOAT:
     case DXGI_FORMAT_R11G11B10_FLOAT:
+    case DXGI_FORMAT_R8_UNORM:
       return format;
     default:
       UNIMPLEMENTED_M( "Add formats as used/required" );

@@ -102,6 +102,8 @@ public:
 
   void Destroy( Type* object )
   {
+    if ( object == nullptr ) return;
+
     object->~Type();
     Deallocate( object );
   }

@@ -334,7 +334,10 @@ uint16_t Ember::LightManager::GetShadowingPointLightCount() const
 }
 
 void Ember::LightManager::RenderAllShadows(
-    ID3D12GraphicsCommandList* command_list, RenderCommandQueue const& rcq, RenderTargetManager const& rtm ) const
+    ID3D12GraphicsCommandList*      command_list,
+    World const&                    world,
+    RenderTargetManager const&      rtm,
+    DirectX::BoundingFrustum const& camera_frustum ) const
 {
   command_list->SetGraphicsRootSignature( m_ShadowRootSignature.Get() );
   command_list->SetPipelineState( m_ShadowPipeline.Get() );
@@ -343,13 +346,18 @@ void Ember::LightManager::RenderAllShadows(
   for ( auto& [handle, texture] : m_OmniShadowsInUse )
   {
     ASSERT( handle.GetGeneration() == m_Generation[handle.GetGeneration()] );
-    RenderOmniShadow( command_list, rcq, rtm, m_PointLights[handle.GetIndex()], texture );
+    OmniLight const&        light = m_PointLights[handle.GetIndex()];
+
+    DirectX::BoundingSphere sphere_of_influence{ light.Position, light.Range };
+    if ( camera_frustum.Contains( sphere_of_influence ) == DirectX::DISJOINT ) continue;
+
+    RenderOmniShadow( command_list, world, rtm, light, texture );
   }
 }
 
 void Ember::LightManager::RenderOmniShadow(
     ID3D12GraphicsCommandList* command_list,
-    RenderCommandQueue const&  rcq,
+    World const&               world,
     RenderTargetManager const& rtm,
     OmniLight const&           point_light,
     Texture const&             texture )
@@ -366,28 +374,26 @@ void Ember::LightManager::RenderOmniShadow(
   command_list->RSSetScissorRects( 1, &scissor );
   command_list->RSSetViewports( 1, &viewport );
 
-  // Anything in the 'view' domain needs to be corrected to reverse 'z'.
-  // We don't touch anything else. The systems are all still Right Handed.
-  DirectX::XMMATRIX lh_to_rh_correction = DirectX::XMMatrixScaling( 1.0f, 1.0f, -1.0f );
+  // We use left handed just this once.
 
-  DirectX::XMFLOAT3 lh_light_position   = point_light.Position;
-  lh_light_position.z                   = -lh_light_position.z;
-
-  DirectX::XMVECTOR const origin        = XMLoadFloat3( &lh_light_position );
-  DirectX::XMVECTOR const up            = DirectX::XMVectorSet( 0.0f, 1.0f, 0.0f, 0.0f );
-  DirectX::XMVECTOR const right         = DirectX::XMVectorSet( 1.0f, 0.0f, 0.0f, 0.0f );
-  DirectX::XMVECTOR const forward       = DirectX::XMVectorSet( 0.0f, 0.0f, -1.0f, 0.0f );
+  DirectX::XMVECTOR const origin  = XMLoadFloat3( &point_light.Position );
+  DirectX::XMVECTOR const up      = DirectX::XMVectorSet( 0.0f, 1.0f, 0.0f, 0.0f );
+  DirectX::XMVECTOR const right   = DirectX::XMVectorSet( 1.0f, 0.0f, 0.0f, 0.0f );
+  DirectX::XMVECTOR const forward = DirectX::XMVectorSet( 0.0f, 0.0f, 1.0f, 0.0f );
 
   DirectX::XMMATRIX       views[6];
-  views[0] = DirectX::XMMatrixLookToRH( origin, right, up );
-  views[1] = DirectX::XMMatrixLookToRH( origin, DirectX::XMVectorNegate( right ), up );
-  views[2] = DirectX::XMMatrixLookToRH( origin, up, DirectX::XMVectorNegate( forward ) );
-  views[3] = DirectX::XMMatrixLookToRH( origin, DirectX::XMVectorNegate( up ), forward );
-  views[4] = DirectX::XMMatrixLookToRH( origin, forward, up );
-  views[5] = DirectX::XMMatrixLookToRH( origin, DirectX::XMVectorNegate( forward ), up );
+  views[0] = DirectX::XMMatrixLookToLH( origin, right, up );
+  views[1] = DirectX::XMMatrixLookToLH( origin, DirectX::XMVectorNegate( right ), up );
+  views[2] = DirectX::XMMatrixLookToLH( origin, up, DirectX::XMVectorNegate( forward ) );
+  views[3] = DirectX::XMMatrixLookToLH( origin, DirectX::XMVectorNegate( up ), forward );
+  views[4] = DirectX::XMMatrixLookToLH( origin, forward, up );
+  views[5] = DirectX::XMMatrixLookToLH( origin, DirectX::XMVectorNegate( forward ), up );
 
   // Projection
-  DirectX::XMMATRIX projection = DirectX::XMMatrixPerspectiveFovRH( DirectX::XM_PIDIV2, 1.0, 0.1f, point_light.Range );
+  DirectX::XMMATRIX projection = DirectX::XMMatrixPerspectiveFovLH( DirectX::XM_PIDIV2, 1.0, 0.1f, point_light.Range );
+
+  DirectX::BoundingFrustum proj_frustum;
+  DirectX::BoundingFrustum::CreateFromMatrix( proj_frustum, projection );
 
   float packed_data[4] = { point_light.Position.x, point_light.Position.y, point_light.Position.z, point_light.Range };
   command_list->SetGraphicsRoot32BitConstants(
@@ -400,21 +406,13 @@ void Ember::LightManager::RenderOmniShadow(
     desc.Texture2DArray.FirstArraySlice = view_idx;
     rtm.OMSetRenderTargets( command_list, 0, nullptr, nullptr, &texture, &desc );
 
-    auto vp_matrix = XMMatrixMultiply( lh_to_rh_correction, XMMatrixMultiply( views[view_idx], projection ) );
-    command_list->SetGraphicsRoot32BitConstants( 0, sizeof( DirectX::XMMATRIX ) / 4, &vp_matrix, 0 );
+    auto vp_matrix = XMMatrixMultiply( views[view_idx], projection );
+    command_list->SetGraphicsRoot32BitConstants(
+        0, sizeof( DirectX::XMMATRIX ) / 4, &vp_matrix, sizeof( DirectX::XMMATRIX ) / 4 );
 
-    size_t const element_count = rcq.Count();
-    for ( size_t i = 0; i < element_count; i++ )
-    {
-      command_list->IASetIndexBuffer( &rcq.Meshes[i]->IndexBuffer.GetIndexBufferView() );
-      command_list->IASetVertexBuffers( 0, 1, &rcq.Meshes[i]->VertexBuffer.GetVertexBufferView() );
-
-      command_list->SetGraphicsRoot32BitConstants(
-          0, sizeof( DirectX::XMMATRIX ) / 4, &rcq.Transforms[i].Transform, sizeof( DirectX::XMMATRIX ) / 4 );
-
-      command_list->DrawIndexedInstanced(
-          rcq.Primitives[i].IndexCount, 1, rcq.Primitives[i].FirstIndex, rcq.Primitives[i].FirstVertex, 0 );
-    }
+    DirectX::BoundingFrustum view_frustum;
+    proj_frustum.Transform( view_frustum, XMMatrixInverse( nullptr, views[view_idx] ) );
+    world.RenderShadow( command_list, view_frustum );
   }
 
   auto bottom_of_shadow_barrier = CD3DX12_RESOURCE_BARRIER::Transition(

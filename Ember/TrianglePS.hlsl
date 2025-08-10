@@ -139,16 +139,10 @@ float3 GetAmbientInfluence( BRDFCookTorranceGGX brdf, float3 view_dir )
 
 float4 TrianglePS( FSIn IN ) : SV_TARGET0
 {
-  if ( !IsValidHandle( g_Material.SamplerIndex ) )
-  {
-    return float4( 1.0f, 0.0f, 1.0f, 1.0f );
-  }
-  SamplerState           texture_sampler = g_Material.GetSampler();
-
-  float4                 albedo          = GetAlbedo( IN.TexCoord[0], texture_sampler );
-  float3                 normal = GetNormal( IN.Normal, IN.Tangent, IN.Position.xyz, IN.TexCoord[0], texture_sampler );
-  float2                 metal_rough = GetMetalRough( IN.TexCoord[0], texture_sampler );
-  float3                 emissive    = GetEmissive( IN.TexCoord[0], texture_sampler );
+  float4                 albedo = GetAlbedo( IN.TexCoord[0], g_DefaultSampler );
+  float3                 normal = GetNormal( IN.Normal, IN.Tangent, IN.Position.xyz, IN.TexCoord[0], g_DefaultSampler );
+  float2                 metal_rough = GetMetalRough( IN.TexCoord[0], g_DefaultSampler );
+  float3                 emissive    = GetEmissive( IN.TexCoord[0], g_DefaultSampler );
 
   ConstantBuffer<Camera> camera      = ResourceDescriptorHeap[g_Camera];
   float3                 view_dir    = normalize( camera.Position.xyz - IN.Position.xyz );

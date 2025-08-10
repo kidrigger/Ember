@@ -52,5 +52,6 @@ public:
   void                              SetHorizontalFoV( float fov );
 
   [[nodiscard]] CBVHandle           PrepareFrame( uint32_t frame_index );
+  DirectX::BoundingFrustum          GetFrustum() const;
 };
 } // namespace Ember

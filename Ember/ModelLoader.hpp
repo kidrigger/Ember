@@ -51,7 +51,7 @@ class ModelLoader
     Model*                 Model;
     MeshData*              MeshData;
     std::vector<Vertex>*   Vertices;
-    std::vector<uint16_t>* Indices;
+    std::vector<uint32_t>* Indices;
   };
 
   RenderDevice*  m_RenderDevice;

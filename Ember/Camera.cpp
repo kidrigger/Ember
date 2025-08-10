@@ -93,3 +93,12 @@ Ember::CBVHandle Ember::Camera::PrepareFrame( uint32_t const frame_index )
 
   return m_CameraBuffer[frame_index].GetCBVHandle();
 }
+
+DirectX::BoundingFrustum Ember::Camera::GetFrustum() const
+{
+  DirectX::BoundingFrustum frustum;
+  DirectX::BoundingFrustum frustum_out;
+  DirectX::BoundingFrustum::CreateFromMatrix( frustum, m_Repr.Projection, true );
+  frustum.Transform( frustum_out, m_Repr.InvView );
+  return frustum_out;
+}

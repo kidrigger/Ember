@@ -29,14 +29,14 @@ struct Material
   RID           NormalTextureIndex;     // 08
   RID           MetalRoughTextureIndex; // 12
   RID           EmissiveTextureIndex;   // 16
-  SamplerID     SamplerIndex;           // 20
-  PackedColor32 BaseColorFactor;        // 24
-  PackedColor32 EmissiveFactor;         // 28
-  float         EmissiveStrength;       // 32
-  float         Metal;                  // 36
-  float         Rough;                  // 40
-  float         AlphaCutoff;            // 44
-  float         Pad0;                   // 48
+  PackedColor32 BaseColorFactor;        // 20
+  PackedColor32 EmissiveFactor;         // 24
+  float         EmissiveStrength;       // 28
+  float         Metal;                  // 32
+  float         Rough;                  // 36
+  float         AlphaCutoff;            // 40
+  float         Pad0;                   // 44
+  float         Pad1;                   // 48
 
   Texture2D     GetBaseColorTexture()
   {
@@ -56,11 +56,6 @@ struct Material
   Texture2D GetEmissiveTexture()
   {
     return ResourceDescriptorHeap[EmissiveTextureIndex];
-  }
-
-  SamplerState GetSampler()
-  {
-    return SamplerDescriptorHeap[SamplerIndex];
   }
 };
 
