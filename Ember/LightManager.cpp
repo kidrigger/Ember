@@ -4,80 +4,56 @@
 #include "RenderTargetManager.hpp"
 #include "Util/DataUtil.hpp"
 
-Ember::LightManager::PointLightHandle::PointLightHandle( uint16_t const inner, uint16_t const generation )
+Ember::OmniLightHandle::OmniLightHandle( uint16_t const inner, uint16_t const generation )
   : m_Inner{ inner }, m_Generation{ generation }
 {}
 
-uint16_t Ember::LightManager::PointLightHandle::GetInner() const
+uint16_t Ember::OmniLightHandle::GetIndex() const
 {
   return m_Inner;
 }
 
-uint16_t Ember::LightManager::PointLightHandle::GetGeneration() const
+uint16_t Ember::OmniLightHandle::GetGeneration() const
 {
   return m_Generation;
 }
 
+std::strong_ordering Ember::OmniLightHandle::operator<=>( OmniLightHandle const& other ) const
+{
+  std::strong_ordering const x = m_Generation <=> other.m_Generation;
+  if ( x == 0 )
+  {
+    return m_Inner <=> other.m_Inner;
+  }
+  return x;
+}
+
 Ember::LightManager::LightManager(
-    Buffer                      point_shadow_proj,
+    RenderDevice*               render_device,
     std::vector<Buffer>         buffers,
-    std::vector<Texture>        textures,
     ComPtr<ID3D12PipelineState> shadow_pipeline,
     ComPtr<ID3D12RootSignature> shadow_root_signature )
-  : m_ShadowRootSignature{ std::move( shadow_root_signature ) }
+  : m_RenderDevice{ render_device }
+  , m_ShadowRootSignature{ std::move( shadow_root_signature ) }
   , m_ShadowPipeline{ std::move( shadow_pipeline ) }
-  , m_PointShadowProjection{ std::move( point_shadow_proj ) }
   , m_PointLightBuffers{ std::move( buffers ) }
-  , m_PointShadowMaps{ std::move( textures ) }
   , m_DirtyFrames{ ( uint8_t )buffers.size() }
 {
-  for ( uint16_t i = 0; i < kMaxPointLights; ++i )
+  for ( uint16_t i = 0; i < kMaxOmniLights; ++i )
   {
     m_IndirectionMap[i] = i + 1;
   }
   m_FreeHead = 0;
-
-  memset( DataOf( m_PointShadowMapOwner ), 0xFFFF, ByteSizeOf( m_PointShadowMapOwner ) );
 }
 
-void Ember::LightManager::Create(
-    LightManager* light_manager, RenderDevice* render_device, uint32_t const num_frames, uint32_t const max_shadows )
+void Ember::LightManager::Create( LightManager* light_manager, RenderDevice* render_device, uint32_t const num_frames )
 {
   std::vector<Buffer> buffers;
   buffers.reserve( num_frames );
   for ( uint32_t i = 0; i < num_frames; i++ )
   {
     buffers.push_back(
-        render_device->CreateStorageBuffer( sizeof( PointLight ) * kMaxPointLights, sizeof( PointLight ) ) );
-  }
-
-  DirectX::XMVECTOR const origin  = DirectX::XMVectorSet( 0.0f, 0.0f, 0.0f, 1.0f );
-  DirectX::XMVECTOR const up      = DirectX::XMVectorSet( 0.0f, 1.0f, 0.0f, 0.0f );
-  DirectX::XMVECTOR const right   = DirectX::XMVectorSet( 1.0f, 0.0f, 0.0f, 0.0f );
-  DirectX::XMVECTOR const forward = DirectX::XMVectorSet( 0.0f, 0.0f, -1.0f, 0.0f );
-  DirectX::XMMATRIX       projections[6];
-  projections[0] = DirectX::XMMatrixLookToRH( origin, right, up );
-  projections[1] = DirectX::XMMatrixLookToRH( origin, DirectX::XMVectorNegate( right ), up );
-  projections[2] = DirectX::XMMatrixLookToRH( origin, up, forward );
-  projections[3] =
-      DirectX::XMMatrixLookToRH( origin, DirectX::XMVectorNegate( up ), DirectX::XMVectorNegate( forward ) );
-  projections[4]           = DirectX::XMMatrixLookToRH( origin, forward, up );
-  projections[5]           = DirectX::XMMatrixLookToRH( origin, DirectX::XMVectorNegate( forward ), up );
-
-  Buffer projection_buffer = render_device->CreateConstantBuffer( ByteSizeOf( projections ) );
-  projection_buffer.Write( 0, ByteSizeOf( projections ), DataOf( projections ) );
-
-  std::vector<Texture> shadow_maps;
-  shadow_maps.reserve( max_shadows );
-  for ( uint32_t i = 0; i < max_shadows; i++ )
-  {
-    shadow_maps.push_back( render_device->CreateTextureCube( {
-        .Format    = DXGI_FORMAT_D16_UNORM,
-        .Side      = kOmniShadowResolution,
-        .Usage     = TextureUsage::kDepthSample,
-        .MipLevels = MipLevels::kBase,
-        .InitState = D3D12_RESOURCE_STATE_PIXEL_SHADER_RESOURCE,
-    } ) );
+        render_device->CreateStorageBuffer( sizeof( OmniLight ) * kMaxOmniLights, sizeof( OmniLight ) ) );
   }
 
   ComPtr<ID3DBlob> shadow_vs;
@@ -155,8 +131,10 @@ void Ember::LightManager::Create(
   ERR_ABORT( render_device->GetDevice()->CreatePipelineState( &desc, IID_PPV_ARGS( &shadow_pipeline ) ) );
 
   new ( light_manager ) LightManager{
-    std::move( projection_buffer ), std::move( buffers ),         std::move( shadow_maps ),
-    std::move( shadow_pipeline ),   std::move( shadow_root_sig ),
+    render_device,
+    std::move( buffers ),
+    std::move( shadow_pipeline ),
+    std::move( shadow_root_sig ),
   };
 }
 
@@ -165,7 +143,7 @@ void Ember::LightManager::SetDirty()
   m_DirtyFrames = ( uint8_t )m_PointLightBuffers.size();
 }
 
-Ember::LightManager::PointLightHandle Ember::LightManager::AddPointLight(
+Ember::OmniLightHandle Ember::LightManager::AddOmniLight(
     DirectX::XMFLOAT3 const position,
     float const             range,
     Color32 const           color,
@@ -173,7 +151,7 @@ Ember::LightManager::PointLightHandle Ember::LightManager::AddPointLight(
     float const             attenuation )
 {
 
-  ASSERT_M( m_PointLightCount < kMaxPointLights, "All free locs exhausted" );
+  ASSERT_M( m_PointLightCount < kMaxOmniLights, "All free locs exhausted" );
 
   uint16_t const true_index = m_PointLightCount;
   uint16_t const index      = m_FreeHead;
@@ -196,10 +174,10 @@ Ember::LightManager::PointLightHandle Ember::LightManager::AddPointLight(
 
   SetDirty();
 
-  return PointLightHandle{ index, generation };
+  return OmniLightHandle{ index, generation };
 }
 
-Ember::LightManager::PointLightHandle Ember::LightManager::AddShadowingPointLight(
+Ember::OmniLightHandle Ember::LightManager::AddShadowingOmniLight(
     DirectX::XMFLOAT3 const position,
     float const             range,
     Color32 const           color,
@@ -207,17 +185,19 @@ Ember::LightManager::PointLightHandle Ember::LightManager::AddShadowingPointLigh
     float const             attenuation )
 {
 
-  ASSERT_M( m_PointLightCount < kMaxPointLights, "All free locs exhausted" );
+  ASSERT_M( m_PointLightCount < kMaxOmniLights, "All free locs exhausted" );
 
   // Relocate the location to allocate at.
   SwapTrueLocations( m_ShadowingPointLightCount, m_PointLightCount );
 
-  uint16_t const true_index = m_ShadowingPointLightCount;
-  uint16_t const index      = m_FreeHead;
+  uint16_t const        true_index = m_ShadowingPointLightCount;
+  uint16_t const        index      = m_FreeHead;
 
-  uint16_t const generation = m_Generation[true_index];
+  uint16_t const        generation = m_Generation[true_index];
 
-  SRVHandle      shadow_map = AllocatePointShadowMap( index );
+  OmniLightHandle const handle{ index, generation };
+
+  SRVHandle const       shadow_map = AllocateOmniShadow( handle );
 
   ASSERT( shadow_map );
 
@@ -237,7 +217,7 @@ Ember::LightManager::PointLightHandle Ember::LightManager::AddShadowingPointLigh
 
   SetDirty();
 
-  return PointLightHandle{ index, generation };
+  return handle;
 }
 
 void Ember::LightManager::SwapTrueLocations( uint16_t const first, uint16_t const second )
@@ -255,38 +235,47 @@ void Ember::LightManager::SwapTrueLocations( uint16_t const first, uint16_t cons
   std::swap( m_PointLights[first], m_PointLights[second] );
 }
 
-Ember::SRVHandle Ember::LightManager::AllocatePointShadowMap( uint16_t const point_light_idx )
+Ember::SRVHandle Ember::LightManager::AllocateOmniShadow( OmniLightHandle const point_light_idx )
 {
-  uint32_t const len = CountOf( m_PointShadowMapOwner );
-  for ( uint32_t i = 0; i < len; i++ )
+  ASSERT( not m_OmniShadowsInUse.contains( point_light_idx ) );
+
+  Texture tex;
+  if ( m_OmniShadowCache.empty() )
   {
-    if ( m_PointShadowMapOwner[i] == UINT16_MAX )
-    {
-      m_PointShadowMapOwner[i] = point_light_idx;
-      return m_PointShadowMaps[i].GetSRVHandle();
-    }
+    tex = m_RenderDevice->CreateTextureCube( {
+        .Format    = DXGI_FORMAT_D16_UNORM,
+        .Side      = kOmniShadowResolution,
+        .Usage     = TextureUsage::kDepthSample,
+        .MipLevels = MipLevels::kBase,
+        .InitState = D3D12_RESOURCE_STATE_PIXEL_SHADER_RESOURCE,
+    } );
+  }
+  else
+  {
+    tex = m_OmniShadowCache.front();
+    m_OmniShadowCache.pop();
   }
 
-  return {};
+  SRVHandle const handle              = tex.GetSRVHandle();
+  m_OmniShadowsInUse[point_light_idx] = std::move( tex );
+  return handle;
 }
 
-void Ember::LightManager::FreePointShadowMap( uint16_t const point_light_idx )
+void Ember::LightManager::FreeOmniShadow( OmniLightHandle const point_light_idx )
 {
-  uint32_t const len = CountOf( m_PointShadowMapOwner );
-  for ( uint32_t i = 0; i < len; i++ )
+  if ( auto const it = m_OmniShadowsInUse.find( point_light_idx ); it != m_OmniShadowsInUse.end() )
   {
-    if ( m_PointShadowMapOwner[i] == point_light_idx )
-    {
-      m_PointShadowMapOwner[i] = UINT16_MAX;
-    }
+    m_OmniShadowCache.push( it->second );
+    m_OmniShadowsInUse.erase( it );
+    return;
   }
 
   UNREACHABLE_M( "Point Light should be actually allocated." );
 }
 
-void Ember::LightManager::Free( PointLightHandle const point_light_handle )
+void Ember::LightManager::Free( OmniLightHandle const point_light_handle )
 {
-  uint16_t const index      = point_light_handle.GetInner();
+  uint16_t const index      = point_light_handle.GetIndex();
   uint16_t const generation = point_light_handle.GetGeneration();
 
   uint16_t const true_index = m_IndirectionMap[index];
@@ -306,7 +295,7 @@ void Ember::LightManager::Free( PointLightHandle const point_light_handle )
     // Then swap with last light
     SwapTrueLocations( last_shadowing_idx, last_point_light_idx );
 
-    FreePointShadowMap( index );
+    FreeOmniShadow( point_light_handle );
     m_PointLights[last_point_light_idx].ShadowMap = {};
   }
   else
@@ -327,16 +316,11 @@ Ember::SRVHandle Ember::LightManager::PrepareFrame( uint32_t const frame_index )
 {
   if ( m_DirtyFrames )
   {
-    m_PointLightBuffers[frame_index].Write( 0, sizeof( PointLight ) * m_PointLightCount, DataOf( m_PointLights ) );
+    m_PointLightBuffers[frame_index].Write( 0, sizeof( OmniLight ) * m_PointLightCount, DataOf( m_PointLights ) );
     m_DirtyFrames--;
   }
 
   return m_PointLightBuffers[frame_index].GetSRVHandle();
-}
-
-Ember::CBVHandle Ember::LightManager::GetOmniProjectionsHandle() const
-{
-  return m_PointShadowProjection.GetCBVHandle();
 }
 
 uint16_t Ember::LightManager::GetPointLightCount() const
@@ -356,12 +340,10 @@ void Ember::LightManager::RenderAllShadows(
   command_list->SetPipelineState( m_ShadowPipeline.Get() );
   command_list->IASetPrimitiveTopology( D3D_PRIMITIVE_TOPOLOGY_TRIANGLELIST );
 
-  uint32_t const len = CountOf( m_PointShadowMapOwner );
-  for ( uint32_t i = 0; i < len; i++ )
+  for ( auto& [handle, texture] : m_OmniShadowsInUse )
   {
-    if ( m_PointShadowMapOwner[i] == 0xFFFF ) continue;
-
-    RenderOmniShadow( command_list, rcq, rtm, m_PointLights[m_PointShadowMapOwner[i]], m_PointShadowMaps[i] );
+    ASSERT( handle.GetGeneration() == m_Generation[handle.GetGeneration()] );
+    RenderOmniShadow( command_list, rcq, rtm, m_PointLights[handle.GetIndex()], texture );
   }
 }
 
@@ -369,7 +351,7 @@ void Ember::LightManager::RenderOmniShadow(
     ID3D12GraphicsCommandList* command_list,
     RenderCommandQueue const&  rcq,
     RenderTargetManager const& rtm,
-    PointLight const&          point_light,
+    OmniLight const&           point_light,
     Texture const&             texture )
 {
   auto top_of_shadow_barrier = CD3DX12_RESOURCE_BARRIER::Transition(

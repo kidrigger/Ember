@@ -452,9 +452,9 @@ void Ember::BasicApp::LoadContent()
 
   // Setup Lights
   LightManager::Create( m_LightManager.get(), m_RenderDevice.get(), RenderDevice::kNumFrames );
-  m_LightManager->AddShadowingPointLight( { -1.0f, 2.0f, 0.0f }, 15.0f, Color32::Blue(), 15.0f );
-  m_LightManager->AddShadowingPointLight( { 0.0f, 2.0f, 0.0f }, 15.0f, Color32::Green(), 15.0f );
-  m_LightManager->AddShadowingPointLight( { 1.0f, 2.0f, 0.0f }, 15.0f, Color32::Red(), 15.0f );
+  m_LightManager->AddShadowingOmniLight( { -1.0f, 2.0f, 0.0f }, 15.0f, Color32::Blue(), 15.0f );
+  m_LightManager->AddShadowingOmniLight( { 0.0f, 2.0f, 0.0f }, 15.0f, Color32::Green(), 15.0f );
+  m_LightManager->AddShadowingOmniLight( { 1.0f, 2.0f, 0.0f }, 15.0f, Color32::Red(), 15.0f );
 
   // Setup Scene Geometry
   RotModel* rm    = m_World->CreateObject<RotModel>( 0.0f );

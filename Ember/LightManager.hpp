@@ -1,19 +1,40 @@
 #pragma once
 
+#include <map>
+
 #include "Color.hpp"
 #include "RenderDevice.hpp"
 #include "RenderTargetManager.hpp"
+#include "Util/DataUtil.hpp"
 #include "Util/DirectXHeaders.hpp"
 
 namespace Ember
 {
 struct RenderCommandQueue;
 
+class OmniLightHandle
+{
+  uint16_t static constexpr kInvalid{ UINT16_MAX };
+
+  uint16_t m_Inner{ kInvalid };
+  uint16_t m_Generation{ kInvalid };
+
+public:
+  OmniLightHandle() = default;
+  explicit OmniLightHandle( uint16_t inner, uint16_t generation );
+
+  [[nodiscard]] uint16_t GetIndex() const;
+  [[nodiscard]] uint16_t GetGeneration() const;
+
+  std::strong_ordering   operator<=>( OmniLightHandle const& ) const;
+};
+
 class LightManager
 {
-  uint16_t constexpr static kMaxPointLights = 32;
+  uint16_t constexpr static kMaxOmniLights        = 32;
+  uint32_t constexpr static kOmniShadowResolution = 1024;
 
-  struct PointLight
+  struct OmniLight
   {
     DirectX::XMFLOAT3 Position{ 0.0f, 0.0f, 0.0f }; // 12
     float             Range{ -1.0f };               // 16
@@ -30,69 +51,46 @@ class LightManager
     int                           Index;
   };
 
-public:
-  class PointLightHandle
-  {
-    uint16_t static constexpr kInvalid{ UINT16_MAX };
+  RenderDevice*                      m_RenderDevice{ nullptr };
+  OmniLight                          m_PointLights[kMaxOmniLights]{};
+  ShadowInfo                         m_ShadowInfo[kMaxOmniLights]{};
+  uint16_t                           m_IndirectionMap[kMaxOmniLights]{};
+  uint16_t                           m_Generation[kMaxOmniLights]{};
+  ComPtr<ID3D12RootSignature>        m_ShadowRootSignature;
+  ComPtr<ID3D12PipelineState>        m_ShadowPipeline;
+  std::vector<Buffer>                m_PointLightBuffers;
+  std::queue<Texture>                m_OmniShadowCache;
+  std::map<OmniLightHandle, Texture> m_OmniShadowsInUse;
+  uint16_t                           m_FreeHead{ UINT16_MAX };
+  uint16_t                           m_PointLightCount{ 0 };
+  uint16_t                           m_ShadowingPointLightCount{ 0 };
+  uint8_t                            m_DirtyFrames{ 0 };
 
-    uint16_t m_Inner{ kInvalid };
-    uint16_t m_Generation{ kInvalid };
+  static_assert( std::numeric_limits<std::remove_cvref_t<decltype( m_IndirectionMap[0] )>>::max() > kMaxOmniLights );
 
-  public:
-    PointLightHandle() = default;
-    explicit PointLightHandle( uint16_t inner, uint16_t generation );
+  void      SetDirty();
+  void      SwapTrueLocations( uint16_t first, uint16_t second );
 
-    [[nodiscard]] uint16_t GetInner() const;
-    [[nodiscard]] uint16_t GetGeneration() const;
-  };
-
-private:
-  uint32_t constexpr static kOmniShadowResolution   = 1024;
-  uint32_t constexpr static kMaxPointShadowMapCount = 32; // Based on m_PointShadowMapInUseFlags being 32 bits
-
-  PointLight                  m_PointLights[kMaxPointLights]{};
-  ShadowInfo                  m_ShadowInfo[kMaxPointLights]{};
-  uint16_t                    m_IndirectionMap[kMaxPointLights]{};
-  uint16_t                    m_Generation[kMaxPointLights]{};
-  ComPtr<ID3D12RootSignature> m_ShadowRootSignature;
-  ComPtr<ID3D12PipelineState> m_ShadowPipeline;
-  Buffer                      m_PointShadowProjection;
-  std::vector<Buffer>         m_PointLightBuffers;
-  std::vector<Texture>        m_PointShadowMaps;
-  uint16_t                    m_PointShadowMapOwner[kMaxPointShadowMapCount]{};
-  uint16_t                    m_FreeHead{ UINT16_MAX };
-  uint16_t                    m_PointLightCount{ 0 };
-  uint16_t                    m_ShadowingPointLightCount{ 0 };
-  uint8_t                     m_DirtyFrames{ 0 };
-
-  static_assert( std::numeric_limits<std::remove_cvref_t<decltype( m_IndirectionMap[0] )>>::max() > kMaxPointLights );
-
-  void             SetDirty();
-  void             SwapTrueLocations( uint16_t first, uint16_t second );
-
-  Ember::SRVHandle AllocatePointShadowMap( uint16_t point_light_idx );
-  void             FreePointShadowMap( uint16_t point_light_idx );
+  SRVHandle AllocateOmniShadow( OmniLightHandle point_light_idx );
+  void      FreeOmniShadow( OmniLightHandle point_light_idx );
 
 public:
   LightManager() = default;
   explicit LightManager(
-      Buffer                      point_shadow_proj,
+      RenderDevice*               render_device,
       std::vector<Buffer>         buffers,
-      std::vector<Texture>        textures,
       ComPtr<ID3D12PipelineState> shadow_pipeline,
       ComPtr<ID3D12RootSignature> shadow_root_signature );
 
-  static void Create(
-      LightManager* light_manager, RenderDevice* render_device, uint32_t num_frames, uint32_t max_shadows = 4 );
+  static void     Create( LightManager* light_manager, RenderDevice* render_device, uint32_t num_frames );
 
-  PointLightHandle AddPointLight(
+  OmniLightHandle AddOmniLight(
       DirectX::XMFLOAT3 position, float range, Color32 color, float intensity, float attenuation = 1.0f );
-  PointLightHandle AddShadowingPointLight(
+  OmniLightHandle AddShadowingOmniLight(
       DirectX::XMFLOAT3 position, float range, Color32 color, float intensity, float attenuation = 1.0f );
-  void                   Free( PointLightHandle point_light_handle );
+  void                   Free( OmniLightHandle point_light_handle );
 
   SRVHandle              PrepareFrame( uint32_t frame_index );
-  CBVHandle              GetOmniProjectionsHandle() const;
   [[nodiscard]] uint16_t GetPointLightCount() const;
   [[nodiscard]] uint16_t GetShadowingPointLightCount() const;
 
@@ -104,7 +102,7 @@ public:
       ID3D12GraphicsCommandList* command_list,
       RenderCommandQueue const&  rcq,
       RenderTargetManager const& rtm,
-      PointLight const&          point_light,
+      OmniLight const&           point_light,
       Texture const&             texture );
 };
 
