@@ -186,8 +186,11 @@ void Ember::ModelLoader::ProcessMesh( LoadingContext* context, flecs::entity own
     }
   }
 
+  DirectX::BoundingBox bb;
+  DirectX::BoundingBox::CreateFromPoints( bb, bb_min, bb_max );
+
   ( void )owning.set<Mesh>( { std::move( primitive_acc ), World::GeometryManager().Copy( geometry ) } )
-      .add<LocalBoundingBox>();
+      .set<LocalBoundingBox>( { bb } );
 }
 
 bool Ember::ModelLoader::TryLoadTexture(

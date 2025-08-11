@@ -29,6 +29,11 @@ void Ember::CullInfo::SetCulled( uint64_t const mask )
   CullMask |= mask;
 }
 
+void Ember::CullInfo::ClearCulled( uint64_t const mask )
+{
+  CullMask &= ~mask;
+}
+
 uint32_t Ember::Material::AddRef()
 {
   return ++RefCount;
@@ -142,6 +147,8 @@ Ember::World::World()
 
   m_CullDescentQuery =
       m_Ecs.query_builder<CullInfo, WorldBoundingBox const, CullInfo const>().term_at( 2 ).parent().cascade().build();
+
+  m_RenderQuery = m_Ecs.query_builder<WorldTransform const, CullInfo const, Mesh const>().build();
 }
 
 void Ember::World::Update( float delta_seconds ) const
@@ -193,7 +200,7 @@ void Ember::World::Render( ID3D12GraphicsCommandList* command_list, DirectX::Bou
   ZoneScoped;
 
   // Clear cull flags;
-  m_Ecs.each( []( CullInfo& cull_info ) { cull_info.SetCulled( 0 ); } );
+  m_Ecs.each( []( CullInfo& cull_info ) { cull_info.ClearCulled( UINT64_MAX ); } );
 
   uint64_t const cull_mask = 0x1;
   {
@@ -214,9 +221,11 @@ void Ember::World::Render( ID3D12GraphicsCommandList* command_list, DirectX::Bou
   {
     ZoneScopedN( "RecordCmdList" );
 
-    m_Ecs.each(
-        [&]( WorldTransform const& wt, Mesh const& mesh )
+    m_RenderQuery.each(
+        [&]( WorldTransform const& wt, CullInfo const& cull_info, Mesh const& mesh )
         {
+          if ( cull_info.IsCulled( cull_mask ) ) return;
+
           for ( Primitive const& primitive : mesh.Primitives )
           {
             DirectX::BoundingBox bb;

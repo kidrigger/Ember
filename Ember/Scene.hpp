@@ -47,10 +47,11 @@ struct WorldBoundingBox
 
 struct CullInfo
 {
-  uint64_t           CullMask;
+  uint64_t           CullMask{ 0 };
 
   [[nodiscard]] bool IsCulled( uint64_t mask ) const;
   void               SetCulled( uint64_t mask );
+  void               ClearCulled( uint64_t mask );
 };
 
 struct Material
@@ -137,6 +138,7 @@ class World
   flecs::query<WorldBoundingBox>                                               m_PrimeCollectingWorldAABBQuery;
   flecs::query<WorldBoundingBox, WorldBoundingBox const>                       m_UpdateWorldAABBQuery;
   flecs::query<CullInfo, WorldBoundingBox const, CullInfo const>               m_CullDescentQuery;
+  flecs::query<WorldTransform const, CullInfo const, Mesh const>               m_RenderQuery;
 
 public:
   static ObjectPool<Geometry>& GeometryManager();

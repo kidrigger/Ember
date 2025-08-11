@@ -445,14 +445,15 @@ void Ember::BasicApp::LoadContent()
   // Setup Scene Geometry
   flecs::entity const sponza = m_ModelLoader->TryLoadModel( "Bistro.glb" ).value().set_name( "Scene" );
 
-  flecs::entity const rm     = m_World.GetECS()
-                               .entity( "HelmetRotator" )
-                               .insert(
-                                   []( LocalTransform& lt, WorldTransform&, RotatingModel& rm, WorldBoundingBox& )
-                                   {
-                                     rm.Speed       = 20.0f;
-                                     lt.Translation = DirectX::XMVectorSet( 0.0f, 1.0f, 5.0f, 1.0f );
-                                   } );
+  flecs::entity const rm =
+      m_World.GetECS()
+          .entity( "HelmetRotator" )
+          .insert(
+              []( LocalTransform& lt, WorldTransform&, RotatingModel& rm, WorldBoundingBox&, CullInfo& )
+              {
+                rm.Speed       = 20.0f;
+                lt.Translation = DirectX::XMVectorSet( 0.0f, 1.0f, 5.0f, 1.0f );
+              } );
   flecs::entity const model           = m_ModelLoader->TryLoadModel( "DamagedHelmet.glb" )->child_of( rm );
 
   LocalTransform*     helmet_local_tx = model.get_mut<LocalTransform>();
@@ -461,7 +462,9 @@ void Ember::BasicApp::LoadContent()
   ASSERT( model );
 
   constexpr char const* kEnvMapFile = "OvercastSoil.hdr";
-  ASSERT( Environment::TryLoadFrom( m_Environment.get(), m_RenderDevice.get(), m_TextureLoader.get(), kEnvMapFile ) );
+  bool const            env_loaded =
+      Environment::TryLoadFrom( m_Environment.get(), m_RenderDevice.get(), m_TextureLoader.get(), kEnvMapFile );
+  ASSERT( env_loaded );
 
   SetupRenderPipeline();
 
@@ -514,10 +517,10 @@ void Ember::BasicApp::Update()
   m_ModelLoader->Update();
   m_TextureLoader->Update();
 
-  float mouse_dx = ( ( float )g_Input.MousePosX - ( float )m_PrevMouseX ) / ( float )m_WindowWidth;
-  float mouse_dy = ( ( float )g_Input.MousePosY - ( float )m_PrevMouseY ) / ( float )m_WindowHeight;
-  m_PrevMouseX   = g_Input.MousePosX;
-  m_PrevMouseY   = g_Input.MousePosY;
+  float const mouse_dx = ( ( float )g_Input.MousePosX - ( float )m_PrevMouseX ) / ( float )m_WindowWidth;
+  float const mouse_dy = ( ( float )g_Input.MousePosY - ( float )m_PrevMouseY ) / ( float )m_WindowHeight;
+  m_PrevMouseX         = g_Input.MousePosX;
+  m_PrevMouseY         = g_Input.MousePosY;
 
   if ( g_Input.IsRightMouseDown )
     m_Camera->SetYawPitch(
@@ -561,10 +564,10 @@ void Ember::BasicApp::RenderScene( ID3D12GraphicsCommandList* command_list, uint
 {
   ZoneScoped;
 
-  CBVHandle const          camera_cbv     = m_Camera->PrepareFrame( frame_idx );
-  SRVHandle const          light_srv      = m_LightManager->PrepareFrame( frame_idx );
+  CBVHandle const                camera_cbv     = m_Camera->PrepareFrame( frame_idx );
+  SRVHandle const                light_srv      = m_LightManager->PrepareFrame( frame_idx );
 
-  DirectX::BoundingFrustum camera_frustum = m_Camera->GetFrustum();
+  DirectX::BoundingFrustum const camera_frustum = m_Camera->GetFrustum();
 
   // Viewport and scissor
   D3D12_VIEWPORT const viewport = {
@@ -609,11 +612,11 @@ void Ember::BasicApp::Render()
 {
   ZoneScoped;
 
-  ID3D12Resource*          backbuffer     = m_RenderDevice->GetCurrentBackbuffer();
-  Context::CommandList     command_list   = m_RenderDevice->GetGraphicsCommandList();
-  uint32_t const           frame_idx      = m_RenderDevice->GetCurrentFrameIndex();
+  ID3D12Resource*                backbuffer     = m_RenderDevice->GetCurrentBackbuffer();
+  Context::CommandList           command_list   = m_RenderDevice->GetGraphicsCommandList();
+  uint32_t const                 frame_idx      = m_RenderDevice->GetCurrentFrameIndex();
 
-  DirectX::BoundingFrustum camera_frustum = m_Camera->GetFrustum();
+  DirectX::BoundingFrustum const camera_frustum = m_Camera->GetFrustum();
 
   // All resources for this frame are guaranteed to be available for CPU modification at this time.
   // Clear Backbuffer
