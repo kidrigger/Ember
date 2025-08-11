@@ -13,6 +13,7 @@
 #include "Util/DataUtil.hpp"
 #include "Util/HelperUtils.hpp"
 #include "Util/PerfCounter.hpp"
+#include "Util/Profiling.hpp"
 
 void ParseArguments( bool* use_warp, uint32_t* client_width, uint32_t* client_height )
 {
@@ -360,10 +361,10 @@ void Ember::BasicApp::SetupRenderPipeline()
       root_signature_blob->GetBufferSize(),
       IID_PPV_ARGS( &m_RootSignature ) ) );
 
-  D3D12_RT_FORMAT_ARRAY rtv_formats = {
+  D3D12_RT_FORMAT_ARRAY rtv_formats{
+    .RTFormats        = { DXGI_FORMAT_R8G8B8A8_UNORM },
     .NumRenderTargets = 1,
   };
-  rtv_formats.RTFormats[0] = DXGI_FORMAT_R8G8B8A8_UNORM;
 
   CD3DX12_RASTERIZER_DESC2 rasterizer_desc{ D3D12_DEFAULT };
   rasterizer_desc.FrontCounterClockwise = true;
@@ -453,9 +454,9 @@ void Ember::BasicApp::LoadContent()
 
   // Setup Lights
   LightManager::Create( m_LightManager.get(), m_RenderDevice.get(), RenderDevice::kNumFrames );
-  m_LightManager->AddShadowingOmniLight( { -1.0f, 2.0f, -1.0f }, 10.0f, Color32::Blue(), 15.0f );
-  m_LightManager->AddShadowingOmniLight( { 0.0f, 2.0f, 0.0f }, 10.0f, Color32::Green(), 15.0f );
-  m_LightManager->AddShadowingOmniLight( { 1.0f, 2.0f, 0.0f }, 10.0f, Color32::Red(), 15.0f );
+  m_LightManager->AddShadowingOmniLight( { 15.0f, 2.0f, 12.0f }, 10.0f, Color32::Blue(), 15.0f );
+  m_LightManager->AddShadowingOmniLight( { 0.0f, 2.0f, 5.0f }, 10.0f, Color32::Green(), 15.0f );
+  m_LightManager->AddShadowingOmniLight( { -15.0f, 2.0f, -5.0f }, 10.0f, Color32::Red(), 15.0f );
 
   // Setup Scene Geometry
   RotModel* rm    = m_World->CreateObject<RotModel>( 0.0f );
@@ -498,20 +499,24 @@ void Ember::BasicApp::LoadContent()
 
 void Ember::BasicApp::Update()
 {
+  ZoneScoped;
+
   m_PerfCounter->Tick();
 
-  double const avg_delta_ms = m_PerfCounter->GetAvgFrameTime();
-  double const avg_fps      = 1000.0f / avg_delta_ms;
+  double const avg_delta_ms    = m_PerfCounter->GetAvgFrameTime();
+  double const avg_fps         = 1000.0f / avg_delta_ms;
 
-  size_t const vertex_count = DebugInfo::Instance().GetVertexCount();
+  size_t const vertex_count    = DebugInfo::Instance().GetVertexCount();
+  size_t const draw_call_count = DebugInfo::Instance().GetDrawCallCount();
 
   swprintf_s(
       m_SprintfBuffer,
-      L"Ember %ux%u | frame time: %.2lf ms (%.2lf fps) | Vertices: %llu",
+      L"Ember %ux%u | frame time: %.2lf ms (%.2lf fps) | DrawCalls: %llu, Vertices: %llu",
       m_WindowWidth,
       m_WindowHeight,
       avg_delta_ms,
       avg_fps,
+      draw_call_count,
       vertex_count );
 
   SetWindowText( m_WindowHandle, m_SprintfBuffer );
@@ -556,6 +561,8 @@ void Ember::BasicApp::Update()
 
 void Ember::BasicApp::RenderScene( ID3D12GraphicsCommandList* command_list, uint32_t frame_idx ) const
 {
+  ZoneScoped;
+
   CBVHandle const          camera_cbv     = m_Camera->PrepareFrame( frame_idx );
   SRVHandle const          light_srv      = m_LightManager->PrepareFrame( frame_idx );
 
@@ -602,6 +609,8 @@ void Ember::BasicApp::RenderScene( ID3D12GraphicsCommandList* command_list, uint
 
 void Ember::BasicApp::Render()
 {
+  ZoneScoped;
+
   ID3D12Resource*          backbuffer     = m_RenderDevice->GetCurrentBackbuffer();
   Context::CommandList     command_list   = m_RenderDevice->GetGraphicsCommandList();
   uint32_t const           frame_idx      = m_RenderDevice->GetCurrentFrameIndex();
@@ -620,8 +629,8 @@ void Ember::BasicApp::Render()
 
   m_LightManager->RenderAllShadows( command_list.Get(), *m_World.get(), *m_RenderTargetManager, camera_frustum );
 
-  FLOAT constexpr cornflower_blue[] = { 0.4f, 0.6f, 0.9f, 1.0f };
-  m_RenderTargetManager->ClearRenderTargetView( command_list.Get(), m_RenderTexture, cornflower_blue );
+  FLOAT constexpr kBlack[4] = {};
+  m_RenderTargetManager->ClearRenderTargetView( command_list.Get(), m_RenderTexture, kBlack );
   m_RenderTargetManager->ClearDepthStencilView( command_list.Get(), m_DepthTexture, D3D12_CLEAR_FLAG_DEPTH, 1.0f, 0 );
 
   RenderScene( command_list.Get(), frame_idx );

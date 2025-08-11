@@ -4,6 +4,7 @@
     "directx-headers",
     "d3d12-memory-allocator",
     "directxtex",
-    "cgltf"
+    "cgltf",
+    "tracy"
   ]
 }

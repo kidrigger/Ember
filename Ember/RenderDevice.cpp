@@ -86,7 +86,7 @@ D3D_ROOT_SIGNATURE_VERSION Ember::RenderDevice::FetchHighestRootSignatureVersion
 
 void Ember::RenderDevice::Create( RenderDevice* render_device, HWND window_handle, bool const use_warp )
 {
-#if defined( _DEBUG )
+#if defined( _DEBUG ) or defined( RELDEBUG )
   {
     ComPtr<ID3D12Debug>  debug_interface;
     ComPtr<ID3D12Debug1> debug_interface1;

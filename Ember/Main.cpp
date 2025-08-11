@@ -3,6 +3,7 @@
 #include "RenderDevice.hpp"
 #include "Util/DirectXHeaders.hpp"
 #include "Util/HelperUtils.hpp"
+#include "Util/Profiling.hpp"
 #include "Util/Runtime.hpp"
 
 #pragma comment( lib, "dxguid.lib" )
@@ -22,6 +23,7 @@ int CALLBACK wWinMain(
   MSG msg = {};
   while ( msg.message != WM_QUIT )
   {
+    ZoneScoped;
     if ( ::PeekMessage( &msg, nullptr, 0, 0, PM_REMOVE ) )
     {
       ::TranslateMessage( &msg );
@@ -31,6 +33,7 @@ int CALLBACK wWinMain(
     {
       app->Update();
       app->Render();
+      FrameMark;
     }
   }
 

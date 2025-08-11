@@ -5,6 +5,7 @@ namespace Ember
 class DebugInfo
 {
   size_t m_VertexCount{ 0 };
+  size_t m_DrawCallCount{ 0 };
 
 public:
   static DebugInfo& Instance()
@@ -18,14 +19,21 @@ public:
     return m_VertexCount;
   }
 
-  void PushVertexCount( size_t const value )
+  [[nodiscard]] size_t GetDrawCallCount() const
   {
-    m_VertexCount += value;
+    return m_DrawCallCount;
+  }
+
+  void PushDrawCall( size_t const vertex_count )
+  {
+    m_VertexCount += vertex_count;
+    m_DrawCallCount++;
   }
 
   void ClearFrame()
   {
-    m_VertexCount = 0;
+    m_VertexCount   = 0;
+    m_DrawCallCount = 0;
   }
 };
 } // namespace Ember

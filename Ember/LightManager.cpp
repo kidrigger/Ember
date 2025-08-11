@@ -3,6 +3,7 @@
 #include "ModelLoader.hpp"
 #include "RenderTargetManager.hpp"
 #include "Util/DataUtil.hpp"
+#include "Util/Profiling.hpp"
 
 Ember::OmniLightHandle::OmniLightHandle( uint16_t const inner, uint16_t const generation )
   : m_Inner{ inner }, m_Generation{ generation }
@@ -339,14 +340,18 @@ void Ember::LightManager::RenderAllShadows(
     RenderTargetManager const&      rtm,
     DirectX::BoundingFrustum const& camera_frustum ) const
 {
+  ZoneScoped;
   command_list->SetGraphicsRootSignature( m_ShadowRootSignature.Get() );
   command_list->SetPipelineState( m_ShadowPipeline.Get() );
   command_list->IASetPrimitiveTopology( D3D_PRIMITIVE_TOPOLOGY_TRIANGLELIST );
 
   for ( auto& [handle, texture] : m_OmniShadowsInUse )
   {
+    ZoneScopedN( "CheckShadow" );
     ASSERT( handle.GetGeneration() == m_Generation[handle.GetGeneration()] );
-    OmniLight const&        light = m_PointLights[handle.GetIndex()];
+    uint32_t const   index = handle.GetIndex();
+    OmniLight const& light = m_PointLights[index];
+    ZoneValue( index );
 
     DirectX::BoundingSphere sphere_of_influence{ light.Position, light.Range };
     if ( camera_frustum.Contains( sphere_of_influence ) == DirectX::DISJOINT ) continue;
@@ -362,6 +367,8 @@ void Ember::LightManager::RenderOmniShadow(
     OmniLight const&           point_light,
     Texture const&             texture )
 {
+  ZoneScoped;
+
   auto top_of_shadow_barrier = CD3DX12_RESOURCE_BARRIER::Transition(
       texture.GetTexture(), D3D12_RESOURCE_STATE_PIXEL_SHADER_RESOURCE, D3D12_RESOURCE_STATE_DEPTH_WRITE );
   command_list->ResourceBarrier( 1, &top_of_shadow_barrier );

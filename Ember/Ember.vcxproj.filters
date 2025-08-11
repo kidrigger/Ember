@@ -206,6 +206,9 @@
     <ClInclude Include="DebugInfo.hpp">
       <Filter>Header Files\Debug</Filter>
     </ClInclude>
+    <ClInclude Include="Util\Profiling.hpp">
+      <Filter>Header Files</Filter>
+    </ClInclude>
   </ItemGroup>
   <ItemGroup>
     <None Include="..\.clang-format">

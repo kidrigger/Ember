@@ -1,5 +1,7 @@
 #include "Scene.hpp"
 
+#include "Util/Profiling.hpp"
+
 #include "DebugInfo.hpp"
 
 DirectX::XMMATRIX Ember::LocalTransform::GetTransform() const
@@ -268,7 +270,7 @@ void Ember::Mesh::Render( ID3D12GraphicsCommandList* command_list, DirectX::Boun
     command_list->SetGraphicsRoot32BitConstants( 0, sizeof( WorldTransform ) / 4, &world_transform, 0 );
     command_list->SetGraphicsRoot32BitConstants( 1, sizeof( Material::GpuRepr ) / 4, &primitive.Material->Repr, 0 );
 
-    DebugInfo::Instance().PushVertexCount( primitive.DrawInfo.IndexCount );
+    DebugInfo::Instance().PushDrawCall( primitive.DrawInfo.IndexCount );
     command_list->DrawIndexedInstanced(
         primitive.DrawInfo.IndexCount, 1, primitive.DrawInfo.FirstIndex, primitive.DrawInfo.FirstVertex, 0 );
   }
@@ -290,6 +292,7 @@ void Ember::Mesh::RenderShadow( ID3D12GraphicsCommandList* command_list, DirectX
 
     command_list->SetGraphicsRoot32BitConstants( 0, sizeof( DirectX::XMMATRIX ) / 4, &world_transform.Transform, 0 );
 
+    DebugInfo::Instance().PushDrawCall( primitive.DrawInfo.IndexCount );
     command_list->DrawIndexedInstanced(
         primitive.DrawInfo.IndexCount, 1, primitive.DrawInfo.FirstIndex, primitive.DrawInfo.FirstVertex, 0 );
   }
@@ -336,7 +339,17 @@ Ember::World::World() : Node( nullptr, std::pmr::new_delete_resource() ), m_Allo
 
 void Ember::World::Update( float const delta_seconds )
 {
-  UpdateWorldTransform( DirectX::XMMatrixIdentity() );
-  UpdateWorldBoundingBox();
-  Node::Update( delta_seconds );
+  ZoneScoped;
+  {
+    ZoneScopedN( "UpdateWorldTransforms" );
+    UpdateWorldTransform( DirectX::XMMatrixIdentity() );
+  }
+  {
+    ZoneScopedN( "UpdateBoundingBoxes" );
+    UpdateWorldBoundingBox();
+  }
+  {
+    ZoneScopedN( "CallUpdate" );
+    Node::Update( delta_seconds );
+  }
 }
