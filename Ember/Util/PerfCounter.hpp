@@ -15,8 +15,11 @@ class PerfCounter
   double        m_256FrameAvgBuffer[256]{};
   double        m_BufferSumMs{ 0.0f };
   int           m_AvgBufferHead{ 0 };
+  double        m_SampleCount{ 0.0f };
 
 public:
+  PerfCounter();
+
   void                 Tick();
 
   [[nodiscard]] double GetAvgFrameTime() const;

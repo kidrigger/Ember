@@ -544,7 +544,7 @@ void Ember::BasicApp::Update()
   }
 
   m_World.GetECS().each(
-      [&]( LocalTransform& lt, WorldTransform const& wt, RotatingModel const& rm )
+      [&]( LocalTransform& lt, RotatingModel const& rm )
       {
         lt.Rotation = DirectX::XMQuaternionMultiply(
             lt.Rotation,

@@ -1,7 +1,6 @@
 #pragma once
 
 #include <memory_resource>
-#include <span>
 
 #include "Buffer.hpp"
 #include "Color.hpp"

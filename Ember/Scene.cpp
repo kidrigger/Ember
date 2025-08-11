@@ -151,7 +151,7 @@ Ember::World::World()
   m_RenderQuery = m_Ecs.query_builder<WorldTransform const, CullInfo const, Mesh const>().build();
 }
 
-void Ember::World::Update( float delta_seconds ) const
+void Ember::World::Update( float ) const
 {
   ZoneScoped;
 
