@@ -77,16 +77,14 @@ void Ember::ModelLoader::ProcessMesh( LoadingContext* context, Node* parent, cgl
       material = TryProcessMaterial( model, *primitive.material );
     }
 
-    BoundingBox* prim_bb = World::LocalBoundingBoxManager().Construct();
-
-    primitive_acc.emplace_back(
-        material,
-        prim_bb,
-        Primitive::Data{
-            .FirstIndex  = ( uint32_t )index_start,
-            .IndexCount  = ( uint32_t )index_count,
-            .FirstVertex = ( uint32_t )vertex_start,
-        } );
+    primitive_acc.push_back( {
+        .Material = material,
+        .DrawInfo = {
+                     .FirstIndex  = ( uint32_t )index_start,
+                     .IndexCount  = ( uint32_t )index_count,
+                     .FirstVertex = ( uint32_t )vertex_start,
+                     },
+    } );
 
     std::vector<float>     scratch;
 
@@ -103,7 +101,7 @@ void Ember::ModelLoader::ProcessMesh( LoadingContext* context, Node* parent, cgl
         DirectX::XMVECTOR pos_min    = XMLoadFloat3( &pos_min_v3 );
         auto              pos_max_v3 = DirectX::XMFLOAT3( position_attr.data->max );
         auto              pos_max    = XMLoadFloat3( &pos_max_v3 );
-        DirectX::BoundingBox::CreateFromPoints( prim_bb->AABB, pos_min, pos_max );
+        DirectX::BoundingBox::CreateFromPoints( primitive_acc.back().AABB, pos_min, pos_max );
 
         bb_min                      = DirectX::XMVectorMin( bb_min, pos_min );
         bb_max                      = DirectX::XMVectorMax( bb_max, pos_max );
@@ -113,13 +111,6 @@ void Ember::ModelLoader::ProcessMesh( LoadingContext* context, Node* parent, cgl
         size_t constexpr components = 3;
 
         LoadAttribute( vertices, vertex_start, &scratch, position_attr, stride, offset, components );
-
-        for ( int i = 0; i < position_attr.data->count; i++ )
-        {
-          ASSERT( vertices->at( vertex_start + i ).Position.x >= bb_min.m128_f32[0] );
-          ASSERT( vertices->at( vertex_start + i ).Position.y >= bb_min.m128_f32[1] );
-          ASSERT( vertices->at( vertex_start + i ).Position.z >= bb_min.m128_f32[2] );
-        }
       }
       if ( "NORMAL"sv == attributes[attrib_index].name )
       {

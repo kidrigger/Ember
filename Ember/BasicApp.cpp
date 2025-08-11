@@ -4,6 +4,7 @@
 #include <utility>
 
 #include "Camera.hpp"
+#include "DebugInfo.hpp"
 #include "Environment.hpp"
 #include "LightManager.hpp"
 #include "ModelLoader.hpp"
@@ -458,7 +459,7 @@ void Ember::BasicApp::LoadContent()
 
   // Setup Scene Geometry
   RotModel* rm    = m_World->CreateObject<RotModel>( 0.0f );
-  Model*    model = m_ModelLoader->TryLoadModel( "Sponza.glb" );
+  Model*    model = m_ModelLoader->TryLoadModel( "Bistro.glb" );
   ASSERT( model );
   rm->AddChild( model );
 
@@ -501,13 +502,17 @@ void Ember::BasicApp::Update()
 
   double const avg_delta_ms = m_PerfCounter->GetAvgFrameTime();
   double const avg_fps      = 1000.0f / avg_delta_ms;
+
+  size_t const vertex_count = DebugInfo::Instance().GetVertexCount();
+
   swprintf_s(
       m_SprintfBuffer,
-      L"Ember %ux%u | frame time: %.2lf ms (%.2lf fps)",
+      L"Ember %ux%u | frame time: %.2lf ms (%.2lf fps) | Vertices: %llu",
       m_WindowWidth,
       m_WindowHeight,
       avg_delta_ms,
-      avg_fps );
+      avg_fps,
+      vertex_count );
 
   SetWindowText( m_WindowHandle, m_SprintfBuffer );
 
@@ -545,6 +550,8 @@ void Ember::BasicApp::Update()
   m_World->Update( delta_seconds );
 
   g_Input.Update();
+
+  DebugInfo::Instance().ClearFrame();
 }
 
 void Ember::BasicApp::RenderScene( ID3D12GraphicsCommandList* command_list, uint32_t frame_idx ) const

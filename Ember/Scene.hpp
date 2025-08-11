@@ -72,31 +72,9 @@ struct Primitive
     uint32_t IndexCount;
     uint32_t FirstVertex;
   };
-  Material*    Material{ nullptr };
-  BoundingBox* BoundingBox{ nullptr };
-  Data         DrawInfo;
-
-  Primitive() = default;
-  Primitive( Ember::Material* const material, Ember::BoundingBox* const bounding_box, Data draw_info )
-    : Material{ material }, BoundingBox{ bounding_box }, DrawInfo{ std::move( draw_info ) }
-  {}
-  Primitive( Primitive const& other ) = default;
-  Primitive( Primitive&& other ) noexcept
-    : Material{ other.Material }, BoundingBox{ other.BoundingBox }, DrawInfo{ std::move( other.DrawInfo ) }
-  {
-    other.Material    = nullptr;
-    other.BoundingBox = nullptr;
-  }
-  Primitive& operator=( Primitive const& other ) = default;
-  Primitive& operator=( Primitive&& other ) noexcept
-  {
-    if ( this == &other ) return *this;
-    std::swap( Material, other.Material );
-    std::swap( BoundingBox, other.BoundingBox );
-    std::swap( DrawInfo, other.DrawInfo );
-    return *this;
-  }
-  ~Primitive();
+  Material*            Material{ nullptr };
+  DirectX::BoundingBox AABB;
+  Data                 DrawInfo;
 };
 
 struct RenderCommandQueue

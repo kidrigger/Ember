@@ -58,6 +58,9 @@
     <Filter Include="Shaders\Shadows">
       <UniqueIdentifier>{19b95aa5-3537-429c-84f2-4fd0eea82243}</UniqueIdentifier>
     </Filter>
+    <Filter Include="Header Files\Debug">
+      <UniqueIdentifier>{33be62f3-5eec-43bf-8b2e-8720ea67d57b}</UniqueIdentifier>
+    </Filter>
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="Main.cpp">
@@ -200,6 +203,9 @@
     <ClInclude Include="RenderTargetManager.hpp">
       <Filter>Header Files</Filter>
     </ClInclude>
+    <ClInclude Include="DebugInfo.hpp">
+      <Filter>Header Files\Debug</Filter>
+    </ClInclude>
   </ItemGroup>
   <ItemGroup>
     <None Include="..\.clang-format">
@@ -318,6 +324,9 @@
       <Filter>Resource Files\Assets\Scenes</Filter>
     </CopyFileToFolders>
     <CopyFileToFolders Include="Assets\Bistro.glb">
+      <Filter>Resource Files\Assets\Scenes</Filter>
+    </CopyFileToFolders>
+    <CopyFileToFolders Include="Assets\VirtualCity.glb">
       <Filter>Resource Files\Assets\Scenes</Filter>
     </CopyFileToFolders>
   </ItemGroup>

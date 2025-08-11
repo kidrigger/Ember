@@ -1,5 +1,7 @@
 #include "Scene.hpp"
 
+#include "DebugInfo.hpp"
+
 DirectX::XMMATRIX Ember::LocalTransform::GetTransform() const
 {
   return DirectX::XMMatrixAffineTransformation( Scale, DirectX::XMVectorZero(), Rotation, Translation );
@@ -8,11 +10,6 @@ DirectX::XMMATRIX Ember::LocalTransform::GetTransform() const
 void Ember::LocalTransform::SetTransform( DirectX::FXMMATRIX& transform )
 {
   XMMatrixDecompose( &Scale, &Rotation, &Translation, transform );
-}
-
-Ember::Primitive::~Primitive()
-{
-  World::LocalBoundingBoxManager().Destroy( BoundingBox );
 }
 
 Ember::Object::Object( Object* const parent )
@@ -90,7 +87,7 @@ Ember::BoundingBox& Ember::Object::GetLocalBoundingBox() const
 
 void Ember::Object::SetLocalBoundingBox( DirectX::FXMVECTOR const& low, DirectX::FXMVECTOR const& high ) const
 {
-  for ( int i = 0; i < 3; i++ ) ASSERT( high.m128_f32[i] > low.m128_f32[i] );
+  for ( int i = 0; i < 3; i++ ) ASSERT( high.m128_f32[i] >= low.m128_f32[i] );
 
   DirectX::BoundingBox::CreateFromPoints( m_LocalBoundingBox->AABB, low, high );
 }
@@ -255,12 +252,15 @@ void Ember::Mesh::Render( ID3D12GraphicsCommandList* command_list, DirectX::Boun
 {
   if ( IsCulled( frustum ) ) return;
 
-  auto& world_transform = GetWorldTransform();
+  WorldTransform const& world_transform = GetWorldTransform();
   for ( Primitive const& primitive : m_Primitives )
   {
     DirectX::BoundingBox bb;
-    primitive.BoundingBox->AABB.Transform( bb, world_transform.Transform );
-    if ( frustum.Contains( bb ) == DirectX::DISJOINT ) continue;
+    primitive.AABB.Transform( bb, world_transform.Transform );
+    if ( frustum.Contains( bb ) == DirectX::DISJOINT )
+    {
+      continue;
+    }
 
     command_list->IASetIndexBuffer( &m_MeshData->IndexBuffer.GetIndexBufferView() );
     command_list->IASetVertexBuffers( 0, 1, &m_MeshData->VertexBuffer.GetVertexBufferView() );
@@ -268,6 +268,7 @@ void Ember::Mesh::Render( ID3D12GraphicsCommandList* command_list, DirectX::Boun
     command_list->SetGraphicsRoot32BitConstants( 0, sizeof( WorldTransform ) / 4, &world_transform, 0 );
     command_list->SetGraphicsRoot32BitConstants( 1, sizeof( Material::GpuRepr ) / 4, &primitive.Material->Repr, 0 );
 
+    DebugInfo::Instance().PushVertexCount( primitive.DrawInfo.IndexCount );
     command_list->DrawIndexedInstanced(
         primitive.DrawInfo.IndexCount, 1, primitive.DrawInfo.FirstIndex, primitive.DrawInfo.FirstVertex, 0 );
   }
@@ -281,7 +282,7 @@ void Ember::Mesh::RenderShadow( ID3D12GraphicsCommandList* command_list, DirectX
   for ( Primitive const& primitive : m_Primitives )
   {
     DirectX::BoundingBox bb;
-    primitive.BoundingBox->AABB.Transform( bb, world_transform.Transform );
+    primitive.AABB.Transform( bb, world_transform.Transform );
     if ( frustum.Contains( bb ) == DirectX::DISJOINT ) continue;
 
     command_list->IASetIndexBuffer( &m_MeshData->IndexBuffer.GetIndexBufferView() );
