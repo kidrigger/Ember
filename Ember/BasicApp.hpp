@@ -46,7 +46,7 @@ class BasicApp final : public IApp
 
   std::unique_ptr<LightManager>        m_LightManager;
 
-  std::unique_ptr<World>               m_World;
+  World                                m_World;
   std::unique_ptr<Environment>         m_Environment;
 
   void                                 SetupRenderPipeline();

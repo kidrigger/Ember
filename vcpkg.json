@@ -5,6 +5,7 @@
     "d3d12-memory-allocator",
     "directxtex",
     "cgltf",
-    "tracy"
+    "tracy",
+    "flecs"
   ]
 }

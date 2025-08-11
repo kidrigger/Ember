@@ -36,6 +36,12 @@ struct Chunk
   void  Deallocate( byte* allocation, size_t aligned_size );
 };
 
+template <typename T>
+concept RefCounted = requires( T a ) {
+  { a.AddRef() } -> std::convertible_to<uint32_t>;
+  { a.Release() } -> std::convertible_to<uint32_t>;
+  { a.GetRefCount() } -> std::convertible_to<uint32_t>;
+};
 
 class ObjectPoolBase
 {
@@ -101,11 +107,31 @@ public:
   }
 
   void Destroy( Type* object )
+    requires not RefCounted<Type>
   {
     if ( object == nullptr ) return;
 
     object->~Type();
     Deallocate( object );
+  }
+
+  void Destroy( Type* object )
+    requires RefCounted<Type>
+  {
+    if ( object == nullptr ) return;
+
+    if ( object->Release() > 0 ) return;
+
+    object->~Type();
+    Deallocate( object );
+  }
+
+  Type* Copy( Type* object )
+    requires RefCounted<Type>
+  {
+    ASSERT( object->GetRefCount() > 0 );
+    object->AddRef();
+    return object;
   }
 };
 

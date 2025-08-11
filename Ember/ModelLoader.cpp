@@ -35,22 +35,22 @@ void LoadAttribute(
   scratch->clear();
 }
 
-void Ember::ModelLoader::ProcessMesh( LoadingContext* context, Node* parent, cgltf_mesh const& mesh ) const
+void Ember::ModelLoader::ProcessMesh( LoadingContext* context, flecs::entity owning, cgltf_mesh const& mesh ) const
 {
   using namespace std::string_view_literals;
 
-  auto [model, mesh_data, vertices, indices] = *context;
+  auto& [mat_cache, geometry, vertices, indices] = *context;
 
-  cgltf_primitive const* primitives          = mesh.primitives;
+  cgltf_primitive const* primitives              = mesh.primitives;
 
-  DirectX::XMVECTOR      bb_min              = DirectX::XMVectorSplatInfinity();
-  DirectX::XMVECTOR      bb_max              = DirectX::XMVectorNegate( DirectX::XMVectorSplatInfinity() );
+  DirectX::XMVECTOR      bb_min                  = DirectX::XMVectorSplatInfinity();
+  DirectX::XMVECTOR      bb_max                  = DirectX::XMVectorNegate( DirectX::XMVectorSplatInfinity() );
 
   std::vector<Primitive> primitive_acc;
   for ( uint32_t primitive_index = 0; primitive_index < mesh.primitives_count; ++primitive_index )
   {
     // VertexStart is per-primitive
-    int32_t const          vertex_start = static_cast<int32_t>( vertices->size() );
+    int32_t const          vertex_start = static_cast<int32_t>( vertices.size() );
 
     cgltf_primitive const& primitive    = primitives[primitive_index];
 
@@ -62,29 +62,29 @@ void Ember::ModelLoader::ProcessMesh( LoadingContext* context, Node* parent, cgl
         ( primitives->indices->component_type == cgltf_component_type_r_32u or
           primitives->indices->component_type == cgltf_component_type_r_16u or
           primitives->indices->component_type == cgltf_component_type_r_8u ) );
-    size_t const index_start = indices->size();
-    size_t const index_count = cgltf_accessor_unpack_indices( primitive.indices, nullptr, sizeof indices->at( 0 ), 0 );
+    size_t const index_start = indices.size();
+    size_t const index_count = cgltf_accessor_unpack_indices( primitive.indices, nullptr, sizeof indices.at( 0 ), 0 );
     ASSERT( index_count > 0 );
-    indices->resize( index_start + index_count );
+    indices.resize( index_start + index_count );
     cgltf_accessor_unpack_indices(
-        primitive.indices, indices->data() + index_start, sizeof indices->at( 0 ), index_count );
+        primitive.indices, indices.data() + index_start, sizeof indices.at( 0 ), index_count );
 
     // Material
 
     Material* material = nullptr;
     if ( primitive.material )
     {
-      material = TryProcessMaterial( model, *primitive.material );
+      material = TryProcessMaterial( context, primitive.material );
     }
 
-    primitive_acc.push_back( {
-        .Material = material,
-        .DrawInfo = {
-                     .FirstIndex  = ( uint32_t )index_start,
-                     .IndexCount  = ( uint32_t )index_count,
-                     .FirstVertex = ( uint32_t )vertex_start,
-                     },
-    } );
+    Primitive& new_prim = primitive_acc.emplace_back(
+        material,
+        DirectX::BoundingBox{},
+        Primitive::Data{
+            .FirstIndex  = ( uint32_t )index_start,
+            .IndexCount  = ( uint32_t )index_count,
+            .FirstVertex = ( uint32_t )vertex_start,
+        } );
 
     std::vector<float>     scratch;
 
@@ -101,7 +101,7 @@ void Ember::ModelLoader::ProcessMesh( LoadingContext* context, Node* parent, cgl
         DirectX::XMVECTOR pos_min    = XMLoadFloat3( &pos_min_v3 );
         auto              pos_max_v3 = DirectX::XMFLOAT3( position_attr.data->max );
         auto              pos_max    = XMLoadFloat3( &pos_max_v3 );
-        DirectX::BoundingBox::CreateFromPoints( primitive_acc.back().AABB, pos_min, pos_max );
+        DirectX::BoundingBox::CreateFromPoints( new_prim.AABB, pos_min, pos_max );
 
         bb_min                      = DirectX::XMVectorMin( bb_min, pos_min );
         bb_max                      = DirectX::XMVectorMax( bb_max, pos_max );
@@ -110,7 +110,7 @@ void Ember::ModelLoader::ProcessMesh( LoadingContext* context, Node* parent, cgl
         size_t constexpr offset     = offsetof( Vertex, Position );
         size_t constexpr components = 3;
 
-        LoadAttribute( vertices, vertex_start, &scratch, position_attr, stride, offset, components );
+        LoadAttribute( &vertices, vertex_start, &scratch, position_attr, stride, offset, components );
       }
       if ( "NORMAL"sv == attributes[attrib_index].name )
       {
@@ -122,7 +122,7 @@ void Ember::ModelLoader::ProcessMesh( LoadingContext* context, Node* parent, cgl
         size_t constexpr offset     = offsetof( Vertex, Normal );
         size_t constexpr components = 3;
 
-        LoadAttribute( vertices, vertex_start, &scratch, normal_attr, stride, offset, components );
+        LoadAttribute( &vertices, vertex_start, &scratch, normal_attr, stride, offset, components );
       }
       if ( "TANGENT"sv == attributes[attrib_index].name )
       {
@@ -134,7 +134,7 @@ void Ember::ModelLoader::ProcessMesh( LoadingContext* context, Node* parent, cgl
         size_t constexpr offset     = offsetof( Vertex, Tangent );
         size_t constexpr components = 4;
 
-        LoadAttribute( vertices, vertex_start, &scratch, tangent_attr, stride, offset, components );
+        LoadAttribute( &vertices, vertex_start, &scratch, tangent_attr, stride, offset, components );
       }
       if ( "TEXCOORD_0"sv == attributes[attrib_index].name )
       {
@@ -146,7 +146,7 @@ void Ember::ModelLoader::ProcessMesh( LoadingContext* context, Node* parent, cgl
         size_t constexpr offset     = offsetof( Vertex, TexCoord0 );
         size_t constexpr components = 2;
 
-        LoadAttribute( vertices, vertex_start, &scratch, tex_coord_attr, stride, offset, components );
+        LoadAttribute( &vertices, vertex_start, &scratch, tex_coord_attr, stride, offset, components );
       }
       if ( "TEXCOORD_1"sv == attributes[attrib_index].name )
       {
@@ -158,7 +158,7 @@ void Ember::ModelLoader::ProcessMesh( LoadingContext* context, Node* parent, cgl
         size_t constexpr offset     = offsetof( Vertex, TexCoord1 );
         size_t constexpr components = 2;
 
-        LoadAttribute( vertices, vertex_start, &scratch, tex_coord_attr, stride, offset, components );
+        LoadAttribute( &vertices, vertex_start, &scratch, tex_coord_attr, stride, offset, components );
       }
       if ( "COLOR_0"sv == attributes[attrib_index].name )
       {
@@ -180,14 +180,14 @@ void Ember::ModelLoader::ProcessMesh( LoadingContext* context, Node* parent, cgl
             UNREACHABLE;
         }
 
-        LoadAttribute( vertices, vertex_start, &scratch, color_attr, stride, offset, components );
+        LoadAttribute( &vertices, vertex_start, &scratch, color_attr, stride, offset, components );
       }
       // TODO: Grab other attributes.
     }
   }
 
-  Mesh const* my_mesh = parent->CreateChildObject<Mesh>( mesh_data, primitive_acc );
-  my_mesh->SetLocalBoundingBox( bb_min, bb_max );
+  ( void )owning.set<Mesh>( { std::move( primitive_acc ), World::GeometryManager().Copy( geometry ) } )
+      .add<LocalBoundingBox>();
 }
 
 bool Ember::ModelLoader::TryLoadTexture(
@@ -217,25 +217,31 @@ bool Ember::ModelLoader::TryLoadTexture(
   return texture;
 }
 
-void Ember::ModelLoader::ProcessNode( LoadingContext* context, Node* parent, cgltf_node const& node )
+flecs::entity Ember::ModelLoader::ProcessNode( LoadingContext* context, flecs::entity parent, cgltf_node const& node )
 {
-  Node* my_node = parent->CreateChildObject<Node>();
-
+  DirectX::XMVECTOR translation{ DirectX::XMVectorSet( 0.0f, 0.0f, 0.0f, 1.0f ) };
+  DirectX::XMVECTOR rotation{ DirectX::XMQuaternionIdentity() };
+  DirectX::XMVECTOR scale{ DirectX::XMVectorSplatOne() };
   if ( node.has_matrix )
   {
-    my_node->SetLocalTransform( DirectX::XMMATRIX{ node.matrix } );
+    XMMatrixDecompose( &scale, &rotation, &translation, DirectX::XMMATRIX{ node.matrix } );
   }
   else
   {
     if ( node.has_translation )
-      my_node->SetLocalTranslation(
-          DirectX::XMVectorSet( node.translation[0], node.translation[1], node.translation[2], 1.0f ) );
+      translation = DirectX::XMVectorSet( node.translation[0], node.translation[1], node.translation[2], 1.0f );
     if ( node.has_rotation )
-      my_node->SetLocalRotation(
-          DirectX::XMVectorSet( node.rotation[0], node.rotation[1], node.rotation[2], node.rotation[3] ) );
-    if ( node.has_scale )
-      my_node->SetLocalScale( DirectX::XMVectorSet( node.scale[0], node.scale[1], node.scale[2], 1.0f ) );
+      rotation = DirectX::XMVectorSet( node.rotation[0], node.rotation[1], node.rotation[2], node.rotation[3] );
+    if ( node.has_scale ) scale = DirectX::XMVectorSet( node.scale[0], node.scale[1], node.scale[2], 1.0f );
   }
+
+  auto const my_node = m_World->GetECS().entity().child_of( parent ).insert(
+      [&]( LocalTransform& lt, WorldTransform&, WorldBoundingBox&, CullInfo& )
+      {
+        lt.Translation = translation;
+        lt.Rotation    = rotation;
+        lt.Scale       = scale;
+      } );
 
   if ( node.mesh )
   {
@@ -246,34 +252,43 @@ void Ember::ModelLoader::ProcessNode( LoadingContext* context, Node* parent, cgl
   {
     ProcessNode( context, my_node, *node.children[child_idx] );
   }
+
+  return my_node;
 }
 
-Ember::Material* Ember::ModelLoader::TryProcessMaterial( Model* model, cgltf_material const& material ) const
-{
-  ASSERT( material.has_pbr_metallic_roughness );
 
-  auto const base_color_factor = DirectX::XMFLOAT4{ material.pbr_metallic_roughness.base_color_factor };
+Ember::Material* Ember::ModelLoader::TryProcessMaterial( LoadingContext* context, cgltf_material const* material ) const
+{
+  if ( auto location = context->MaterialCache.find( material ); location != context->MaterialCache.end() )
+  {
+    return World::MaterialManager().Copy( location->second );
+  }
+
+  ASSERT( material->has_pbr_metallic_roughness );
+
+  auto const base_color_factor = DirectX::XMFLOAT4{ material->pbr_metallic_roughness.base_color_factor };
   float      max_em            = std::max(
       1.0f,
-      std::max( material.emissive_factor[0], std::max( material.emissive_factor[1], material.emissive_factor[2] ) ) );
+      std::max(
+          material->emissive_factor[0], std::max( material->emissive_factor[1], material->emissive_factor[2] ) ) );
 
   auto const emissive_factor = DirectX::XMFLOAT4{
-    material.emissive_factor[0] / max_em,
-    material.emissive_factor[1] / max_em,
-    material.emissive_factor[2] / max_em,
+    material->emissive_factor[0] / max_em,
+    material->emissive_factor[1] / max_em,
+    material->emissive_factor[2] / max_em,
     0.0f,
   };
 
-  auto const emissive_strength = std::max( material.emissive_strength.emissive_strength, 1.0f ) * max_em;
+  auto const emissive_strength = std::max( material->emissive_strength.emissive_strength, 1.0f ) * max_em;
 
   Texture    base_color_texture;
   Texture    normal_texture;
   Texture    metal_rough_texture;
   Texture    emissive_texture;
 
-  if ( material.pbr_metallic_roughness.base_color_texture.texture )
+  if ( material->pbr_metallic_roughness.base_color_texture.texture )
   {
-    cgltf_image const* base_color_image = material.pbr_metallic_roughness.base_color_texture.texture->image;
+    cgltf_image const* base_color_image = material->pbr_metallic_roughness.base_color_texture.texture->image;
 
     if ( not TryLoadTexture( &base_color_texture, *base_color_image, ColorSpaceOverride::kSrgb ) )
     {
@@ -281,9 +296,9 @@ Ember::Material* Ember::ModelLoader::TryProcessMaterial( Model* model, cgltf_mat
     }
   }
 
-  if ( material.pbr_metallic_roughness.metallic_roughness_texture.texture )
+  if ( material->pbr_metallic_roughness.metallic_roughness_texture.texture )
   {
-    cgltf_image const* metal_rough_image = material.pbr_metallic_roughness.metallic_roughness_texture.texture->image;
+    cgltf_image const* metal_rough_image = material->pbr_metallic_roughness.metallic_roughness_texture.texture->image;
 
     if ( not TryLoadTexture( &metal_rough_texture, *metal_rough_image, ColorSpaceOverride::kLinear ) )
     {
@@ -291,9 +306,9 @@ Ember::Material* Ember::ModelLoader::TryProcessMaterial( Model* model, cgltf_mat
     }
   }
 
-  if ( material.normal_texture.texture )
+  if ( material->normal_texture.texture )
   {
-    cgltf_image const* normal_image = material.normal_texture.texture->image;
+    cgltf_image const* normal_image = material->normal_texture.texture->image;
 
     if ( not TryLoadTexture( &normal_texture, *normal_image, ColorSpaceOverride::kLinear ) )
     {
@@ -301,9 +316,9 @@ Ember::Material* Ember::ModelLoader::TryProcessMaterial( Model* model, cgltf_mat
     }
   }
 
-  if ( material.emissive_texture.texture )
+  if ( material->emissive_texture.texture )
   {
-    cgltf_image const* emissive_image = material.emissive_texture.texture->image;
+    cgltf_image const* emissive_image = material->emissive_texture.texture->image;
 
     if ( not TryLoadTexture( &emissive_texture, *emissive_image, ColorSpaceOverride::kSrgb ) )
     {
@@ -311,8 +326,8 @@ Ember::Material* Ember::ModelLoader::TryProcessMaterial( Model* model, cgltf_mat
     }
   }
 
-  float const metallic     = material.pbr_metallic_roughness.metallic_factor;
-  float const roughness    = material.pbr_metallic_roughness.roughness_factor;
+  float const metallic     = material->pbr_metallic_roughness.metallic_factor;
+  float const roughness    = material->pbr_metallic_roughness.roughness_factor;
 
   Material*   new_material = World::MaterialManager().Construct(
       base_color_texture,
@@ -331,7 +346,7 @@ Ember::Material* Ember::ModelLoader::TryProcessMaterial( Model* model, cgltf_mat
             .Rough             = roughness,
       } );
 
-  model->AddMaterial( new_material );
+  context->MaterialCache.insert_or_assign( material, new_material );
 
   return new_material;
 }
@@ -340,7 +355,7 @@ Ember::ModelLoader::ModelLoader( RenderDevice* render_device, World* world, Text
   : m_RenderDevice{ render_device }, m_World{ world }, m_TextureLoader{ texture_loader }
 {}
 
-Ember::Model* Ember::ModelLoader::TryLoadModel( char const* filename )
+std::optional<flecs::entity> Ember::ModelLoader::TryLoadModel( char const* filename )
 {
   cgltf_data*   gltf_model = nullptr;
   cgltf_options options    = {};
@@ -353,7 +368,7 @@ Ember::Model* Ember::ModelLoader::TryLoadModel( char const* filename )
     OutputDebugStringA( buf );
     cgltf_free( gltf_model );
 
-    return nullptr;
+    return {};
   }
 
   result = cgltf_validate( gltf_model );
@@ -364,7 +379,7 @@ Ember::Model* Ember::ModelLoader::TryLoadModel( char const* filename )
     OutputDebugStringA( buf );
     cgltf_free( gltf_model );
 
-    return nullptr;
+    return {};
   }
 
   result = cgltf_load_buffers( &options, gltf_model, filename );
@@ -376,43 +391,37 @@ Ember::Model* Ember::ModelLoader::TryLoadModel( char const* filename )
     OutputDebugStringA( buf );
     cgltf_free( gltf_model );
 
-    return nullptr;
+    return {};
   }
 
-  // Output data
-  std::vector<Vertex>    vertices;
-  std::vector<uint32_t>  indices;
-  std::vector<Mesh*>     meshes;
-  std::vector<Material*> materials;
-  std::vector<Primitive> primitives;
-  std::vector<Node*>     nodes;
-  MeshData*              mesh_data     = World::MeshManager().Construct();
+  auto entity =
+      m_World->GetECS().entity().insert( [&]( LocalTransform&, WorldTransform&, WorldBoundingBox&, CullInfo& ) {} );
 
-  Model*                 model         = m_World->CreateObject<Model>( mesh_data );
+  LoadingContext     context       = { .Geometry = World::GeometryManager().Construct() };
 
-  LoadingContext         context       = { model, mesh_data, &vertices, &indices };
-
-  cgltf_scene const*     current_scene = gltf_model->scene;
+  cgltf_scene const* current_scene = gltf_model->scene;
   for ( uint32_t node_idx = 0; node_idx < current_scene->nodes_count; ++node_idx )
   {
-    ProcessNode( &context, model, *current_scene->nodes[node_idx] );
+    ProcessNode( &context, entity, *current_scene->nodes[node_idx] );
   }
 
-  auto const vertex_buffer = m_RenderDevice->CreateVertexBuffer( ByteSizeOf( vertices ), sizeof( vertices[0] ) );
-  vertex_buffer.Write( 0, ByteSizeOf( vertices ), DataOf( vertices ) );
+  auto const vertex_buffer =
+      m_RenderDevice->CreateVertexBuffer( ByteSizeOf( context.Vertices ), sizeof( context.Vertices[0] ) );
+  vertex_buffer.Write( 0, ByteSizeOf( context.Vertices ), DataOf( context.Vertices ) );
 
-  auto const index_buffer = m_RenderDevice->CreateIndexBuffer( ByteSizeOf( indices ), DXGI_FORMAT_R32_UINT );
-  index_buffer.Write( 0, ByteSizeOf( indices ), DataOf( indices ) );
+  auto const index_buffer = m_RenderDevice->CreateIndexBuffer( ByteSizeOf( context.Indices ), DXGI_FORMAT_R32_UINT );
+  index_buffer.Write( 0, ByteSizeOf( context.Indices ), DataOf( context.Indices ) );
 
-  mesh_data->VertexBuffer = vertex_buffer;
-  mesh_data->IndexBuffer  = index_buffer;
+  context.Geometry->VertexBuffer = vertex_buffer;
+  context.Geometry->IndexBuffer  = index_buffer;
 
   cgltf_free( gltf_model );
+  World::GeometryManager().Destroy( context.Geometry );
 
   Context::Receipt receipt = m_TextureLoader->EndBatch();
   m_RenderDevice->WaitOn( receipt );
 
-  return model;
+  return entity;
 }
 
 // TODO: Remove -> Replaced by Trackers.

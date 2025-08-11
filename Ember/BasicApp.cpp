@@ -214,24 +214,9 @@ HWND CreateWindow(
   return h_window;
 }
 
-class RotModel final : public Ember::Node
+struct RotatingModel
 {
-  float m_Speed;
-
-public:
-  explicit RotModel( Object* parent, float speed, allocator_type const& allocator = {} )
-    : Node{ parent, allocator }, m_Speed{ speed }
-  {}
-
-  void Update( float const delta_seconds ) override
-  {
-    auto transform = GetLocalTransform();
-    transform      = XMMatrixMultiply(
-        DirectX::XMMatrixRotationY( DirectX::XMConvertToRadians( m_Speed ) * delta_seconds ), transform );
-    SetLocalTransform( transform );
-
-    Node::Update( delta_seconds );
-  }
+  float Speed;
 };
 
 struct PerFrameConstants
@@ -255,13 +240,12 @@ Ember::BasicApp::BasicApp(
   , m_SwapchainFormat{ m_RenderDevice->FetchSwapchainFormat() }
   , m_Camera{ std::make_unique<Camera>() }
   , m_LightManager{ std::make_unique<LightManager>() }
-  , m_World{ std::make_unique<World>() }
   , m_Environment{ std::make_unique<Environment>() }
 {
   m_TextureLoader = std::make_unique_for_overwrite<TextureLoader>();
   TextureLoader::Create( m_TextureLoader.get(), m_RenderDevice.get(), 3 );
 
-  m_ModelLoader = std::make_unique<ModelLoader>( m_RenderDevice.get(), m_World.get(), m_TextureLoader.get() );
+  m_ModelLoader = std::make_unique<ModelLoader>( m_RenderDevice.get(), &m_World, m_TextureLoader.get() );
 }
 
 void Ember::BasicApp::Create( BasicApp* app, HINSTANCE const instance_handle )
@@ -459,21 +443,25 @@ void Ember::BasicApp::LoadContent()
   m_LightManager->AddShadowingOmniLight( { -15.0f, 2.0f, -5.0f }, 10.0f, Color32::Red(), 15.0f );
 
   // Setup Scene Geometry
-  RotModel* rm    = m_World->CreateObject<RotModel>( 0.0f );
-  Model*    model = m_ModelLoader->TryLoadModel( "Bistro.glb" );
-  ASSERT( model );
-  rm->AddChild( model );
+  flecs::entity const sponza = m_ModelLoader->TryLoadModel( "Bistro.glb" ).value().set_name( "Scene" );
 
-  rm    = m_World->CreateObject<RotModel>( 20.0f );
-  model = m_ModelLoader->TryLoadModel( "DamagedHelmet.glb" );
-  model->SetLocalScale( DirectX::XMVectorSet( 0.3f, 0.3f, 0.3f, 0.0f ) );
-  rm->SetLocalTranslation( DirectX::XMVectorSet( 0.0f, 1.0f, 0.0f, 1.0f ) );
-  ASSERT( model );
-  rm->AddChild( model );
+  flecs::entity const rm     = m_World.GetECS()
+                               .entity( "HelmetRotator" )
+                               .insert(
+                                   []( LocalTransform& lt, WorldTransform&, RotatingModel& rm, WorldBoundingBox& )
+                                   {
+                                     rm.Speed       = 20.0f;
+                                     lt.Translation = DirectX::XMVectorSet( 0.0f, 1.0f, 5.0f, 1.0f );
+                                   } );
+  flecs::entity const model           = m_ModelLoader->TryLoadModel( "DamagedHelmet.glb" )->child_of( rm );
 
-  // constexpr char const* kEnvMapFile = "OvercastSoil.hdr";
-  // ASSERT( Environment::TryLoadFrom( m_Environment.get(), m_RenderDevice.get(), m_TextureLoader.get(), kEnvMapFile )
-  //);
+  LocalTransform*     helmet_local_tx = model.get_mut<LocalTransform>();
+  helmet_local_tx->Scale              = DirectX::XMVectorSet( 0.3f, 0.3f, 0.3f, 0.0f );
+  helmet_local_tx->Rotation           = DirectX::XMQuaternionIdentity();
+  ASSERT( model );
+
+  constexpr char const* kEnvMapFile = "OvercastSoil.hdr";
+  ASSERT( Environment::TryLoadFrom( m_Environment.get(), m_RenderDevice.get(), m_TextureLoader.get(), kEnvMapFile ) );
 
   SetupRenderPipeline();
 
@@ -552,7 +540,17 @@ void Ember::BasicApp::Update()
     m_Camera->LocalTranslate( 5 * delta_seconds, 0, 0 );
   }
 
-  m_World->Update( delta_seconds );
+  m_World.GetECS().each(
+      [&]( LocalTransform& lt, WorldTransform const& wt, RotatingModel const& rm )
+      {
+        lt.Rotation = DirectX::XMQuaternionMultiply(
+            lt.Rotation,
+            DirectX::XMQuaternionRotationAxis(
+                DirectX::XMVectorSet( 0.0f, 1.0f, 0.0f, 0.0f ),
+                DirectX::XMConvertToRadians( rm.Speed ) * delta_seconds ) );
+      } );
+
+  m_World.Update( delta_seconds );
 
   g_Input.Update();
 
@@ -604,7 +602,7 @@ void Ember::BasicApp::RenderScene( ID3D12GraphicsCommandList* command_list, uint
   command_list->SetGraphicsRoot32BitConstants( 2, sizeof( PerFrameConstants ) / 4, &constants, 0 );
   command_list->SetGraphicsRoot32BitConstants( 3, sizeof( Environment::GpuRepr ) / 4, &m_Environment->Repr(), 0 );
 
-  m_World->Render( command_list, camera_frustum );
+  m_World.Render( command_list, camera_frustum );
 }
 
 void Ember::BasicApp::Render()
@@ -627,7 +625,7 @@ void Ember::BasicApp::Render()
   m_ModelLoader->FlushBarriers( command_list.Get() );
   m_TextureLoader->FlushBarriers( command_list.Get() );
 
-  m_LightManager->RenderAllShadows( command_list.Get(), *m_World.get(), *m_RenderTargetManager, camera_frustum );
+  m_LightManager->RenderAllShadows( command_list.Get(), m_World, *m_RenderTargetManager, camera_frustum );
 
   FLOAT constexpr kBlack[4] = {};
   m_RenderTargetManager->ClearRenderTargetView( command_list.Get(), m_RenderTexture, kBlack );
