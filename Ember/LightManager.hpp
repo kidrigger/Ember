@@ -53,6 +53,7 @@ class LightManager
   };
 
   RenderDevice*                      m_RenderDevice{ nullptr };
+  Buffer                             m_ShadowProjectionBuffer;
   OmniLight                          m_PointLights[kMaxOmniLights]{};
   ShadowInfo                         m_ShadowInfo[kMaxOmniLights]{};
   uint16_t                           m_IndirectionMap[kMaxOmniLights]{};
@@ -79,6 +80,7 @@ public:
   LightManager() = default;
   explicit LightManager(
       RenderDevice*               render_device,
+      Buffer                      shadow_projection_buffer,
       std::vector<Buffer>         buffers,
       ComPtr<ID3D12PipelineState> shadow_pipeline,
       ComPtr<ID3D12RootSignature> shadow_root_signature );
@@ -102,12 +104,12 @@ public:
       RenderTargetManager const&      rtm,
       DirectX::BoundingFrustum const& camera_frustum ) const;
 
-  static void RenderOmniShadow(
+  void RenderOmniShadow(
       ID3D12GraphicsCommandList* command_list,
       World const&               world,
       RenderTargetManager const& rtm,
       OmniLight const&           point_light,
-      Texture const&             texture );
+      Texture const&             texture ) const;
 };
 
 } // namespace Ember

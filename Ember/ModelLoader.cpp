@@ -5,26 +5,28 @@
 #include "Util/DataUtil.hpp"
 #include "Util/HelperUtils.hpp"
 
+template <typename T>
 void LoadAttribute(
-    std::vector<Ember::Vertex>* vertices,
-    int32_t const               vertex_start,
-    std::vector<float>*         scratch,
-    cgltf_attribute const&      position_attr,
-    size_t const                stride,
-    size_t const                offset,
-    size_t const                components )
+    std::vector<T>*        vertices,
+    int32_t const          vertex_start,
+    std::vector<float>*    scratch,
+    cgltf_attribute const& position_attr,
+    size_t const           stride,
+    size_t const           offset,
+    size_t const           components )
 {
   size_t const float_count = cgltf_accessor_unpack_floats( position_attr.data, nullptr, 0 );
   ASSERT( float_count % components == 0 );
   scratch->resize( float_count );
   cgltf_accessor_unpack_floats( position_attr.data, scratch->data(), scratch->size() );
 
+  size_t const element_count = float_count / components;
   // Guaranteed to have space for these vertices.
-  vertices->resize( vertex_start + float_count / components );
+  vertices->resize( vertex_start + element_count );
 
   byte*        write_ptr = reinterpret_cast<byte*>( vertices->data() + vertex_start ) + offset;
   float const* read_ptr  = scratch->data();
-  for ( size_t i = vertex_start; i < vertices->size(); ++i )
+  for ( size_t i = 0; i < element_count; ++i )
   {
     memcpy( write_ptr, read_ptr, components * sizeof( float ) );
 
@@ -39,18 +41,16 @@ void Ember::ModelLoader::ProcessMesh( LoadingContext* context, flecs::entity own
 {
   using namespace std::string_view_literals;
 
-  auto& [mat_cache, geometry, vertices, indices] = *context;
+  cgltf_primitive const* primitives = mesh.primitives;
 
-  cgltf_primitive const* primitives              = mesh.primitives;
-
-  DirectX::XMVECTOR      bb_min                  = DirectX::XMVectorSplatInfinity();
-  DirectX::XMVECTOR      bb_max                  = DirectX::XMVectorNegate( DirectX::XMVectorSplatInfinity() );
+  DirectX::XMVECTOR      bb_min     = DirectX::XMVectorSplatInfinity();
+  DirectX::XMVECTOR      bb_max     = DirectX::XMVectorNegate( DirectX::XMVectorSplatInfinity() );
 
   std::vector<Primitive> primitive_acc;
   for ( uint32_t primitive_index = 0; primitive_index < mesh.primitives_count; ++primitive_index )
   {
     // VertexStart is per-primitive
-    int32_t const          vertex_start = static_cast<int32_t>( vertices.size() );
+    int32_t const          vertex_start = static_cast<int32_t>( context->VertexPositions.size() );
 
     cgltf_primitive const& primitive    = primitives[primitive_index];
 
@@ -62,12 +62,13 @@ void Ember::ModelLoader::ProcessMesh( LoadingContext* context, flecs::entity own
         ( primitives->indices->component_type == cgltf_component_type_r_32u or
           primitives->indices->component_type == cgltf_component_type_r_16u or
           primitives->indices->component_type == cgltf_component_type_r_8u ) );
-    size_t const index_start = indices.size();
-    size_t const index_count = cgltf_accessor_unpack_indices( primitive.indices, nullptr, sizeof indices.at( 0 ), 0 );
+    size_t const index_start = context->Indices.size();
+    size_t const index_count =
+        cgltf_accessor_unpack_indices( primitive.indices, nullptr, sizeof context->Indices.at( 0 ), 0 );
     ASSERT( index_count > 0 );
-    indices.resize( index_start + index_count );
+    context->Indices.resize( index_start + index_count );
     cgltf_accessor_unpack_indices(
-        primitive.indices, indices.data() + index_start, sizeof indices.at( 0 ), index_count );
+        primitive.indices, context->Indices.data() + index_start, sizeof context->Indices.at( 0 ), index_count );
 
     // Material
 
@@ -106,11 +107,11 @@ void Ember::ModelLoader::ProcessMesh( LoadingContext* context, flecs::entity own
         bb_min                      = DirectX::XMVectorMin( bb_min, pos_min );
         bb_max                      = DirectX::XMVectorMax( bb_max, pos_max );
 
-        size_t constexpr stride     = sizeof( Vertex );
-        size_t constexpr offset     = offsetof( Vertex, Position );
+        size_t constexpr stride     = sizeof( VertexPosition );
+        size_t constexpr offset     = offsetof( VertexPosition, Position );
         size_t constexpr components = 3;
 
-        LoadAttribute( &vertices, vertex_start, &scratch, position_attr, stride, offset, components );
+        LoadAttribute( &context->VertexPositions, vertex_start, &scratch, position_attr, stride, offset, components );
       }
       if ( "NORMAL"sv == attributes[attrib_index].name )
       {
@@ -118,11 +119,11 @@ void Ember::ModelLoader::ProcessMesh( LoadingContext* context, flecs::entity own
         ASSERT( normal_attr.data->component_type == cgltf_component_type_r_32f );
         ASSERT( normal_attr.data->type == cgltf_type_vec3 );
 
-        size_t constexpr stride     = sizeof( Vertex );
-        size_t constexpr offset     = offsetof( Vertex, Normal );
+        size_t constexpr stride     = sizeof( VertexData );
+        size_t constexpr offset     = offsetof( VertexData, Normal );
         size_t constexpr components = 3;
 
-        LoadAttribute( &vertices, vertex_start, &scratch, normal_attr, stride, offset, components );
+        LoadAttribute( &context->VertexData, vertex_start, &scratch, normal_attr, stride, offset, components );
       }
       if ( "TANGENT"sv == attributes[attrib_index].name )
       {
@@ -130,11 +131,11 @@ void Ember::ModelLoader::ProcessMesh( LoadingContext* context, flecs::entity own
         ASSERT( tangent_attr.data->component_type == cgltf_component_type_r_32f );
         ASSERT( tangent_attr.data->type == cgltf_type_vec4 );
 
-        size_t constexpr stride     = sizeof( Vertex );
-        size_t constexpr offset     = offsetof( Vertex, Tangent );
+        size_t constexpr stride     = sizeof( VertexData );
+        size_t constexpr offset     = offsetof( VertexData, Tangent );
         size_t constexpr components = 4;
 
-        LoadAttribute( &vertices, vertex_start, &scratch, tangent_attr, stride, offset, components );
+        LoadAttribute( &context->VertexData, vertex_start, &scratch, tangent_attr, stride, offset, components );
       }
       if ( "TEXCOORD_0"sv == attributes[attrib_index].name )
       {
@@ -142,11 +143,11 @@ void Ember::ModelLoader::ProcessMesh( LoadingContext* context, flecs::entity own
         ASSERT( tex_coord_attr.data->component_type == cgltf_component_type_r_32f );
         ASSERT( tex_coord_attr.data->type == cgltf_type_vec2 );
 
-        size_t constexpr stride     = sizeof( Vertex );
-        size_t constexpr offset     = offsetof( Vertex, TexCoord0 );
+        size_t constexpr stride     = sizeof( VertexData );
+        size_t constexpr offset     = offsetof( VertexData, TexCoord0 );
         size_t constexpr components = 2;
 
-        LoadAttribute( &vertices, vertex_start, &scratch, tex_coord_attr, stride, offset, components );
+        LoadAttribute( &context->VertexData, vertex_start, &scratch, tex_coord_attr, stride, offset, components );
       }
       if ( "TEXCOORD_1"sv == attributes[attrib_index].name )
       {
@@ -154,19 +155,19 @@ void Ember::ModelLoader::ProcessMesh( LoadingContext* context, flecs::entity own
         ASSERT( tex_coord_attr.data->component_type == cgltf_component_type_r_32f );
         ASSERT( tex_coord_attr.data->type == cgltf_type_vec2 );
 
-        size_t constexpr stride     = sizeof( Vertex );
-        size_t constexpr offset     = offsetof( Vertex, TexCoord1 );
+        size_t constexpr stride     = sizeof( VertexData );
+        size_t constexpr offset     = offsetof( VertexData, TexCoord1 );
         size_t constexpr components = 2;
 
-        LoadAttribute( &vertices, vertex_start, &scratch, tex_coord_attr, stride, offset, components );
+        LoadAttribute( &context->VertexData, vertex_start, &scratch, tex_coord_attr, stride, offset, components );
       }
       if ( "COLOR_0"sv == attributes[attrib_index].name )
       {
         cgltf_attribute const& color_attr = attributes[attrib_index];
         ASSERT( color_attr.data->component_type == cgltf_component_type_r_32f );
 
-        size_t constexpr stride = sizeof( Vertex );
-        size_t constexpr offset = offsetof( Vertex, Color );
+        size_t constexpr stride = sizeof( VertexData );
+        size_t constexpr offset = offsetof( VertexData, Color );
         size_t components       = 3;
         switch ( color_attr.data->type )
         {
@@ -180,7 +181,7 @@ void Ember::ModelLoader::ProcessMesh( LoadingContext* context, flecs::entity own
             UNREACHABLE;
         }
 
-        LoadAttribute( &vertices, vertex_start, &scratch, color_attr, stride, offset, components );
+        LoadAttribute( &context->VertexData, vertex_start, &scratch, color_attr, stride, offset, components );
       }
       // TODO: Grab other attributes.
     }
@@ -189,7 +190,7 @@ void Ember::ModelLoader::ProcessMesh( LoadingContext* context, flecs::entity own
   DirectX::BoundingBox bb;
   DirectX::BoundingBox::CreateFromPoints( bb, bb_min, bb_max );
 
-  ( void )owning.set<Mesh>( { std::move( primitive_acc ), World::GeometryManager().Copy( geometry ) } )
+  ( void )owning.set<Mesh>( { std::move( primitive_acc ), World::GeometryManager().Copy( context->Geometry ) } )
       .set<LocalBoundingBox>( { bb } );
 }
 
@@ -408,15 +409,20 @@ std::optional<flecs::entity> Ember::ModelLoader::TryLoadModel( char const* filen
     ProcessNode( &context, entity, *current_scene->nodes[node_idx] );
   }
 
-  auto const vertex_buffer =
-      m_RenderDevice->CreateVertexBuffer( ByteSizeOf( context.Vertices ), sizeof( context.Vertices[0] ) );
-  vertex_buffer.Write( 0, ByteSizeOf( context.Vertices ), DataOf( context.Vertices ) );
+  auto const vertex_position_buffer =
+      m_RenderDevice->CreateVertexBuffer( ByteSizeOf( context.VertexPositions ), sizeof( context.VertexPositions[0] ) );
+  vertex_position_buffer.Write( 0, ByteSizeOf( context.VertexPositions ), DataOf( context.VertexPositions ) );
+
+  auto const vertex_data_buffer =
+      m_RenderDevice->CreateVertexBuffer( ByteSizeOf( context.VertexData ), sizeof( context.VertexData[0] ) );
+  vertex_data_buffer.Write( 0, ByteSizeOf( context.VertexData ), DataOf( context.VertexData ) );
 
   auto const index_buffer = m_RenderDevice->CreateIndexBuffer( ByteSizeOf( context.Indices ), DXGI_FORMAT_R32_UINT );
   index_buffer.Write( 0, ByteSizeOf( context.Indices ), DataOf( context.Indices ) );
 
-  context.Geometry->VertexBuffer = vertex_buffer;
-  context.Geometry->IndexBuffer  = index_buffer;
+  context.Geometry->VertexPositionBuffer = vertex_position_buffer;
+  context.Geometry->VertexDataBuffer     = vertex_data_buffer;
+  context.Geometry->IndexBuffer          = index_buffer;
 
   cgltf_free( gltf_model );
   World::GeometryManager().Destroy( context.Geometry );
@@ -426,11 +432,3 @@ std::optional<flecs::entity> Ember::ModelLoader::TryLoadModel( char const* filen
 
   return entity;
 }
-
-// TODO: Remove -> Replaced by Trackers.
-void Ember::ModelLoader::Update()
-{}
-
-// TODO: Remove -> Replaced by Trackers.
-void Ember::ModelLoader::FlushBarriers( ID3D12GraphicsCommandList* )
-{}

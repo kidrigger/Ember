@@ -1,5 +1,6 @@
 #include "LightManager.hpp"
 
+#include "DebugInfo.hpp"
 #include "ModelLoader.hpp"
 #include "RenderTargetManager.hpp"
 #include "Util/DataUtil.hpp"
@@ -31,24 +32,46 @@ std::strong_ordering Ember::OmniLightHandle::operator<=>( OmniLightHandle const&
 
 Ember::LightManager::LightManager(
     RenderDevice*               render_device,
-    std::vector<Buffer>         buffers,
+    Buffer                      projection_buffer,
+    std::vector<Buffer>         light_buffers,
     ComPtr<ID3D12PipelineState> shadow_pipeline,
     ComPtr<ID3D12RootSignature> shadow_root_signature )
   : m_RenderDevice{ render_device }
+  , m_ShadowProjectionBuffer{ std::move( projection_buffer ) }
   , m_ShadowRootSignature{ std::move( shadow_root_signature ) }
   , m_ShadowPipeline{ std::move( shadow_pipeline ) }
-  , m_PointLightBuffers{ std::move( buffers ) }
-  , m_DirtyFrames{ ( uint8_t )buffers.size() }
+  , m_PointLightBuffers{ std::move( light_buffers ) }
+  , m_DirtyFrames{ ( uint8_t )light_buffers.size() }
 {
   for ( uint16_t i = 0; i < kMaxOmniLights; ++i )
   {
     m_IndirectionMap[i] = i + 1;
   }
   m_FreeHead = 0;
+
+  // We use left handed just this once.
+
+  DirectX::XMVECTOR const origin  = DirectX::XMVectorSet( 0.0f, 0.0f, 0.0f, 1.0f );
+  DirectX::XMVECTOR const up      = DirectX::XMVectorSet( 0.0f, 1.0f, 0.0f, 0.0f );
+  DirectX::XMVECTOR const right   = DirectX::XMVectorSet( 1.0f, 0.0f, 0.0f, 0.0f );
+  DirectX::XMVECTOR const forward = DirectX::XMVectorSet( 0.0f, 0.0f, 1.0f, 0.0f );
+
+  DirectX::XMMATRIX       views[6];
+  views[0] = DirectX::XMMatrixLookToLH( origin, right, up );
+  views[1] = DirectX::XMMatrixLookToLH( origin, DirectX::XMVectorNegate( right ), up );
+  views[2] = DirectX::XMMatrixLookToLH( origin, up, DirectX::XMVectorNegate( forward ) );
+  views[3] = DirectX::XMMatrixLookToLH( origin, DirectX::XMVectorNegate( up ), forward );
+  views[4] = DirectX::XMMatrixLookToLH( origin, forward, up );
+  views[5] = DirectX::XMMatrixLookToLH( origin, DirectX::XMVectorNegate( forward ), up );
+
+  m_ShadowProjectionBuffer.Write( 0, ByteSizeOf( views ), DataOf( views ) );
 }
 
 void Ember::LightManager::Create( LightManager* light_manager, RenderDevice* render_device, uint32_t const num_frames )
 {
+
+  Buffer              proj_buffer = render_device->CreateConstantBuffer( 6 * sizeof( DirectX::XMMATRIX ) );
+
   std::vector<Buffer> buffers;
   buffers.reserve( num_frames );
   for ( uint32_t i = 0; i < num_frames; i++ )
@@ -92,8 +115,8 @@ void Ember::LightManager::Create( LightManager* light_manager, RenderDevice* ren
       IID_PPV_ARGS( &shadow_root_sig ) ) );
 
   D3D12_INPUT_LAYOUT_DESC input_layout = {
-    .pInputElementDescs = &Vertex::kInputElementDesc[0],
-    .NumElements        = 1,
+    .pInputElementDescs = DataOf( VertexPosition::kInputElementDesc ),
+    .NumElements        = CountOf( VertexPosition::kInputElementDesc ),
   };
 
   // We scale everything with -z for Left-Handed to Right-Handed correction.
@@ -130,9 +153,11 @@ void Ember::LightManager::Create( LightManager* light_manager, RenderDevice* ren
 
   ComPtr<ID3D12PipelineState> shadow_pipeline;
   ERR_ABORT( render_device->GetDevice()->CreatePipelineState( &desc, IID_PPV_ARGS( &shadow_pipeline ) ) );
+  ERR_ABORT( shadow_pipeline->SetName( L"Omni Shadow Pipeline" ) );
 
   new ( light_manager ) LightManager{
     render_device,
+    std::move( proj_buffer ),
     std::move( buffers ),
     std::move( shadow_pipeline ),
     std::move( shadow_root_sig ),
@@ -250,6 +275,9 @@ Ember::SRVHandle Ember::LightManager::AllocateOmniShadow( OmniLightHandle const 
         .MipLevels = MipLevels::kBase,
         .InitState = D3D12_RESOURCE_STATE_PIXEL_SHADER_RESOURCE,
     } );
+    wchar_t buf[36];
+    swprintf_s( buf, L"Omni Shadow Map %llu", m_OmniShadowsInUse.size() );
+    tex.SetName( buf );
   }
   else
   {
@@ -342,6 +370,8 @@ void Ember::LightManager::RenderAllShadows(
 {
   ZoneScoped;
   command_list->SetGraphicsRootSignature( m_ShadowRootSignature.Get() );
+  auto bindless_desc_heaps = m_RenderDevice->GetBindlessDescriptorHeaps();
+  command_list->SetDescriptorHeaps( CountOf( bindless_desc_heaps ), DataOf( bindless_desc_heaps ) );
   command_list->SetPipelineState( m_ShadowPipeline.Get() );
   command_list->IASetPrimitiveTopology( D3D_PRIMITIVE_TOPOLOGY_TRIANGLELIST );
 
@@ -365,7 +395,7 @@ void Ember::LightManager::RenderOmniShadow(
     World const&               world,
     RenderTargetManager const& rtm,
     OmniLight const&           point_light,
-    Texture const&             texture )
+    Texture const&             texture ) const
 {
   ZoneScoped;
 
@@ -381,46 +411,48 @@ void Ember::LightManager::RenderOmniShadow(
   command_list->RSSetScissorRects( 1, &scissor );
   command_list->RSSetViewports( 1, &viewport );
 
-  // We use left handed just this once.
-
-  DirectX::XMVECTOR const origin  = XMLoadFloat3( &point_light.Position );
-  DirectX::XMVECTOR const up      = DirectX::XMVectorSet( 0.0f, 1.0f, 0.0f, 0.0f );
-  DirectX::XMVECTOR const right   = DirectX::XMVectorSet( 1.0f, 0.0f, 0.0f, 0.0f );
-  DirectX::XMVECTOR const forward = DirectX::XMVectorSet( 0.0f, 0.0f, 1.0f, 0.0f );
-
-  DirectX::XMMATRIX       views[6];
-  views[0] = DirectX::XMMatrixLookToLH( origin, right, up );
-  views[1] = DirectX::XMMatrixLookToLH( origin, DirectX::XMVectorNegate( right ), up );
-  views[2] = DirectX::XMMatrixLookToLH( origin, up, DirectX::XMVectorNegate( forward ) );
-  views[3] = DirectX::XMMatrixLookToLH( origin, DirectX::XMVectorNegate( up ), forward );
-  views[4] = DirectX::XMMatrixLookToLH( origin, forward, up );
-  views[5] = DirectX::XMMatrixLookToLH( origin, DirectX::XMVectorNegate( forward ), up );
-
-  // Projection
-  DirectX::XMMATRIX projection = DirectX::XMMatrixPerspectiveFovLH( DirectX::XM_PIDIV2, 1.0, 0.1f, point_light.Range );
-
-  DirectX::BoundingFrustum proj_frustum;
-  DirectX::BoundingFrustum::CreateFromMatrix( proj_frustum, projection );
-
-  float packed_data[4] = { point_light.Position.x, point_light.Position.y, point_light.Position.z, point_light.Range };
-  command_list->SetGraphicsRoot32BitConstants(
-      0, ByteSizeOf( packed_data ) / 4, packed_data, 2 * sizeof( DirectX::XMMATRIX ) / 4 );
-
-  D3D12_DEPTH_STENCIL_VIEW_DESC desc = *texture.GetDepthStencilView();
-  desc.Texture2DArray.ArraySize      = 1;
-  for ( int view_idx = 0; view_idx < 6; view_idx++ )
+  struct PackedData
   {
-    desc.Texture2DArray.FirstArraySlice = view_idx;
-    rtm.OMSetRenderTargets( command_list, 0, nullptr, nullptr, &texture, &desc );
+    DirectX::XMFLOAT3 Position;
+    float             FarPlane;
+    CBVHandle         ProjViewHandle;
+  };
+  PackedData const packed_data{
+    .Position       = point_light.Position,
+    .FarPlane       = point_light.Range,
+    .ProjViewHandle = m_ShadowProjectionBuffer.GetCBVHandle(),
+  };
+  command_list->SetGraphicsRoot32BitConstants(
+      0, sizeof( PackedData ) / 4, &packed_data, sizeof( DirectX::XMMATRIX ) / 4 );
 
-    auto vp_matrix = XMMatrixMultiply( views[view_idx], projection );
-    command_list->SetGraphicsRoot32BitConstants(
-        0, sizeof( DirectX::XMMATRIX ) / 4, &vp_matrix, sizeof( DirectX::XMMATRIX ) / 4 );
+  rtm.OMSetRenderTargets( command_list, 0, nullptr, &texture );
 
-    DirectX::BoundingFrustum view_frustum;
-    proj_frustum.Transform( view_frustum, XMMatrixInverse( nullptr, views[view_idx] ) );
-    world.RenderShadow( command_list, view_frustum );
-  }
+  DirectX::BoundingSphere const sphere_of_influence{ point_light.Position, point_light.Range };
+
+  world.CullSphere( sphere_of_influence );
+
+  world.GetECS().each(
+      [&]( WorldTransform const& wt, Mesh const& mesh )
+      {
+        for ( Primitive const& primitive : mesh.Primitives )
+        {
+          DirectX::BoundingBox bb;
+          primitive.AABB.Transform( bb, wt.Transform );
+          if ( sphere_of_influence.Contains( bb ) == DirectX::DISJOINT )
+          {
+            continue;
+          }
+
+          command_list->IASetIndexBuffer( &mesh.Geometry->IndexBuffer.GetIndexBufferView() );
+          command_list->IASetVertexBuffers( 0, 1, &mesh.Geometry->VertexPositionBuffer.GetVertexBufferView() );
+
+          command_list->SetGraphicsRoot32BitConstants( 0, sizeof( DirectX::XMMATRIX ) / 4, &wt.Transform, 0 );
+
+          DebugInfo::Instance().PushDrawCall( primitive.DrawInfo.IndexCount );
+          command_list->DrawIndexedInstanced(
+              primitive.DrawInfo.IndexCount, 6, primitive.DrawInfo.FirstIndex, primitive.DrawInfo.FirstVertex, 0 );
+        }
+      } );
 
   auto bottom_of_shadow_barrier = CD3DX12_RESOURCE_BARRIER::Transition(
       texture.GetTexture(), D3D12_RESOURCE_STATE_DEPTH_WRITE, D3D12_RESOURCE_STATE_PIXEL_SHADER_RESOURCE );

@@ -3,6 +3,7 @@
 #include "Util/Profiling.hpp"
 
 #include "DebugInfo.hpp"
+#include "Util/DataUtil.hpp"
 
 DirectX::XMMATRIX Ember::LocalTransform::GetTransform() const
 {
@@ -235,8 +236,12 @@ void Ember::World::Render( ID3D12GraphicsCommandList* command_list, DirectX::Bou
               continue;
             }
 
+            D3D12_VERTEX_BUFFER_VIEW const vertex_buffers[] = {
+              mesh.Geometry->VertexPositionBuffer.GetVertexBufferView(),
+              mesh.Geometry->VertexDataBuffer.GetVertexBufferView(),
+            };
+            command_list->IASetVertexBuffers( 0, CountOf( vertex_buffers ), DataOf( vertex_buffers ) );
             command_list->IASetIndexBuffer( &mesh.Geometry->IndexBuffer.GetIndexBufferView() );
-            command_list->IASetVertexBuffers( 0, 1, &mesh.Geometry->VertexBuffer.GetVertexBufferView() );
 
             command_list->SetGraphicsRoot32BitConstants( 0, sizeof( WorldTransform ) / 4, &wt, 0 );
             command_list->SetGraphicsRoot32BitConstants(
@@ -250,8 +255,7 @@ void Ember::World::Render( ID3D12GraphicsCommandList* command_list, DirectX::Bou
   }
 }
 
-void Ember::World::RenderShadow(
-    ID3D12GraphicsCommandList* command_list, DirectX::BoundingFrustum const& frustum ) const
+void Ember::World::CullFrustum( DirectX::BoundingFrustum const& frustum ) const
 {
   ZoneScoped;
 
@@ -259,20 +263,47 @@ void Ember::World::RenderShadow(
   m_Ecs.each( []( CullInfo& cull_info ) { cull_info.SetCulled( 0 ); } );
 
   uint64_t const cull_mask = 0x1;
-  {
-    ZoneScopedN( "Cull" );
-    m_CullDescentQuery.each(
-        [&]( CullInfo& cull_info, WorldBoundingBox const& bb, CullInfo const& parent_cull )
-        {
-          cull_info.SetCulled( parent_cull.CullMask );
-          if ( cull_info.IsCulled( cull_mask ) ) return;
+  m_CullDescentQuery.each(
+      [&]( CullInfo& cull_info, WorldBoundingBox const& bb, CullInfo const& parent_cull )
+      {
+        cull_info.SetCulled( parent_cull.CullMask );
+        if ( cull_info.IsCulled( cull_mask ) ) return;
 
-          if ( frustum.Contains( bb.AABB ) == DirectX::DISJOINT or bb.AABB.Contains( frustum ) == DirectX::DISJOINT )
-          {
-            cull_info.SetCulled( cull_mask );
-          }
-        } );
-  }
+        if ( frustum.Contains( bb.AABB ) == DirectX::DISJOINT or bb.AABB.Contains( frustum ) == DirectX::DISJOINT )
+        {
+          cull_info.SetCulled( cull_mask );
+        }
+      } );
+}
+
+void Ember::World::CullSphere( DirectX::BoundingSphere const& sphere ) const
+{
+  ZoneScoped;
+
+  // Clear cull flags;
+  m_Ecs.each( []( CullInfo& cull_info ) { cull_info.SetCulled( 0 ); } );
+
+  uint64_t const cull_mask = 0x1;
+  m_CullDescentQuery.each(
+      [&]( CullInfo& cull_info, WorldBoundingBox const& bb, CullInfo const& parent_cull )
+      {
+        cull_info.SetCulled( parent_cull.CullMask );
+        if ( cull_info.IsCulled( cull_mask ) ) return;
+
+        if ( sphere.Contains( bb.AABB ) == DirectX::DISJOINT )
+        {
+          cull_info.SetCulled( cull_mask );
+        }
+      } );
+}
+
+void Ember::World::RenderShadow(
+    ID3D12GraphicsCommandList* command_list, DirectX::BoundingFrustum const& frustum ) const
+{
+  ZoneScoped;
+  ZoneText( "Frustum", 7 );
+
+  CullFrustum( frustum );
 
   {
     ZoneScopedN( "RecordCmdList" );
@@ -290,7 +321,7 @@ void Ember::World::RenderShadow(
             }
 
             command_list->IASetIndexBuffer( &mesh.Geometry->IndexBuffer.GetIndexBufferView() );
-            command_list->IASetVertexBuffers( 0, 1, &mesh.Geometry->VertexBuffer.GetVertexBufferView() );
+            command_list->IASetVertexBuffers( 0, 1, &mesh.Geometry->VertexPositionBuffer.GetVertexBufferView() );
 
             command_list->SetGraphicsRoot32BitConstants( 0, sizeof( DirectX::XMMATRIX ) / 4, &wt.Transform, 0 );
 
@@ -302,7 +333,42 @@ void Ember::World::RenderShadow(
   }
 }
 
-flecs::world& Ember::World::GetECS()
+void Ember::World::RenderShadow( ID3D12GraphicsCommandList* command_list, DirectX::BoundingSphere const& sphere ) const
+{
+  ZoneScoped;
+  ZoneText( "Sphere", 6 );
+
+  CullSphere( sphere );
+
+  {
+    ZoneScopedN( "RecordCmdList" );
+
+    m_Ecs.each(
+        [&]( WorldTransform const& wt, Mesh const& mesh )
+        {
+          for ( Primitive const& primitive : mesh.Primitives )
+          {
+            DirectX::BoundingBox bb;
+            primitive.AABB.Transform( bb, wt.Transform );
+            if ( sphere.Contains( bb ) == DirectX::DISJOINT )
+            {
+              continue;
+            }
+
+            command_list->IASetIndexBuffer( &mesh.Geometry->IndexBuffer.GetIndexBufferView() );
+            command_list->IASetVertexBuffers( 0, 1, &mesh.Geometry->VertexPositionBuffer.GetVertexBufferView() );
+
+            command_list->SetGraphicsRoot32BitConstants( 0, sizeof( DirectX::XMMATRIX ) / 4, &wt.Transform, 0 );
+
+            DebugInfo::Instance().PushDrawCall( primitive.DrawInfo.IndexCount );
+            command_list->DrawIndexedInstanced(
+                primitive.DrawInfo.IndexCount, 1, primitive.DrawInfo.FirstIndex, primitive.DrawInfo.FirstVertex, 0 );
+          }
+        } );
+  }
+}
+
+flecs::world const& Ember::World::GetECS() const
 {
   return m_Ecs;
 }

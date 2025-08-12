@@ -85,7 +85,8 @@ struct Material
 
 struct Geometry
 {
-  Buffer               VertexBuffer;
+  Buffer               VertexPositionBuffer;
+  Buffer               VertexDataBuffer;
   Buffer               IndexBuffer;
   std::atomic_uint32_t RefCount{ 1 };
 
@@ -145,11 +146,14 @@ public:
 
   World();
 
-  void          Update( float delta_seconds ) const;
-  void          Render( ID3D12GraphicsCommandList* command_list, DirectX::BoundingFrustum const& frustum ) const;
-  void          RenderShadow( ID3D12GraphicsCommandList* command_list, DirectX::BoundingFrustum const& frustum ) const;
+  void Update( float delta_seconds ) const;
+  void Render( ID3D12GraphicsCommandList* command_list, DirectX::BoundingFrustum const& frustum ) const;
+  void CullFrustum( DirectX::BoundingFrustum const& frustum ) const;
+  void CullSphere( DirectX::BoundingSphere const& sphere ) const;
+  void RenderShadow( ID3D12GraphicsCommandList* command_list, DirectX::BoundingFrustum const& frustum ) const;
+  void RenderShadow( ID3D12GraphicsCommandList* command_list, DirectX::BoundingSphere const& sphere ) const;
 
-  flecs::world& GetECS();
+  flecs::world const& GetECS() const;
 };
 
 } // namespace Ember

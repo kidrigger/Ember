@@ -11,22 +11,31 @@ namespace Ember
 {
 class RenderDevice;
 
-constexpr D3D12_INPUT_ELEMENT_DESC PerVertexInput( char const* name, uint32_t const index, DXGI_FORMAT const format )
+constexpr D3D12_INPUT_ELEMENT_DESC PerVertexInput(
+    char const* name, uint32_t const index, DXGI_FORMAT const format, uint32_t const input_slot )
 {
   return {
     .SemanticName         = name,
     .SemanticIndex        = index,
     .Format               = format,
-    .InputSlot            = 0,
+    .InputSlot            = input_slot,
     .AlignedByteOffset    = D3D12_APPEND_ALIGNED_ELEMENT,
     .InputSlotClass       = D3D12_INPUT_CLASSIFICATION_PER_VERTEX_DATA,
     .InstanceDataStepRate = 0,
   };
 }
 
-struct Vertex
+struct VertexPosition
 {
   DirectX::XMFLOAT3                         Position;
+
+  constexpr static D3D12_INPUT_ELEMENT_DESC kInputElementDesc[] = {
+    PerVertexInput( "POSITION", 0, DXGI_FORMAT_R32G32B32_FLOAT, 0 ),
+  };
+};
+
+struct VertexData
+{
   DirectX::XMFLOAT3                         Normal;
   DirectX::XMFLOAT4                         Tangent;
   DirectX::XMFLOAT3                         Color;
@@ -34,12 +43,11 @@ struct Vertex
   DirectX::XMFLOAT2                         TexCoord1;
 
   constexpr static D3D12_INPUT_ELEMENT_DESC kInputElementDesc[] = {
-    PerVertexInput( "POSITION", 0, DXGI_FORMAT_R32G32B32_FLOAT ),
-    PerVertexInput( "NORMAL", 0, DXGI_FORMAT_R32G32B32_FLOAT ),
-    PerVertexInput( "TANGENT", 0, DXGI_FORMAT_R32G32B32A32_FLOAT ),
-    PerVertexInput( "COLOR", 0, DXGI_FORMAT_R32G32B32_FLOAT ),
-    PerVertexInput( "TEXCOORD", 0, DXGI_FORMAT_R32G32_FLOAT ),
-    PerVertexInput( "TEXCOORD", 1, DXGI_FORMAT_R32G32_FLOAT ),
+    PerVertexInput( "NORMAL", 0, DXGI_FORMAT_R32G32B32_FLOAT, 1 ),
+    PerVertexInput( "TANGENT", 0, DXGI_FORMAT_R32G32B32A32_FLOAT, 1 ),
+    PerVertexInput( "COLOR", 0, DXGI_FORMAT_R32G32B32_FLOAT, 1 ),
+    PerVertexInput( "TEXCOORD", 0, DXGI_FORMAT_R32G32_FLOAT, 1 ),
+    PerVertexInput( "TEXCOORD", 1, DXGI_FORMAT_R32G32_FLOAT, 1 ),
   };
 };
 
@@ -49,7 +57,8 @@ class ModelLoader
   {
     std::map<cgltf_material const*, Material*> MaterialCache;
     Geometry*                                  Geometry;
-    std::vector<Vertex>                        Vertices;
+    std::vector<VertexPosition>                VertexPositions;
+    std::vector<VertexData>                    VertexData;
     std::vector<uint32_t>                      Indices;
   };
 
@@ -64,8 +73,6 @@ class ModelLoader
 
 public:
   std::optional<flecs::entity> TryLoadModel( char const* filename );
-  void                         Update();
-  void                         FlushBarriers( ID3D12GraphicsCommandList* command_list );
 
   ModelLoader( RenderDevice* render_device, World* world, TextureLoader* texture_loader );
 };

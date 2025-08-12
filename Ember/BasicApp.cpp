@@ -355,12 +355,20 @@ void Ember::BasicApp::SetupRenderPipeline()
   rasterizer_desc.CullMode              = D3D12_CULL_MODE_BACK;
 
   CD3DX12_DEPTH_STENCIL_DESC depth_stencil_desc{ D3D12_DEFAULT };
-  depth_stencil_desc.DepthEnable       = true;
-  depth_stencil_desc.DepthFunc         = D3D12_COMPARISON_FUNC_LESS;
+  depth_stencil_desc.DepthEnable = TRUE;
+  depth_stencil_desc.DepthFunc   = D3D12_COMPARISON_FUNC_LESS;
+
+  std::vector<D3D12_INPUT_ELEMENT_DESC> input_element;
+  input_element.insert(
+      input_element.end(),
+      std::begin( VertexPosition::kInputElementDesc ),
+      std::end( VertexPosition::kInputElementDesc ) );
+  input_element.insert(
+      input_element.end(), std::begin( VertexData::kInputElementDesc ), std::end( VertexData::kInputElementDesc ) );
 
   D3D12_INPUT_LAYOUT_DESC input_layout = {
-    .pInputElementDescs = DataOf( Vertex::kInputElementDesc ),
-    .NumElements        = CountOf( Vertex::kInputElementDesc ),
+    .pInputElementDescs = DataOf( input_element ),
+    .NumElements        = CountOf( input_element ),
   };
 
   struct MainPipelineStream
@@ -514,7 +522,6 @@ void Ember::BasicApp::Update()
 
   float const delta_seconds = ( float )m_PerfCounter->GetDeltaMilliSeconds() * 0.001f;
 
-  m_ModelLoader->Update();
   m_TextureLoader->Update();
 
   float const mouse_dx = ( ( float )g_Input.MousePosX - ( float )m_PrevMouseX ) / ( float )m_WindowWidth;
@@ -625,7 +632,6 @@ void Ember::BasicApp::Render()
   };
 
   command_list->ResourceBarrier( CountOf( top_of_renderpass_barriers ), DataOf( top_of_renderpass_barriers ) );
-  m_ModelLoader->FlushBarriers( command_list.Get() );
   m_TextureLoader->FlushBarriers( command_list.Get() );
 
   m_LightManager->RenderAllShadows( command_list.Get(), m_World, *m_RenderTargetManager, camera_frustum );
