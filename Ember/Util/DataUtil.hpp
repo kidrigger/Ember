@@ -42,12 +42,36 @@ constexpr uint64_t HashFnv1A( auto& data )
   return HashFnv1A( size, bytes );
 }
 
-constexpr uint64_t HashFnv1A( std::string& data )
+constexpr uint64_t HashFnv1A( std::string_view const& data )
 {
-  byte const*  bytes = ( byte* )data.data();
+  byte const*  bytes = ( byte const* )data.data();
   size_t const size  = data.size() * sizeof( char );
 
   return HashFnv1A( size, bytes );
+}
+
+class StringID
+{
+  uint64_t m_Value;
+
+public:
+  consteval StringID( std::string_view const& str ) : m_Value{ HashFnv1A( str ) }
+  {}
+
+  consteval StringID( char const* c_str, size_t const size ) : m_Value{ HashFnv1A( size, ( byte const* )c_str ) }
+  {}
+
+  [[nodiscard]] consteval uint64_t GetValue() const
+  {
+    return m_Value;
+  }
+
+  constexpr auto operator<=>( StringID const& ) const = default;
+};
+
+consteval StringID operator""_id( char const* data, size_t const size )
+{
+  return StringID{ data, size };
 }
 
 } // namespace Ember
