@@ -200,9 +200,29 @@ float4 TrianglePS( FSIn IN ) : SV_TARGET0
     }
   }
 
+  float3 dir_contrib = 0.0f;
+  if ( IsValidHandle( g_DirLights ) )
+  {
+    StructuredBuffer<DirLight> dir_lights = ResourceDescriptorHeap[g_DirLights];
+
+    int                        light_idx  = 0;
+    for ( ; light_idx < g_DirLightCount; light_idx++ )
+    {
+      float3 light_dir  = dir_lights[light_idx].DirectionIntensity;
+      float  intensity  = length( light_dir );
+
+      light_dir        /= intensity; // Normalization
+
+      float3 radiance   = intensity * UnpackColor32( dir_lights[light_idx].Color ).rgb;
+
+      // Expects direction *to* light.
+      dir_contrib += brdf.Evaluate( radiance, view_dir, -light_dir );
+    }
+  }
+
   float3 ambient_contrib = GetAmbientInfluence( brdf, view_dir );
 
-  float3 total_contrib   = emissive + point_contrib + ambient_contrib;
+  float3 total_contrib   = emissive + point_contrib + dir_contrib + ambient_contrib;
 
   return float4( LinearToSrgb( total_contrib ), albedo.a );
 }

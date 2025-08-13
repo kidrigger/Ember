@@ -194,6 +194,7 @@
       <EnableEnhancedInstructionSet>AdvancedVectorExtensions512</EnableEnhancedInstructionSet>
       <EnableVectorLength>VectorLength512</EnableVectorLength>
       <ExternalWarningLevel>TurnOffAllWarnings</ExternalWarningLevel>
+      <FloatingPointModel>Fast</FloatingPointModel>
     </ClCompile>
     <Link>
       <SubSystem>Windows</SubSystem>
@@ -216,6 +217,7 @@
       <EnableEnhancedInstructionSet>AdvancedVectorExtensions512</EnableEnhancedInstructionSet>
       <EnableVectorLength>VectorLength512</EnableVectorLength>
       <ExternalWarningLevel>TurnOffAllWarnings</ExternalWarningLevel>
+      <FloatingPointModel>Fast</FloatingPointModel>
     </ClCompile>
     <Link>
       <SubSystem>Windows</SubSystem>
@@ -240,6 +242,7 @@
       <EnableEnhancedInstructionSet>AdvancedVectorExtensions512</EnableEnhancedInstructionSet>
       <EnableVectorLength>VectorLength512</EnableVectorLength>
       <ExternalWarningLevel>TurnOffAllWarnings</ExternalWarningLevel>
+      <FloatingPointModel>Fast</FloatingPointModel>
     </ClCompile>
     <Link>
       <SubSystem>Windows</SubSystem>
@@ -270,6 +273,7 @@
       <SupportJustMyCode>true</SupportJustMyCode>
       <WholeProgramOptimization>false</WholeProgramOptimization>
       <ExternalWarningLevel>TurnOffAllWarnings</ExternalWarningLevel>
+      <FloatingPointModel>Fast</FloatingPointModel>
     </ClCompile>
     <Link>
       <SubSystem>Windows</SubSystem>
@@ -290,10 +294,11 @@
     <ClCompile Include="Buffer.cpp" />
     <ClCompile Include="Camera.cpp" />
     <ClCompile Include="CgltfImpl.cpp" />
+    <ClCompile Include="DirectionLightManager.cpp" />
     <ClCompile Include="Environment.cpp" />
     <ClCompile Include="IApp.cpp" />
     <ClCompile Include="LightManager.cpp" />
-    <ClCompile Include="OmniLightHandle.cpp" />
+    <ClCompile Include="LightHandle.cpp" />
     <ClCompile Include="OmniLightManager.cpp" />
     <ClCompile Include="ModelLoader.cpp" />
     <ClCompile Include="ObjectPool.cpp" />
@@ -317,10 +322,11 @@
     <ClInclude Include="Camera.hpp" />
     <ClInclude Include="Color.hpp" />
     <ClInclude Include="DebugInfo.hpp" />
+    <ClInclude Include="DirectionLightManager.hpp" />
     <ClInclude Include="Environment.hpp" />
     <ClInclude Include="IApp.hpp" />
     <ClInclude Include="LightManager.hpp" />
-    <ClInclude Include="OmniLightHandle.hpp" />
+    <ClInclude Include="LightHandle.hpp" />
     <ClInclude Include="OmniLightManager.hpp" />
     <ClInclude Include="ModelLoader.hpp" />
     <ClInclude Include="ObjectPool.hpp" />

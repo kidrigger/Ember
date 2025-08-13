@@ -3,12 +3,13 @@
 #include <map>
 
 #include "Color.hpp"
-#include "OmniLightHandle.hpp"
+#include "LightHandle.hpp"
 #include "RenderDevice.hpp"
 #include "RenderTargetManager.hpp"
 #include "Scene.hpp"
 #include "Util/DataUtil.hpp"
 #include "Util/DirectXHeaders.hpp"
+#include "Util/FlatMap.hpp"
 
 namespace Ember
 {

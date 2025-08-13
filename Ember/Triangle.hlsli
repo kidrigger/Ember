@@ -23,6 +23,12 @@ struct PointLight
   RID           ShadowIdx;   // 32
 };
 
+struct DirLight
+{
+  float3        DirectionIntensity; // 12
+  PackedColor32 Color;              // 16
+};
+
 struct Material
 {
   RID           BaseColorTextureIndex;  // 04
@@ -84,6 +90,8 @@ cbuffer BindlessIndex : register( b2, space0 )
   RID  g_PointLights;
   uint g_PointLightCount;
   uint g_ShadowPointLightCount;
+  RID  g_DirLights;
+  uint g_DirLightCount;
 }
 
 cbuffer EnvironmentBlock : register( b3, space0 )
