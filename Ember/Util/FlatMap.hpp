@@ -13,6 +13,31 @@ class FlatMap
   std::vector<TValue> m_Values;
 
 public:
+  class Iterator
+  {
+    using KeyIter   = typename std::vector<TKey>::iterator;
+    using ValueIter = typename std::vector<TValue>::iterator;
+    KeyIter   m_KeyIter;
+    ValueIter m_ValueIter;
+
+  public:
+    Iterator( KeyIter key_iter, ValueIter value_iter )
+      : m_KeyIter{ std::move( key_iter ) }, m_ValueIter{ std::move( value_iter ) }
+    {}
+
+    std::pair<TKey&, TValue&> operator*()
+    {
+      return { *m_KeyIter, *m_ValueIter };
+    }
+
+    Iterator& operator++()
+    {
+      ++m_KeyIter;
+      ++m_ValueIter;
+      return *this;
+    }
+  };
+
   bool Contains( TKey const& key )
   {
     return std::ranges::binary_search( m_Keys, key );
@@ -69,6 +94,16 @@ public:
   TValue const& operator[]( TKey const& key )
   {
     return Get( key );
+  }
+
+  Iterator begin()
+  {
+    return { m_Keys.begin(), m_Values.begin() };
+  }
+
+  Iterator end()
+  {
+    return { m_Keys.end(), m_Values.end() };
   }
 };
 
