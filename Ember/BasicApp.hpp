@@ -10,11 +10,11 @@
 
 namespace Ember
 {
+class LightManager;
 class ModelLoader;
 class PerfCounter;
 class RenderDevice;
 class Camera;
-class LightManager;
 
 class BasicApp final : public IApp
 {

@@ -200,24 +200,7 @@ void Ember::World::Render( ID3D12GraphicsCommandList* command_list, DirectX::Bou
 {
   ZoneScoped;
 
-  // Clear cull flags;
-  m_Ecs.each( []( CullInfo& cull_info ) { cull_info.ClearCulled( UINT64_MAX ); } );
-
-  uint64_t const cull_mask = 0x1;
-  {
-    ZoneScopedN( "Cull" );
-    m_CullDescentQuery.each(
-        [&]( CullInfo& cull_info, WorldBoundingBox const& bb, CullInfo const& parent_cull )
-        {
-          cull_info.SetCulled( parent_cull.CullMask );
-          if ( cull_info.IsCulled( cull_mask ) ) return;
-
-          if ( frustum.Contains( bb.AABB ) == DirectX::DISJOINT or bb.AABB.Contains( frustum ) == DirectX::DISJOINT )
-          {
-            cull_info.SetCulled( cull_mask );
-          }
-        } );
-  }
+  CullFrustum( frustum );
 
   {
     ZoneScopedN( "RecordCmdList" );
@@ -225,7 +208,7 @@ void Ember::World::Render( ID3D12GraphicsCommandList* command_list, DirectX::Bou
     m_RenderQuery.each(
         [&]( WorldTransform const& wt, CullInfo const& cull_info, Mesh const& mesh )
         {
-          if ( cull_info.IsCulled( cull_mask ) ) return;
+          if ( cull_info.IsCulled( UINT64_MAX ) ) return;
 
           for ( Primitive const& primitive : mesh.Primitives )
           {
@@ -260,9 +243,9 @@ void Ember::World::CullFrustum( DirectX::BoundingFrustum const& frustum ) const
   ZoneScoped;
 
   // Clear cull flags;
-  m_Ecs.each( []( CullInfo& cull_info ) { cull_info.SetCulled( 0 ); } );
+  uint64_t const cull_mask = UINT64_MAX;
+  m_Ecs.each( []( CullInfo& cull_info ) { cull_info.ClearCulled( cull_mask ); } );
 
-  uint64_t const cull_mask = 0x1;
   m_CullDescentQuery.each(
       [&]( CullInfo& cull_info, WorldBoundingBox const& bb, CullInfo const& parent_cull )
       {
@@ -281,9 +264,9 @@ void Ember::World::CullSphere( DirectX::BoundingSphere const& sphere ) const
   ZoneScoped;
 
   // Clear cull flags;
-  m_Ecs.each( []( CullInfo& cull_info ) { cull_info.SetCulled( 0 ); } );
+  uint64_t const cull_mask = UINT64_MAX;
+  m_Ecs.each( []( CullInfo& cull_info ) { cull_info.ClearCulled( cull_mask ); } );
 
-  uint64_t const cull_mask = 0x1;
   m_CullDescentQuery.each(
       [&]( CullInfo& cull_info, WorldBoundingBox const& bb, CullInfo const& parent_cull )
       {
@@ -308,9 +291,10 @@ void Ember::World::RenderShadow(
   {
     ZoneScopedN( "RecordCmdList" );
 
-    m_Ecs.each(
-        [&]( WorldTransform const& wt, Mesh const& mesh )
+    m_RenderQuery.each(
+        [&]( WorldTransform const& wt, CullInfo const& cull, Mesh const& mesh )
         {
+          if ( cull.IsCulled( 0x1 ) ) return;
           for ( Primitive const& primitive : mesh.Primitives )
           {
             DirectX::BoundingBox bb;
@@ -343,9 +327,10 @@ void Ember::World::RenderShadow( ID3D12GraphicsCommandList* command_list, Direct
   {
     ZoneScopedN( "RecordCmdList" );
 
-    m_Ecs.each(
-        [&]( WorldTransform const& wt, Mesh const& mesh )
+    m_RenderQuery.each(
+        [&]( WorldTransform const& wt, CullInfo const& cull_info, Mesh const& mesh )
         {
+          if ( cull_info.IsCulled( 0x1 ) ) return;
           for ( Primitive const& primitive : mesh.Primitives )
           {
             DirectX::BoundingBox bb;

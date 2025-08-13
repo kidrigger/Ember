@@ -239,7 +239,7 @@ Ember::BasicApp::BasicApp(
   , m_RenderTargetManager{ std::move( render_target_manager ) }
   , m_SwapchainFormat{ m_RenderDevice->FetchSwapchainFormat() }
   , m_Camera{ std::make_unique<Camera>() }
-  , m_LightManager{ std::make_unique<LightManager>() }
+  , m_LightManager{ std::make_unique_for_overwrite<LightManager>() }
   , m_Environment{ std::make_unique<Environment>() }
 {
   m_TextureLoader = std::make_unique_for_overwrite<TextureLoader>();
@@ -605,8 +605,8 @@ void Ember::BasicApp::RenderScene( ID3D12GraphicsCommandList* command_list, uint
   PerFrameConstants const constants = {
     .Camera           = camera_cbv,
     .PointLightBuffer = light_srv,
-    .PointLightCount  = m_LightManager->GetPointLightCount(),
-    .ShadowLightCount = m_LightManager->GetShadowingPointLightCount(),
+    .PointLightCount  = m_LightManager->GetOmniLightCount(),
+    .ShadowLightCount = m_LightManager->GetShadowingOmniLightCount(),
   };
 
   command_list->SetGraphicsRoot32BitConstants( 2, sizeof( PerFrameConstants ) / 4, &constants, 0 );
