@@ -239,7 +239,7 @@ void Ember::Internal::OmniLightManager::SwapTrueLocations( uint16_t const first,
 
 Ember::SRVHandle Ember::Internal::OmniLightManager::AllocateOmniShadow( OmniLightHandle const omni_light_idx )
 {
-  ASSERT( not m_ShadowsInUse.contains( omni_light_idx ) );
+  ASSERT( not m_ShadowsInUse.Contains( omni_light_idx ) );
 
   Texture tex;
   if ( m_ShadowCache.empty() )
@@ -252,7 +252,7 @@ Ember::SRVHandle Ember::Internal::OmniLightManager::AllocateOmniShadow( OmniLigh
         .InitState = D3D12_RESOURCE_STATE_PIXEL_SHADER_RESOURCE,
     } );
     wchar_t buf[36];
-    swprintf_s( buf, L"Omni Shadow Map %llu", m_ShadowsInUse.size() );
+    swprintf_s( buf, L"Omni Shadow Map %llu", m_ShadowsInUse.Size() );
     tex.SetName( buf );
   }
   else
@@ -268,10 +268,10 @@ Ember::SRVHandle Ember::Internal::OmniLightManager::AllocateOmniShadow( OmniLigh
 
 void Ember::Internal::OmniLightManager::FreeOmniShadow( OmniLightHandle const omni_light_idx )
 {
-  if ( auto const it = m_ShadowsInUse.find( omni_light_idx ); it != m_ShadowsInUse.end() )
+  if ( auto it = m_ShadowsInUse.Find( omni_light_idx ); it != m_ShadowsInUse.end() )
   {
     m_ShadowCache.push( it->second );
-    m_ShadowsInUse.erase( it );
+    m_ShadowsInUse.Erase( it );
     return;
   }
 
@@ -352,7 +352,7 @@ void Ember::Internal::OmniLightManager::RenderAllShadows(
   command_list->SetPipelineState( m_Pipeline.Get() );
   command_list->IASetPrimitiveTopology( D3D_PRIMITIVE_TOPOLOGY_TRIANGLELIST );
 
-  for ( auto& [handle, texture] : m_ShadowsInUse )
+  for ( auto const& [handle, texture] : m_ShadowsInUse )
   {
     ZoneScopedN( "CheckShadow" );
     uint32_t const index = handle.GetIndex();

@@ -33,20 +33,20 @@ class OmniLightManager
     SRVHandle         ShadowMap;                    // 32
   };
 
-  RenderDevice*                      m_RenderDevice{ nullptr };
-  Buffer                             m_ShadowProjectionBuffer;
-  OmniLight                          m_LightData[kMaxOmniLights]{};
-  uint16_t                           m_IndirectionMap[kMaxOmniLights]{};
-  uint16_t                           m_HandleGeneration[kMaxOmniLights]{};
-  ComPtr<ID3D12RootSignature>        m_RootSignature;
-  ComPtr<ID3D12PipelineState>        m_Pipeline;
-  std::vector<Buffer>                m_DataBuffers;
-  std::queue<Texture>                m_ShadowCache;
-  std::map<OmniLightHandle, Texture> m_ShadowsInUse;
-  uint16_t                           m_IndirectionFreeHead{ UINT16_MAX };
-  uint16_t                           m_TotalLightCount{ 0 };
-  uint16_t                           m_ShadowingLightCount{ 0 };
-  uint8_t                            m_DirtyFrames{ 0 };
+  RenderDevice*                     m_RenderDevice{ nullptr };
+  Buffer                            m_ShadowProjectionBuffer;
+  OmniLight                         m_LightData[kMaxOmniLights]{};
+  uint16_t                          m_IndirectionMap[kMaxOmniLights]{};
+  uint16_t                          m_HandleGeneration[kMaxOmniLights]{};
+  ComPtr<ID3D12RootSignature>       m_RootSignature;
+  ComPtr<ID3D12PipelineState>       m_Pipeline;
+  std::vector<Buffer>               m_DataBuffers;
+  std::queue<Texture>               m_ShadowCache;
+  FlatMap<OmniLightHandle, Texture> m_ShadowsInUse;
+  uint16_t                          m_IndirectionFreeHead{ UINT16_MAX };
+  uint16_t                          m_TotalLightCount{ 0 };
+  uint16_t                          m_ShadowingLightCount{ 0 };
+  uint8_t                           m_DirtyFrames{ 0 };
 
   static_assert( std::numeric_limits<std::remove_cvref_t<decltype( m_IndirectionMap[0] )>>::max() > kMaxOmniLights );
 
