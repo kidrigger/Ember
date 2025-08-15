@@ -354,7 +354,7 @@ void Ember::Internal::OmniLightManager::RenderAllShadows(
 
   for ( auto const& [handle, texture] : m_ShadowsInUse )
   {
-    ZoneScopedN( "CheckShadow" );
+    ZoneScopedN( "CheckOmniShadow" );
     uint32_t const index = handle.GetIndex();
     ASSERT( handle.GetGeneration() == m_HandleGeneration[index] );
     OmniLight const& light = m_LightData[index];
@@ -409,8 +409,10 @@ void Ember::Internal::OmniLightManager::RenderOmniShadow(
   world.CullSphere( sphere_of_influence );
 
   world.GetECS().each(
-      [&]( WorldTransform const& wt, Mesh const& mesh )
+      [&]( WorldTransform const& wt, CullInfo const& cull_info, Mesh const& mesh )
       {
+        if ( cull_info.IsCulled( 0x1 ) ) return;
+
         for ( Primitive const& primitive : mesh.Primitives )
         {
           DirectX::BoundingBox bb;

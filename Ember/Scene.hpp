@@ -148,8 +148,10 @@ public:
 
   void Update( float delta_seconds ) const;
   void Render( ID3D12GraphicsCommandList* command_list, DirectX::BoundingFrustum const& frustum ) const;
+  void ClearCull( uint64_t cull_mask = UINT64_MAX ) const;
   void CullFrustum( DirectX::BoundingFrustum const& frustum ) const;
   void CullSphere( DirectX::BoundingSphere const& sphere ) const;
+  void CullBox( DirectX::BoundingOrientedBox const& bob ) const;
   void RenderShadow( ID3D12GraphicsCommandList* command_list, DirectX::BoundingFrustum const& frustum ) const;
   void RenderShadow( ID3D12GraphicsCommandList* command_list, DirectX::BoundingSphere const& sphere ) const;
 

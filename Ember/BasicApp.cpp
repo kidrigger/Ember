@@ -222,11 +222,12 @@ struct RotatingModel
 struct PerFrameConstants
 {
   Ember::CBVHandle Camera;
-  Ember::SRVHandle PointLightBuffer;
-  uint32_t         PointLightCount;
-  uint32_t         ShadowLightCount;
+  Ember::SRVHandle OmniLightBuffer;
+  uint32_t         OmniLightCount;
+  uint32_t         OmniLightShadowCount;
   Ember::SRVHandle DirLightBuffer;
   uint32_t         DirLightCount;
+  uint32_t         DirLightShadowCount;
 };
 
 Ember::BasicApp::BasicApp(
@@ -313,8 +314,8 @@ void Ember::BasicApp::SetupRenderPipeline()
                                 D3D12_FILTER_ANISOTROPIC, D3D12_TEXTURE_ADDRESS_MODE_CLAMP,
                                 D3D12_TEXTURE_ADDRESS_MODE_CLAMP, D3D12_TEXTURE_ADDRESS_MODE_CLAMP },
     CD3DX12_STATIC_SAMPLER_DESC{ 2,
-                                D3D12_FILTER_COMPARISON_MIN_MAG_LINEAR_MIP_POINT, D3D12_TEXTURE_ADDRESS_MODE_CLAMP,
-                                D3D12_TEXTURE_ADDRESS_MODE_CLAMP, D3D12_TEXTURE_ADDRESS_MODE_CLAMP,
+                                D3D12_FILTER_COMPARISON_MIN_MAG_LINEAR_MIP_POINT, D3D12_TEXTURE_ADDRESS_MODE_BORDER,
+                                D3D12_TEXTURE_ADDRESS_MODE_BORDER, D3D12_TEXTURE_ADDRESS_MODE_BORDER,
                                 0, 16,
                                 D3D12_COMPARISON_FUNC_LESS_EQUAL },
   };
@@ -455,8 +456,8 @@ void Ember::BasicApp::LoadContent()
   LightManager::Create( m_LightManager.get(), m_RenderDevice.get(), RenderDevice::kNumFrames );
   m_LightManager->AddShadowingOmniLight( { 15.0f, 2.0f, 12.0f }, 10.0f, Color32::Blue(), 15.0f );
   m_LightManager->AddShadowingOmniLight( { 0.0f, 2.0f, 5.0f }, 10.0f, Color32::Green(), 15.0f );
-  m_LightManager->AddShadowingOmniLight( { -15.0f, 2.0f, -5.0f }, 10.0f, Color32::Red(), 15.0f );
-  m_LightManager->AddDirLight( { 0.5f, -0.5f, 0.0f }, Color32::White(), 12.0f );
+  m_LightManager->AddShadowingOmniLight( { -15.0f, 2.0f, -5.0f }, 10.0f, Color32::Red(), 25.0f );
+  m_LightManager->AddShadowingDirLight( { 1.0f, -1.0f, 0.0f }, Color32::White(), 12.0f );
 
   // Setup Scene Geometry
   flecs::entity const sponza = m_ModelLoader->TryLoadModel( "Bistro.glb" ).value().set_name( "Scene" );
@@ -477,10 +478,10 @@ void Ember::BasicApp::LoadContent()
   helmet_local_tx->Rotation           = DirectX::XMQuaternionIdentity();
   ASSERT( model );
 
-  constexpr char const* kEnvMapFile = "OvercastSoil.hdr";
-  bool const            env_loaded =
-      Environment::TryLoadFrom( m_Environment.get(), m_RenderDevice.get(), m_TextureLoader.get(), kEnvMapFile );
-  ASSERT( env_loaded );
+  // constexpr char const* kEnvMapFile = "OvercastSoil.hdr";
+  // bool const            env_loaded =
+  //     Environment::TryLoadFrom( m_Environment.get(), m_RenderDevice.get(), m_TextureLoader.get(), kEnvMapFile );
+  // ASSERT( env_loaded );
 
   SetupRenderPipeline();
 
@@ -498,10 +499,9 @@ void Ember::BasicApp::LoadContent()
        .Usage     = TextureUsage::kDepthSample,
        .MipLevels = MipLevels::kBase,
   } );
-  // m_RenderDevice->SetDepthBuffer( m_DepthTexture );
 
-  m_PrevMouseX = g_Input.MousePosX;
-  m_PrevMouseY = g_Input.MousePosY;
+  m_PrevMouseX    = g_Input.MousePosX;
+  m_PrevMouseY    = g_Input.MousePosY;
 }
 
 void Ember::BasicApp::Update()
@@ -582,7 +582,7 @@ void Ember::BasicApp::RenderScene( ID3D12GraphicsCommandList* command_list, uint
   CBVHandle const camera_cbv                    = m_Camera->PrepareFrame( frame_idx );
   auto const [omni_light_srv, dir_light_srv]    = m_LightManager->PrepareFrame( frame_idx );
 
-  DirectX::BoundingFrustum const camera_frustum = m_Camera->GetFrustum();
+  DirectX::BoundingFrustum const camera_frustum = m_Camera->GetLastUpdatedFrustum();
 
   // Viewport and scissor
   D3D12_VIEWPORT const viewport = {
@@ -611,12 +611,13 @@ void Ember::BasicApp::RenderScene( ID3D12GraphicsCommandList* command_list, uint
   m_RenderTargetManager->OMSetRenderTargets( command_list, 1, &m_RenderTexture, &m_DepthTexture );
 
   PerFrameConstants const constants = {
-    .Camera           = camera_cbv,
-    .PointLightBuffer = omni_light_srv,
-    .PointLightCount  = m_LightManager->GetOmniLightCount(),
-    .ShadowLightCount = m_LightManager->GetShadowingOmniLightCount(),
-    .DirLightBuffer   = dir_light_srv,
-    .DirLightCount    = m_LightManager->GetDirLightCount(),
+    .Camera               = camera_cbv,
+    .OmniLightBuffer      = omni_light_srv,
+    .OmniLightCount       = m_LightManager->GetOmniLightCount(),
+    .OmniLightShadowCount = m_LightManager->GetShadowingOmniLightCount(),
+    .DirLightBuffer       = dir_light_srv,
+    .DirLightCount        = m_LightManager->GetDirLightCount(),
+    .DirLightShadowCount  = m_LightManager->GetShadowingDirLightCount(),
   };
 
   command_list->SetGraphicsRoot32BitConstants( 2, sizeof( PerFrameConstants ) / 4, &constants, 0 );
@@ -633,7 +634,7 @@ void Ember::BasicApp::Render()
   Context::CommandList           command_list   = m_RenderDevice->GetGraphicsCommandList();
   uint32_t const                 frame_idx      = m_RenderDevice->GetCurrentFrameIndex();
 
-  DirectX::BoundingFrustum const camera_frustum = m_Camera->GetFrustum();
+  DirectX::BoundingFrustum const camera_frustum = m_Camera->GetLastUpdatedFrustum();
 
   // All resources for this frame are guaranteed to be available for CPU modification at this time.
   // Clear Backbuffer

@@ -39,9 +39,16 @@ Ember::OmniLightHandle Ember::LightManager::AddShadowingOmniLight(
   return m_OmniLightManager->AddShadowingOmniLight( position, range, color, intensity, attenuation );
 }
 
-Ember::DirLightHandle Ember::LightManager::AddDirLight( DirectX::XMFLOAT3 direction, Color32 color, float intensity )
+Ember::DirLightHandle Ember::LightManager::AddDirLight(
+    DirectX::XMFLOAT3 const direction, Color32 const color, float const intensity )
 {
   return m_DirLightManager->AddDirLight( direction, color, intensity );
+}
+
+Ember::DirLightHandle Ember::LightManager::AddShadowingDirLight(
+    DirectX::XMFLOAT3 const direction, Color32 const color, float const intensity )
+{
+  return m_DirLightManager->AddShadowingDirLight( direction, color, intensity );
 }
 
 void Ember::LightManager::Free( OmniLightHandle const omni_light_handle )
@@ -74,6 +81,11 @@ uint16_t Ember::LightManager::GetDirLightCount() const
   return m_DirLightManager->GetDirLightCount();
 }
 
+uint16_t Ember::LightManager::GetShadowingDirLightCount() const
+{
+  return m_DirLightManager->GetShadowingDirLightCount();
+}
+
 void Ember::LightManager::RenderAllShadows(
     ID3D12GraphicsCommandList*      command_list,
     World const&                    world,
@@ -81,4 +93,5 @@ void Ember::LightManager::RenderAllShadows(
     DirectX::BoundingFrustum const& camera_frustum ) const
 {
   m_OmniLightManager->RenderAllShadows( command_list, world, rtm, camera_frustum );
+  m_DirLightManager->RenderAllShadows( command_list, world, rtm, camera_frustum );
 }

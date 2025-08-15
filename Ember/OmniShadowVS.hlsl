@@ -1,4 +1,4 @@
-#include "OmniShader.hlsli"
+#include "OmniShadow.hlsli"
 
 VSOut OmniShadowVS( float4 position : POSITION, uint instance_id : SV_INSTANCEID )
 {

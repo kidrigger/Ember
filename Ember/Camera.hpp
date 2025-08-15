@@ -33,8 +33,6 @@ private:
   float               m_Pitch{ 0 };
   uint32_t            m_DirtyFlags{ UINT32_MAX };
 
-  void                UpdateRepr();
-
 public:
   Camera() = default;
   explicit Camera( std::vector<Buffer> camera_buffer );
@@ -51,7 +49,8 @@ public:
   void                              SetAspectRatio( float aspect_ratio );
   void                              SetHorizontalFoV( float fov );
 
+  void                              UpdateRepr();
   [[nodiscard]] CBVHandle           PrepareFrame( uint32_t frame_index );
-  DirectX::BoundingFrustum          GetFrustum() const;
+  DirectX::BoundingFrustum          GetLastUpdatedFrustum() const;
 };
 } // namespace Ember

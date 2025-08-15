@@ -238,13 +238,18 @@ void Ember::World::Render( ID3D12GraphicsCommandList* command_list, DirectX::Bou
   }
 }
 
+void Ember::World::ClearCull( uint64_t const cull_mask ) const
+{
+  m_Ecs.each( [&]( CullInfo& cull_info ) { cull_info.ClearCulled( cull_mask ); } );
+}
+
 void Ember::World::CullFrustum( DirectX::BoundingFrustum const& frustum ) const
 {
   ZoneScoped;
 
   // Clear cull flags;
   uint64_t const cull_mask = UINT64_MAX;
-  m_Ecs.each( []( CullInfo& cull_info ) { cull_info.ClearCulled( cull_mask ); } );
+  ClearCull( cull_mask );
 
   m_CullDescentQuery.each(
       [&]( CullInfo& cull_info, WorldBoundingBox const& bb, CullInfo const& parent_cull )
@@ -265,7 +270,7 @@ void Ember::World::CullSphere( DirectX::BoundingSphere const& sphere ) const
 
   // Clear cull flags;
   uint64_t const cull_mask = UINT64_MAX;
-  m_Ecs.each( []( CullInfo& cull_info ) { cull_info.ClearCulled( cull_mask ); } );
+  ClearCull( cull_mask );
 
   m_CullDescentQuery.each(
       [&]( CullInfo& cull_info, WorldBoundingBox const& bb, CullInfo const& parent_cull )
@@ -274,6 +279,27 @@ void Ember::World::CullSphere( DirectX::BoundingSphere const& sphere ) const
         if ( cull_info.IsCulled( cull_mask ) ) return;
 
         if ( sphere.Contains( bb.AABB ) == DirectX::DISJOINT )
+        {
+          cull_info.SetCulled( cull_mask );
+        }
+      } );
+}
+
+void Ember::World::CullBox( DirectX::BoundingOrientedBox const& bob ) const
+{
+  ZoneScoped;
+
+  // Clear cull flags;
+  uint64_t const cull_mask = UINT64_MAX;
+  ClearCull( cull_mask );
+
+  m_CullDescentQuery.each(
+      [&]( CullInfo& cull_info, WorldBoundingBox const& bb, CullInfo const& parent_cull )
+      {
+        cull_info.SetCulled( parent_cull.CullMask );
+        if ( cull_info.IsCulled( cull_mask ) ) return;
+
+        if ( bob.Contains( bb.AABB ) == DirectX::DISJOINT )
         {
           cull_info.SetCulled( cull_mask );
         }

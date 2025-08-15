@@ -1,4 +1,4 @@
-#include "OmniShader.hlsli"
+#include "OmniShadow.hlsli"
 
 FSOut OmniShadowPS( FSIn IN )
 {

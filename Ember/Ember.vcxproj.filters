@@ -136,7 +136,7 @@
       <Filter>Source Files\Scene</Filter>
     </ClCompile>
     <ClCompile Include="DirectionLightManager.cpp">
-      <Filter>Source Files</Filter>
+      <Filter>Source Files\Scene</Filter>
     </ClCompile>
   </ItemGroup>
   <ItemGroup>
@@ -231,7 +231,7 @@
       <Filter>Header Files\Scene</Filter>
     </ClInclude>
     <ClInclude Include="DirectionLightManager.hpp">
-      <Filter>Header Files</Filter>
+      <Filter>Header Files\Scene</Filter>
     </ClInclude>
   </ItemGroup>
   <ItemGroup>
@@ -256,7 +256,7 @@
     <None Include="IBLCommon.hlsli">
       <Filter>Shaders\IBL</Filter>
     </None>
-    <None Include="OmniShader.hlsli">
+    <None Include="OmniShadow.hlsli">
       <Filter>Shaders\Shadows</Filter>
     </None>
     <None Include="Bindless.hlsli">
@@ -304,6 +304,12 @@
       <Filter>Shaders\Shadows</Filter>
     </FxCompile>
     <FxCompile Include="OmniShadowPS.hlsl">
+      <Filter>Shaders\Shadows</Filter>
+    </FxCompile>
+    <FxCompile Include="DirShadowVS.hlsl">
+      <Filter>Shaders\Shadows</Filter>
+    </FxCompile>
+    <FxCompile Include="DirShadowPS.hlsl">
       <Filter>Shaders\Shadows</Filter>
     </FxCompile>
   </ItemGroup>

@@ -32,6 +32,7 @@ class OmniLightManager
     float             Attenuation{ 1.0f };          // 28
     SRVHandle         ShadowMap;                    // 32
   };
+  static_assert( sizeof( OmniLight ) % 16 == 0 );
 
   RenderDevice*                     m_RenderDevice{ nullptr };
   Buffer                            m_ShadowProjectionBuffer;
