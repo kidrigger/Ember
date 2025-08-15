@@ -99,8 +99,9 @@ cbuffer EnvironmentBlock : register( b3, space0 )
   Environment g_Env;
 }
 
-SamplerState g_DefaultSampler : register( s0, space0 );
-SamplerState g_ClampedSampler : register( s1, space0 );
+SamplerState           g_DefaultSampler : register( s0, space0 );
+SamplerState           g_ClampedSampler : register( s1, space0 );
+SamplerComparisonState g_ShadowSampler : register( s2, space0 );
 
 struct VSInput
 {

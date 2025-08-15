@@ -168,19 +168,17 @@ float4 TrianglePS( FSIn IN ) : SV_TARGET0
 
       if ( light_dist > point_lights[light_idx].Range ) continue;
 
-      light_dir /= light_dist; // Normalization
-
       // Shadow test
       TextureCube<float> shadow_map = ResourceDescriptorHeap[point_lights[light_idx].ShadowIdx];
-      float              depth      = shadow_map.Sample( g_DefaultSampler, -light_dir ) * point_lights[light_idx].Range;
-
-      if ( light_dist > depth ) continue;
+      float              shadowing =
+          shadow_map.SampleCmpLevelZero( g_ShadowSampler, -light_dir, light_dist / point_lights[light_idx].Range );
 
       float  attenuation = 1.0f / ( light_dist * light_dist ); // TODO: Controlled Attenuation
       float3 radiance =
           point_lights[light_idx].Intensity * UnpackColor32( point_lights[light_idx].Color ).rgb * attenuation;
 
-      point_contrib += brdf.Evaluate( radiance, view_dir, light_dir );
+      light_dir     /= light_dist; // Normalization
+      point_contrib += shadowing * brdf.Evaluate( radiance, view_dir, light_dir );
     }
 
     for ( ; light_idx < g_PointLightCount; light_idx++ )
