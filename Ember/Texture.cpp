@@ -257,14 +257,14 @@ DXGI_FORMAT MakeSRVCompat( DXGI_FORMAT const format )
 
 Ember::Texture Ember::TextureManager::CreateDepthTexture2D( Texture2DCreateInfo const& create_info )
 {
-  auto [format, width, height, usage, levels, init_state] = create_info;
+  auto [format, width, height, usage, levels, array_size, init_state] = create_info;
   ASSERT( usage == TextureUsage::kDepthSample );
 
   ComPtr<ID3D12Resource>      texture;
   ComPtr<D3D12MA::Allocation> allocation;
 
-  CD3DX12_RESOURCE_DESC       resource_desc  = CD3DX12_RESOURCE_DESC::Tex2D( format, width, height, 1, levels );
-  resource_desc.Flags                       |= D3D12_RESOURCE_FLAG_ALLOW_DEPTH_STENCIL;
+  CD3DX12_RESOURCE_DESC       resource_desc = CD3DX12_RESOURCE_DESC::Tex2D( format, width, height, array_size, levels );
+  resource_desc.Flags |= D3D12_RESOURCE_FLAG_ALLOW_DEPTH_STENCIL;
 
   //
   D3D12_CLEAR_VALUE clear_value = {
@@ -280,11 +280,19 @@ Ember::Texture Ember::TextureManager::CreateDepthTexture2D( Texture2DCreateInfo 
       m_Bindless->CreateDescriptorHandle( texture.Get(), CD3DX12_SHADER_RESOURCE_VIEW_DESC::Tex2D( srv_format ) );
 
   D3D12_DEPTH_STENCIL_VIEW_DESC depth_stencil_view{
-    .Format        = format,
-    .ViewDimension = D3D12_DSV_DIMENSION_TEXTURE2D,
-    .Flags         = D3D12_DSV_FLAG_NONE,
-    .Texture2D     = { .MipSlice = 0 },
+    .Format = format,
+    .Flags  = D3D12_DSV_FLAG_NONE,
   };
+  if ( array_size == 1 )
+  {
+    depth_stencil_view.ViewDimension = D3D12_DSV_DIMENSION_TEXTURE2D;
+    depth_stencil_view.Texture2D     = { .MipSlice = 0 };
+  }
+  else
+  {
+    depth_stencil_view.ViewDimension  = D3D12_DSV_DIMENSION_TEXTURE2DARRAY;
+    depth_stencil_view.Texture2DArray = { .MipSlice = 0, .FirstArraySlice = 0, .ArraySize = array_size };
+  }
 
   auto texture_info = std::allocate_shared<Texture::DepthInfoImpl>(
       std::pmr::polymorphic_allocator{ &m_MemoryPool }, m_Bindless, srv_handle, depth_stencil_view );
@@ -294,14 +302,14 @@ Ember::Texture Ember::TextureManager::CreateDepthTexture2D( Texture2DCreateInfo 
 
 Ember::Texture Ember::TextureManager::CreateRenderTexture2D( Texture2DCreateInfo const& create_info )
 {
-  auto [format, width, height, usage, levels, init_state] = create_info;
+  auto [format, width, height, usage, levels, array_size, init_state] = create_info;
   ASSERT( usage == TextureUsage::kRenderTarget );
 
   ComPtr<ID3D12Resource>      texture;
   ComPtr<D3D12MA::Allocation> allocation;
 
-  CD3DX12_RESOURCE_DESC       resource_desc  = CD3DX12_RESOURCE_DESC::Tex2D( format, width, height, 1, levels );
-  resource_desc.Flags                       |= D3D12_RESOURCE_FLAG_ALLOW_RENDER_TARGET;
+  CD3DX12_RESOURCE_DESC       resource_desc = CD3DX12_RESOURCE_DESC::Tex2D( format, width, height, array_size, levels );
+  resource_desc.Flags |= D3D12_RESOURCE_FLAG_ALLOW_RENDER_TARGET;
 
   //
   D3D12_CLEAR_VALUE const clear_value = {
@@ -316,10 +324,24 @@ Ember::Texture Ember::TextureManager::CreateRenderTexture2D( Texture2DCreateInfo
       m_Bindless->CreateDescriptorHandle( texture.Get(), CD3DX12_SHADER_RESOURCE_VIEW_DESC::Tex2D( format ) );
 
   D3D12_RENDER_TARGET_VIEW_DESC render_target_view{
-    .Format        = format,
-    .ViewDimension = D3D12_RTV_DIMENSION_TEXTURE2D,
-    .Texture2D     = { .MipSlice = 0, .PlaneSlice = 0 },
+    .Format = format,
   };
+
+  if ( array_size == 1 )
+  {
+    render_target_view.ViewDimension = D3D12_RTV_DIMENSION_TEXTURE2D;
+    render_target_view.Texture2D     = { .MipSlice = 0, .PlaneSlice = 0 };
+  }
+  else
+  {
+    render_target_view.ViewDimension  = D3D12_RTV_DIMENSION_TEXTURE2DARRAY;
+    render_target_view.Texture2DArray = {
+      .MipSlice        = 0,
+      .FirstArraySlice = 0,
+      .ArraySize       = array_size,
+      .PlaneSlice      = 0,
+    };
+  }
 
   auto texture_info = std::allocate_shared<Texture::AttachmentInfoImpl>(
       std::pmr::polymorphic_allocator{ &m_MemoryPool }, m_Bindless, srv_handle, render_target_view );
@@ -351,7 +373,7 @@ void Ember::TextureManager::CreateResourceImpl(
 
 Ember::Texture Ember::TextureManager::CreateTexture2D( Texture2DCreateInfo const& create_info )
 {
-  auto [format, width, height, usage, levels, init_state] = create_info;
+  auto [format, width, height, usage, levels, array_size, init_state] = create_info;
   if ( create_info.Usage == TextureUsage::kDepthSample )
   {
     return CreateDepthTexture2D( create_info );
@@ -364,7 +386,7 @@ Ember::Texture Ember::TextureManager::CreateTexture2D( Texture2DCreateInfo const
   ComPtr<ID3D12Resource>      texture;
   ComPtr<D3D12MA::Allocation> allocation;
 
-  CD3DX12_RESOURCE_DESC       resource_desc = CD3DX12_RESOURCE_DESC::Tex2D( format, width, height, 1, levels );
+  CD3DX12_RESOURCE_DESC       resource_desc = CD3DX12_RESOURCE_DESC::Tex2D( format, width, height, array_size, levels );
 
   if ( usage == TextureUsage::kReadWrite ) resource_desc.Flags |= D3D12_RESOURCE_FLAG_ALLOW_UNORDERED_ACCESS;
   if ( usage == TextureUsage::kDepthSample ) resource_desc.Flags |= D3D12_RESOURCE_FLAG_ALLOW_DEPTH_STENCIL;
@@ -372,8 +394,10 @@ Ember::Texture Ember::TextureManager::CreateTexture2D( Texture2DCreateInfo const
   CreateResourceImpl(
       &texture, &allocation, resource_desc, nullptr, init_state.value_or( D3D12_RESOURCE_STATE_COMMON ) );
 
-  SRVHandle srv_handle =
-      m_Bindless->CreateDescriptorHandle( texture.Get(), CD3DX12_SHADER_RESOURCE_VIEW_DESC::Tex2D( format ) );
+  SRVHandle srv_handle = m_Bindless->CreateDescriptorHandle(
+      texture.Get(),
+      array_size == 1 ? CD3DX12_SHADER_RESOURCE_VIEW_DESC::Tex2D( format )
+                      : CD3DX12_SHADER_RESOURCE_VIEW_DESC::Tex2DArray( format ) );
 
   switch ( usage )
   {
@@ -386,43 +410,20 @@ Ember::Texture Ember::TextureManager::CreateTexture2D( Texture2DCreateInfo const
     }
     case TextureUsage::kReadWrite:
     {
+      auto      uav_format = DirectX::MakeLinear( format );
       UAVHandle uav_handle = m_Bindless->CreateDescriptorHandle(
-          texture.Get(), CD3DX12_UNORDERED_ACCESS_VIEW_DESC::Tex2D( DirectX::MakeLinear( format ) ) );
+          texture.Get(),
+          array_size == 1 ? CD3DX12_UNORDERED_ACCESS_VIEW_DESC::Tex2D( uav_format )
+                          : CD3DX12_UNORDERED_ACCESS_VIEW_DESC::Tex2DArray( uav_format ) );
 
       auto texture_info = std::allocate_shared<Texture::StorageInfoImpl>(
           std::pmr::polymorphic_allocator{ &m_MemoryPool }, m_Bindless, srv_handle, uav_handle );
 
       return Texture{ std::move( texture ), std::move( allocation ), std::move( texture_info ) };
     }
-    case TextureUsage::kDepthSample:
-    {
-      D3D12_DEPTH_STENCIL_VIEW_DESC depth_stencil_view{
-        .Format        = format,
-        .ViewDimension = D3D12_DSV_DIMENSION_TEXTURE2D,
-        .Flags         = D3D12_DSV_FLAG_NONE,
-        .Texture2D     = { .MipSlice = 0 },
-      };
-
-      auto texture_info = std::allocate_shared<Texture::DepthInfoImpl>(
-          std::pmr::polymorphic_allocator{ &m_MemoryPool }, m_Bindless, srv_handle, depth_stencil_view );
-
-      return Texture{ std::move( texture ), std::move( allocation ), std::move( texture_info ) };
-    }
-    case TextureUsage::kRenderTarget:
-    {
-      D3D12_RENDER_TARGET_VIEW_DESC render_target_view{
-        .Format        = format,
-        .ViewDimension = D3D12_RTV_DIMENSION_TEXTURE2D,
-        .Texture2D     = { .MipSlice = 0, .PlaneSlice = 0 },
-      };
-
-      auto texture_info = std::allocate_shared<Texture::AttachmentInfoImpl>(
-          std::pmr::polymorphic_allocator{ &m_MemoryPool }, m_Bindless, srv_handle, render_target_view );
-
-      return Texture{ std::move( texture ), std::move( allocation ), std::move( texture_info ) };
-    }
+    default:
+      UNREACHABLE_M( "The other case are dispatched at the start of the function" );
   }
-  UNREACHABLE;
 }
 
 Ember::Texture Ember::TextureManager::CreateDepthTextureCube( TextureCubeCreateInfo const& create_info )

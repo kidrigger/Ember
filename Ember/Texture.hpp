@@ -164,6 +164,7 @@ struct Texture2DCreateInfo
   uint32_t                             Height;
   TextureUsage                         Usage{ TextureUsage::kReadonly };
   MipLevels                            MipLevels{ MipLevels::kAuto };
+  uint16_t                             ArraySize{ 1 };
   std::optional<D3D12_RESOURCE_STATES> InitState;
 };
 
