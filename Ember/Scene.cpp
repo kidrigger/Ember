@@ -219,11 +219,7 @@ void Ember::World::Render( ID3D12GraphicsCommandList* command_list, DirectX::Bou
               continue;
             }
 
-            D3D12_VERTEX_BUFFER_VIEW const vertex_buffers[] = {
-              mesh.Geometry->VertexPositionBuffer.GetVertexBufferView(),
-              mesh.Geometry->VertexDataBuffer.GetVertexBufferView(),
-            };
-            command_list->IASetVertexBuffers( 0, CountOf( vertex_buffers ), DataOf( vertex_buffers ) );
+            command_list->IASetVertexBuffers( 0, 1, &mesh.Geometry->VertexBuffer.GetVertexBufferView() );
             command_list->IASetIndexBuffer( &mesh.Geometry->IndexBuffer.GetIndexBufferView() );
 
             command_list->SetGraphicsRoot32BitConstants( 0, sizeof( WorldTransform ) / 4, &wt, 0 );
@@ -331,7 +327,7 @@ void Ember::World::RenderShadow(
             }
 
             command_list->IASetIndexBuffer( &mesh.Geometry->IndexBuffer.GetIndexBufferView() );
-            command_list->IASetVertexBuffers( 0, 1, &mesh.Geometry->VertexPositionBuffer.GetVertexBufferView() );
+            command_list->IASetVertexBuffers( 0, 1, &mesh.Geometry->ShadowVertexBuffer.GetVertexBufferView() );
 
             command_list->SetGraphicsRoot32BitConstants( 0, sizeof( DirectX::XMMATRIX ) / 4, &wt.Transform, 0 );
 
@@ -367,7 +363,7 @@ void Ember::World::RenderShadow( ID3D12GraphicsCommandList* command_list, Direct
             }
 
             command_list->IASetIndexBuffer( &mesh.Geometry->IndexBuffer.GetIndexBufferView() );
-            command_list->IASetVertexBuffers( 0, 1, &mesh.Geometry->VertexPositionBuffer.GetVertexBufferView() );
+            command_list->IASetVertexBuffers( 0, 1, &mesh.Geometry->ShadowVertexBuffer.GetVertexBufferView() );
 
             command_list->SetGraphicsRoot32BitConstants( 0, sizeof( DirectX::XMMATRIX ) / 4, &wt.Transform, 0 );
 

@@ -25,7 +25,7 @@ constexpr D3D12_INPUT_ELEMENT_DESC PerVertexInput(
   };
 }
 
-struct VertexPosition
+struct ShadowVertex
 {
   DirectX::XMFLOAT3                         Position;
 
@@ -36,6 +36,7 @@ struct VertexPosition
 
 struct VertexData
 {
+  DirectX::XMFLOAT3                         Position;
   DirectX::XMFLOAT3                         Normal;
   DirectX::XMFLOAT4                         Tangent;
   DirectX::XMFLOAT3                         Color;
@@ -43,11 +44,12 @@ struct VertexData
   DirectX::XMFLOAT2                         TexCoord1;
 
   constexpr static D3D12_INPUT_ELEMENT_DESC kInputElementDesc[] = {
-    PerVertexInput( "NORMAL", 0, DXGI_FORMAT_R32G32B32_FLOAT, 1 ),
-    PerVertexInput( "TANGENT", 0, DXGI_FORMAT_R32G32B32A32_FLOAT, 1 ),
-    PerVertexInput( "COLOR", 0, DXGI_FORMAT_R32G32B32_FLOAT, 1 ),
-    PerVertexInput( "TEXCOORD", 0, DXGI_FORMAT_R32G32_FLOAT, 1 ),
-    PerVertexInput( "TEXCOORD", 1, DXGI_FORMAT_R32G32_FLOAT, 1 ),
+    PerVertexInput( "POSITION", 0, DXGI_FORMAT_R32G32B32_FLOAT, 0 ),
+    PerVertexInput( "NORMAL", 0, DXGI_FORMAT_R32G32B32_FLOAT, 0 ),
+    PerVertexInput( "TANGENT", 0, DXGI_FORMAT_R32G32B32A32_FLOAT, 0 ),
+    PerVertexInput( "COLOR", 0, DXGI_FORMAT_R32G32B32_FLOAT, 0 ),
+    PerVertexInput( "TEXCOORD", 0, DXGI_FORMAT_R32G32_FLOAT, 0 ),
+    PerVertexInput( "TEXCOORD", 1, DXGI_FORMAT_R32G32_FLOAT, 0 ),
   };
 };
 
@@ -57,7 +59,7 @@ class ModelLoader
   {
     std::map<cgltf_material const*, Material*> MaterialCache;
     Geometry*                                  Geometry;
-    std::vector<VertexPosition>                VertexPositions;
+    std::vector<ShadowVertex>                  VertexPositions;
     std::vector<VertexData>                    VertexData;
     std::vector<uint32_t>                      Indices;
   };
@@ -67,7 +69,12 @@ class ModelLoader
   TextureLoader* m_TextureLoader;
 
   flecs::entity  ProcessNode( LoadingContext* context, flecs::entity parent, cgltf_node const& node );
-  void           ProcessMesh( LoadingContext* context, flecs::entity owning, cgltf_mesh const& mesh ) const;
+  Primitive      LoadPrimitive(
+           LoadingContext*        context,
+           DirectX::XMVECTOR*     bb_min,
+           DirectX::XMVECTOR*     bb_max,
+           cgltf_primitive const& primitive ) const;
+  void      ProcessMesh( LoadingContext* context, flecs::entity owning, cgltf_mesh const& mesh ) const;
   bool      TryLoadTexture( Texture* texture, cgltf_image const& image, ColorSpaceOverride color_space_override ) const;
   Material* TryProcessMaterial( LoadingContext* context, cgltf_material const* material ) const;
 

@@ -74,6 +74,14 @@
 #define ASSERT( x ) assert( x )
 #define ASSERT_M( x, MSG ) assert( x )
 
+#if defined( _DEBUG )
+#define CHECK( x ) assert( x )
+#else
+#define CHECK( x )                                                                                                     \
+  if ( not( x ) ) std::terminate()
+#endif
+
+
 #define UNREACHABLE std::terminate()
 #define UNREACHABLE_M( MSG ) std::terminate()
 

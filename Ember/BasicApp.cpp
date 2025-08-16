@@ -363,20 +363,12 @@ void Ember::BasicApp::SetupRenderPipeline()
   rasterizer_desc.CullMode              = D3D12_CULL_MODE_BACK;
 
   CD3DX12_DEPTH_STENCIL_DESC depth_stencil_desc{ D3D12_DEFAULT };
-  depth_stencil_desc.DepthEnable = TRUE;
-  depth_stencil_desc.DepthFunc   = D3D12_COMPARISON_FUNC_LESS;
-
-  std::vector<D3D12_INPUT_ELEMENT_DESC> input_element;
-  input_element.insert(
-      input_element.end(),
-      std::begin( VertexPosition::kInputElementDesc ),
-      std::end( VertexPosition::kInputElementDesc ) );
-  input_element.insert(
-      input_element.end(), std::begin( VertexData::kInputElementDesc ), std::end( VertexData::kInputElementDesc ) );
+  depth_stencil_desc.DepthEnable       = TRUE;
+  depth_stencil_desc.DepthFunc         = D3D12_COMPARISON_FUNC_LESS;
 
   D3D12_INPUT_LAYOUT_DESC input_layout = {
-    .pInputElementDescs = DataOf( input_element ),
-    .NumElements        = CountOf( input_element ),
+    .pInputElementDescs = DataOf( VertexData::kInputElementDesc ),
+    .NumElements        = CountOf( VertexData::kInputElementDesc ),
   };
 
   struct MainPipelineStream
@@ -460,7 +452,7 @@ void Ember::BasicApp::LoadContent()
   m_LightManager->AddShadowingDirLight( { 1.0f, -1.0f, 0.0f }, Color32::White(), 12.0f );
 
   // Setup Scene Geometry
-  flecs::entity const sponza = m_ModelLoader->TryLoadModel( "Bistro.glb" ).value().set_name( "Scene" );
+  flecs::entity       model = m_ModelLoader->TryLoadModel( "Bistro.glb" ).value().set_name( "Scene" );
 
   flecs::entity const rm =
       m_World.GetECS()
@@ -471,12 +463,19 @@ void Ember::BasicApp::LoadContent()
                 rm.Speed       = 20.0f;
                 lt.Translation = DirectX::XMVectorSet( 0.0f, 1.0f, 5.0f, 1.0f );
               } );
-  flecs::entity const model           = m_ModelLoader->TryLoadModel( "DamagedHelmet.glb" )->child_of( rm );
 
-  LocalTransform*     helmet_local_tx = model.get_mut<LocalTransform>();
-  helmet_local_tx->Scale              = DirectX::XMVectorSet( 0.3f, 0.3f, 0.3f, 0.0f );
-  helmet_local_tx->Rotation           = DirectX::XMQuaternionIdentity();
-  ASSERT( model );
+  model                    = m_ModelLoader->TryLoadModel( "DamagedHelmet.glb" )->child_of( rm );
+  LocalTransform* local_tx = model.get_mut<LocalTransform>();
+  local_tx->Scale          = DirectX::XMVectorSet( 0.3f, 0.3f, 0.3f, 0.0f );
+  local_tx->Rotation       = DirectX::XMQuaternionIdentity();
+
+  model                    = m_ModelLoader->TryLoadModel( "NormalTangentTest.glb" ).value();
+  local_tx                 = model.get_mut<LocalTransform>();
+  local_tx->Translation    = DirectX::XMVectorSet( 3.0f, 2.0f, 7.0f, 1.0f );
+
+  model                    = m_ModelLoader->TryLoadModel( "NormalTangentMirrorTest.glb" ).value();
+  local_tx                 = model.get_mut<LocalTransform>();
+  local_tx->Translation    = DirectX::XMVectorSet( 6.0f, 2.0f, 7.0f, 1.0f );
 
   // constexpr char const* kEnvMapFile = "OvercastSoil.hdr";
   // bool const            env_loaded =

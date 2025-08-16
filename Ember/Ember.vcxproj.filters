@@ -362,6 +362,12 @@
     <CopyFileToFolders Include="Assets\VirtualCity.glb">
       <Filter>Resource Files\Assets\Scenes</Filter>
     </CopyFileToFolders>
+    <CopyFileToFolders Include="Assets\NormalTangentTest.glb">
+      <Filter>Resource Files\Assets\Scenes</Filter>
+    </CopyFileToFolders>
+    <CopyFileToFolders Include="Assets\NormalTangentMirrorTest.glb">
+      <Filter>Resource Files\Assets\Scenes</Filter>
+    </CopyFileToFolders>
   </ItemGroup>
   <ItemGroup>
     <Image Include="Assets\checkerboard.png">

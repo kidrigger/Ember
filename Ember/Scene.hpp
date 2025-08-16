@@ -85,8 +85,8 @@ struct Material
 
 struct Geometry
 {
-  Buffer               VertexPositionBuffer;
-  Buffer               VertexDataBuffer;
+  Buffer               ShadowVertexBuffer;
+  Buffer               VertexBuffer;
   Buffer               IndexBuffer;
   std::atomic_uint32_t RefCount{ 1 };
 

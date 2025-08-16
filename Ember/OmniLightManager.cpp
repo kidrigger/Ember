@@ -92,8 +92,8 @@ void Ember::Internal::OmniLightManager::Create(
       IID_PPV_ARGS( &shadow_root_sig ) ) );
 
   D3D12_INPUT_LAYOUT_DESC input_layout = {
-    .pInputElementDescs = DataOf( VertexPosition::kInputElementDesc ),
-    .NumElements        = CountOf( VertexPosition::kInputElementDesc ),
+    .pInputElementDescs = DataOf( ShadowVertex::kInputElementDesc ),
+    .NumElements        = CountOf( ShadowVertex::kInputElementDesc ),
   };
 
   // We scale everything with -z for Left-Handed to Right-Handed correction.
@@ -423,7 +423,7 @@ void Ember::Internal::OmniLightManager::RenderOmniShadow(
           }
 
           command_list->IASetIndexBuffer( &mesh.Geometry->IndexBuffer.GetIndexBufferView() );
-          command_list->IASetVertexBuffers( 0, 1, &mesh.Geometry->VertexPositionBuffer.GetVertexBufferView() );
+          command_list->IASetVertexBuffers( 0, 1, &mesh.Geometry->ShadowVertexBuffer.GetVertexBufferView() );
 
           command_list->SetGraphicsRoot32BitConstants( 0, sizeof( DirectX::XMMATRIX ) / 4, &wt.Transform, 0 );
 

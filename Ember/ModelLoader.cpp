@@ -5,27 +5,91 @@
 #include "Util/DataUtil.hpp"
 #include "Util/HelperUtils.hpp"
 
+#include <meshoptimizer.h>
+#include <mikktspace.h>
+
+namespace Ember::Internal
+{
+
+struct Payload
+{
+  byte*  Data;
+  size_t Stride;
+  size_t PositionOffset;
+  size_t NormalOffset;
+  size_t TangentCoordOffset;
+  size_t TexCoordOffset;
+  size_t VertexCount;
+};
+
+void SetTangent(
+    SMikkTSpaceContext const* ctx, float const out_tan[], float const sign, int const face_idx, int const vert_idx )
+{
+  Payload const* payload             = ( Payload* )ctx->m_pUserData;
+  size_t const   vertex_idx          = 3 * face_idx + vert_idx;
+  float          gltf_corrected_sign = -sign;
+  memcpy(
+      payload->Data + ( payload->Stride * vertex_idx ) + payload->TangentCoordOffset, out_tan, sizeof( float ) * 3 );
+  memcpy(
+      payload->Data + ( payload->Stride * vertex_idx ) + payload->TangentCoordOffset + 3 * sizeof( float ),
+      &gltf_corrected_sign,
+      sizeof( float ) );
+}
+
+int GetFaceCount( SMikkTSpaceContext const* ctx )
+{
+  Payload* payload = ( Payload* )ctx->m_pUserData;
+  return ( int )payload->VertexCount / 3;
+}
+
+int GetNumFaceVertices( SMikkTSpaceContext const*, int const )
+{
+  return 3;
+}
+
+void GetPosition( SMikkTSpaceContext const* ctx, float out_pos[], int const face_idx, int const vert_idx )
+{
+  Payload const* payload    = ( Payload* )ctx->m_pUserData;
+  size_t const   vertex_idx = 3 * face_idx + vert_idx;
+  memcpy( out_pos, payload->Data + ( payload->Stride * vertex_idx ) + payload->PositionOffset, sizeof( float ) * 3 );
+}
+
+void GetNormal( SMikkTSpaceContext const* ctx, float out_norm[], int const face_idx, int const vert_idx )
+{
+  Payload const* payload    = ( Payload* )ctx->m_pUserData;
+  size_t const   vertex_idx = 3 * face_idx + vert_idx;
+  memcpy( out_norm, payload->Data + ( payload->Stride * vertex_idx ) + payload->NormalOffset, sizeof( float ) * 3 );
+}
+
+void GetTexCoord( SMikkTSpaceContext const* ctx, float out_tex[], int const face_idx, int const vert_idx )
+{
+  Payload const* payload    = ( Payload* )ctx->m_pUserData;
+  size_t const   vertex_idx = 3 * face_idx + vert_idx;
+  memcpy( out_tex, payload->Data + ( payload->Stride * vertex_idx ) + payload->TexCoordOffset, sizeof( float ) * 2 );
+};
+
+} // namespace Ember::Internal
+
 template <typename T>
 void LoadAttribute(
-    std::vector<T>*        vertices,
-    int32_t const          vertex_start,
-    std::vector<float>*    scratch,
-    cgltf_attribute const& position_attr,
-    size_t const           stride,
-    size_t const           offset,
-    size_t const           components )
+    std::vector<T>*       vertices,
+    std::vector<byte>*    scratch,
+    cgltf_accessor const* accessor,
+    size_t const          stride,
+    size_t const          offset,
+    size_t const          components )
 {
-  size_t const float_count = cgltf_accessor_unpack_floats( position_attr.data, nullptr, 0 );
+  size_t const float_count = cgltf_accessor_unpack_floats( accessor, nullptr, 0 );
   ASSERT( float_count % components == 0 );
-  scratch->resize( float_count );
-  cgltf_accessor_unpack_floats( position_attr.data, scratch->data(), scratch->size() );
+  scratch->resize( float_count * sizeof( float ) );
+  cgltf_accessor_unpack_floats( accessor, ( float* )scratch->data(), float_count );
 
   size_t const element_count = float_count / components;
   // Guaranteed to have space for these vertices.
-  vertices->resize( vertex_start + element_count );
+  vertices->resize( element_count );
 
-  byte*        write_ptr = reinterpret_cast<byte*>( vertices->data() + vertex_start ) + offset;
-  float const* read_ptr  = scratch->data();
+  byte*        write_ptr = reinterpret_cast<byte*>( vertices->data() ) + offset;
+  float const* read_ptr  = ( float* )scratch->data();
   for ( size_t i = 0; i < element_count; ++i )
   {
     memcpy( write_ptr, read_ptr, components * sizeof( float ) );
@@ -39,8 +103,6 @@ void LoadAttribute(
 
 void Ember::ModelLoader::ProcessMesh( LoadingContext* context, flecs::entity owning, cgltf_mesh const& mesh ) const
 {
-  using namespace std::string_view_literals;
-
   cgltf_primitive const* primitives = mesh.primitives;
 
   DirectX::XMVECTOR      bb_min     = DirectX::XMVectorSplatInfinity();
@@ -49,142 +111,9 @@ void Ember::ModelLoader::ProcessMesh( LoadingContext* context, flecs::entity own
   std::vector<Primitive> primitive_acc;
   for ( uint32_t primitive_index = 0; primitive_index < mesh.primitives_count; ++primitive_index )
   {
-    // VertexStart is per-primitive
-    int32_t const          vertex_start = static_cast<int32_t>( context->VertexPositions.size() );
+    cgltf_primitive const& primitive = primitives[primitive_index];
 
-    cgltf_primitive const& primitive    = primitives[primitive_index];
-
-    ASSERT( primitive.type == cgltf_primitive_type_triangles );
-
-    // Index Buffer
-    ASSERT(
-        primitive.indices->type == cgltf_type_scalar and
-        ( primitives->indices->component_type == cgltf_component_type_r_32u or
-          primitives->indices->component_type == cgltf_component_type_r_16u or
-          primitives->indices->component_type == cgltf_component_type_r_8u ) );
-    size_t const index_start = context->Indices.size();
-    size_t const index_count =
-        cgltf_accessor_unpack_indices( primitive.indices, nullptr, sizeof context->Indices.at( 0 ), 0 );
-    ASSERT( index_count > 0 );
-    context->Indices.resize( index_start + index_count );
-    cgltf_accessor_unpack_indices(
-        primitive.indices, context->Indices.data() + index_start, sizeof context->Indices.at( 0 ), index_count );
-
-    // Material
-
-    Material* material = nullptr;
-    if ( primitive.material )
-    {
-      material = TryProcessMaterial( context, primitive.material );
-    }
-
-    Primitive& new_prim = primitive_acc.emplace_back(
-        material,
-        DirectX::BoundingBox{},
-        Primitive::Data{
-            .FirstIndex  = ( uint32_t )index_start,
-            .IndexCount  = ( uint32_t )index_count,
-            .FirstVertex = ( uint32_t )vertex_start,
-        } );
-
-    std::vector<float>     scratch;
-
-    cgltf_attribute const* attributes = primitive.attributes;
-    for ( uint32_t attrib_index = 0; attrib_index < primitive.attributes_count; ++attrib_index )
-    {
-      if ( "POSITION"sv == attributes[attrib_index].name )
-      {
-        cgltf_attribute const& position_attr = attributes[attrib_index];
-        ASSERT( position_attr.data->component_type == cgltf_component_type_r_32f );
-        ASSERT( position_attr.data->type == cgltf_type_vec3 );
-
-        auto              pos_min_v3 = DirectX::XMFLOAT3( position_attr.data->min );
-        DirectX::XMVECTOR pos_min    = XMLoadFloat3( &pos_min_v3 );
-        auto              pos_max_v3 = DirectX::XMFLOAT3( position_attr.data->max );
-        auto              pos_max    = XMLoadFloat3( &pos_max_v3 );
-        DirectX::BoundingBox::CreateFromPoints( new_prim.AABB, pos_min, pos_max );
-
-        bb_min                      = DirectX::XMVectorMin( bb_min, pos_min );
-        bb_max                      = DirectX::XMVectorMax( bb_max, pos_max );
-
-        size_t constexpr stride     = sizeof( VertexPosition );
-        size_t constexpr offset     = offsetof( VertexPosition, Position );
-        size_t constexpr components = 3;
-
-        LoadAttribute( &context->VertexPositions, vertex_start, &scratch, position_attr, stride, offset, components );
-      }
-      if ( "NORMAL"sv == attributes[attrib_index].name )
-      {
-        cgltf_attribute const& normal_attr = attributes[attrib_index];
-        ASSERT( normal_attr.data->component_type == cgltf_component_type_r_32f );
-        ASSERT( normal_attr.data->type == cgltf_type_vec3 );
-
-        size_t constexpr stride     = sizeof( VertexData );
-        size_t constexpr offset     = offsetof( VertexData, Normal );
-        size_t constexpr components = 3;
-
-        LoadAttribute( &context->VertexData, vertex_start, &scratch, normal_attr, stride, offset, components );
-      }
-      if ( "TANGENT"sv == attributes[attrib_index].name )
-      {
-        cgltf_attribute const& tangent_attr = attributes[attrib_index];
-        ASSERT( tangent_attr.data->component_type == cgltf_component_type_r_32f );
-        ASSERT( tangent_attr.data->type == cgltf_type_vec4 );
-
-        size_t constexpr stride     = sizeof( VertexData );
-        size_t constexpr offset     = offsetof( VertexData, Tangent );
-        size_t constexpr components = 4;
-
-        LoadAttribute( &context->VertexData, vertex_start, &scratch, tangent_attr, stride, offset, components );
-      }
-      if ( "TEXCOORD_0"sv == attributes[attrib_index].name )
-      {
-        cgltf_attribute const& tex_coord_attr = attributes[attrib_index];
-        ASSERT( tex_coord_attr.data->component_type == cgltf_component_type_r_32f );
-        ASSERT( tex_coord_attr.data->type == cgltf_type_vec2 );
-
-        size_t constexpr stride     = sizeof( VertexData );
-        size_t constexpr offset     = offsetof( VertexData, TexCoord0 );
-        size_t constexpr components = 2;
-
-        LoadAttribute( &context->VertexData, vertex_start, &scratch, tex_coord_attr, stride, offset, components );
-      }
-      if ( "TEXCOORD_1"sv == attributes[attrib_index].name )
-      {
-        cgltf_attribute const& tex_coord_attr = attributes[attrib_index];
-        ASSERT( tex_coord_attr.data->component_type == cgltf_component_type_r_32f );
-        ASSERT( tex_coord_attr.data->type == cgltf_type_vec2 );
-
-        size_t constexpr stride     = sizeof( VertexData );
-        size_t constexpr offset     = offsetof( VertexData, TexCoord1 );
-        size_t constexpr components = 2;
-
-        LoadAttribute( &context->VertexData, vertex_start, &scratch, tex_coord_attr, stride, offset, components );
-      }
-      if ( "COLOR_0"sv == attributes[attrib_index].name )
-      {
-        cgltf_attribute const& color_attr = attributes[attrib_index];
-        ASSERT( color_attr.data->component_type == cgltf_component_type_r_32f );
-
-        size_t constexpr stride = sizeof( VertexData );
-        size_t constexpr offset = offsetof( VertexData, Color );
-        size_t components       = 3;
-        switch ( color_attr.data->type )
-        {
-          case cgltf_type_vec3:
-            components = 3;
-            break;
-          case cgltf_type_vec4:
-            components = 4;
-            break;
-          default:
-            UNREACHABLE;
-        }
-
-        LoadAttribute( &context->VertexData, vertex_start, &scratch, color_attr, stride, offset, components );
-      }
-      // TODO: Grab other attributes.
-    }
+    primitive_acc.push_back( LoadPrimitive( context, &bb_min, &bb_max, primitive ) );
   }
 
   DirectX::BoundingBox bb;
@@ -260,6 +189,230 @@ flecs::entity Ember::ModelLoader::ProcessNode( LoadingContext* context, flecs::e
   return my_node;
 }
 
+cgltf_accessor* FindAccessor(
+    cgltf_primitive const& primitive, cgltf_attribute_type const attribute_type, int const index = 0 )
+{
+  for ( int i = 0; i < primitive.attributes_count; i++ )
+  {
+    if ( primitive.attributes[i].type == attribute_type and primitive.attributes[i].index == index )
+      return primitive.attributes[i].data;
+  }
+  return nullptr;
+}
+
+Ember::Primitive Ember::ModelLoader::LoadPrimitive(
+    LoadingContext*        context,
+    DirectX::XMVECTOR*     bb_min,
+    DirectX::XMVECTOR*     bb_max,
+    cgltf_primitive const& primitive ) const
+{
+  using namespace std::string_view_literals;
+
+  // VertexStart is per-primitive
+  int32_t const vertex_start = static_cast<int32_t>( context->VertexPositions.size() );
+
+  ASSERT( primitive.type == cgltf_primitive_type_triangles );
+
+  size_t const index_start = context->Indices.size();
+
+  // Index Buffer
+  std::vector<uint32_t> loaded_indices;
+  ASSERT(
+      primitive.indices->type == cgltf_type_scalar and
+      ( primitive.indices->component_type == cgltf_component_type_r_32u or
+        primitive.indices->component_type == cgltf_component_type_r_16u or
+        primitive.indices->component_type == cgltf_component_type_r_8u ) );
+  size_t const index_count = cgltf_accessor_unpack_indices( primitive.indices, nullptr, sizeof( uint32_t ), 0 );
+  ASSERT( index_count > 0 );
+  loaded_indices.resize( index_count );
+  cgltf_accessor_unpack_indices( primitive.indices, loaded_indices.data(), sizeof( uint32_t ), index_count );
+
+  // Material
+
+  Material* material = nullptr;
+  if ( primitive.material )
+  {
+    // TODO: Default Material.
+    material = TryProcessMaterial( context, primitive.material );
+  }
+
+  DirectX::BoundingBox    prim_aabb;
+
+  std::vector<byte>       scratch;
+  std::vector<VertexData> loaded_data;
+
+  bool                    has_tangent = false;
+
+  // TODO: Check and use cgltf_find_accessor.
+  if ( auto* accessor = FindAccessor( primitive, cgltf_attribute_type_position ) )
+  {
+    ASSERT( accessor->component_type == cgltf_component_type_r_32f );
+    ASSERT( accessor->type == cgltf_type_vec3 );
+
+    auto              pos_min_v3 = DirectX::XMFLOAT3( accessor->min );
+    DirectX::XMVECTOR pos_min    = XMLoadFloat3( &pos_min_v3 );
+    auto              pos_max_v3 = DirectX::XMFLOAT3( accessor->max );
+    auto              pos_max    = XMLoadFloat3( &pos_max_v3 );
+    DirectX::BoundingBox::CreateFromPoints( prim_aabb, pos_min, pos_max );
+
+    *bb_min                     = DirectX::XMVectorMin( *bb_min, pos_min );
+    *bb_max                     = DirectX::XMVectorMax( *bb_max, pos_max );
+
+    size_t constexpr stride     = sizeof( VertexData );
+    size_t constexpr offset     = offsetof( VertexData, Position );
+    size_t constexpr components = 3;
+
+    LoadAttribute( &loaded_data, &scratch, accessor, stride, offset, components );
+  }
+  if ( auto* accessor = FindAccessor( primitive, cgltf_attribute_type_normal ) )
+  {
+    ASSERT( accessor->component_type == cgltf_component_type_r_32f );
+    ASSERT( accessor->type == cgltf_type_vec3 );
+
+    size_t constexpr stride     = sizeof( VertexData );
+    size_t constexpr offset     = offsetof( VertexData, Normal );
+    size_t constexpr components = 3;
+
+    LoadAttribute( &loaded_data, &scratch, accessor, stride, offset, components );
+  }
+  if ( auto* accessor = FindAccessor( primitive, cgltf_attribute_type_tangent ) )
+  {
+    ASSERT( accessor->component_type == cgltf_component_type_r_32f );
+    ASSERT( accessor->type == cgltf_type_vec4 );
+
+    size_t constexpr stride     = sizeof( VertexData );
+    size_t constexpr offset     = offsetof( VertexData, Tangent );
+    size_t constexpr components = 4;
+
+    LoadAttribute( &loaded_data, &scratch, accessor, stride, offset, components );
+
+    has_tangent = true;
+  }
+  if ( auto* accessor = FindAccessor( primitive, cgltf_attribute_type_texcoord, 0 ) )
+  {
+    ASSERT( accessor->component_type == cgltf_component_type_r_32f );
+    ASSERT( accessor->type == cgltf_type_vec2 );
+
+    size_t constexpr stride     = sizeof( VertexData );
+    size_t constexpr offset     = offsetof( VertexData, TexCoord0 );
+    size_t constexpr components = 2;
+
+    LoadAttribute( &loaded_data, &scratch, accessor, stride, offset, components );
+  }
+  if ( auto* accessor = FindAccessor( primitive, cgltf_attribute_type_texcoord, 1 ) )
+  {
+    ASSERT( accessor->component_type == cgltf_component_type_r_32f );
+    ASSERT( accessor->type == cgltf_type_vec2 );
+
+    size_t constexpr stride     = sizeof( VertexData );
+    size_t constexpr offset     = offsetof( VertexData, TexCoord1 );
+    size_t constexpr components = 2;
+
+    LoadAttribute( &loaded_data, &scratch, accessor, stride, offset, components );
+  }
+  if ( auto* accessor = FindAccessor( primitive, cgltf_attribute_type_color, 0 ) )
+  {
+    ASSERT( accessor->component_type == cgltf_component_type_r_32f );
+
+    size_t constexpr stride = sizeof( VertexData );
+    size_t constexpr offset = offsetof( VertexData, Color );
+    size_t components       = 3;
+    ASSERT( accessor->type == cgltf_type_vec3 );
+
+    LoadAttribute( &loaded_data, &scratch, accessor, stride, offset, components );
+  }
+  // TODO: Grab other attributes.
+
+  // Tangent Loading
+  if ( not has_tangent )
+  {
+    // Flatten vertices.
+    scratch.resize( sizeof( VertexData ) * index_count );
+
+    VertexData* write_ptr = ( VertexData* )scratch.data();
+    VertexData* read_ptr  = loaded_data.data();
+    for ( uint32_t const index : loaded_indices )
+    {
+      memcpy( write_ptr, read_ptr + index, sizeof( VertexData ) );
+      write_ptr++;
+    }
+
+    Internal::Payload payload{
+      .Data               = scratch.data(),
+      .Stride             = sizeof( VertexData ),
+      .PositionOffset     = offsetof( VertexData, Position ),
+      .NormalOffset       = offsetof( VertexData, Normal ),
+      .TangentCoordOffset = offsetof( VertexData, Tangent ),
+      .TexCoordOffset     = offsetof( VertexData, TexCoord0 ),
+      .VertexCount        = index_count,
+    };
+
+    SMikkTSpaceInterface mikk_t_space_interface;
+    ZeroMemory( &mikk_t_space_interface, sizeof mikk_t_space_interface );
+    mikk_t_space_interface.m_getNumFaces          = &Internal::GetFaceCount;
+    mikk_t_space_interface.m_getNumVerticesOfFace = &Internal::GetNumFaceVertices;
+    mikk_t_space_interface.m_getPosition          = &Internal::GetPosition;
+    mikk_t_space_interface.m_getNormal            = &Internal::GetNormal;
+    mikk_t_space_interface.m_getTexCoord          = &Internal::GetTexCoord;
+    mikk_t_space_interface.m_setTSpaceBasic       = &Internal::SetTangent;
+
+    SMikkTSpaceContext mikk_t_space_context{
+      .m_pInterface = &mikk_t_space_interface,
+      .m_pUserData  = &payload,
+    };
+
+    CHECK( genTangSpaceDefault( &mikk_t_space_context ) );
+
+    size_t                unindexed_vertex_count = index_count;
+    VertexData*           unindexed_vertices     = ( VertexData* )scratch.data();
+    std::vector<uint32_t> remap( unindexed_vertex_count );
+    size_t                vertex_count = meshopt_generateVertexRemap(
+        remap.data(), nullptr, index_count, scratch.data(), unindexed_vertex_count, sizeof( VertexData ) );
+
+    loaded_data.resize( vertex_count );
+
+    meshopt_remapIndexBuffer( loaded_indices.data(), nullptr, index_count, remap.data() );
+    meshopt_remapVertexBuffer(
+        loaded_data.data(), unindexed_vertices, unindexed_vertex_count, sizeof( VertexData ), remap.data() );
+
+    scratch.clear();
+  }
+
+  // Finalization
+  size_t const new_vertex_count = loaded_data.size();
+  context->VertexData.resize( vertex_start + new_vertex_count );
+  memcpy( context->VertexData.data() + vertex_start, DataOf( loaded_data ), ByteSizeOf( loaded_data ) );
+
+  context->VertexPositions.resize( vertex_start + new_vertex_count );
+  {
+    size_t const write_offset  = offsetof( ShadowVertex, Position );
+    byte*        write_ptr     = ( byte* )( context->VertexPositions.data() + vertex_start );
+    size_t const read_offset   = offsetof( VertexData, Position );
+    byte*        read_ptr      = ( byte* )loaded_data.data();
+
+    write_ptr                 += write_offset;
+    read_ptr                  += read_offset;
+    for ( int i = 0; i < new_vertex_count; i++ )
+    {
+      memcpy( write_ptr, read_ptr, sizeof( ShadowVertex::Position ) );
+      write_ptr += sizeof( ShadowVertex );
+      read_ptr  += sizeof( VertexData );
+    }
+  }
+
+  context->Indices.resize( index_start + index_count );
+  memcpy( context->Indices.data() + index_start, DataOf( loaded_indices ), ByteSizeOf( loaded_indices ) );
+
+  return Primitive{
+    material,
+    prim_aabb,
+    {
+      .FirstIndex  = ( uint32_t )index_start,
+      .IndexCount  = ( uint32_t )index_count,
+      .FirstVertex = ( uint32_t )vertex_start,
+      },
+  };
+}
 
 Ember::Material* Ember::ModelLoader::TryProcessMaterial( LoadingContext* context, cgltf_material const* material ) const
 {
@@ -420,9 +573,9 @@ std::optional<flecs::entity> Ember::ModelLoader::TryLoadModel( char const* filen
   auto const index_buffer = m_RenderDevice->CreateIndexBuffer( ByteSizeOf( context.Indices ), DXGI_FORMAT_R32_UINT );
   index_buffer.Write( 0, ByteSizeOf( context.Indices ), DataOf( context.Indices ) );
 
-  context.Geometry->VertexPositionBuffer = vertex_position_buffer;
-  context.Geometry->VertexDataBuffer     = vertex_data_buffer;
-  context.Geometry->IndexBuffer          = index_buffer;
+  context.Geometry->ShadowVertexBuffer = vertex_position_buffer;
+  context.Geometry->VertexBuffer       = vertex_data_buffer;
+  context.Geometry->IndexBuffer        = index_buffer;
 
   cgltf_free( gltf_model );
   World::GeometryManager().Destroy( context.Geometry );

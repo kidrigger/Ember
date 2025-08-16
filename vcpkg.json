@@ -6,6 +6,8 @@
     "directxtex",
     "cgltf",
     "tracy",
-    "flecs"
+    "flecs",
+    "mikktspace",
+    "meshoptimizer"
   ]
 }
