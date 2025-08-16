@@ -24,6 +24,7 @@ class DirectionLightManager
   uint32_t constexpr static kDirShadowResolution = 4096;
   DirectX::XMVECTORF32 constexpr static kUp      = DirectX::XMVECTORF32{ 0.0f, 1.0f, 0.0f, 0.0f };
   DirectX::XMVECTORF32 constexpr static kForward = DirectX::XMVECTORF32{ 0.0f, 0.0f, 1.0f, 0.0f };
+  DirectX::XMVECTORF32 constexpr static kRight   = DirectX::XMVECTORF32{ 1.0f, 0.0f, 0.0f, 0.0f };
 
   struct DirLight
   {

@@ -354,41 +354,56 @@ void Ember::Internal::DirectionLightManager::RenderDirShadow(
   command_list->RSSetScissorRects( 1, &scissor );
   command_list->RSSetViewports( 1, &viewport );
 
-  DirectX::XMVECTOR direction  = XMLoadFloat3( &dir_light->Direction );
+  DirectX::XMVECTOR direction = XMLoadFloat3( &dir_light->Direction );
+  ASSERT_M(
+      fabsf( DirectX::XMVector3LengthSq( direction ).m128_f32[0] - 1.0f ) < FLT_EPSILON,
+      "This should be normalized on set" );
 
-  DirectX::XMVECTOR cam_fwd    = XMVector3Rotate( kForward, XMLoadFloat4( &camera_frust.Orientation ) );
-  DirectX::XMVECTOR cam_origin = XMLoadFloat3( &camera_frust.Origin );
-  float             mid        = 0.5f * ( camera_frust.Far + camera_frust.Near );
+  DirectX::BoundingSphere bounding_sphere;
+  DirectX::BoundingSphere::CreateFromFrustum( bounding_sphere, camera_frust );
 
   // The shadow map is centered here.
-  DirectX::XMVECTOR focus     = DirectX::XMVectorAdd( DirectX::XMVectorScale( cam_fwd, mid ), cam_origin );
-  bool              fwd_is_up = abs( XMVector3Dot( kForward, direction ).m128_f32[0] ) < 0.99f;
+  // We round the focus to pixel width, to reduce thick-thin shimmers on vertical rods.
+  //
+  DirectX::XMVECTOR focus           = XMLoadFloat3( &bounding_sphere.Center );
+  float             world_per_pixel = ( 2 * bounding_sphere.Radius / kDirShadowResolution );
+  focus                             = DirectX::XMVectorScale(
+      DirectX::XMVectorFloor( DirectX::XMVectorScale( focus, 1.0f / world_per_pixel ) ), world_per_pixel );
 
-  DirectX::XMMATRIX look_to   = XMMatrixLookToRH( focus, direction, fwd_is_up ? kForward : kUp );
+  bool use_fwd_as_up =
+      abs( XMVector3Dot( kUp, direction ).m128_f32[0] ) > 0.99f; // If up and dir are aligned, we need to use forward.
+
+  DirectX::XMVECTOR light_space_up = use_fwd_as_up ? kForward : kUp;
+  DirectX::XMVECTOR light_space_right =
+      DirectX::XMVector3Normalize( DirectX::XMVector3Cross( direction, light_space_up ) );
+  light_space_up            = DirectX::XMVector3Cross( light_space_right, direction );
+
+  DirectX::XMMATRIX look_to = DirectX::XMMatrixLookToRH( focus, direction, light_space_up );
 
   // Find bounds for ortho proj
-  DirectX::BoundingFrustum light_space_cam_frust;
-  camera_frust.Transform( light_space_cam_frust, look_to );
-  DirectX::BoundingBox light_space_cam_bb;
-  DirectX::XMFLOAT3    corners[8];
-  light_space_cam_frust.GetCorners( corners );
-  DirectX::BoundingBox::CreateFromPoints( light_space_cam_bb, 8, corners, sizeof( DirectX::XMFLOAT3 ) );
 
   DirectX::XMMATRIX projection = DirectX::XMMatrixOrthographicRH(
-      light_space_cam_bb.Extents.x * 2.0f,
-      light_space_cam_bb.Extents.y * 2.0f,
-      -light_space_cam_bb.Extents.z,
-      light_space_cam_bb.Extents.z );
+      bounding_sphere.Radius * 2.0f, bounding_sphere.Radius * 2.0f, -bounding_sphere.Radius, bounding_sphere.Radius );
 
   // Infinitely long cull for shadow.
+
+  DirectX::XMFLOAT3 bounds[8];
+  for ( int i = 0; i < 8; i++ )
+  {
+    float x_scale      = bounding_sphere.Radius;
+    float y_scale      = bounding_sphere.Radius;
+    float z_scale      = 1e10;
+    auto  right_offset = DirectX::XMVectorScale( light_space_right, ( i & 0b010 ) ? x_scale : -x_scale );
+    auto  up_offset    = DirectX::XMVectorScale( light_space_up, ( i & 0b100 ) ? y_scale : -y_scale );
+    auto  fwd_offset   = DirectX::XMVectorScale( direction, ( i & 0b001 ) ? z_scale : -z_scale );
+    XMStoreFloat3(
+        &bounds[i],
+        DirectX::XMVectorAdd(
+            DirectX::XMVectorAdd( DirectX::XMVectorAdd( focus, fwd_offset ), right_offset ), up_offset ) );
+  }
+
   DirectX::BoundingOrientedBox bob;
-  DirectX::BoundingOrientedBox::CreateFromBoundingBox(
-      bob,
-      {
-          light_space_cam_bb.Center,
-          { light_space_cam_bb.Extents.x, light_space_cam_bb.Extents.y, D3D12_FLOAT32_MAX }
-  } );
-  bob.Transform( bob, XMMatrixInverse( nullptr, look_to ) );
+  DirectX::BoundingOrientedBox::CreateFromPoints( bob, CountOf( bounds ), DataOf( bounds ), sizeof( bounds[0] ) );
   world.CullBox( bob );
 
   DirectX::XMMATRIX proj_view = XMMatrixMultiply( look_to, projection );
