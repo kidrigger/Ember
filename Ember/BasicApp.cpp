@@ -446,10 +446,10 @@ void Ember::BasicApp::LoadContent()
 
   // Setup Lights
   LightManager::Create( m_LightManager.get(), m_RenderDevice.get(), RenderDevice::kNumFrames );
-  m_LightManager->AddShadowingOmniLight( { 15.0f, 2.0f, 12.0f }, 10.0f, Color32::Blue(), 15.0f );
-  m_LightManager->AddShadowingOmniLight( { 0.0f, 2.0f, 5.0f }, 10.0f, Color32::Green(), 15.0f );
-  m_LightManager->AddShadowingOmniLight( { -15.0f, 2.0f, -5.0f }, 10.0f, Color32::Red(), 25.0f );
-  m_LightManager->AddShadowingDirLight( { 1.0f, -1.0f, 0.0f }, Color32::White(), 12.0f );
+  m_LightManager->AddOmniLight( { 15.0f, 2.0f, 12.0f }, 10.0f, Color32::Blue(), 15.0f );
+  m_LightManager->AddOmniLight( { 0.0f, 2.0f, 5.0f }, 10.0f, Color32::Green(), 15.0f );
+  m_LightManager->AddOmniLight( { -15.0f, 2.0f, -5.0f }, 10.0f, Color32::Red(), 25.0f );
+  m_LightManager->AddDirLight( { 1.0f, -1.0f, 0.0f }, Color32::White(), 12.0f );
 
   // Setup Scene Geometry
   flecs::entity       model = m_ModelLoader->TryLoadModel( "Bistro.glb" ).value().set_name( "Scene" );
@@ -477,10 +477,10 @@ void Ember::BasicApp::LoadContent()
   local_tx                 = model.get_mut<LocalTransform>();
   local_tx->Translation    = DirectX::XMVectorSet( 6.0f, 2.0f, 7.0f, 1.0f );
 
-  // constexpr char const* kEnvMapFile = "OvercastSoil.hdr";
-  // bool const            env_loaded =
-  //     Environment::TryLoadFrom( m_Environment.get(), m_RenderDevice.get(), m_TextureLoader.get(), kEnvMapFile );
-  // ASSERT( env_loaded );
+  constexpr char const* kEnvMapFile = "OvercastSoil.hdr";
+  bool const            env_loaded =
+      Environment::TryLoadFrom( m_Environment.get(), m_RenderDevice.get(), m_TextureLoader.get(), kEnvMapFile );
+  ASSERT( env_loaded );
 
   SetupRenderPipeline();
 

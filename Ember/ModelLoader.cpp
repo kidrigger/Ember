@@ -8,38 +8,36 @@
 #include <meshoptimizer.h>
 #include <mikktspace.h>
 
-namespace Ember::Internal
+namespace
 {
 
-struct Payload
+struct LoadingData
 {
-  byte*  Data;
-  size_t Stride;
-  size_t PositionOffset;
-  size_t NormalOffset;
-  size_t TangentCoordOffset;
-  size_t TexCoordOffset;
-  size_t VertexCount;
+  DirectX::XMFLOAT3 Position;
+  DirectX::XMFLOAT3 Normal;
+  DirectX::XMFLOAT4 Tangent;
+  DirectX::XMFLOAT4 Color{ 1.0f, 1.0f, 1.0f, 1.0f };
+  DirectX::XMFLOAT2 TexCoord0;
+  DirectX::XMFLOAT2 TexCoord1;
 };
 
+using Payload = std::span<LoadingData>;
+
+namespace Internal
+{
 void SetTangent(
     SMikkTSpaceContext const* ctx, float const out_tan[], float const sign, int const face_idx, int const vert_idx )
 {
-  Payload const* payload             = ( Payload* )ctx->m_pUserData;
-  size_t const   vertex_idx          = 3 * face_idx + vert_idx;
-  float          gltf_corrected_sign = -sign;
-  memcpy(
-      payload->Data + ( payload->Stride * vertex_idx ) + payload->TangentCoordOffset, out_tan, sizeof( float ) * 3 );
-  memcpy(
-      payload->Data + ( payload->Stride * vertex_idx ) + payload->TangentCoordOffset + 3 * sizeof( float ),
-      &gltf_corrected_sign,
-      sizeof( float ) );
+  Payload&     payload    = *( Payload* )ctx->m_pUserData;
+  size_t const vertex_idx = 3 * face_idx + vert_idx;
+  memcpy( &payload[vertex_idx].Tangent, out_tan, sizeof( float ) * 3 );
+  payload[vertex_idx].Tangent.w = -sign;
 }
 
 int GetFaceCount( SMikkTSpaceContext const* ctx )
 {
-  Payload* payload = ( Payload* )ctx->m_pUserData;
-  return ( int )payload->VertexCount / 3;
+  Payload const& payload = *( Payload* )ctx->m_pUserData;
+  return ( int )payload.size() / 3;
 }
 
 int GetNumFaceVertices( SMikkTSpaceContext const*, int const )
@@ -49,35 +47,76 @@ int GetNumFaceVertices( SMikkTSpaceContext const*, int const )
 
 void GetPosition( SMikkTSpaceContext const* ctx, float out_pos[], int const face_idx, int const vert_idx )
 {
-  Payload const* payload    = ( Payload* )ctx->m_pUserData;
+  Payload const& payload    = *( Payload* )ctx->m_pUserData;
   size_t const   vertex_idx = 3 * face_idx + vert_idx;
-  memcpy( out_pos, payload->Data + ( payload->Stride * vertex_idx ) + payload->PositionOffset, sizeof( float ) * 3 );
+  memcpy( out_pos, &payload[vertex_idx].Position, sizeof( float ) * 3 );
 }
 
 void GetNormal( SMikkTSpaceContext const* ctx, float out_norm[], int const face_idx, int const vert_idx )
 {
-  Payload const* payload    = ( Payload* )ctx->m_pUserData;
+  Payload const& payload    = *( Payload* )ctx->m_pUserData;
   size_t const   vertex_idx = 3 * face_idx + vert_idx;
-  memcpy( out_norm, payload->Data + ( payload->Stride * vertex_idx ) + payload->NormalOffset, sizeof( float ) * 3 );
+  memcpy( out_norm, &payload[vertex_idx].Normal, sizeof( float ) * 3 );
 }
 
 void GetTexCoord( SMikkTSpaceContext const* ctx, float out_tex[], int const face_idx, int const vert_idx )
 {
-  Payload const* payload    = ( Payload* )ctx->m_pUserData;
+  Payload const& payload    = *( Payload* )ctx->m_pUserData;
   size_t const   vertex_idx = 3 * face_idx + vert_idx;
-  memcpy( out_tex, payload->Data + ( payload->Stride * vertex_idx ) + payload->TexCoordOffset, sizeof( float ) * 2 );
-};
+  memcpy( out_tex, &payload[vertex_idx].TexCoord0, sizeof( float ) * 2 );
+}
 
-} // namespace Ember::Internal
+} // namespace Internal
 
-template <typename T>
+Ember::VertexData QuantizeData( LoadingData const& in_data )
+{
+  uint16_t const    p_x = meshopt_quantizeHalf( in_data.Position.x );
+  uint16_t const    p_y = meshopt_quantizeHalf( in_data.Position.y );
+  uint16_t const    p_z = meshopt_quantizeHalf( in_data.Position.z );
+  uint16_t const    p_w = meshopt_quantizeHalf( 1.0f );
+
+  DirectX::XMFLOAT3 norm;
+  XMStoreFloat3( &norm, DirectX::XMVector3Normalize( XMLoadFloat3( &in_data.Normal ) ) );
+  uint32_t const normal = meshopt_quantizeUnorm( norm.x * 0.5f + 0.5f, 10 ) |
+                          ( meshopt_quantizeUnorm( norm.y * 0.5f + 0.5f, 10 ) << 10 ) |
+                          ( meshopt_quantizeUnorm( norm.z * 0.5f + 0.5f, 10 ) << 20 );
+
+  DirectX::XMFLOAT3 tang;
+  XMStoreFloat3( &tang, DirectX::XMVector3Normalize( XMLoadFloat4( &in_data.Tangent ) ) );
+  uint32_t const tangent = meshopt_quantizeUnorm( tang.x * 0.5f + 0.5f, 10 ) |
+                           ( meshopt_quantizeUnorm( tang.y * 0.5f + 0.5f, 10 ) << 10 ) |
+                           ( meshopt_quantizeUnorm( tang.z * 0.5f + 0.5f, 10 ) << 20 ) |
+                           ( meshopt_quantizeUnorm( in_data.Tangent.w * 0.5f + 0.5f, 2 ) ) << 30;
+
+  uint16_t const uv0_x = meshopt_quantizeHalf( in_data.TexCoord0.x );
+  uint16_t const uv0_y = meshopt_quantizeHalf( in_data.TexCoord0.y );
+  uint16_t const uv1_x = meshopt_quantizeHalf( in_data.TexCoord1.x );
+  uint16_t const uv1_y = meshopt_quantizeHalf( in_data.TexCoord1.y );
+
+  return Ember::VertexData{
+    .PositionX        = p_x,
+    .PositionY        = p_y,
+    .PositionZ        = p_z,
+    .PositionW        = p_w,
+    .QuantizedNormal  = normal,
+    .QuantizedTangent = tangent,
+    .Color            = in_data.Color,
+    .TexCoord0X       = uv0_x,
+    .TexCoord0Y       = uv0_y,
+    .TexCoord1X       = uv1_x,
+    .TexCoord1Y       = uv1_y,
+  };
+}
+
+} // namespace
+
 void LoadAttribute(
-    std::vector<T>*       vertices,
-    std::vector<byte>*    scratch,
-    cgltf_accessor const* accessor,
-    size_t const          stride,
-    size_t const          offset,
-    size_t const          components )
+    std::vector<LoadingData>* vertices,
+    std::vector<byte>*        scratch,
+    cgltf_accessor const*     accessor,
+    size_t const              stride,
+    size_t const              offset,
+    size_t const              components )
 {
   size_t const float_count = cgltf_accessor_unpack_floats( accessor, nullptr, 0 );
   ASSERT( float_count % components == 0 );
@@ -236,12 +275,12 @@ Ember::Primitive Ember::ModelLoader::LoadPrimitive(
     material = TryProcessMaterial( context, primitive.material );
   }
 
-  DirectX::BoundingBox    prim_aabb;
+  DirectX::BoundingBox     prim_aabb;
 
-  std::vector<byte>       scratch;
-  std::vector<VertexData> loaded_data;
+  std::vector<byte>        scratch;
+  std::vector<LoadingData> loaded_data;
 
-  bool                    has_tangent = false;
+  bool                     has_tangent = false;
 
   // TODO: Check and use cgltf_find_accessor.
   if ( auto* accessor = FindAccessor( primitive, cgltf_attribute_type_position ) )
@@ -258,8 +297,8 @@ Ember::Primitive Ember::ModelLoader::LoadPrimitive(
     *bb_min                     = DirectX::XMVectorMin( *bb_min, pos_min );
     *bb_max                     = DirectX::XMVectorMax( *bb_max, pos_max );
 
-    size_t constexpr stride     = sizeof( VertexData );
-    size_t constexpr offset     = offsetof( VertexData, Position );
+    size_t constexpr stride     = sizeof( LoadingData );
+    size_t constexpr offset     = offsetof( LoadingData, Position );
     size_t constexpr components = 3;
 
     LoadAttribute( &loaded_data, &scratch, accessor, stride, offset, components );
@@ -269,8 +308,8 @@ Ember::Primitive Ember::ModelLoader::LoadPrimitive(
     ASSERT( accessor->component_type == cgltf_component_type_r_32f );
     ASSERT( accessor->type == cgltf_type_vec3 );
 
-    size_t constexpr stride     = sizeof( VertexData );
-    size_t constexpr offset     = offsetof( VertexData, Normal );
+    size_t constexpr stride     = sizeof( LoadingData );
+    size_t constexpr offset     = offsetof( LoadingData, Normal );
     size_t constexpr components = 3;
 
     LoadAttribute( &loaded_data, &scratch, accessor, stride, offset, components );
@@ -280,8 +319,8 @@ Ember::Primitive Ember::ModelLoader::LoadPrimitive(
     ASSERT( accessor->component_type == cgltf_component_type_r_32f );
     ASSERT( accessor->type == cgltf_type_vec4 );
 
-    size_t constexpr stride     = sizeof( VertexData );
-    size_t constexpr offset     = offsetof( VertexData, Tangent );
+    size_t constexpr stride     = sizeof( LoadingData );
+    size_t constexpr offset     = offsetof( LoadingData, Tangent );
     size_t constexpr components = 4;
 
     LoadAttribute( &loaded_data, &scratch, accessor, stride, offset, components );
@@ -293,8 +332,8 @@ Ember::Primitive Ember::ModelLoader::LoadPrimitive(
     ASSERT( accessor->component_type == cgltf_component_type_r_32f );
     ASSERT( accessor->type == cgltf_type_vec2 );
 
-    size_t constexpr stride     = sizeof( VertexData );
-    size_t constexpr offset     = offsetof( VertexData, TexCoord0 );
+    size_t constexpr stride     = sizeof( LoadingData );
+    size_t constexpr offset     = offsetof( LoadingData, TexCoord0 );
     size_t constexpr components = 2;
 
     LoadAttribute( &loaded_data, &scratch, accessor, stride, offset, components );
@@ -304,8 +343,8 @@ Ember::Primitive Ember::ModelLoader::LoadPrimitive(
     ASSERT( accessor->component_type == cgltf_component_type_r_32f );
     ASSERT( accessor->type == cgltf_type_vec2 );
 
-    size_t constexpr stride     = sizeof( VertexData );
-    size_t constexpr offset     = offsetof( VertexData, TexCoord1 );
+    size_t constexpr stride     = sizeof( LoadingData );
+    size_t constexpr offset     = offsetof( LoadingData, TexCoord1 );
     size_t constexpr components = 2;
 
     LoadAttribute( &loaded_data, &scratch, accessor, stride, offset, components );
@@ -314,94 +353,159 @@ Ember::Primitive Ember::ModelLoader::LoadPrimitive(
   {
     ASSERT( accessor->component_type == cgltf_component_type_r_32f );
 
-    size_t constexpr stride = sizeof( VertexData );
-    size_t constexpr offset = offsetof( VertexData, Color );
+    size_t constexpr stride = sizeof( LoadingData );
+    size_t constexpr offset = offsetof( LoadingData, Color );
     size_t components       = 3;
-    ASSERT( accessor->type == cgltf_type_vec3 );
+    switch ( accessor->type )
+    {
+      case cgltf_type_vec3:
+        components = 3;
+        break;
+      case cgltf_type_vec4:
+        components = 4;
+        break;
+      default:
+        UNREACHABLE;
+    }
 
     LoadAttribute( &loaded_data, &scratch, accessor, stride, offset, components );
   }
   // TODO: Grab other attributes.
 
+  size_t                  vertex_count;
+
+  std::vector<VertexData> quantized_vertex;
   // Tangent Loading
   if ( not has_tangent )
   {
     // Flatten vertices.
-    scratch.resize( sizeof( VertexData ) * index_count );
+    scratch.resize( sizeof( LoadingData ) * index_count );
 
-    VertexData* write_ptr = ( VertexData* )scratch.data();
-    VertexData* read_ptr  = loaded_data.data();
-    for ( uint32_t const index : loaded_indices )
     {
-      memcpy( write_ptr, read_ptr + index, sizeof( VertexData ) );
-      write_ptr++;
+      LoadingData* write_ptr = ( LoadingData* )scratch.data();
+      LoadingData* read_ptr  = loaded_data.data();
+      for ( uint32_t const index : loaded_indices )
+      {
+        memcpy( write_ptr, read_ptr + index, sizeof( LoadingData ) );
+        write_ptr++;
+      }
     }
 
-    Internal::Payload payload{
-      .Data               = scratch.data(),
-      .Stride             = sizeof( VertexData ),
-      .PositionOffset     = offsetof( VertexData, Position ),
-      .NormalOffset       = offsetof( VertexData, Normal ),
-      .TangentCoordOffset = offsetof( VertexData, Tangent ),
-      .TexCoordOffset     = offsetof( VertexData, TexCoord0 ),
-      .VertexCount        = index_count,
-    };
+    {
+      Payload              payload{ ( LoadingData* )scratch.data(), index_count };
 
-    SMikkTSpaceInterface mikk_t_space_interface;
-    ZeroMemory( &mikk_t_space_interface, sizeof mikk_t_space_interface );
-    mikk_t_space_interface.m_getNumFaces          = &Internal::GetFaceCount;
-    mikk_t_space_interface.m_getNumVerticesOfFace = &Internal::GetNumFaceVertices;
-    mikk_t_space_interface.m_getPosition          = &Internal::GetPosition;
-    mikk_t_space_interface.m_getNormal            = &Internal::GetNormal;
-    mikk_t_space_interface.m_getTexCoord          = &Internal::GetTexCoord;
-    mikk_t_space_interface.m_setTSpaceBasic       = &Internal::SetTangent;
+      SMikkTSpaceInterface mikk_t_space_interface;
+      ZeroMemory( &mikk_t_space_interface, sizeof mikk_t_space_interface );
+      mikk_t_space_interface.m_getNumFaces          = &Internal::GetFaceCount;
+      mikk_t_space_interface.m_getNumVerticesOfFace = &Internal::GetNumFaceVertices;
+      mikk_t_space_interface.m_getPosition          = &Internal::GetPosition;
+      mikk_t_space_interface.m_getNormal            = &Internal::GetNormal;
+      mikk_t_space_interface.m_getTexCoord          = &Internal::GetTexCoord;
+      mikk_t_space_interface.m_setTSpaceBasic       = &Internal::SetTangent;
 
-    SMikkTSpaceContext mikk_t_space_context{
-      .m_pInterface = &mikk_t_space_interface,
-      .m_pUserData  = &payload,
-    };
+      SMikkTSpaceContext mikk_t_space_context{
+        .m_pInterface = &mikk_t_space_interface,
+        .m_pUserData  = &payload,
+      };
 
-    CHECK( genTangSpaceDefault( &mikk_t_space_context ) );
+      CHECK( genTangSpaceDefault( &mikk_t_space_context ) );
+    }
 
-    size_t                unindexed_vertex_count = index_count;
-    VertexData*           unindexed_vertices     = ( VertexData* )scratch.data();
-    std::vector<uint32_t> remap( unindexed_vertex_count );
-    size_t                vertex_count = meshopt_generateVertexRemap(
+    // Quantization
+    {
+      // We will read and write into the same buffer, with different sizes.
+      // As each write (VertexData) is smaller than read (LoadingData)
+      // We can keep writing without bugs.
+      static_assert( sizeof( VertexData ) < sizeof( LoadingData ) );
+
+      LoadingData const* read_ptr  = ( LoadingData* )scratch.data();
+      VertexData*        write_ptr = ( VertexData* )scratch.data();
+      for ( int i = 0; i < index_count; i++ )
+      {
+        *write_ptr = QuantizeData( *read_ptr );
+        write_ptr++;
+        read_ptr++;
+      }
+    }
+
+    // Mesh Optimizer
+    size_t const            unindexed_vertex_count = index_count;
+    VertexData const* const unindexed_vertices     = ( VertexData* )scratch.data();
+    std::vector<uint32_t>   remap( unindexed_vertex_count );
+    vertex_count = meshopt_generateVertexRemap(
         remap.data(), nullptr, index_count, scratch.data(), unindexed_vertex_count, sizeof( VertexData ) );
 
-    loaded_data.resize( vertex_count );
+    context->VertexData.resize( vertex_start + vertex_count );
+    context->Indices.resize( index_start + index_count );
 
-    meshopt_remapIndexBuffer( loaded_indices.data(), nullptr, index_count, remap.data() );
+    meshopt_remapIndexBuffer( context->Indices.data() + index_start, nullptr, index_count, remap.data() );
     meshopt_remapVertexBuffer(
-        loaded_data.data(), unindexed_vertices, unindexed_vertex_count, sizeof( VertexData ), remap.data() );
+        context->VertexData.data() + vertex_start,
+        unindexed_vertices,
+        unindexed_vertex_count,
+        sizeof( VertexData ),
+        remap.data() );
 
     scratch.clear();
   }
-
-  // Finalization
-  size_t const new_vertex_count = loaded_data.size();
-  context->VertexData.resize( vertex_start + new_vertex_count );
-  memcpy( context->VertexData.data() + vertex_start, DataOf( loaded_data ), ByteSizeOf( loaded_data ) );
-
-  context->VertexPositions.resize( vertex_start + new_vertex_count );
+  else
   {
-    size_t const write_offset  = offsetof( ShadowVertex, Position );
-    byte*        write_ptr     = ( byte* )( context->VertexPositions.data() + vertex_start );
-    size_t const read_offset   = offsetof( VertexData, Position );
-    byte*        read_ptr      = ( byte* )loaded_data.data();
 
-    write_ptr                 += write_offset;
-    read_ptr                  += read_offset;
-    for ( int i = 0; i < new_vertex_count; i++ )
+    vertex_count = loaded_data.size();
+    scratch.resize( sizeof( VertexData ) * vertex_count );
+
+    // Quantization
     {
-      memcpy( write_ptr, read_ptr, sizeof( ShadowVertex::Position ) );
-      write_ptr += sizeof( ShadowVertex );
-      read_ptr  += sizeof( VertexData );
+      LoadingData const* read_ptr  = loaded_data.data();
+      VertexData*        write_ptr = ( VertexData* )scratch.data();
+      for ( int i = 0; i < vertex_count; i++ )
+      {
+        *write_ptr = QuantizeData( *read_ptr );
+        write_ptr++;
+        read_ptr++;
+      }
     }
+
+    // Mesh Optimizer
+    size_t const            unindexed_vertex_count = vertex_count;
+    VertexData const* const unindexed_vertices     = ( VertexData* )scratch.data();
+    std::vector<uint32_t>   remap( unindexed_vertex_count );
+    vertex_count = meshopt_generateVertexRemap(
+        remap.data(),
+        loaded_indices.data(),
+        index_count,
+        scratch.data(),
+        unindexed_vertex_count,
+        sizeof( VertexData ) );
+
+    context->VertexData.resize( vertex_start + vertex_count );
+    context->Indices.resize( index_start + index_count );
+
+    meshopt_remapIndexBuffer( context->Indices.data() + index_start, loaded_indices.data(), index_count, remap.data() );
+    meshopt_remapVertexBuffer(
+        context->VertexData.data() + vertex_start,
+        unindexed_vertices,
+        unindexed_vertex_count,
+        sizeof( VertexData ),
+        remap.data() );
   }
 
-  context->Indices.resize( index_start + index_count );
-  memcpy( context->Indices.data() + index_start, DataOf( loaded_indices ), ByteSizeOf( loaded_indices ) );
+  // Finalization
+  context->VertexPositions.resize( vertex_start + vertex_count );
+  {
+    ShadowVertex* write_ptr = ( context->VertexPositions.data() + vertex_start );
+    VertexData*   read_ptr  = context->VertexData.data() + vertex_start;
+
+    for ( int i = 0; i < vertex_count; i++ )
+    {
+      write_ptr->Px = read_ptr->PositionX;
+      write_ptr->Py = read_ptr->PositionY;
+      write_ptr->Pz = read_ptr->PositionZ;
+      write_ptr->Pw = read_ptr->PositionW;
+      ++write_ptr;
+      ++read_ptr;
+    }
+  }
 
   return Primitive{
     material,

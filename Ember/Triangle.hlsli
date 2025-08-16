@@ -111,10 +111,10 @@ SamplerComparisonState g_ShadowSampler : register( s2, space0 );
 
 struct VSInput
 {
-  float3 Position : POSITION;
-  float3 Normal : NORMAL;
+  float4 Position : POSITION;
+  float4 Normal : NORMAL;
   float4 Tangent : TANGENT;
-  float3 Color : COLOR;
+  float4 Color : COLOR;
   float2 TexCoord[2] : TEXCOORD;
 };
 

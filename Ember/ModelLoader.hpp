@@ -27,29 +27,37 @@ constexpr D3D12_INPUT_ELEMENT_DESC PerVertexInput(
 
 struct ShadowVertex
 {
-  DirectX::XMFLOAT3                         Position;
+  uint16_t                                  Px;
+  uint16_t                                  Py;
+  uint16_t                                  Pz;
+  uint16_t                                  Pw;
 
   constexpr static D3D12_INPUT_ELEMENT_DESC kInputElementDesc[] = {
-    PerVertexInput( "POSITION", 0, DXGI_FORMAT_R32G32B32_FLOAT, 0 ),
+    PerVertexInput( "POSITION", 0, DXGI_FORMAT_R16G16B16A16_FLOAT, 0 ),
   };
 };
 
 struct VertexData
 {
-  DirectX::XMFLOAT3                         Position;
-  DirectX::XMFLOAT3                         Normal;
-  DirectX::XMFLOAT4                         Tangent;
-  DirectX::XMFLOAT3                         Color;
-  DirectX::XMFLOAT2                         TexCoord0;
-  DirectX::XMFLOAT2                         TexCoord1;
+  uint16_t                                  PositionX;
+  uint16_t                                  PositionY;
+  uint16_t                                  PositionZ;
+  uint16_t                                  PositionW;
+  uint32_t                                  QuantizedNormal;
+  uint32_t                                  QuantizedTangent;
+  Color32                                   Color;
+  uint16_t                                  TexCoord0X;
+  uint16_t                                  TexCoord0Y;
+  uint16_t                                  TexCoord1X;
+  uint16_t                                  TexCoord1Y;
 
   constexpr static D3D12_INPUT_ELEMENT_DESC kInputElementDesc[] = {
-    PerVertexInput( "POSITION", 0, DXGI_FORMAT_R32G32B32_FLOAT, 0 ),
-    PerVertexInput( "NORMAL", 0, DXGI_FORMAT_R32G32B32_FLOAT, 0 ),
-    PerVertexInput( "TANGENT", 0, DXGI_FORMAT_R32G32B32A32_FLOAT, 0 ),
-    PerVertexInput( "COLOR", 0, DXGI_FORMAT_R32G32B32_FLOAT, 0 ),
-    PerVertexInput( "TEXCOORD", 0, DXGI_FORMAT_R32G32_FLOAT, 0 ),
-    PerVertexInput( "TEXCOORD", 1, DXGI_FORMAT_R32G32_FLOAT, 0 ),
+    PerVertexInput( "POSITION", 0, DXGI_FORMAT_R16G16B16A16_FLOAT, 0 ),
+    PerVertexInput( "NORMAL", 0, DXGI_FORMAT_R10G10B10A2_UNORM, 0 ),
+    PerVertexInput( "TANGENT", 0, DXGI_FORMAT_R10G10B10A2_UNORM, 0 ),
+    PerVertexInput( "COLOR", 0, DXGI_FORMAT_R8G8B8A8_UNORM, 0 ),
+    PerVertexInput( "TEXCOORD", 0, DXGI_FORMAT_R16G16_FLOAT, 0 ),
+    PerVertexInput( "TEXCOORD", 1, DXGI_FORMAT_R16G16_FLOAT, 0 ),
   };
 };
 
