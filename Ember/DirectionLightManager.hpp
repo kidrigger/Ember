@@ -20,20 +20,28 @@ namespace Internal
 
 class DirectionLightManager
 {
-  uint16_t constexpr static kMaxDirLights        = 4;
   uint32_t constexpr static kDirShadowResolution = 4096;
+  uint16_t constexpr static kMaxDirLights        = 4;
+  uint8_t constexpr static kNumCascades          = 6;
+  float constexpr static kCascadeLambda          = 0.33f;
+
+  // Frustums aligned with bounding boxes can cause 1 pixel gap between the cascades.
+  // This overlap (in world-space) ensures the edges of the cascades overlap.
+  float constexpr static kCascadeOverlap         = 0.05f;
+
   DirectX::XMVECTORF32 constexpr static kUp      = DirectX::XMVECTORF32{ 0.0f, 1.0f, 0.0f, 0.0f };
   DirectX::XMVECTORF32 constexpr static kForward = DirectX::XMVECTORF32{ 0.0f, 0.0f, 1.0f, 0.0f };
   DirectX::XMVECTORF32 constexpr static kRight   = DirectX::XMVECTORF32{ 1.0f, 0.0f, 0.0f, 0.0f };
 
   struct DirLight
   {
-    DirectX::XMMATRIX LightSpaceMatrix;               // 16
-    DirectX::XMFLOAT3 Direction{ 0.0f, -1.0f, 0.0f }; // 28
-    Color32           Color;                          // 32
-    float             Intensity;                      // 36
-    SRVHandle         ShadowMap;                      // 40
-    uint32_t          Padding[2];                     // 48
+    DirectX::XMMATRIX LightSpaceMatrix[kNumCascades]; // 384
+    DirectX::XMFLOAT3 Direction{ 0.0f, -1.0f, 0.0f }; // 396
+    float             Cascades[kNumCascades - 1];     // 416
+    Color32           Color;                          // 420
+    float             Intensity;                      // 424
+    SRVHandle         ShadowMap;                      // 428
+    uint32_t          Padding;                        // 432
   };
   static_assert( sizeof( DirLight ) % 16 == 0 );
 
@@ -83,7 +91,8 @@ public:
       ID3D12GraphicsCommandList*      command_list,
       World const&                    world,
       RenderTargetManager const&      rtm,
-      DirectX::BoundingFrustum const& camera_frustum );
+      DirectX::BoundingFrustum const& camera_frustum,
+      uint32_t                        frame_idx );
 
   void RenderDirShadow(
       ID3D12GraphicsCommandList*      command_list,
@@ -91,7 +100,8 @@ public:
       RenderTargetManager const&      rtm,
       DirLight*                       dir_light,
       Texture const&                  texture,
-      DirectX::BoundingFrustum const& camera_frust );
+      DirectX::BoundingFrustum const& camera_frust,
+      uint32_t                        light_index );
 };
 
 } // namespace Internal

@@ -275,9 +275,11 @@ Ember::Texture Ember::TextureManager::CreateDepthTexture2D( Texture2DCreateInfo 
   CreateResourceImpl(
       &texture, &allocation, resource_desc, &clear_value, init_state.value_or( D3D12_RESOURCE_STATE_DEPTH_WRITE ) );
 
-  DXGI_FORMAT srv_format = MakeSRVCompat( format );
-  SRVHandle   srv_handle =
-      m_Bindless->CreateDescriptorHandle( texture.Get(), CD3DX12_SHADER_RESOURCE_VIEW_DESC::Tex2D( srv_format ) );
+  DXGI_FORMAT const srv_format = MakeSRVCompat( format );
+  SRVHandle         srv_handle = m_Bindless->CreateDescriptorHandle(
+      texture.Get(),
+      array_size == 1 ? CD3DX12_SHADER_RESOURCE_VIEW_DESC::Tex2D( srv_format )
+                              : CD3DX12_SHADER_RESOURCE_VIEW_DESC::Tex2DArray( srv_format ) );
 
   D3D12_DEPTH_STENCIL_VIEW_DESC depth_stencil_view{
     .Format = format,
@@ -320,8 +322,10 @@ Ember::Texture Ember::TextureManager::CreateRenderTexture2D( Texture2DCreateInfo
   CreateResourceImpl(
       &texture, &allocation, resource_desc, &clear_value, init_state.value_or( D3D12_RESOURCE_STATE_RENDER_TARGET ) );
 
-  SRVHandle srv_handle =
-      m_Bindless->CreateDescriptorHandle( texture.Get(), CD3DX12_SHADER_RESOURCE_VIEW_DESC::Tex2D( format ) );
+  SRVHandle srv_handle = m_Bindless->CreateDescriptorHandle(
+      texture.Get(),
+      array_size == 1 ? CD3DX12_SHADER_RESOURCE_VIEW_DESC::Tex2D( format )
+                      : CD3DX12_SHADER_RESOURCE_VIEW_DESC::Tex2DArray( format ) );
 
   D3D12_RENDER_TARGET_VIEW_DESC render_target_view{
     .Format = format,

@@ -20,9 +20,14 @@ bool Ember::WorldBoundingBox::IsInit() const
   return AABB.Extents.x != 0.0f or AABB.Extents.y != 0.0f or AABB.Extents.y != 0.0f;
 }
 
-bool Ember::CullInfo::IsCulled( uint64_t const mask ) const
+bool Ember::CullInfo::AreAnyCulled( uint64_t const mask ) const
 {
   return CullMask & mask;
+}
+
+bool Ember::CullInfo::AreAllCulled( uint64_t const mask ) const
+{
+  return ( CullMask & mask ) == mask;
 }
 
 void Ember::CullInfo::SetCulled( uint64_t const mask )
@@ -208,7 +213,7 @@ void Ember::World::Render( ID3D12GraphicsCommandList* command_list, DirectX::Bou
     m_RenderQuery.each(
         [&]( WorldTransform const& wt, CullInfo const& cull_info, Mesh const& mesh )
         {
-          if ( cull_info.IsCulled( UINT64_MAX ) ) return;
+          if ( cull_info.AreAnyCulled( UINT64_MAX ) ) return;
 
           for ( Primitive const& primitive : mesh.Primitives )
           {
@@ -251,7 +256,7 @@ void Ember::World::CullFrustum( DirectX::BoundingFrustum const& frustum ) const
       [&]( CullInfo& cull_info, WorldBoundingBox const& bb, CullInfo const& parent_cull )
       {
         cull_info.SetCulled( parent_cull.CullMask );
-        if ( cull_info.IsCulled( cull_mask ) ) return;
+        if ( cull_info.AreAnyCulled( cull_mask ) ) return;
 
         if ( frustum.Contains( bb.AABB ) == DirectX::DISJOINT or bb.AABB.Contains( frustum ) == DirectX::DISJOINT )
         {
@@ -272,7 +277,7 @@ void Ember::World::CullSphere( DirectX::BoundingSphere const& sphere ) const
       [&]( CullInfo& cull_info, WorldBoundingBox const& bb, CullInfo const& parent_cull )
       {
         cull_info.SetCulled( parent_cull.CullMask );
-        if ( cull_info.IsCulled( cull_mask ) ) return;
+        if ( cull_info.AreAnyCulled( cull_mask ) ) return;
 
         if ( sphere.Contains( bb.AABB ) == DirectX::DISJOINT )
         {
@@ -281,19 +286,18 @@ void Ember::World::CullSphere( DirectX::BoundingSphere const& sphere ) const
       } );
 }
 
-void Ember::World::CullBox( DirectX::BoundingOrientedBox const& bob ) const
+void Ember::World::CullBox( DirectX::BoundingOrientedBox const& bob, uint64_t const cull_mask ) const
 {
   ZoneScoped;
 
   // Clear cull flags;
-  uint64_t const cull_mask = UINT64_MAX;
   ClearCull( cull_mask );
 
   m_CullDescentQuery.each(
       [&]( CullInfo& cull_info, WorldBoundingBox const& bb, CullInfo const& parent_cull )
       {
         cull_info.SetCulled( parent_cull.CullMask );
-        if ( cull_info.IsCulled( cull_mask ) ) return;
+        if ( cull_info.AreAnyCulled( cull_mask ) ) return;
 
         if ( bob.Contains( bb.AABB ) == DirectX::DISJOINT )
         {
@@ -316,7 +320,7 @@ void Ember::World::RenderShadow(
     m_RenderQuery.each(
         [&]( WorldTransform const& wt, CullInfo const& cull, Mesh const& mesh )
         {
-          if ( cull.IsCulled( 0x1 ) ) return;
+          if ( cull.AreAnyCulled( 0x1 ) ) return;
           for ( Primitive const& primitive : mesh.Primitives )
           {
             DirectX::BoundingBox bb;
@@ -352,7 +356,7 @@ void Ember::World::RenderShadow( ID3D12GraphicsCommandList* command_list, Direct
     m_RenderQuery.each(
         [&]( WorldTransform const& wt, CullInfo const& cull_info, Mesh const& mesh )
         {
-          if ( cull_info.IsCulled( 0x1 ) ) return;
+          if ( cull_info.AreAnyCulled( 0x1 ) ) return;
           for ( Primitive const& primitive : mesh.Primitives )
           {
             DirectX::BoundingBox bb;

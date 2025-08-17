@@ -47,7 +47,8 @@ public:
       ID3D12GraphicsCommandList*      command_list,
       World const&                    world,
       RenderTargetManager const&      rtm,
-      DirectX::BoundingFrustum const& camera_frustum ) const;
+      DirectX::BoundingFrustum const& camera_frustum,
+      uint32_t                        frame_idx ) const;
 };
 
 } // namespace Ember

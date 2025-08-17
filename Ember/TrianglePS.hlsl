@@ -207,19 +207,25 @@ float4 TrianglePS( FSIn IN ) : SV_TARGET0
     for ( ; light_idx < g_ShadowDirLightCount; light_idx++ )
     {
       // Lightdir pre-normalized
-      float3 light_dir    = dir_lights[light_idx].Direction;
-      float  intensity    = dir_lights[light_idx].Intensity;
+      float3 light_dir = dir_lights[light_idx].Direction;
+      float  intensity = dir_lights[light_idx].Intensity;
 
-      float4 ls_position  = mul( dir_lights[light_idx].LightSpaceMat, IN.Position );
+      float cascade = step( dir_lights[light_idx].Cascade5, IN.LinearDepth );
+      for ( int i = 0; i < 4; i++ )
+      {
+        cascade += step( dir_lights[light_idx].Cascades0To4[i], IN.LinearDepth );
+      }
+
+      float4 ls_position  = mul( dir_lights[light_idx].LightSpaceMat[cascade], IN.Position );
       ls_position        /= ls_position.w;
 
       ls_position.xy      = float2( 0.5f, -0.5f ) * ls_position.xy + 0.5f; // must invert y
 
       // Shadow test
-      Texture2D<float> shadow_map = ResourceDescriptorHeap[dir_lights[light_idx].ShadowIdx];
-      float            shadowing  = shadow_map.SampleCmpLevelZero( g_ShadowSampler, ls_position.xy, ls_position.z );
+      Texture2DArray<float> shadow_map = ResourceDescriptorHeap[dir_lights[light_idx].ShadowIdx];
+      float  shadowing = shadow_map.SampleCmp( g_ShadowSampler, float3( ls_position.xy, cascade ), ls_position.z );
 
-      float3           radiance   = intensity * UnpackColor32( dir_lights[light_idx].Color ).rgb;
+      float3 radiance  = intensity * UnpackColor32( dir_lights[light_idx].Color ).rgb;
 
       // Expects direction *to* light.
       dir_contrib += shadowing * brdf.Evaluate( radiance, view_dir, -light_dir );

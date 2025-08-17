@@ -411,7 +411,7 @@ void Ember::Internal::OmniLightManager::RenderOmniShadow(
   world.GetECS().each(
       [&]( WorldTransform const& wt, CullInfo const& cull_info, Mesh const& mesh )
       {
-        if ( cull_info.IsCulled( 0x1 ) ) return;
+        if ( cull_info.AreAnyCulled( 0x1 ) ) return;
 
         for ( Primitive const& primitive : mesh.Primitives )
         {

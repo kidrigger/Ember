@@ -3,6 +3,7 @@
 
 #include "Bindless.hlsli"
 #include "Colors.hlsli"
+#include "LightData.hlsli"
 
 struct Camera
 {
@@ -11,27 +12,6 @@ struct Camera
   float4x4 View;
   float4x4 InvView;
   float4   Position;
-};
-
-struct PointLight
-{
-  float3        Position;    // 12
-  float         Range;       // 16
-  PackedColor32 Color;       // 20
-  float         Intensity;   // 24
-  float         Attenuation; // 28
-  RID           ShadowIdx;   // 32
-};
-
-struct DirLight
-{
-  float4x4      LightSpaceMat; // 16
-  float3        Direction;     // 28
-  PackedColor32 Color;         // 32
-  float         Intensity;     // 36
-  RID           ShadowIdx;     // 40
-  uint          Pad0;          // 44
-  uint          Pad1;          // 48
 };
 
 struct Material
@@ -123,6 +103,7 @@ struct VSOut
   float4 ScreenPosition : SV_POSITION;
   float4 Position : POSITION;
   float3 Normal : NORMAL;
+  float  LinearDepth : LINEAR_DEPTH;
   float4 Tangent : TANGENT;
   float4 Color : COLOR;
   float2 TexCoord[2] : TEXCOORD;

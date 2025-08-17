@@ -528,6 +528,7 @@
     </CopyFileToFolders>
     <None Include="Bindless.hlsli" />
     <None Include="Colors.hlsli" />
+    <None Include="LightData.hlsli" />
     <None Include="OmniShadow.hlsli" />
     <None Include="Utility.hlsli" />
     <None Include="IBLCommon.hlsli" />
