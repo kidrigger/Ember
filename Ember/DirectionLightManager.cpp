@@ -361,23 +361,21 @@ void Ember::Internal::DirectionLightManager::RenderDirShadow(
   command_list->RSSetViewports( 1, &viewport );
 
   // Setup Light-Space basis
-  DirectX::XMVECTOR direction = XMLoadFloat3( &dir_light->Direction );
+  DirectX::FXMVECTOR direction = XMLoadFloat3( &dir_light->Direction );
   ASSERT_M(
       fabsf( DirectX::XMVector3LengthSq( direction ).m128_f32[0] - 1.0f ) < FLT_EPSILON,
       "This should be normalized on set" );
 
-  DirectX::FXMVECTOR camera_orientation = XMLoadFloat4( &camera_frust.Orientation );
-
-  DirectX::XMVECTOR  ls_right           = XMVector3Rotate( kRight, camera_orientation );
+  DirectX::XMVECTOR ls_right = kRight;
   if ( float dot = DirectX::XMVector3Dot( ls_right, direction ).m128_f32[0]; dot > 0.99f )
   {
     // If cam_right and direction are aligned, we need to use -fwd;
-    ls_right = DirectX::XMVector3Rotate( XMVectorNegate( kForward ), camera_orientation );
+    ls_right = XMVectorNegate( kForward );
   }
   else if ( dot < -0.99f )
   {
     // If cam_right is opposing direction, we need to use fwd;
-    ls_right = XMVector3Rotate( kForward, camera_orientation );
+    ls_right = kForward;
   }
 
   DirectX::FXMVECTOR ls_up = DirectX::XMVector3Normalize( DirectX::XMVector3Cross( ls_right, direction ) );
@@ -398,8 +396,7 @@ void Ember::Internal::DirectionLightManager::RenderDirShadow(
   // Copy cascades to GPU
   memcpy( dir_light->Cascades, &cascades[1], ByteSizeOf( dir_light->Cascades ) );
 
-  DirectX::BoundingOrientedBox bob[kNumCascades];
-  DirectX::XMFLOAT3            corners[8];
+  DirectX::BoundingOrientedBox bounding_oriented_boxes[kNumCascades];
   for ( int cascade_id = 0; cascade_id < kNumCascades; cascade_id++ )
   {
     DirectX::BoundingFrustum frustum = camera_frust;
@@ -407,34 +404,37 @@ void Ember::Internal::DirectionLightManager::RenderDirShadow(
     frustum.Near                     = cascades[cascade_id] - kCascadeOverlap;
     frustum.Far                      = cascades[cascade_id + 1] + kCascadeOverlap;
 
-    frustum.GetCorners( corners );
-    for ( auto& corner : corners )
-    {
-      XMStoreFloat3( &corner, DirectX::XMVector3Rotate( XMLoadFloat3( &corner ), world_to_ls_orientation ) );
-    }
-    DirectX::BoundingBox ls_bb;
-    DirectX::BoundingBox::CreateFromPoints( ls_bb, CountOf( corners ), DataOf( corners ), StrideOf( corners ) );
+    DirectX::BoundingSphere ws_bs;
+    DirectX::BoundingSphere::CreateFromFrustum( ws_bs, frustum );
+
+    float world_per_texel = ( 2.0f * ws_bs.Radius ) / kDirShadowResolution;
+    float texel_per_world = 1.0f / world_per_texel;
 
     // The shadow map is centered here.
-    //
-    DirectX::XMVECTOR focus = XMLoadFloat3( &ls_bb.Center );
-    focus                   = DirectX::XMVector3Rotate( focus, ls_to_world_orientation );
-    DirectX::XMFLOAT3 focus_f3;
-    XMStoreFloat3( &focus_f3, focus );
+    // Rounding the focus to texel increments to keep the
+    DirectX::FXMVECTOR focus = DirectX::XMVectorScale(
+        DirectX::XMVectorFloor( DirectX::XMVectorScale( XMLoadFloat3( &ws_bs.Center ), texel_per_world ) ),
+        world_per_texel );
 
     // Create 'shadow camera view and projections
-    DirectX::XMMATRIX view       = DirectX::XMMatrixLookToRH( focus, direction, ls_up );
-    DirectX::XMMATRIX projection = DirectX::XMMatrixOrthographicRH(
-        ls_bb.Extents.x * 2.0f, ls_bb.Extents.y * 2.0f, -ls_bb.Extents.z, ls_bb.Extents.z );
+    DirectX::FXMMATRIX view = DirectX::XMMatrixLookToRH( focus, direction, ls_up );
+    DirectX::FXMMATRIX projection =
+        DirectX::XMMatrixOrthographicRH( ws_bs.Radius * 2.0f, ws_bs.Radius * 2.0f, -ws_bs.Radius, ws_bs.Radius );
 
-    ls_bb.Extents.z = 1e6;
-    // Infinitely long cull for shadow.
-    DirectX::XMFLOAT4 bob_orientation;
-    XMStoreFloat4( &bob_orientation, ls_to_world_orientation );
-    bob[cascade_id] = { focus_f3, ls_bb.Extents, bob_orientation };
-    world.CullBox( bob[cascade_id], 1llu << cascade_id );
+    //  Infinitely long cull for shadow.
+    DirectX::XMFLOAT4 box_orientation;
+    XMStoreFloat4( &box_orientation, ls_to_world_orientation );
 
-    DirectX::XMMATRIX proj_view             = XMMatrixMultiply( view, projection );
+    DirectX::XMFLOAT3  box_center;
+    DirectX::FXMVECTOR box_offset = DirectX::XMVectorScale( direction, -1e6f );
+    XMStoreFloat3( &box_center, DirectX::XMVectorAdd( focus, box_offset ) );
+    bounding_oriented_boxes[cascade_id] = {
+      box_center, { ws_bs.Radius, ws_bs.Radius, 1e6f + ws_bs.Radius },
+       box_orientation
+    };
+    world.CullBox( bounding_oriented_boxes[cascade_id], 1llu << cascade_id );
+
+    DirectX::FXMMATRIX proj_view            = XMMatrixMultiply( view, projection );
     dir_light->LightSpaceMatrix[cascade_id] = proj_view;
   }
 
@@ -453,14 +453,14 @@ void Ember::Internal::DirectionLightManager::RenderDirShadow(
         {
           DirectX::BoundingBox bb;
           primitive.AABB.Transform( bb, wt.Transform );
-          bool is_culled = true;
-          // Draw if not culled in any cascades.
-          for ( auto const& cascade_box : bob )
-          {
-            bool const culled_in_cascade =
-                ( cascade_box.Contains( bb ) == DirectX::DISJOINT or bb.Contains( cascade_box ) == DirectX::DISJOINT );
-            is_culled = is_culled and culled_in_cascade;
-          }
+          // Skip if culled in all cascades.
+          bool const is_culled = std::ranges::all_of(
+              bounding_oriented_boxes,
+              [&]( auto const& cascade_box ) {
+                return (
+                    cascade_box.Contains( bb ) == DirectX::DISJOINT or
+                    bb.Contains( cascade_box ) == DirectX::DISJOINT );
+              } );
           if ( is_culled ) continue;
 
           // TODO: Move outside primitive loop. IB and VB are per-mesh.
