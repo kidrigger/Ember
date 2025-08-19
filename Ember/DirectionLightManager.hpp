@@ -20,7 +20,7 @@ namespace Internal
 
 class DirectionLightManager
 {
-  uint32_t constexpr static kDirShadowResolution = 4096;
+  uint32_t constexpr static kDirShadowResolution = 1024;
   uint16_t constexpr static kMaxDirLights        = 4;
   uint8_t constexpr static kNumCascades          = 6;
   float constexpr static kCascadeLambda          = 0.33f;

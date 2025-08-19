@@ -441,8 +441,8 @@ void Ember::BasicApp::LoadContent()
 
   m_Camera->SetHorizontalFoV( DirectX::XMConvertToRadians( 70.0f ) );
   m_Camera->SetAspectRatio( ( float )m_WindowWidth / ( float )m_WindowHeight );
-  m_Camera->SetYawPitch( DirectX::XM_PI, 0.0f );
-  m_Camera->SetPosition( DirectX::XMVectorSet( 0.0f, 2.0f, 0.0f, 1.0f ) );
+  m_Camera->SetYawPitch( DirectX::XM_PI * 5.0f / 4.0f, 0.0f );
+  m_Camera->SetPosition( DirectX::XMVectorSet( -23.0f, 2.0f, -10.0f, 1.0f ) );
 
   // Setup Lights
   LightManager::Create( m_LightManager.get(), m_RenderDevice.get(), RenderDevice::kNumFrames );
@@ -509,21 +509,30 @@ void Ember::BasicApp::Update()
 
   m_PerfCounter->Tick();
 
-  double const avg_delta_ms    = m_PerfCounter->GetAvgFrameTime();
-  double const avg_fps         = 1000.0f / avg_delta_ms;
+  double const              avg_delta_ms    = m_PerfCounter->GetAvgFrameTime();
+  double const              avg_fps         = 1000.0f / avg_delta_ms;
 
-  size_t const vertex_count    = DebugInfo::Instance().GetVertexCount();
-  size_t const draw_call_count = DebugInfo::Instance().GetDrawCallCount();
+  size_t const              vertex_count    = DebugInfo::Instance().GetVertexCount();
+  size_t const              draw_call_count = DebugInfo::Instance().GetDrawCallCount();
 
+  DirectX::FXMVECTOR const& cam_pos         = m_Camera->GetPosition();
+  float const               pitch           = m_Camera->GetPitch();
+  float const               yaw             = m_Camera->GetYaw();
   swprintf_s(
       m_SprintfBuffer,
-      L"Ember %ux%u | frame time: %.2lf ms (%.2lf fps) | DrawCalls: %llu, Vertices: %llu",
+      L"Ember %ux%u | frame time: %.2lf ms (%.2lf fps) | DrawCalls: %llu, Vertices: %llu | Camera: %.2f %.2f %.2f @ "
+      L"%.2f %.2f",
       m_WindowWidth,
       m_WindowHeight,
       avg_delta_ms,
       avg_fps,
       draw_call_count,
-      vertex_count );
+      vertex_count,
+      cam_pos.m128_f32[0],
+      cam_pos.m128_f32[1],
+      cam_pos.m128_f32[2],
+      yaw,
+      pitch );
 
   SetWindowText( m_WindowHandle, m_SprintfBuffer );
 

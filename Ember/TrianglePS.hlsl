@@ -210,7 +210,7 @@ float4 TrianglePS( FSIn IN ) : SV_TARGET0
       float3 light_dir = dir_lights[light_idx].Direction;
       float  intensity = dir_lights[light_idx].Intensity;
 
-      float cascade = step( dir_lights[light_idx].Cascade5, IN.LinearDepth );
+      float  cascade   = step( dir_lights[light_idx].Cascade5, IN.LinearDepth );
       for ( int i = 0; i < 4; i++ )
       {
         cascade += step( dir_lights[light_idx].Cascades0To4[i], IN.LinearDepth );
