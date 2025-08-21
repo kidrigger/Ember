@@ -77,11 +77,7 @@ class ModelLoader
   TextureLoader* m_TextureLoader;
 
   flecs::entity  ProcessNode( LoadingContext* context, flecs::entity parent, cgltf_node const& node );
-  Primitive      LoadPrimitive(
-           LoadingContext*        context,
-           DirectX::XMVECTOR*     bb_min,
-           DirectX::XMVECTOR*     bb_max,
-           cgltf_primitive const& primitive ) const;
+  void      ProcessPrimitive( LoadingContext* context, flecs::entity owning, cgltf_primitive const& primitive ) const;
   void      ProcessMesh( LoadingContext* context, flecs::entity owning, cgltf_mesh const& mesh ) const;
   bool      TryLoadTexture( Texture* texture, cgltf_image const& image, ColorSpaceOverride color_space_override ) const;
   Material* TryProcessMaterial( LoadingContext* context, cgltf_material const* material ) const;

@@ -96,7 +96,7 @@ struct Geometry
   uint32_t             GetRefCount();
 };
 
-struct Primitive
+struct Mesh
 {
   struct Data
   {
@@ -104,25 +104,17 @@ struct Primitive
     uint32_t IndexCount;
     uint32_t FirstVertex;
   };
-  Material*            Material;
-  DirectX::BoundingBox AABB;
-  Data                 DrawInfo;
-
-  Primitive( Ember::Material* material, DirectX::BoundingBox aabb, Data draw_info );
-  Primitive( Primitive const& other ) = delete;
-  Primitive( Primitive&& other ) noexcept;
-  Primitive& operator=( Primitive const& other ) = delete;
-  Primitive& operator=( Primitive&& other ) noexcept;
-  ~Primitive();
-};
-
-struct Mesh
-{
-  std::vector<Primitive> Primitives;
-  Geometry*              Geometry{ nullptr };
+  Geometry* Geometry{ nullptr };
+  Material* Material{ nullptr };
+  Data      DrawInfo;
 
   Mesh() = default;
-  Mesh( std::vector<Primitive> primitives, Ember::Geometry* geometry );
+  Mesh(
+      Ember::Geometry* geometry,
+      Ember::Material* material,
+      uint32_t         first_index,
+      uint32_t         index_count,
+      uint32_t         first_vertex );
   Mesh( Mesh const& other ) = delete;
   Mesh( Mesh&& other ) noexcept;
   Mesh& operator=( Mesh const& other ) = delete;
@@ -148,14 +140,12 @@ public:
   World();
 
   void Update( float delta_seconds ) const;
-  void Render( ID3D12GraphicsCommandList* command_list, DirectX::BoundingFrustum const& frustum ) const;
   void ClearCull( uint64_t cull_mask = UINT64_MAX ) const;
   void CullFrustum( DirectX::BoundingFrustum const& frustum ) const;
   void CullSphere( DirectX::BoundingSphere const& sphere ) const;
   void CullBox( DirectX::BoundingOrientedBox const& bob, uint64_t cull_mask ) const;
-  void RenderShadow( ID3D12GraphicsCommandList* command_list, DirectX::BoundingFrustum const& frustum ) const;
-  void RenderShadow( ID3D12GraphicsCommandList* command_list, DirectX::BoundingSphere const& sphere ) const;
 
+  //
   flecs::world const& GetECS() const;
 };
 

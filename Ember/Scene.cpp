@@ -70,54 +70,42 @@ uint32_t Ember::Geometry::GetRefCount()
   return RefCount;
 }
 
-Ember::Primitive::Primitive( Ember::Material* const material, DirectX::BoundingBox aabb, Data draw_info )
-  : Material{ material }, AABB{ std::move( aabb ) }, DrawInfo{ std::move( draw_info ) }
+Ember::Mesh::Mesh(
+    Ember::Geometry* geometry,
+    Ember::Material* material,
+    uint32_t const   first_index,
+    uint32_t const   index_count,
+    uint32_t const   first_vertex )
+  : Geometry{ geometry }, Material{ material }, DrawInfo{ first_index, index_count, first_vertex }
 {}
 
-Ember::Primitive::Primitive( Primitive&& other ) noexcept
-  : Material{ other.Material }, AABB{ std::move( other.AABB ) }, DrawInfo{ std::move( other.DrawInfo ) }
-{
-  other.Material = nullptr;
-}
-
-Ember::Primitive& Ember::Primitive::operator=( Primitive&& other ) noexcept
-{
-  if ( this == &other ) return *this;
-  World::MaterialManager().Destroy( Material );
-  Material       = other.Material;
-  other.Material = nullptr;
-  AABB           = std::move( other.AABB );
-  DrawInfo       = std::move( other.DrawInfo );
-  return *this;
-}
-
-Ember::Primitive::~Primitive()
-{
-  World::MaterialManager().Destroy( Material );
-}
-
-Ember::Mesh::Mesh( std::vector<Primitive> primitives, Ember::Geometry* const geometry )
-  : Primitives{ std::move( primitives ) }, Geometry{ geometry }
-{}
-
-Ember::Mesh::Mesh( Mesh&& other ) noexcept : Primitives{ std::move( other.Primitives ) }, Geometry{ other.Geometry }
+Ember::Mesh::Mesh( Mesh&& other ) noexcept
+  : Geometry{ other.Geometry }, Material{ other.Material }, DrawInfo{ std::move( other.DrawInfo ) }
 {
   other.Geometry = nullptr;
+  other.Material = nullptr;
 }
 
 Ember::Mesh& Ember::Mesh::operator=( Mesh&& other ) noexcept
 {
   if ( this == &other ) return *this;
-  Primitives = std::move( other.Primitives );
+
   World::GeometryManager().Destroy( Geometry );
   Geometry       = other.Geometry;
   other.Geometry = nullptr;
+
+  World::MaterialManager().Destroy( Material );
+  Material       = other.Material;
+  other.Material = nullptr;
+
+  DrawInfo       = std::move( other.DrawInfo );
   return *this;
 }
 
 Ember::Mesh::~Mesh()
 {
   World::GeometryManager().Destroy( Geometry );
+  World::MaterialManager().Destroy( Material );
 }
 
 Ember::ObjectPool<Ember::Geometry>& Ember::World::GeometryManager()
@@ -201,44 +189,6 @@ void Ember::World::Update( float ) const
   }
 }
 
-void Ember::World::Render( ID3D12GraphicsCommandList* command_list, DirectX::BoundingFrustum const& frustum ) const
-{
-  ZoneScoped;
-
-  CullFrustum( frustum );
-
-  {
-    ZoneScopedN( "RecordCmdList" );
-
-    m_RenderQuery.each(
-        [&]( WorldTransform const& wt, CullInfo const& cull_info, Mesh const& mesh )
-        {
-          if ( cull_info.AreAnyCulled( UINT64_MAX ) ) return;
-
-          for ( Primitive const& primitive : mesh.Primitives )
-          {
-            DirectX::BoundingBox bb;
-            primitive.AABB.Transform( bb, wt.Transform );
-            if ( frustum.Contains( bb ) == DirectX::DISJOINT )
-            {
-              continue;
-            }
-
-            command_list->IASetVertexBuffers( 0, 1, &mesh.Geometry->VertexBuffer.GetVertexBufferView() );
-            command_list->IASetIndexBuffer( &mesh.Geometry->IndexBuffer.GetIndexBufferView() );
-
-            command_list->SetGraphicsRoot32BitConstants( 0, sizeof( WorldTransform ) / 4, &wt, 0 );
-            command_list->SetGraphicsRoot32BitConstants(
-                1, sizeof( Material::GpuRepr ) / 4, &primitive.Material->Repr, 0 );
-
-            DebugInfo::Instance().PushDrawCall( primitive.DrawInfo.IndexCount );
-            command_list->DrawIndexedInstanced(
-                primitive.DrawInfo.IndexCount, 1, primitive.DrawInfo.FirstIndex, primitive.DrawInfo.FirstVertex, 0 );
-          }
-        } );
-  }
-}
-
 void Ember::World::ClearCull( uint64_t const cull_mask ) const
 {
   m_Ecs.each( [&]( CullInfo& cull_info ) { cull_info.ClearCulled( cull_mask ); } );
@@ -277,7 +227,7 @@ void Ember::World::CullSphere( DirectX::BoundingSphere const& sphere ) const
       [&]( CullInfo& cull_info, WorldBoundingBox const& bb, CullInfo const& parent_cull )
       {
         cull_info.SetCulled( parent_cull.CullMask );
-        if ( cull_info.AreAnyCulled( cull_mask ) ) return;
+        if ( cull_info.AreAllCulled( cull_mask ) ) return;
 
         if ( sphere.Contains( bb.AABB ) == DirectX::DISJOINT )
         {
@@ -297,86 +247,13 @@ void Ember::World::CullBox( DirectX::BoundingOrientedBox const& bob, uint64_t co
       [&]( CullInfo& cull_info, WorldBoundingBox const& bb, CullInfo const& parent_cull )
       {
         cull_info.SetCulled( parent_cull.CullMask );
-        if ( cull_info.AreAnyCulled( cull_mask ) ) return;
+        if ( cull_info.AreAllCulled( cull_mask ) ) return;
 
         if ( bob.Contains( bb.AABB ) == DirectX::DISJOINT )
         {
           cull_info.SetCulled( cull_mask );
         }
       } );
-}
-
-void Ember::World::RenderShadow(
-    ID3D12GraphicsCommandList* command_list, DirectX::BoundingFrustum const& frustum ) const
-{
-  ZoneScoped;
-  ZoneText( "Frustum", 7 );
-
-  CullFrustum( frustum );
-
-  {
-    ZoneScopedN( "RecordCmdList" );
-
-    m_RenderQuery.each(
-        [&]( WorldTransform const& wt, CullInfo const& cull, Mesh const& mesh )
-        {
-          if ( cull.AreAnyCulled( 0x1 ) ) return;
-          for ( Primitive const& primitive : mesh.Primitives )
-          {
-            DirectX::BoundingBox bb;
-            primitive.AABB.Transform( bb, wt.Transform );
-            if ( frustum.Contains( bb ) == DirectX::DISJOINT )
-            {
-              continue;
-            }
-
-            command_list->IASetIndexBuffer( &mesh.Geometry->IndexBuffer.GetIndexBufferView() );
-            command_list->IASetVertexBuffers( 0, 1, &mesh.Geometry->ShadowVertexBuffer.GetVertexBufferView() );
-
-            command_list->SetGraphicsRoot32BitConstants( 0, sizeof( DirectX::XMMATRIX ) / 4, &wt.Transform, 0 );
-
-            DebugInfo::Instance().PushDrawCall( primitive.DrawInfo.IndexCount );
-            command_list->DrawIndexedInstanced(
-                primitive.DrawInfo.IndexCount, 1, primitive.DrawInfo.FirstIndex, primitive.DrawInfo.FirstVertex, 0 );
-          }
-        } );
-  }
-}
-
-void Ember::World::RenderShadow( ID3D12GraphicsCommandList* command_list, DirectX::BoundingSphere const& sphere ) const
-{
-  ZoneScoped;
-  ZoneText( "Sphere", 6 );
-
-  CullSphere( sphere );
-
-  {
-    ZoneScopedN( "RecordCmdList" );
-
-    m_RenderQuery.each(
-        [&]( WorldTransform const& wt, CullInfo const& cull_info, Mesh const& mesh )
-        {
-          if ( cull_info.AreAnyCulled( 0x1 ) ) return;
-          for ( Primitive const& primitive : mesh.Primitives )
-          {
-            DirectX::BoundingBox bb;
-            primitive.AABB.Transform( bb, wt.Transform );
-            if ( sphere.Contains( bb ) == DirectX::DISJOINT )
-            {
-              continue;
-            }
-
-            command_list->IASetIndexBuffer( &mesh.Geometry->IndexBuffer.GetIndexBufferView() );
-            command_list->IASetVertexBuffers( 0, 1, &mesh.Geometry->ShadowVertexBuffer.GetVertexBufferView() );
-
-            command_list->SetGraphicsRoot32BitConstants( 0, sizeof( DirectX::XMMATRIX ) / 4, &wt.Transform, 0 );
-
-            DebugInfo::Instance().PushDrawCall( primitive.DrawInfo.IndexCount );
-            command_list->DrawIndexedInstanced(
-                primitive.DrawInfo.IndexCount, 1, primitive.DrawInfo.FirstIndex, primitive.DrawInfo.FirstVertex, 0 );
-          }
-        } );
-  }
 }
 
 flecs::world const& Ember::World::GetECS() const

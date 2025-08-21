@@ -449,34 +449,14 @@ void Ember::Internal::DirectionLightManager::RenderDirShadow(
       {
         if ( cull_info.AreAllCulled( kCullMask ) ) return;
 
-        for ( Primitive const& primitive : mesh.Primitives )
-        {
-          DirectX::BoundingBox bb;
-          primitive.AABB.Transform( bb, wt.Transform );
-          // Skip if culled in all cascades.
-          bool const is_culled = std::ranges::all_of(
-              bounding_oriented_boxes,
-              [&]( auto const& cascade_box ) {
-                return (
-                    cascade_box.Contains( bb ) == DirectX::DISJOINT or
-                    bb.Contains( cascade_box ) == DirectX::DISJOINT );
-              } );
-          if ( is_culled ) continue;
+        command_list->IASetIndexBuffer( &mesh.Geometry->IndexBuffer.GetIndexBufferView() );
+        command_list->IASetVertexBuffers( 0, 1, &mesh.Geometry->ShadowVertexBuffer.GetVertexBufferView() );
 
-          // TODO: Move outside primitive loop. IB and VB are per-mesh.
-          command_list->IASetIndexBuffer( &mesh.Geometry->IndexBuffer.GetIndexBufferView() );
-          command_list->IASetVertexBuffers( 0, 1, &mesh.Geometry->ShadowVertexBuffer.GetVertexBufferView() );
+        command_list->SetGraphicsRoot32BitConstants( 0, sizeof( DirectX::XMMATRIX ) / 4, &wt.Transform, 0 );
 
-          command_list->SetGraphicsRoot32BitConstants( 0, sizeof( DirectX::XMMATRIX ) / 4, &wt.Transform, 0 );
-
-          DebugInfo::Instance().PushDrawCall( primitive.DrawInfo.IndexCount );
-          command_list->DrawIndexedInstanced(
-              primitive.DrawInfo.IndexCount,
-              kNumCascades,
-              primitive.DrawInfo.FirstIndex,
-              primitive.DrawInfo.FirstVertex,
-              0 );
-        }
+        DebugInfo::Instance().PushDrawCall( mesh.DrawInfo.IndexCount );
+        command_list->DrawIndexedInstanced(
+            mesh.DrawInfo.IndexCount, kNumCascades, mesh.DrawInfo.FirstIndex, ( INT )mesh.DrawInfo.FirstVertex, 0 );
       } );
 
   auto bottom_of_shadow_barrier = CD3DX12_RESOURCE_BARRIER::Transition(

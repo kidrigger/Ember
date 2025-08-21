@@ -144,22 +144,12 @@ void Ember::ModelLoader::ProcessMesh( LoadingContext* context, flecs::entity own
 {
   cgltf_primitive const* primitives = mesh.primitives;
 
-  DirectX::XMVECTOR      bb_min     = DirectX::XMVectorSplatInfinity();
-  DirectX::XMVECTOR      bb_max     = DirectX::XMVectorNegate( DirectX::XMVectorSplatInfinity() );
-
-  std::vector<Primitive> primitive_acc;
   for ( uint32_t primitive_index = 0; primitive_index < mesh.primitives_count; ++primitive_index )
   {
     cgltf_primitive const& primitive = primitives[primitive_index];
 
-    primitive_acc.push_back( LoadPrimitive( context, &bb_min, &bb_max, primitive ) );
+    ProcessPrimitive( context, owning, primitive );
   }
-
-  DirectX::BoundingBox bb;
-  DirectX::BoundingBox::CreateFromPoints( bb, bb_min, bb_max );
-
-  ( void )owning.set<Mesh>( { std::move( primitive_acc ), World::GeometryManager().Copy( context->Geometry ) } )
-      .set<LocalBoundingBox>( { bb } );
 }
 
 bool Ember::ModelLoader::TryLoadTexture(
@@ -239,11 +229,8 @@ cgltf_accessor* FindAccessor(
   return nullptr;
 }
 
-Ember::Primitive Ember::ModelLoader::LoadPrimitive(
-    LoadingContext*        context,
-    DirectX::XMVECTOR*     bb_min,
-    DirectX::XMVECTOR*     bb_max,
-    cgltf_primitive const& primitive ) const
+void Ember::ModelLoader::ProcessPrimitive(
+    LoadingContext* context, flecs::entity owning, cgltf_primitive const& primitive ) const
 {
   using namespace std::string_view_literals;
 
@@ -293,9 +280,6 @@ Ember::Primitive Ember::ModelLoader::LoadPrimitive(
     auto              pos_max_v3 = DirectX::XMFLOAT3( accessor->max );
     auto              pos_max    = XMLoadFloat3( &pos_max_v3 );
     DirectX::BoundingBox::CreateFromPoints( prim_aabb, pos_min, pos_max );
-
-    *bb_min                     = DirectX::XMVectorMin( *bb_min, pos_min );
-    *bb_max                     = DirectX::XMVectorMax( *bb_max, pos_max );
 
     size_t constexpr stride     = sizeof( LoadingData );
     size_t constexpr offset     = offsetof( LoadingData, Position );
@@ -507,15 +491,25 @@ Ember::Primitive Ember::ModelLoader::LoadPrimitive(
     }
   }
 
-  return Primitive{
-    material,
-    prim_aabb,
-    {
-      .FirstIndex  = ( uint32_t )index_start,
-      .IndexCount  = ( uint32_t )index_count,
-      .FirstVertex = ( uint32_t )vertex_start,
-      },
-  };
+  Geometry* geometry = World::GeometryManager().Copy( context->Geometry );
+
+  ( void )m_World->GetECS()
+      .entity()
+      .insert(
+          [&]( WorldTransform&,
+               LocalTransform&,
+               CullInfo&,
+               WorldBoundingBox&,
+               LocalBoundingBox&,
+               Mesh&             prim,
+               LocalBoundingBox& bb )
+          {
+            prim = {
+              geometry, material, ( uint32_t )index_start, ( uint32_t )index_count, ( uint32_t )vertex_start,
+            };
+            bb.AABB = prim_aabb;
+          } )
+      .child_of( owning );
 }
 
 Ember::Material* Ember::ModelLoader::TryProcessMaterial( LoadingContext* context, cgltf_material const* material ) const

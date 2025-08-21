@@ -413,24 +413,14 @@ void Ember::Internal::OmniLightManager::RenderOmniShadow(
       {
         if ( cull_info.AreAnyCulled( 0x1 ) ) return;
 
-        for ( Primitive const& primitive : mesh.Primitives )
-        {
-          DirectX::BoundingBox bb;
-          primitive.AABB.Transform( bb, wt.Transform );
-          if ( sphere_of_influence.Contains( bb ) == DirectX::DISJOINT )
-          {
-            continue;
-          }
+        command_list->IASetIndexBuffer( &mesh.Geometry->IndexBuffer.GetIndexBufferView() );
+        command_list->IASetVertexBuffers( 0, 1, &mesh.Geometry->ShadowVertexBuffer.GetVertexBufferView() );
 
-          command_list->IASetIndexBuffer( &mesh.Geometry->IndexBuffer.GetIndexBufferView() );
-          command_list->IASetVertexBuffers( 0, 1, &mesh.Geometry->ShadowVertexBuffer.GetVertexBufferView() );
+        command_list->SetGraphicsRoot32BitConstants( 0, sizeof( DirectX::XMMATRIX ) / 4, &wt.Transform, 0 );
 
-          command_list->SetGraphicsRoot32BitConstants( 0, sizeof( DirectX::XMMATRIX ) / 4, &wt.Transform, 0 );
-
-          DebugInfo::Instance().PushDrawCall( primitive.DrawInfo.IndexCount );
-          command_list->DrawIndexedInstanced(
-              primitive.DrawInfo.IndexCount, 6, primitive.DrawInfo.FirstIndex, primitive.DrawInfo.FirstVertex, 0 );
-        }
+        DebugInfo::Instance().PushDrawCall( mesh.DrawInfo.IndexCount );
+        command_list->DrawIndexedInstanced(
+            mesh.DrawInfo.IndexCount, 6, mesh.DrawInfo.FirstIndex, mesh.DrawInfo.FirstVertex, 0 );
       } );
 
   auto bottom_of_shadow_barrier = CD3DX12_RESOURCE_BARRIER::Transition(
