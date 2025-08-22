@@ -500,12 +500,17 @@ void Ember::ModelLoader::ProcessPrimitive(
                LocalTransform&,
                CullInfo&,
                WorldBoundingBox&,
-               LocalBoundingBox&,
                Mesh&             prim,
+               MaterialComp&     mat,
+               GeometryComp&     geom,
                LocalBoundingBox& bb )
           {
+            mat  = MaterialComp{ material };
+            geom = GeometryComp{ geometry };
             prim = {
-              geometry, material, ( uint32_t )index_start, ( uint32_t )index_count, ( uint32_t )vertex_start,
+              ( uint32_t )index_start,
+              ( uint32_t )index_count,
+              ( uint32_t )vertex_start,
             };
             bb.AABB = prim_aabb;
           } )

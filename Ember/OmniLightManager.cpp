@@ -409,18 +409,18 @@ void Ember::Internal::OmniLightManager::RenderOmniShadow(
   world.CullSphere( sphere_of_influence );
 
   world.GetECS().each(
-      [&]( WorldTransform const& wt, CullInfo const& cull_info, Mesh const& mesh )
+      [&]( WorldTransform const& wt, CullInfo const& cull_info, Mesh const& mesh, GeometryComp const& geometry )
       {
         if ( cull_info.AreAnyCulled( 0x1 ) ) return;
 
-        command_list->IASetIndexBuffer( &mesh.Geometry->IndexBuffer.GetIndexBufferView() );
-        command_list->IASetVertexBuffers( 0, 1, &mesh.Geometry->ShadowVertexBuffer.GetVertexBufferView() );
+        command_list->IASetIndexBuffer( &geometry.Geometry->IndexBuffer.GetIndexBufferView() );
+        command_list->IASetVertexBuffers( 0, 1, &geometry.Geometry->ShadowVertexBuffer.GetVertexBufferView() );
 
         command_list->SetGraphicsRoot32BitConstants( 0, sizeof( DirectX::XMMATRIX ) / 4, &wt.Transform, 0 );
 
-        DebugInfo::Instance().PushDrawCall( mesh.DrawInfo.IndexCount );
+        DebugInfo::Instance().PushDrawCall( mesh.IndexCount );
         command_list->DrawIndexedInstanced(
-            mesh.DrawInfo.IndexCount, 6, mesh.DrawInfo.FirstIndex, mesh.DrawInfo.FirstVertex, 0 );
+            mesh.IndexCount, 6, mesh.FirstIndex, mesh.FirstVertex, 0 );
       } );
 
   auto bottom_of_shadow_barrier = CD3DX12_RESOURCE_BARRIER::Transition(

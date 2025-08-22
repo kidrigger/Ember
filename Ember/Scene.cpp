@@ -70,23 +70,39 @@ uint32_t Ember::Geometry::GetRefCount()
   return RefCount;
 }
 
-Ember::Mesh::Mesh(
-    Ember::Geometry* geometry,
-    Ember::Material* material,
-    uint32_t const   first_index,
-    uint32_t const   index_count,
-    uint32_t const   first_vertex )
-  : Geometry{ geometry }, Material{ material }, DrawInfo{ first_index, index_count, first_vertex }
+Ember::MaterialComp::MaterialComp( Ember::Material* const material ) : Material{ material }
 {}
 
-Ember::Mesh::Mesh( Mesh&& other ) noexcept
-  : Geometry{ other.Geometry }, Material{ other.Material }, DrawInfo{ std::move( other.DrawInfo ) }
+Ember::MaterialComp::MaterialComp( MaterialComp&& other ) noexcept : Material{ other.Material }
 {
-  other.Geometry = nullptr;
   other.Material = nullptr;
 }
 
-Ember::Mesh& Ember::Mesh::operator=( Mesh&& other ) noexcept
+Ember::MaterialComp& Ember::MaterialComp::operator=( MaterialComp&& other ) noexcept
+{
+  if ( this == &other ) return *this;
+
+  World::MaterialManager().Destroy( Material );
+  Material       = other.Material;
+  other.Material = nullptr;
+
+  return *this;
+}
+
+Ember::MaterialComp::~MaterialComp()
+{
+  World::MaterialManager().Destroy( Material );
+}
+
+Ember::GeometryComp::GeometryComp( Ember::Geometry* const geometry ) : Geometry{ geometry }
+{}
+
+Ember::GeometryComp::GeometryComp( GeometryComp&& other ) noexcept : Geometry{ other.Geometry }
+{
+  other.Geometry = nullptr;
+}
+
+Ember::GeometryComp& Ember::GeometryComp::operator=( GeometryComp&& other ) noexcept
 {
   if ( this == &other ) return *this;
 
@@ -94,18 +110,12 @@ Ember::Mesh& Ember::Mesh::operator=( Mesh&& other ) noexcept
   Geometry       = other.Geometry;
   other.Geometry = nullptr;
 
-  World::MaterialManager().Destroy( Material );
-  Material       = other.Material;
-  other.Material = nullptr;
-
-  DrawInfo       = std::move( other.DrawInfo );
   return *this;
 }
 
-Ember::Mesh::~Mesh()
+Ember::GeometryComp::~GeometryComp()
 {
   World::GeometryManager().Destroy( Geometry );
-  World::MaterialManager().Destroy( Material );
 }
 
 Ember::ObjectPool<Ember::Geometry>& Ember::World::GeometryManager()
@@ -142,7 +152,7 @@ Ember::World::World()
   m_CullDescentQuery =
       m_Ecs.query_builder<CullInfo, WorldBoundingBox const, CullInfo const>().term_at( 2 ).parent().cascade().build();
 
-  m_RenderQuery = m_Ecs.query_builder<WorldTransform const, CullInfo const, Mesh const>().build();
+  m_RenderQuery = m_Ecs.query_builder<WorldTransform const, CullInfo const, Mesh const, MaterialComp const, GeometryComp const>().build();
 }
 
 void Ember::World::Update( float ) const

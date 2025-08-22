@@ -637,19 +637,23 @@ void Ember::BasicApp::RenderScene( ID3D12GraphicsCommandList* command_list, uint
     ZoneScopedN( "RecordCmdList" );
 
     m_World.GetECS().each(
-        [&]( WorldTransform const& wt, CullInfo const& cull_info, Mesh const& mesh )
+        [&]( WorldTransform const& wt,
+             CullInfo const&       cull_info,
+             Mesh const&           mesh,
+             MaterialComp const&   material,
+             GeometryComp const&   geometry )
         {
           if ( cull_info.AreAnyCulled( UINT64_MAX ) ) return;
 
-          command_list->IASetVertexBuffers( 0, 1, &mesh.Geometry->VertexBuffer.GetVertexBufferView() );
-          command_list->IASetIndexBuffer( &mesh.Geometry->IndexBuffer.GetIndexBufferView() );
+          command_list->IASetVertexBuffers( 0, 1, &geometry.Geometry->VertexBuffer.GetVertexBufferView() );
+          command_list->IASetIndexBuffer( &geometry.Geometry->IndexBuffer.GetIndexBufferView() );
 
           command_list->SetGraphicsRoot32BitConstants( 0, sizeof( WorldTransform ) / 4, &wt, 0 );
-          command_list->SetGraphicsRoot32BitConstants( 1, sizeof( Material::GpuRepr ) / 4, &mesh.Material->Repr, 0 );
+          command_list->SetGraphicsRoot32BitConstants(
+              1, sizeof( Material::GpuRepr ) / 4, &material.Material->Repr, 0 );
 
-          DebugInfo::Instance().PushDrawCall( mesh.DrawInfo.IndexCount );
-          command_list->DrawIndexedInstanced(
-              mesh.DrawInfo.IndexCount, 1, mesh.DrawInfo.FirstIndex, mesh.DrawInfo.FirstVertex, 0 );
+          DebugInfo::Instance().PushDrawCall( mesh.IndexCount );
+          command_list->DrawIndexedInstanced( mesh.IndexCount, 1, mesh.FirstIndex, mesh.FirstVertex, 0 );
         } );
   }
 }

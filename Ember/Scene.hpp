@@ -96,30 +96,37 @@ struct Geometry
   uint32_t             GetRefCount();
 };
 
+struct MaterialComp
+{
+  Material* Material{ nullptr };
+
+  MaterialComp() = default;
+  explicit MaterialComp( Ember::Material* const material );
+  MaterialComp( MaterialComp const& other ) = delete;
+  MaterialComp( MaterialComp&& other ) noexcept;
+  MaterialComp& operator=( MaterialComp const& other ) = delete;
+  MaterialComp& operator=( MaterialComp&& other ) noexcept;
+  ~MaterialComp();
+};
+
+struct GeometryComp
+{
+  Geometry* Geometry{ nullptr };
+
+  GeometryComp() = default;
+  explicit GeometryComp( Ember::Geometry* geometry );
+  GeometryComp( GeometryComp const& other ) = delete;
+  GeometryComp( GeometryComp&& other ) noexcept;
+  GeometryComp& operator=( GeometryComp const& other ) = delete;
+  GeometryComp& operator=( GeometryComp&& other ) noexcept;
+  ~GeometryComp();
+};
+
 struct Mesh
 {
-  struct Data
-  {
-    uint32_t FirstIndex;
-    uint32_t IndexCount;
-    uint32_t FirstVertex;
-  };
-  Geometry* Geometry{ nullptr };
-  Material* Material{ nullptr };
-  Data      DrawInfo;
-
-  Mesh() = default;
-  Mesh(
-      Ember::Geometry* geometry,
-      Ember::Material* material,
-      uint32_t         first_index,
-      uint32_t         index_count,
-      uint32_t         first_vertex );
-  Mesh( Mesh const& other ) = delete;
-  Mesh( Mesh&& other ) noexcept;
-  Mesh& operator=( Mesh const& other ) = delete;
-  Mesh& operator=( Mesh&& other ) noexcept;
-  ~Mesh();
+  uint32_t FirstIndex;
+  uint32_t IndexCount;
+  uint32_t FirstVertex;
 };
 
 class World
@@ -131,7 +138,7 @@ class World
   flecs::query<WorldBoundingBox>                                               m_PrimeCollectingWorldAABBQuery;
   flecs::query<WorldBoundingBox, WorldBoundingBox const>                       m_UpdateWorldAABBQuery;
   flecs::query<CullInfo, WorldBoundingBox const, CullInfo const>               m_CullDescentQuery;
-  flecs::query<WorldTransform const, CullInfo const, Mesh const>               m_RenderQuery;
+  flecs::query<WorldTransform const, CullInfo const, Mesh const, MaterialComp const, GeometryComp const> m_RenderQuery;
 
 public:
   static ObjectPool<Geometry>& GeometryManager();
