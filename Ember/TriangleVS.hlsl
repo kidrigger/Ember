@@ -1,26 +1,30 @@
 #include "Triangle.hlsli"
 
-VSOut TriangleVS( VSInput IN )
+VSOut TriangleVS( uint vertex_idx : SV_VERTEXID )
 {
-  VSOut                  OUT;
+  VSOut                    OUT;
 
-  ConstantBuffer<Camera> camera     = ResourceDescriptorHeap[g_Camera];
+  ConstantBuffer<Camera>   camera        = ResourceDescriptorHeap[g_Camera];
 
-  float4                 world_pos  = mul( g_Model, IN.Position );
-  float4                 clip_pos   = mul( camera.View, world_pos );
-  float4                 screen_pos = mul( camera.Projection, clip_pos );
+  StructuredBuffer<Vertex> vertex_buffer = ResourceDescriptorHeap[g_VertexBufferIdx];
+  Vertex                   vertex        = vertex_buffer[NonUniformResourceIndex( vertex_idx + g_FirstVertex )];
 
-  float3                 normal     = normalize( mul( float4( 2.0f * IN.Normal.xyz - 1.0f, 0.0f ), g_InvModel ).xyz );
-  float4                 tangent    = float4(
-      normalize( mul( float4( 2.0f * IN.Tangent.xyz - 1.0f, 0.0f ), g_InvModel ).xyz ), 2.0f * IN.Tangent.w - 1.0f );
+  float4                   world_pos     = mul( g_Model, vertex.GetPosition() );
+  float4                   clip_pos      = mul( camera.View, world_pos );
+  float4                   screen_pos    = mul( camera.Projection, clip_pos );
+
+  float3 normal  = normalize( mul( float4( 2.0f * vertex.GetNormal().xyz - 1.0f, 0.0f ), g_InvModel ).xyz );
+  float4 tangent = vertex.GetTangent();
+  tangent =
+      float4( normalize( mul( float4( 2.0f * tangent.xyz - 1.0f, 0.0f ), g_InvModel ).xyz ), 2.0f * tangent.w - 1.0f );
 
   OUT.ScreenPosition = screen_pos;
   OUT.Position       = world_pos;
   OUT.Normal         = normal;
   OUT.LinearDepth    = clip_pos.z;
   OUT.Tangent        = tangent;
-  OUT.Color          = IN.Color;
-  OUT.TexCoord[0]    = IN.TexCoord[0];
-  OUT.TexCoord[1]    = IN.TexCoord[1];
+  OUT.Color          = vertex.GetColor();
+  OUT.TexCoord[0]    = vertex.GetTexCoord(0);
+  OUT.TexCoord[1]    = vertex.GetTexCoord(1);
   return OUT;
 }

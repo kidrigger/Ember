@@ -289,6 +289,9 @@
     <None Include="LightData.hlsli">
       <Filter>Shaders\Shadows</Filter>
     </None>
+    <None Include="Quantization.hlsli">
+      <Filter>Shaders\Utils</Filter>
+    </None>
   </ItemGroup>
   <ItemGroup>
     <FxCompile Include="TriangleVS.hlsl">

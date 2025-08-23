@@ -74,7 +74,7 @@ float4 TrianglePS( FSIn IN ) : SV_TARGET0
   StructuredBuffer<Material> materials = ResourceDescriptorHeap[g_Materials];
   Material                   mat       = materials[g_MaterialIdx];
 
-  float4                     albedo    = mat.GetAlbedo( IN.TexCoord[0], g_DefaultSampler );
+  float4                     albedo    = IN.Color * mat.GetAlbedo( IN.TexCoord[0], g_DefaultSampler );
   float3 normal      = mat.GetNormal( IN.Normal, IN.Tangent, IN.Position.xyz, IN.TexCoord[0], g_DefaultSampler );
   float2 metal_rough = mat.GetMetalRough( IN.TexCoord[0], g_DefaultSampler );
   float3 emissive    = mat.GetEmissive( IN.TexCoord[0], g_DefaultSampler );

@@ -37,19 +37,20 @@ struct ShadowVertex
   };
 };
 
-struct VertexData
+struct alignas( 16 ) VertexData
 {
-  uint16_t                                  PositionX;
-  uint16_t                                  PositionY;
-  uint16_t                                  PositionZ;
-  uint16_t                                  PositionW;
-  uint32_t                                  QuantizedNormal;
-  uint32_t                                  QuantizedTangent;
-  Color32                                   Color;
-  uint16_t                                  TexCoord0X;
-  uint16_t                                  TexCoord0Y;
-  uint16_t                                  TexCoord1X;
-  uint16_t                                  TexCoord1Y;
+  uint16_t                                  PositionX;        // 02
+  uint16_t                                  PositionY;        // 04
+  uint16_t                                  PositionZ;        // 06
+  uint16_t                                  PositionW;        // 08
+  uint32_t                                  QuantizedNormal;  // 12
+  uint32_t                                  QuantizedTangent; // 16
+  Color32                                   Color;            // 20
+  uint16_t                                  TexCoord0X;       // 22
+  uint16_t                                  TexCoord0Y;       // 24
+  uint16_t                                  TexCoord1X;       // 26
+  uint16_t                                  TexCoord1Y;       // 28
+  uint32_t                                  Padding0;         // 32
 
   constexpr static D3D12_INPUT_ELEMENT_DESC kInputElementDesc[] = {
     PerVertexInput( "POSITION", 0, DXGI_FORMAT_R16G16B16A16_FLOAT, 0 ),

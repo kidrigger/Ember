@@ -4,6 +4,7 @@
 #include "Bindless.hlsli"
 #include "Colors.hlsli"
 #include "LightData.hlsli"
+#include "Quantization.hlsli"
 
 struct Camera
 {
@@ -114,9 +115,11 @@ cbuffer Transform : register( b0, space0 )
   float4x4 g_InvModel;
 }
 
-cbuffer MaterialInfo : register( b1, space0 )
+cbuffer DrawInfo : register( b1, space0 )
 {
-  RID g_MaterialIdx;
+  RID  g_MaterialIdx;
+  RID  g_VertexBufferIdx;
+  uint g_FirstVertex;
 }
 
 cbuffer BindlessIndex : register( b2, space0 )
@@ -140,13 +143,39 @@ SamplerState           g_DefaultSampler : register( s0, space0 );
 SamplerState           g_ClampedSampler : register( s1, space0 );
 SamplerComparisonState g_ShadowSampler : register( s2, space0 );
 
-struct VSInput
+struct Vertex
 {
-  float4 Position : POSITION;
-  float4 Normal : NORMAL;
-  float4 Tangent : TANGENT;
-  float4 Color : COLOR;
-  float2 TexCoord[2] : TEXCOORD;
+  half4         Position;
+  uint          Normal;
+  uint          Tangent;
+  PackedColor32 Color;
+  half2         TexCoord[2];
+  uint          Padding0;
+
+  float4        GetPosition()
+  {
+    return Position;
+  }
+
+  float3 GetNormal()
+  {
+    return UnpackR10G10B10A2( Normal ).xyz;
+  }
+
+  float4 GetTangent()
+  {
+    return UnpackR10G10B10A2( Tangent );
+  }
+
+  float4 GetColor()
+  {
+    return UnpackColor32( Color );
+  }
+
+  float2 GetTexCoord(uint idx)
+  {
+    return TexCoord[idx];
+  }
 };
 
 struct VSOut

@@ -324,7 +324,6 @@ void Ember::BasicApp::SetupRenderPipeline()
   };
 
   D3D12_ROOT_SIGNATURE_FLAGS const root_signature_flags =
-      D3D12_ROOT_SIGNATURE_FLAG_ALLOW_INPUT_ASSEMBLER_INPUT_LAYOUT |
       D3D12_ROOT_SIGNATURE_FLAG_CBV_SRV_UAV_HEAP_DIRECTLY_INDEXED |
       D3D12_ROOT_SIGNATURE_FLAG_SAMPLER_HEAP_DIRECTLY_INDEXED | D3D12_ROOT_SIGNATURE_FLAG_DENY_MESH_SHADER_ROOT_ACCESS |
       D3D12_ROOT_SIGNATURE_FLAG_DENY_AMPLIFICATION_SHADER_ROOT_ACCESS |
@@ -333,7 +332,7 @@ void Ember::BasicApp::SetupRenderPipeline()
 
   CD3DX12_ROOT_PARAMETER1 root_parameters[4];
   root_parameters[0].InitAsConstants( sizeof( WorldTransform ) / 4, 0 );
-  root_parameters[1].InitAsConstants( 1, 1 );
+  root_parameters[1].InitAsConstants( 3, 1 );
   root_parameters[2].InitAsConstants( sizeof( PerFrameConstants ) / 4, 2 );
   root_parameters[3].InitAsConstants( sizeof( Environment::GpuRepr ) / 4, 3 );
 
@@ -366,17 +365,11 @@ void Ember::BasicApp::SetupRenderPipeline()
   rasterizer_desc.CullMode              = D3D12_CULL_MODE_BACK;
 
   CD3DX12_DEPTH_STENCIL_DESC depth_stencil_desc{ D3D12_DEFAULT };
-  depth_stencil_desc.DepthEnable       = TRUE;
-  depth_stencil_desc.DepthFunc         = D3D12_COMPARISON_FUNC_LESS;
-
-  D3D12_INPUT_LAYOUT_DESC input_layout = {
-    .pInputElementDescs = DataOf( VertexData::kInputElementDesc ),
-    .NumElements        = CountOf( VertexData::kInputElementDesc ),
-  };
+  depth_stencil_desc.DepthEnable = TRUE;
+  depth_stencil_desc.DepthFunc   = D3D12_COMPARISON_FUNC_LESS;
 
   struct MainPipelineStream
   {
-    CD3DX12_PIPELINE_STATE_STREAM_INPUT_LAYOUT          InputLayout;
     CD3DX12_PIPELINE_STATE_STREAM_ROOT_SIGNATURE        RootSignature;
     CD3DX12_PIPELINE_STATE_STREAM_PRIMITIVE_TOPOLOGY    PrimitiveTopologyType;
     CD3DX12_PIPELINE_STATE_STREAM_VS                    VS;
@@ -387,7 +380,6 @@ void Ember::BasicApp::SetupRenderPipeline()
   };
 
   MainPipelineStream pipeline_stream = {
-    .InputLayout           = input_layout,
     .RootSignature         = m_RootSignature.Get(),
     .PrimitiveTopologyType = D3D12_PRIMITIVE_TOPOLOGY_TYPE_TRIANGLE,
     .VS                    = CD3DX12_SHADER_BYTECODE( vertex_shader_blob.Get() ),
@@ -662,11 +654,12 @@ void Ember::BasicApp::RenderScene( ID3D12GraphicsCommandList* command_list, uint
         {
           if ( cull_info.AreAnyCulled( UINT64_MAX ) ) return;
 
-          command_list->IASetVertexBuffers( 0, 1, &geometry.Geometry->VertexBuffer.GetVertexBufferView() );
           command_list->IASetIndexBuffer( &geometry.Geometry->IndexBuffer.GetIndexBufferView() );
 
           command_list->SetGraphicsRoot32BitConstants( 0, sizeof( WorldTransform ) / 4, &wt, 0 );
           command_list->SetGraphicsRoot32BitConstant( 1, ( UINT )material.Material->GetHandle(), 0 );
+          command_list->SetGraphicsRoot32BitConstant( 1, ( UINT )geometry.Geometry->VertexBuffer.GetSRVHandle(), 1 );
+          command_list->SetGraphicsRoot32BitConstant( 1, ( UINT )mesh.FirstVertex, 2 );
 
           DebugInfo::Instance().PushDrawCall( mesh.IndexCount );
           command_list->DrawIndexedInstanced( mesh.IndexCount, 1, mesh.FirstIndex, mesh.FirstVertex, 0 );

@@ -674,7 +674,7 @@ std::optional<flecs::entity> Ember::ModelLoader::TryLoadModel( char const* filen
   vertex_position_buffer.Write( 0, ByteSizeOf( context.VertexPositions ), DataOf( context.VertexPositions ) );
 
   auto const vertex_data_buffer =
-      m_RenderDevice->CreateVertexBuffer( ByteSizeOf( context.VertexData ), sizeof( context.VertexData[0] ) );
+      m_RenderDevice->CreateStorageBuffer( ByteSizeOf( context.VertexData ), sizeof( context.VertexData[0] ) );
   vertex_data_buffer.Write( 0, ByteSizeOf( context.VertexData ), DataOf( context.VertexData ) );
 
   auto const index_buffer = m_RenderDevice->CreateIndexBuffer( ByteSizeOf( context.Indices ), DXGI_FORMAT_R32_UINT );
