@@ -6,6 +6,7 @@ static const float kTau    = 6.28318537f;
 static const float kHalfPi = 1.57079632f;
 
 #define NUMTHREADS( x, y, z ) [numthreads( x, y, z )]
+#define NUM_THREADS( x, y, z ) [numthreads( x, y, z )]
 
 /*
  The Goal is simply to convert from a (0,0,0) to (CubeSide, CubeSide, FaceCount) Invocation ID space to a

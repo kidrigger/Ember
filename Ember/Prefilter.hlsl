@@ -27,7 +27,7 @@ float        GetSampleMipLevel( float n_dot_h, float h_dot_v, float sample_count
   return g_Roughness == 0.0f ? 0.0f : 0.5f * log2( surf_area_sample / surf_area_texel );
 }
 
-NUMTHREADS( 16, 16, 1 )
+NUM_THREADS( 16, 16, 1 )
 void Prefilter( uint3 global_invocation_id : SV_DispatchThreadID )
 {
   float3                   normal = GetCubeDir( global_invocation_id.xy, global_invocation_id.z, 1.0f / g_OutputSide );

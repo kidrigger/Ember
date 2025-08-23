@@ -17,7 +17,7 @@ float4 PrepareColor( float4 color )
   return select( g_IsSrgb, float4( LinearToSrgb( color.rgb ), color.a ), color );
 }
 
-NUMTHREADS( 8, 8, 1 )
+NUM_THREADS( 8, 8, 1 )
 void MipMap( uint3 dt_id : SV_DispatchThreadID )
 {
   float2              tex_coord = g_TexelSize * ( dt_id.xy + 0.5f );

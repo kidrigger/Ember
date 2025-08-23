@@ -20,7 +20,7 @@ float2       SampleSphericalMap( float3 v )
 }
 
 // This function requires
-NUMTHREADS( 16, 16, 1 )
+NUM_THREADS( 16, 16, 1 )
 void EqrectToCube( uint3 global_invocation_id : SV_DispatchThreadID )
 {
   float3                   local_dir = GetCubeDir( global_invocation_id.xy, global_invocation_id.z, 1.0f / g_CubeSide );

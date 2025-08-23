@@ -10,7 +10,7 @@ cbuffer Block
 
 SamplerState g_Sampler : register( s0, space0 );
 
-NUMTHREADS( 16, 16, 1 )
+NUM_THREADS( 16, 16, 1 )
 void DiffuseIrradiance( uint3 global_invocation_id : SV_DispatchThreadID )
 {
   float3 forward = GetCubeDir( float2( global_invocation_id.xy ), global_invocation_id.z, 1.0f / g_CubeSide );

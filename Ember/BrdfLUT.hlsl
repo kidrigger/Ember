@@ -49,7 +49,7 @@ float2 IntegrateBRDF( float n_dot_v, float roughness )
   return float2( a, b );
 }
 
-NUMTHREADS( 16, 16, 1 )
+NUM_THREADS( 16, 16, 1 )
 void BrdfLUT( uint3 global_invocation_id : SV_DispatchThreadID )
 {
   float2              uv                   = global_invocation_id.xy / float2( g_Width - 1, g_Height - 1 );
