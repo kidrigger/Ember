@@ -2,8 +2,8 @@
 
 #include <memory>
 
-#include "BindlessHandle.hpp"
 #include "Color.hpp"
+#include "DeviceHandle.hpp"
 #include "DirectionLightManager.hpp"
 #include "LightHandle.hpp"
 #include "OmniLightManager.hpp"

@@ -2,8 +2,7 @@
 
 #include "Util/Profiling.hpp"
 
-#include "DebugInfo.hpp"
-#include "Util/DataUtil.hpp"
+#include "Material.hpp"
 
 DirectX::XMMATRIX Ember::LocalTransform::GetTransform() const
 {
@@ -38,21 +37,6 @@ void Ember::CullInfo::SetCulled( uint64_t const mask )
 void Ember::CullInfo::ClearCulled( uint64_t const mask )
 {
   CullMask &= ~mask;
-}
-
-uint32_t Ember::Material::AddRef()
-{
-  return ++RefCount;
-}
-
-uint32_t Ember::Material::Release()
-{
-  return --RefCount;
-}
-
-uint32_t Ember::Material::GetRefCount()
-{
-  return RefCount;
 }
 
 uint32_t Ember::Geometry::AddRef()
@@ -152,7 +136,9 @@ Ember::World::World()
   m_CullDescentQuery =
       m_Ecs.query_builder<CullInfo, WorldBoundingBox const, CullInfo const>().term_at( 2 ).parent().cascade().build();
 
-  m_RenderQuery = m_Ecs.query_builder<WorldTransform const, CullInfo const, Mesh const, MaterialComp const, GeometryComp const>().build();
+  m_RenderQuery =
+      m_Ecs.query_builder<WorldTransform const, CullInfo const, Mesh const, MaterialComp const, GeometryComp const>()
+          .build();
 }
 
 void Ember::World::Update( float ) const

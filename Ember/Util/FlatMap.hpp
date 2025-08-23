@@ -195,6 +195,19 @@ public:
     return *m_Values.emplace( value_it, std::forward<TValue>( value ) );
   }
 
+  TValue& Put( TKey const& key, TValue const& value )
+  {
+    ASSERT( not Contains( key ) );
+
+    KeyIter key_it     = std::ranges::lower_bound( m_Keys, key );
+
+    key_it             = m_Keys.insert( key_it, key );
+    ptrdiff_t offset   = key_it - m_Keys.begin();
+    ValueIter value_it = m_Values.begin() + offset;
+
+    return *m_Values.emplace( value_it, value );
+  }
+
   TValue& operator[]( TKey const& key )
     requires std::is_default_constructible_v<TValue>
   {
@@ -248,6 +261,16 @@ public:
   ConstIterator end() const
   {
     return { m_Keys.end(), m_Values.end() };
+  }
+
+  std::vector<TKey> const& Keys() const
+  {
+    return m_Keys;
+  }
+
+  std::vector<TValue> const& Values() const
+  {
+    return m_Values;
   }
 };
 

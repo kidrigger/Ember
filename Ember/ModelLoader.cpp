@@ -1,6 +1,8 @@
 #include "ModelLoader.hpp"
 
 #include "BasicApp.hpp"
+#include "Material.hpp"
+#include "MaterialManager.hpp"
 #include "RenderDevice.hpp"
 #include "Util/DataUtil.hpp"
 #include "Util/HelperUtils.hpp"
@@ -392,7 +394,7 @@ void Ember::ModelLoader::ProcessPrimitive(
         .m_pUserData  = &payload,
       };
 
-      CHECK( genTangSpaceDefault( &mikk_t_space_context ) );
+      ENSURE( genTangSpaceDefault( &mikk_t_space_context ) );
     }
 
     // Quantization
@@ -586,33 +588,35 @@ Ember::Material* Ember::ModelLoader::TryProcessMaterial( LoadingContext* context
     }
   }
 
-  float const metallic     = material->pbr_metallic_roughness.metallic_factor;
-  float const roughness    = material->pbr_metallic_roughness.roughness_factor;
+  float const    metallic        = material->pbr_metallic_roughness.metallic_factor;
+  float const    roughness       = material->pbr_metallic_roughness.roughness_factor;
 
-  Material*   new_material = World::MaterialManager().Construct(
-      base_color_texture,
-      normal_texture,
-      metal_rough_texture,
-      emissive_texture,
-      Material::GpuRepr{
-            .BaseColorTexture  = base_color_texture ? base_color_texture.GetSRVHandle() : SRVHandle{},
-            .NormalTexture     = normal_texture ? normal_texture.GetSRVHandle() : SRVHandle{},
-            .MetalRoughTexture = metal_rough_texture ? metal_rough_texture.GetSRVHandle() : SRVHandle{},
-            .EmissiveTexture   = emissive_texture ? emissive_texture.GetSRVHandle() : SRVHandle{},
-            .BaseColorFactor   = base_color_factor,
-            .EmissiveFactor    = emissive_factor,
-            .EmissiveStrength  = emissive_strength,
-            .Metal             = metallic,
-            .Rough             = roughness,
-      } );
+  MaterialHandle material_handle = m_MaterialManager->CreateMaterialHandle( {
+      .BaseColorTexture  = base_color_texture ? base_color_texture.GetSRVHandle() : SRVHandle{},
+      .NormalTexture     = normal_texture ? normal_texture.GetSRVHandle() : SRVHandle{},
+      .MetalRoughTexture = metal_rough_texture ? metal_rough_texture.GetSRVHandle() : SRVHandle{},
+      .EmissiveTexture   = emissive_texture ? emissive_texture.GetSRVHandle() : SRVHandle{},
+      .BaseColorFactor   = base_color_factor,
+      .EmissiveFactor    = emissive_factor,
+      .EmissiveStrength  = emissive_strength,
+      .Metal             = metallic,
+      .Rough             = roughness,
+  } );
+
+  Material*      new_material    = World::MaterialManager().Construct(
+      base_color_texture, normal_texture, metal_rough_texture, emissive_texture, m_MaterialManager, material_handle );
 
   context->MaterialCache.insert_or_assign( material, new_material );
 
   return new_material;
 }
 
-Ember::ModelLoader::ModelLoader( RenderDevice* render_device, World* world, TextureLoader* texture_loader )
-  : m_RenderDevice{ render_device }, m_World{ world }, m_TextureLoader{ texture_loader }
+Ember::ModelLoader::ModelLoader(
+    RenderDevice* render_device, World* world, TextureLoader* texture_loader, MaterialManager* material_manager )
+  : m_RenderDevice{ render_device }
+  , m_World{ world }
+  , m_TextureLoader{ texture_loader }
+  , m_MaterialManager{ material_manager }
 {}
 
 std::optional<flecs::entity> Ember::ModelLoader::TryLoadModel( char const* filename )

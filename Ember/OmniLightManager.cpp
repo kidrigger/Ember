@@ -419,8 +419,7 @@ void Ember::Internal::OmniLightManager::RenderOmniShadow(
         command_list->SetGraphicsRoot32BitConstants( 0, sizeof( DirectX::XMMATRIX ) / 4, &wt.Transform, 0 );
 
         DebugInfo::Instance().PushDrawCall( mesh.IndexCount );
-        command_list->DrawIndexedInstanced(
-            mesh.IndexCount, 6, mesh.FirstIndex, mesh.FirstVertex, 0 );
+        command_list->DrawIndexedInstanced( mesh.IndexCount, 6, mesh.FirstIndex, mesh.FirstVertex, 0 );
       } );
 
   auto bottom_of_shadow_barrier = CD3DX12_RESOURCE_BARRIER::Transition(

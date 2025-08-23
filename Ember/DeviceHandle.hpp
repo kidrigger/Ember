@@ -5,14 +5,14 @@
 namespace Ember
 {
 
-class BindlessHandle
+class DeviceHandle
 {
 public:
-  BindlessHandle() = default;
+  DeviceHandle() = default;
   [[nodiscard]] bool IsNull() const noexcept;
 
 protected:
-  explicit BindlessHandle( uint32_t index );
+  explicit DeviceHandle( uint32_t index );
 
   [[nodiscard]] uint32_t GetInner() const
   {
@@ -25,10 +25,10 @@ private:
 };
 
 // Guarantee size matches the 32bit (DWORD) constants.
-static_assert( sizeof( BindlessHandle ) == sizeof( DWORD32 ) );
+static_assert( sizeof( DeviceHandle ) == sizeof( DWORD32 ) );
 
-#define TYPED_BINDLESS_HANDLE( Type )                                                                                  \
-  class Type##Handle : public BindlessHandle                                                                           \
+#define TYPED_HANDLE( Type, Owner )                                                                                    \
+  class Type##Handle : public DeviceHandle                                                                             \
   {                                                                                                                    \
   public:                                                                                                              \
     Type##Handle() = default;                                                                                          \
@@ -44,16 +44,17 @@ static_assert( sizeof( BindlessHandle ) == sizeof( DWORD32 ) );
     }                                                                                                                  \
                                                                                                                        \
   protected:                                                                                                           \
-    friend class BindlessManager;                                                                                      \
+    friend class Owner;                                                                                                \
                                                                                                                        \
-    explicit Type##Handle( uint32_t const index ) : BindlessHandle{ index }                                            \
+    explicit Type##Handle( uint32_t const index ) : DeviceHandle{ index }                                              \
     {}                                                                                                                 \
   };                                                                                                                   \
   static_assert( sizeof( Type##Handle ) == sizeof( DWORD32 ) )
 
-TYPED_BINDLESS_HANDLE( SRV );
-TYPED_BINDLESS_HANDLE( UAV );
-TYPED_BINDLESS_HANDLE( CBV );
-TYPED_BINDLESS_HANDLE( Sampler );
+TYPED_HANDLE( SRV, BindlessManager );
+TYPED_HANDLE( UAV, BindlessManager );
+TYPED_HANDLE( CBV, BindlessManager );
+TYPED_HANDLE( Sampler, BindlessManager );
+TYPED_HANDLE( Material, MaterialManager );
 
 } // namespace Ember

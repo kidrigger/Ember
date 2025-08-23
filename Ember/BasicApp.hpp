@@ -35,7 +35,7 @@ class BasicApp final : public IApp
   ComPtr<ID3D12PipelineState>          m_MainPipeline;
   ComPtr<ID3D12PipelineState>          m_BackgroundPipeline;
 
-  std::unique_ptr<RenderTargetManager> m_RenderTargetManager{};
+  std::unique_ptr<RenderTargetManager> m_RenderTargetManager;
   Texture                              m_RenderTexture;
   Texture                              m_DepthTexture;
   DXGI_FORMAT                          m_SwapchainFormat;
@@ -46,8 +46,11 @@ class BasicApp final : public IApp
 
   std::unique_ptr<LightManager>        m_LightManager;
 
-  World                                m_World;
   std::unique_ptr<Environment>         m_Environment;
+  Buffer                               m_PerFrameWorldTransformBuffer[RenderDevice::kNumFrames];
+  std::unique_ptr<MaterialManager>     m_MaterialManager;
+  World                                m_World;
+  flecs::query<>                       m_WorldTransformQuery;
 
   void                                 SetupRenderPipeline();
 

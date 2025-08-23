@@ -1,12 +1,15 @@
 #include "BasicApp.hpp"
 
 #include <cstdint>
+#include <unordered_set>
 #include <utility>
 
 #include "Camera.hpp"
 #include "DebugInfo.hpp"
 #include "Environment.hpp"
 #include "LightManager.hpp"
+#include "Material.hpp"
+#include "MaterialManager.hpp"
 #include "ModelLoader.hpp"
 #include "RenderDevice.hpp"
 #include "TextureLoader.hpp"
@@ -221,6 +224,7 @@ struct RotatingModel
 
 struct PerFrameConstants
 {
+  Ember::SRVHandle MaterialsBuffer;
   Ember::CBVHandle Camera;
   Ember::SRVHandle OmniLightBuffer;
   uint32_t         OmniLightCount;
@@ -243,12 +247,11 @@ Ember::BasicApp::BasicApp(
   , m_SwapchainFormat{ m_RenderDevice->FetchSwapchainFormat() }
   , m_Camera{ std::make_unique<Camera>() }
   , m_LightManager{ std::make_unique_for_overwrite<LightManager>() }
+  , m_MaterialManager{ std::make_unique_for_overwrite<MaterialManager>() }
   , m_Environment{ std::make_unique<Environment>() }
 {
   m_TextureLoader = std::make_unique_for_overwrite<TextureLoader>();
   TextureLoader::Create( m_TextureLoader.get(), m_RenderDevice.get(), 3 );
-
-  m_ModelLoader = std::make_unique<ModelLoader>( m_RenderDevice.get(), &m_World, m_TextureLoader.get() );
 }
 
 void Ember::BasicApp::Create( BasicApp* app, HINSTANCE const instance_handle )
@@ -330,7 +333,7 @@ void Ember::BasicApp::SetupRenderPipeline()
 
   CD3DX12_ROOT_PARAMETER1 root_parameters[4];
   root_parameters[0].InitAsConstants( sizeof( WorldTransform ) / 4, 0 );
-  root_parameters[1].InitAsConstants( sizeof( Material::GpuRepr ) / 4, 1 );
+  root_parameters[1].InitAsConstants( 1, 1 );
   root_parameters[2].InitAsConstants( sizeof( PerFrameConstants ) / 4, 2 );
   root_parameters[3].InitAsConstants( sizeof( Environment::GpuRepr ) / 4, 3 );
 
@@ -451,6 +454,11 @@ void Ember::BasicApp::LoadContent()
   m_LightManager->AddShadowingOmniLight( { -15.0f, 2.0f, -5.0f }, 10.0f, Color32::Red(), 25.0f );
   m_LightManager->AddShadowingDirLight( { 1.0f, -1.0f, 0.0f }, Color32::White(), 12.0f );
 
+  MaterialManager::Create( m_MaterialManager.get(), m_RenderDevice.get(), 10'000 );
+
+  m_ModelLoader =
+      std::make_unique<ModelLoader>( m_RenderDevice.get(), &m_World, m_TextureLoader.get(), m_MaterialManager.get() );
+
   // Setup Scene Geometry
   flecs::entity       model = m_ModelLoader->TryLoadModel( "Bistro.glb" ).value().set_name( "Scene" );
 
@@ -501,6 +509,13 @@ void Ember::BasicApp::LoadContent()
 
   m_PrevMouseX    = g_Input.MousePosX;
   m_PrevMouseY    = g_Input.MousePosY;
+
+  for ( auto& world_tx : m_PerFrameWorldTransformBuffer )
+  {
+    world_tx = m_RenderDevice->CreateStorageBuffer( sizeof( WorldTransform ) * 1'000'000, sizeof( WorldTransform ) );
+  }
+
+  m_WorldTransformQuery = m_World.GetECS().query_builder().with<WorldTransform const>().with<Mesh const>().build();
 }
 
 void Ember::BasicApp::Update()
@@ -589,6 +604,7 @@ void Ember::BasicApp::RenderScene( ID3D12GraphicsCommandList* command_list, uint
 
   CBVHandle const camera_cbv                    = m_Camera->PrepareFrame( frame_idx );
   auto const [omni_light_srv, dir_light_srv]    = m_LightManager->PrepareFrame( frame_idx );
+  SRVHandle const                materials_srv  = m_MaterialManager->PrepareFrame();
 
   DirectX::BoundingFrustum const camera_frustum = m_Camera->GetLastUpdatedFrustum();
 
@@ -619,6 +635,7 @@ void Ember::BasicApp::RenderScene( ID3D12GraphicsCommandList* command_list, uint
   m_RenderTargetManager->OMSetRenderTargets( command_list, 1, &m_RenderTexture, &m_DepthTexture );
 
   PerFrameConstants const constants = {
+    .MaterialsBuffer      = materials_srv,
     .Camera               = camera_cbv,
     .OmniLightBuffer      = omni_light_srv,
     .OmniLightCount       = m_LightManager->GetOmniLightCount(),
@@ -649,8 +666,7 @@ void Ember::BasicApp::RenderScene( ID3D12GraphicsCommandList* command_list, uint
           command_list->IASetIndexBuffer( &geometry.Geometry->IndexBuffer.GetIndexBufferView() );
 
           command_list->SetGraphicsRoot32BitConstants( 0, sizeof( WorldTransform ) / 4, &wt, 0 );
-          command_list->SetGraphicsRoot32BitConstants(
-              1, sizeof( Material::GpuRepr ) / 4, &material.Material->Repr, 0 );
+          command_list->SetGraphicsRoot32BitConstant( 1, ( UINT )material.Material->GetHandle(), 0 );
 
           DebugInfo::Instance().PushDrawCall( mesh.IndexCount );
           command_list->DrawIndexedInstanced( mesh.IndexCount, 1, mesh.FirstIndex, mesh.FirstVertex, 0 );
@@ -667,6 +683,24 @@ void Ember::BasicApp::Render()
   uint32_t const                 frame_idx      = m_RenderDevice->GetCurrentFrameIndex();
 
   DirectX::BoundingFrustum const camera_frustum = m_Camera->GetLastUpdatedFrustum();
+
+  {
+    ZoneScopedN( "Upload Transforms" );
+    size_t world_tx_offset = 0;
+    /*m_WorldTransformQuery.run(
+        [&]( flecs::iter& iter )
+        {
+          while ( iter.next() )
+          {
+            auto         tx   = iter.field<WorldTransform const>( 1 );
+
+            size_t const size = iter.count() * sizeof( WorldTransform );
+            m_PerFrameWorldTransformBuffer[frame_idx].Write( world_tx_offset, size, &tx[0] );
+
+            world_tx_offset += size;
+          }
+        } );*/
+  }
 
   // All resources for this frame are guaranteed to be available for CPU modification at this time.
   // Clear Backbuffer

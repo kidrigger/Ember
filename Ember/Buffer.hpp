@@ -6,7 +6,7 @@
 #include <memory_resource>
 #include <variant>
 
-#include "BindlessHandle.hpp"
+#include "DeviceHandle.hpp"
 
 namespace Ember
 {

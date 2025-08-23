@@ -2,9 +2,9 @@
 
 #include <mutex>
 
-#include "BindlessHandle.hpp"
 #include "BindlessManager.hpp"
 #include "Buffer.hpp"
+#include "DeviceHandle.hpp"
 #include "Texture.hpp"
 #include "TextureLoader.hpp"
 #include "Util/DirectXHeaders.hpp"

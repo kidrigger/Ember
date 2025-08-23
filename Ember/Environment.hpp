@@ -1,5 +1,5 @@
 #pragma once
-#include "BindlessHandle.hpp"
+#include "DeviceHandle.hpp"
 #include "RenderDevice.hpp"
 #include "Texture.hpp"
 

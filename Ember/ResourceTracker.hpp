@@ -4,7 +4,7 @@
 #include <memory_resource>
 #include <variant>
 
-#include "BindlessHandle.hpp"
+#include "DeviceHandle.hpp"
 #include "Util/DirectXHeaders.hpp"
 #include "Util/Runtime.hpp"
 

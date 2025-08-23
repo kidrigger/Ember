@@ -5,13 +5,13 @@
 #include "Buffer.hpp"
 #include "Color.hpp"
 #include "ObjectPool.hpp"
-#include "Texture.hpp"
 #include "Util/DirectXHeaders.hpp"
 
 #include <flecs.h>
 
 namespace Ember
 {
+class Material;
 
 struct LocalTransform
 {
@@ -54,36 +54,6 @@ struct CullInfo
   void               ClearCulled( uint64_t mask );
 };
 
-struct Material
-{
-  struct alignas( 16 ) GpuRepr
-  {
-    SRVHandle BaseColorTexture;  // 04
-    SRVHandle NormalTexture;     // 08
-    SRVHandle MetalRoughTexture; // 12
-    SRVHandle EmissiveTexture;   // 16
-    Color32   BaseColorFactor;   // 20
-    Color32   EmissiveFactor;    // 24
-    float     EmissiveStrength;  // 28
-    float     Metal;             // 32
-    float     Rough;             // 36
-    float     AlphaCutoff;       // 40
-    uint32_t  Padding0;          // 44
-    uint32_t  Padding1;          // 48
-  };
-
-  Texture              BaseColorTexture;
-  Texture              NormalTexture;
-  Texture              MetalRoughTexture;
-  Texture              EmissiveTexture;
-  GpuRepr              Repr;
-  std::atomic_uint32_t RefCount{ 1 };
-
-  uint32_t             AddRef();
-  uint32_t             Release();
-  uint32_t             GetRefCount();
-};
-
 struct Geometry
 {
   Buffer               ShadowVertexBuffer;
@@ -101,7 +71,7 @@ struct MaterialComp
   Material* Material{ nullptr };
 
   MaterialComp() = default;
-  explicit MaterialComp( Ember::Material* const material );
+  explicit MaterialComp( Ember::Material* material );
   MaterialComp( MaterialComp const& other ) = delete;
   MaterialComp( MaterialComp&& other ) noexcept;
   MaterialComp& operator=( MaterialComp const& other ) = delete;

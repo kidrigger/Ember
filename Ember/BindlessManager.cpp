@@ -2,49 +2,13 @@
 
 #include "Util/HelperUtils.hpp"
 
-bool Ember::BindlessHandle::IsNull() const noexcept
+bool Ember::DeviceHandle::IsNull() const noexcept
 {
   return m_Handle == kInvalid;
 }
 
-Ember::BindlessHandle::BindlessHandle( uint32_t const index ) : m_Handle{ index }
+Ember::DeviceHandle::DeviceHandle( uint32_t const index ) : m_Handle{ index }
 {}
-
-Ember::BindlessManager::RabbitPullingFreeList::RabbitPullingFreeList( uint32_t const max_allowed )
-  : m_MaxAllowed{ max_allowed }
-{
-  // Sentinel
-  ASSERT( max_allowed != UINT32_MAX );
-}
-
-uint32_t Ember::BindlessManager::RabbitPullingFreeList::Allocate()
-{
-  if ( not m_Recycled.empty() )
-  {
-    uint32_t const index = m_Recycled.front();
-    m_Recycled.pop_front();
-    return index;
-  }
-
-  ASSERT( m_MaxReached < m_MaxAllowed );
-
-  uint32_t const index = m_MaxReached++;
-
-  return index;
-}
-
-void Ember::BindlessManager::RabbitPullingFreeList::Free( uint32_t const index )
-{
-#if defined( _DEBUG )
-  ASSERT( std::ranges::find( m_Recycled, index ) == m_Recycled.end() );
-#endif
-  m_Recycled.push_back( index );
-}
-
-uint32_t Ember::BindlessManager::RabbitPullingFreeList::InUse() const
-{
-  return m_MaxReached - ( uint32_t )m_Recycled.size();
-}
 
 Ember::BindlessManager::BindlessManager(
     ComPtr<ID3D12Device2>        device,

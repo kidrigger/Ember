@@ -72,11 +72,12 @@ class ModelLoader
     std::vector<uint32_t>                      Indices;
   };
 
-  RenderDevice*  m_RenderDevice;
-  World*         m_World;
-  TextureLoader* m_TextureLoader;
+  RenderDevice*    m_RenderDevice;
+  World*           m_World;
+  TextureLoader*   m_TextureLoader;
+  MaterialManager* m_MaterialManager;
 
-  flecs::entity  ProcessNode( LoadingContext* context, flecs::entity parent, cgltf_node const& node );
+  flecs::entity    ProcessNode( LoadingContext* context, flecs::entity parent, cgltf_node const& node );
   void      ProcessPrimitive( LoadingContext* context, flecs::entity owning, cgltf_primitive const& primitive ) const;
   void      ProcessMesh( LoadingContext* context, flecs::entity owning, cgltf_mesh const& mesh ) const;
   bool      TryLoadTexture( Texture* texture, cgltf_image const& image, ColorSpaceOverride color_space_override ) const;
@@ -85,7 +86,8 @@ class ModelLoader
 public:
   std::optional<flecs::entity> TryLoadModel( char const* filename );
 
-  ModelLoader( RenderDevice* render_device, World* world, TextureLoader* texture_loader );
+  ModelLoader(
+      RenderDevice* render_device, World* world, TextureLoader* texture_loader, MaterialManager* material_manager );
 };
 
 } // namespace Ember

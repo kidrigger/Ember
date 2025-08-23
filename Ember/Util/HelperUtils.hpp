@@ -75,9 +75,9 @@
 #define ASSERT_M( x, MSG ) assert( x )
 
 #if defined( _DEBUG )
-#define CHECK( x ) assert( x )
+#define ENSURE( x ) assert( x )
 #else
-#define CHECK( x )                                                                                                     \
+#define ENSURE( x )                                                                                                    \
   if ( not( x ) ) std::terminate()
 #endif
 

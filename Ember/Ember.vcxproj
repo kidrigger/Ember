@@ -299,6 +299,8 @@
     <ClCompile Include="IApp.cpp" />
     <ClCompile Include="LightManager.cpp" />
     <ClCompile Include="LightHandle.cpp" />
+    <ClCompile Include="Material.cpp" />
+    <ClCompile Include="MaterialManager.cpp" />
     <ClCompile Include="OmniLightManager.cpp" />
     <ClCompile Include="ModelLoader.cpp" />
     <ClCompile Include="ObjectPool.cpp" />
@@ -312,11 +314,12 @@
     <ClCompile Include="Context.cpp" />
     <ClCompile Include="Util\FreeList.cpp" />
     <ClCompile Include="Util\PerfCounter.cpp" />
+    <ClCompile Include="Util\RabbitPullingFreeList.cpp" />
     <ClCompile Include="Util\ScopedHandle.cpp" />
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="BasicApp.hpp" />
-    <ClInclude Include="BindlessHandle.hpp" />
+    <ClInclude Include="DeviceHandle.hpp" />
     <ClInclude Include="BindlessManager.hpp" />
     <ClInclude Include="Buffer.hpp" />
     <ClInclude Include="Camera.hpp" />
@@ -327,6 +330,8 @@
     <ClInclude Include="IApp.hpp" />
     <ClInclude Include="LightManager.hpp" />
     <ClInclude Include="LightHandle.hpp" />
+    <ClInclude Include="Material.hpp" />
+    <ClInclude Include="MaterialManager.hpp" />
     <ClInclude Include="OmniLightManager.hpp" />
     <ClInclude Include="ModelLoader.hpp" />
     <ClInclude Include="ObjectPool.hpp" />
@@ -344,6 +349,7 @@
     <ClInclude Include="Util\HelperUtils.hpp" />
     <ClInclude Include="Util\PerfCounter.hpp" />
     <ClInclude Include="Util\Profiling.hpp" />
+    <ClInclude Include="Util\RabbitPullingFreeList.hpp" />
     <ClInclude Include="Util\Runtime.hpp" />
     <ClInclude Include="Util\ScopedHandle.hpp" />
   </ItemGroup>

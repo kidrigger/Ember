@@ -2,33 +2,16 @@
 
 #include <array>
 #include <mutex>
-#include <queue>
 
-#include "BindlessHandle.hpp"
-#include "Buffer.hpp"
+#include "DeviceHandle.hpp"
 #include "Util/DirectXHeaders.hpp"
+#include "Util/RabbitPullingFreeList.hpp"
 
 namespace Ember
 {
 
 class BindlessManager
 {
-  class RabbitPullingFreeList
-  {
-    std::deque<uint32_t> m_Recycled{};
-    uint32_t             m_MaxReached{ 0 };
-    uint32_t             m_MaxAllowed{ 0 };
-
-  public:
-    RabbitPullingFreeList() = default;
-    explicit RabbitPullingFreeList( uint32_t max_allowed );
-
-    uint32_t Allocate();
-    void     Free( uint32_t index );
-
-    uint32_t InUse() const;
-  };
-
   ComPtr<ID3D12Device2>        m_Device;
 
   RabbitPullingFreeList        m_ResourceFreeList;

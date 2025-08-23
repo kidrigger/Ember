@@ -29,24 +29,74 @@ struct Material
   float         Pad0;                   // 44
   float         Pad1;                   // 48
 
-  Texture2D     GetBaseColorTexture()
+  float4        GetAlbedo( float2 in_texcoord, SamplerState texture_sampler )
   {
-    return ResourceDescriptorHeap[BaseColorTextureIndex];
+    float4 albedo = UnpackColor32( BaseColorFactor );
+    if ( IsValidHandle( BaseColorTextureIndex ) )
+    {
+      Texture2D texture = ResourceDescriptorHeap[BaseColorTextureIndex];
+      return albedo * texture.Sample( texture_sampler, in_texcoord );
+    }
+    return albedo;
   }
 
-  Texture2D GetNormalTexture()
+
+  float3 GetNormal(
+      float3 in_normal, float4 in_tangent, float3 in_position, float2 in_texcoord, SamplerState texture_sampler )
   {
-    return ResourceDescriptorHeap[NormalTextureIndex];
+    float3 normal = normalize( in_normal );
+    if ( IsValidHandle( NormalTextureIndex ) )
+    {
+      Texture2D texture   = ResourceDescriptorHeap[NormalTextureIndex];
+      float3    normal_ts = texture.Sample( texture_sampler, in_texcoord ).rgb;
+      normal_ts           = normalize( 2.0f * normal_ts - 1.0f );
+
+      float3 tangent;
+      float3 bitangent;
+
+      if ( in_tangent.w == 0.0f )
+      {
+        float3 q1  = ddx( in_position );
+        float3 q2  = ddy( in_position );
+        float2 st1 = ddx( in_texcoord );
+        float2 st2 = ddy( in_texcoord );
+
+        float  det = ( st1.x * st2.y - st2.x * st1.y );
+
+        tangent    = -( q1 * st2.y - q2 * st1.y ) / det;
+        tangent    = tangent - normal * dot( normal, tangent );
+        bitangent  = normalize( cross( normal, tangent ) );
+      }
+      else
+      {
+        tangent   = normalize( in_tangent.xyz );
+        bitangent = in_tangent.w * cross( normal, tangent );
+      }
+      normal = normalize( tangent * normal_ts.x + bitangent * normal_ts.y + normal * normal_ts.z );
+    }
+
+    return normal;
   }
 
-  Texture2D GetMetalRoughTexture()
+  float2 GetMetalRough( float2 in_texcoord, SamplerState texture_sampler )
   {
-    return ResourceDescriptorHeap[MetalRoughTextureIndex];
+    if ( IsValidHandle( MetalRoughTextureIndex ) )
+    {
+      Texture2D texture = ResourceDescriptorHeap[MetalRoughTextureIndex];
+      return texture.Sample( texture_sampler, in_texcoord ).bg * float2( Metal, Rough );
+    }
+    return float2( Metal, Rough );
   }
 
-  Texture2D GetEmissiveTexture()
+  float3 GetEmissive( float2 in_texcoord, SamplerState texture_sampler )
   {
-    return ResourceDescriptorHeap[EmissiveTextureIndex];
+    float3 emissive = UnpackColor32( EmissiveFactor ).rgb * EmissiveStrength;
+    if ( IsValidHandle( EmissiveTextureIndex ) )
+    {
+      Texture2D texture = ResourceDescriptorHeap[EmissiveTextureIndex];
+      return emissive * texture.Sample( texture_sampler, in_texcoord ).rgb;
+    }
+    return emissive;
   }
 };
 
@@ -66,11 +116,12 @@ cbuffer Transform : register( b0, space0 )
 
 cbuffer MaterialInfo : register( b1, space0 )
 {
-  Material g_Material;
+  RID g_MaterialIdx;
 }
 
 cbuffer BindlessIndex : register( b2, space0 )
 {
+  RID  g_Materials;
   RID  g_Camera;
   RID  g_PointLights;
   uint g_PointLightCount;
