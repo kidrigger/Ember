@@ -5,7 +5,7 @@ static const float kPi     = 3.14159265f;
 static const float kTau    = 6.28318537f;
 static const float kHalfPi = 1.57079632f;
 
-#define NUMTHREADS( x, y, z ) [numthreads( x, y, z )]
+#define OUTPUT_TOPOLOGY( x ) [outputtopology( x )]
 #define NUM_THREADS( x, y, z ) [numthreads( x, y, z )]
 
 /*

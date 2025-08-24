@@ -101,6 +101,14 @@ struct Material
   }
 };
 
+struct Meshlet
+{
+  uint VertexOffset;
+  uint TriangleOffset;
+  uint VertexCount;
+  uint TriangleCount;
+};
+
 struct Environment
 {
   RID Skybox;
@@ -120,6 +128,11 @@ cbuffer DrawInfo : register( b1, space0 )
   RID  g_MaterialIdx;
   RID  g_VertexBufferIdx;
   uint g_FirstVertex;
+  RID  g_MeshletBufferIdx;
+  RID  g_MeshletTrianglesIdx;
+  RID  g_MeshletVerticesIdx;
+  uint g_FirstMeshlet;
+  uint g_FirstIndex;
 }
 
 cbuffer BindlessIndex : register( b2, space0 )
@@ -145,26 +158,26 @@ SamplerComparisonState g_ShadowSampler : register( s2, space0 );
 
 struct Vertex
 {
-  half4         Position;
-  uint          Normal;
-  uint          Tangent;
-  PackedColor32 Color;
-  half2         TexCoord[2];
-  uint          Padding0;
+  half4         Position;    // 08
+  uint          Normal;      // 12
+  uint          Tangent;     // 16
+  PackedColor32 Color;       // 20
+  half2         TexCoord[2]; // 28
+  uint          Padding0;    // 32
 
   float4        GetPosition()
   {
     return Position;
   }
 
-  float3 GetNormal()
+  float4 GetNormal()
   {
-    return UnpackR10G10B10A2( Normal ).xyz;
+    return float4( 2.0f * UnpackR10G10B10A2Unorm( Normal ).xyz - 1.0f, 0.0f );
   }
 
   float4 GetTangent()
   {
-    return UnpackR10G10B10A2( Tangent );
+    return 2.0f * UnpackR10G10B10A2Unorm( Tangent ) - 1.0f;
   }
 
   float4 GetColor()
@@ -172,7 +185,7 @@ struct Vertex
     return UnpackColor32( Color );
   }
 
-  float2 GetTexCoord(uint idx)
+  float2 GetTexCoord( uint idx )
   {
     return TexCoord[idx];
   }

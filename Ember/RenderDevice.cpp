@@ -347,6 +347,11 @@ Ember::Buffer Ember::RenderDevice::CreateStorageBuffer( uint32_t const size, uin
   return m_BufferManager.CreateStorageBuffer( size, stride );
 }
 
+Ember::Buffer Ember::RenderDevice::CreateRawStorageBuffer( uint32_t const size )
+{
+  return m_BufferManager.CreateRawStorageBuffer( size );
+}
+
 Ember::Buffer Ember::RenderDevice::CreateConstantBuffer( uint32_t const size )
 {
   return m_BufferManager.CreateConstantBuffer( size );

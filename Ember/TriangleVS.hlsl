@@ -13,10 +13,9 @@ VSOut TriangleVS( uint vertex_idx : SV_VERTEXID )
   float4                   clip_pos      = mul( camera.View, world_pos );
   float4                   screen_pos    = mul( camera.Projection, clip_pos );
 
-  float3 normal  = normalize( mul( float4( 2.0f * vertex.GetNormal().xyz - 1.0f, 0.0f ), g_InvModel ).xyz );
-  float4 tangent = vertex.GetTangent();
-  tangent =
-      float4( normalize( mul( float4( 2.0f * tangent.xyz - 1.0f, 0.0f ), g_InvModel ).xyz ), 2.0f * tangent.w - 1.0f );
+  float3                   normal        = normalize( mul( vertex.GetNormal(), g_InvModel ).xyz );
+  float4                   tangent       = vertex.GetTangent();
+  tangent            = float4( normalize( mul( float4( tangent.xyz, 0.0f ), g_InvModel ).xyz ), tangent.w );
 
   OUT.ScreenPosition = screen_pos;
   OUT.Position       = world_pos;
@@ -24,7 +23,7 @@ VSOut TriangleVS( uint vertex_idx : SV_VERTEXID )
   OUT.LinearDepth    = clip_pos.z;
   OUT.Tangent        = tangent;
   OUT.Color          = vertex.GetColor();
-  OUT.TexCoord[0]    = vertex.GetTexCoord(0);
-  OUT.TexCoord[1]    = vertex.GetTexCoord(1);
+  OUT.TexCoord[0]    = vertex.GetTexCoord( 0 );
+  OUT.TexCoord[1]    = vertex.GetTexCoord( 1 );
   return OUT;
 }

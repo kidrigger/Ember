@@ -28,7 +28,7 @@ public:
     [[nodiscard]] uint64_t     GetFenceValue() const;
   };
 
-  using CommandList = ComPtr<ID3D12GraphicsCommandList>;
+  using CommandList = ComPtr<ID3D12GraphicsCommandList6>;
 
 private:
   struct InFlightAllocators

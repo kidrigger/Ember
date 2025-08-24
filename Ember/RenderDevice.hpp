@@ -78,6 +78,7 @@ public:
   [[nodiscard]] Buffer  CreateVertexBuffer( uint32_t size, uint32_t stride );
   [[nodiscard]] Buffer  CreateIndexBuffer( uint32_t size, DXGI_FORMAT format );
   [[nodiscard]] Buffer  CreateStorageBuffer( uint32_t size, uint32_t stride );
+  [[nodiscard]] Buffer  CreateRawStorageBuffer( uint32_t size );
   [[nodiscard]] Buffer  CreateConstantBuffer( uint32_t size );
 
   [[nodiscard]] Texture CreateTexture2D( Texture2DCreateInfo const& create_info );

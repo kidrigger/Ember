@@ -62,12 +62,27 @@ struct alignas( 16 ) VertexData
   };
 };
 
+struct Meshlet
+{
+  uint32_t VertexOffset;
+  uint32_t TriangleOffset;
+  uint32_t VertexCount;
+  uint32_t TriangleCount;
+};
+
 class ModelLoader
 {
+  size_t constexpr static kMaxVertices  = 64;
+  size_t constexpr static kMaxTriangles = 124;
+  float constexpr static kConeWeight    = 0.0f;
+
   struct LoadingContext
   {
     std::map<cgltf_material const*, Material*> MaterialCache;
     Geometry*                                  Geometry;
+    std::vector<Meshlet>                       Meshlets;
+    std::vector<uint32_t>                      MeshletVertices;
+    std::vector<byte>                          MeshletTriangles;
     std::vector<ShadowVertex>                  VertexPositions;
     std::vector<VertexData>                    VertexData;
     std::vector<uint32_t>                      Indices;
@@ -83,6 +98,7 @@ class ModelLoader
   void      ProcessMesh( LoadingContext* context, flecs::entity owning, cgltf_mesh const& mesh ) const;
   bool      TryLoadTexture( Texture* texture, cgltf_image const& image, ColorSpaceOverride color_space_override ) const;
   Material* TryProcessMaterial( LoadingContext* context, cgltf_material const* material ) const;
+  Material* GetDefaultMaterial( LoadingContext* context ) const;
 
 public:
   std::optional<flecs::entity> TryLoadModel( char const* filename );

@@ -63,7 +63,7 @@ public:
 
   void        LoadContent() override;
   void        Update() override;
-  void        RenderScene( ID3D12GraphicsCommandList* command_list, uint32_t frame_idx ) const;
+  void        RenderScene( ID3D12GraphicsCommandList6* command_list, uint32_t frame_idx ) const;
   void        Render() override;
   void        UnloadContent() override;
 

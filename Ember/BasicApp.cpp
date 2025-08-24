@@ -18,6 +18,8 @@
 #include "Util/PerfCounter.hpp"
 #include "Util/Profiling.hpp"
 
+// #define USE_VERTEX_SHADER 1
+
 void ParseArguments( bool* use_warp, uint32_t* client_width, uint32_t* client_height )
 {
   // Parse Args
@@ -234,6 +236,18 @@ struct PerFrameConstants
   uint32_t         DirLightShadowCount;
 };
 
+struct PerMeshConstants
+{
+  Ember::MaterialHandle MaterialIdx;
+  Ember::SRVHandle      VertexBuffer;
+  uint32_t              FirstVertex;
+  Ember::SRVHandle      MeshletBuffer;
+  Ember::SRVHandle      MeshletTriangles;
+  Ember::SRVHandle      MeshletVertices;
+  uint32_t              FirstMeshlet;
+  uint32_t              FirstIndex;
+};
+
 Ember::BasicApp::BasicApp(
     HWND                                 window_handle,
     std::unique_ptr<RenderDevice>        render_device,
@@ -298,8 +312,13 @@ Ember::BasicApp::~BasicApp() // NOLINT(modernize-use-equals-default)
 
 void Ember::BasicApp::SetupRenderPipeline()
 {
+#if defined( USE_VERTEX_SHADER )
   ComPtr<ID3DBlob> vertex_shader_blob;
   ERR_ABORT( D3DReadFileToBlob( L"TriangleVS.cso", &vertex_shader_blob ) );
+#else
+  ComPtr<ID3DBlob> mesh_shader_blob;
+  ERR_ABORT( D3DReadFileToBlob( L"TriangleMS.cso", &mesh_shader_blob ) );
+#endif
   ComPtr<ID3DBlob> pixel_shader_blob;
   ERR_ABORT( D3DReadFileToBlob( L"TrianglePS.cso", &pixel_shader_blob ) );
   ComPtr<ID3DBlob> bg_vertex_shader_blob;
@@ -325,14 +344,14 @@ void Ember::BasicApp::SetupRenderPipeline()
 
   D3D12_ROOT_SIGNATURE_FLAGS const root_signature_flags =
       D3D12_ROOT_SIGNATURE_FLAG_CBV_SRV_UAV_HEAP_DIRECTLY_INDEXED |
-      D3D12_ROOT_SIGNATURE_FLAG_SAMPLER_HEAP_DIRECTLY_INDEXED | D3D12_ROOT_SIGNATURE_FLAG_DENY_MESH_SHADER_ROOT_ACCESS |
+      D3D12_ROOT_SIGNATURE_FLAG_SAMPLER_HEAP_DIRECTLY_INDEXED |
       D3D12_ROOT_SIGNATURE_FLAG_DENY_AMPLIFICATION_SHADER_ROOT_ACCESS |
       D3D12_ROOT_SIGNATURE_FLAG_DENY_GEOMETRY_SHADER_ROOT_ACCESS |
       D3D12_ROOT_SIGNATURE_FLAG_DENY_DOMAIN_SHADER_ROOT_ACCESS | D3D12_ROOT_SIGNATURE_FLAG_DENY_HULL_SHADER_ROOT_ACCESS;
 
   CD3DX12_ROOT_PARAMETER1 root_parameters[4];
   root_parameters[0].InitAsConstants( sizeof( WorldTransform ) / 4, 0 );
-  root_parameters[1].InitAsConstants( 3, 1 );
+  root_parameters[1].InitAsConstants( sizeof( PerMeshConstants ) / 4, 1 );
   root_parameters[2].InitAsConstants( sizeof( PerFrameConstants ) / 4, 2 );
   root_parameters[3].InitAsConstants( sizeof( Environment::GpuRepr ) / 4, 3 );
 
@@ -370,9 +389,13 @@ void Ember::BasicApp::SetupRenderPipeline()
 
   struct MainPipelineStream
   {
-    CD3DX12_PIPELINE_STATE_STREAM_ROOT_SIGNATURE        RootSignature;
-    CD3DX12_PIPELINE_STATE_STREAM_PRIMITIVE_TOPOLOGY    PrimitiveTopologyType;
-    CD3DX12_PIPELINE_STATE_STREAM_VS                    VS;
+    CD3DX12_PIPELINE_STATE_STREAM_ROOT_SIGNATURE     RootSignature;
+    CD3DX12_PIPELINE_STATE_STREAM_PRIMITIVE_TOPOLOGY PrimitiveTopologyType;
+#if defined( USE_VERTEX_SHADER )
+    CD3DX12_PIPELINE_STATE_STREAM_VS VS;
+#else
+    CD3DX12_PIPELINE_STATE_STREAM_MS MS;
+#endif
     CD3DX12_PIPELINE_STATE_STREAM_PS                    PS;
     CD3DX12_PIPELINE_STATE_STREAM_RASTERIZER2           Rasterizer;
     CD3DX12_PIPELINE_STATE_STREAM_RENDER_TARGET_FORMATS RTVFormats;
@@ -382,11 +405,15 @@ void Ember::BasicApp::SetupRenderPipeline()
   MainPipelineStream pipeline_stream = {
     .RootSignature         = m_RootSignature.Get(),
     .PrimitiveTopologyType = D3D12_PRIMITIVE_TOPOLOGY_TYPE_TRIANGLE,
-    .VS                    = CD3DX12_SHADER_BYTECODE( vertex_shader_blob.Get() ),
-    .PS                    = CD3DX12_SHADER_BYTECODE( pixel_shader_blob.Get() ),
-    .Rasterizer            = rasterizer_desc,
-    .RTVFormats            = rtv_formats,
-    .DSVFormat             = DXGI_FORMAT_D32_FLOAT,
+#if defined( USE_VERTEX_SHADER )
+    .VS = CD3DX12_SHADER_BYTECODE( vertex_shader_blob.Get() ),
+#else
+    .MS = CD3DX12_SHADER_BYTECODE( mesh_shader_blob.Get() ),
+#endif
+    .PS         = CD3DX12_SHADER_BYTECODE( pixel_shader_blob.Get() ),
+    .Rasterizer = rasterizer_desc,
+    .RTVFormats = rtv_formats,
+    .DSVFormat  = DXGI_FORMAT_D32_FLOAT,
   };
 
   struct BackgroundPipelineStream
@@ -590,7 +617,7 @@ void Ember::BasicApp::Update()
   DebugInfo::Instance().ClearFrame();
 }
 
-void Ember::BasicApp::RenderScene( ID3D12GraphicsCommandList* command_list, uint32_t frame_idx ) const
+void Ember::BasicApp::RenderScene( ID3D12GraphicsCommandList6* command_list, uint32_t frame_idx ) const
 {
   ZoneScoped;
 
@@ -654,15 +681,30 @@ void Ember::BasicApp::RenderScene( ID3D12GraphicsCommandList* command_list, uint
         {
           if ( cull_info.AreAnyCulled( UINT64_MAX ) ) return;
 
+#if defined( USE_VERTEX_SHADER )
           command_list->IASetIndexBuffer( &geometry.Geometry->IndexBuffer.GetIndexBufferView() );
+#endif
+
+          PerMeshConstants const mesh_constants = {
+            .MaterialIdx      = material.Material->GetHandle(),
+            .VertexBuffer     = geometry.Geometry->VertexBuffer.GetSRVHandle(),
+            .FirstVertex      = mesh.FirstVertex,
+            .MeshletBuffer    = geometry.Geometry->MeshletBuffer.GetSRVHandle(),
+            .MeshletTriangles = geometry.Geometry->MeshletTrianglesBuffer.GetSRVHandle(),
+            .MeshletVertices  = geometry.Geometry->MeshletVerticesBuffer.GetSRVHandle(),
+            .FirstMeshlet     = mesh.FirstMeshlet,
+            .FirstIndex       = mesh.FirstIndex,
+          };
 
           command_list->SetGraphicsRoot32BitConstants( 0, sizeof( WorldTransform ) / 4, &wt, 0 );
-          command_list->SetGraphicsRoot32BitConstant( 1, ( UINT )material.Material->GetHandle(), 0 );
-          command_list->SetGraphicsRoot32BitConstant( 1, ( UINT )geometry.Geometry->VertexBuffer.GetSRVHandle(), 1 );
-          command_list->SetGraphicsRoot32BitConstant( 1, ( UINT )mesh.FirstVertex, 2 );
+          command_list->SetGraphicsRoot32BitConstants( 1, sizeof( PerMeshConstants ) / 4, &mesh_constants, 0 );
 
           DebugInfo::Instance().PushDrawCall( mesh.IndexCount );
+#if defined( USE_VERTEX_SHADER )
           command_list->DrawIndexedInstanced( mesh.IndexCount, 1, mesh.FirstIndex, mesh.FirstVertex, 0 );
+#else
+          command_list->DispatchMesh( mesh.MeshletCount, 1, 1 );
+#endif
         } );
   }
 }

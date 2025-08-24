@@ -336,6 +336,9 @@
     <FxCompile Include="DirShadowPS.hlsl">
       <Filter>Shaders\Shadows</Filter>
     </FxCompile>
+    <FxCompile Include="TriangleMS.hlsl">
+      <Filter>Shaders</Filter>
+    </FxCompile>
   </ItemGroup>
   <ItemGroup>
     <CopyFileToFolders Include="Assets\container2.png">
@@ -390,6 +393,9 @@
       <Filter>Resource Files\Assets\Scenes</Filter>
     </CopyFileToFolders>
     <CopyFileToFolders Include="Assets\NormalTangentMirrorTest.glb">
+      <Filter>Resource Files\Assets\Scenes</Filter>
+    </CopyFileToFolders>
+    <CopyFileToFolders Include="Assets\ModdedCompareRoughness.glb">
       <Filter>Resource Files\Assets\Scenes</Filter>
     </CopyFileToFolders>
   </ItemGroup>

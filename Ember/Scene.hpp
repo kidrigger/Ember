@@ -59,6 +59,9 @@ struct Geometry
   Buffer               ShadowVertexBuffer;
   Buffer               VertexBuffer;
   Buffer               IndexBuffer;
+  Buffer               MeshletBuffer;
+  Buffer               MeshletVerticesBuffer;
+  Buffer               MeshletTrianglesBuffer;
   std::atomic_uint32_t RefCount{ 1 };
 
   uint32_t             AddRef();
@@ -97,6 +100,8 @@ struct Mesh
   uint32_t FirstIndex;
   uint32_t IndexCount;
   uint32_t FirstVertex;
+  uint32_t MeshletCount;
+  uint32_t FirstMeshlet;
 };
 
 class World

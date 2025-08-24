@@ -1,6 +1,10 @@
 ---
 BasedOnStyle: Microsoft
 AlignAfterOpenBracket: AlwaysBreak
+AttributeMacros:
+  - numthreads
+  - register
+  - outputtopology
 AlignConsecutiveAssignments:
   Enabled: true
   AcrossEmptyLines: true

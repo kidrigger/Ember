@@ -151,6 +151,11 @@ Ember::CBVHandle Ember::Buffer::GetCBVHandle() const
   return std::get<ConstantBufferInfo>( m_Views )->AsCBV;
 }
 
+void Ember::Buffer::SetName( LPCWSTR const name ) const
+{
+  ERR_ABORT( m_Buffer->SetName( name ) );
+}
+
 Ember::BufferManager::BufferManager(
     ComPtr<ID3D12Device2> device, ComPtr<D3D12MA::Allocator> gpu_allocator, BindlessManager* bindless_manager )
   : m_Bindless{ bindless_manager }, m_Device{ std::move( device ) }, m_GpuAllocator{ std::move( gpu_allocator ) }
@@ -230,6 +235,28 @@ Ember::Buffer Ember::BufferManager::CreateStorageBuffer( uint32_t const size, ui
 
   CD3DX12_SHADER_RESOURCE_VIEW_DESC const srv_desc =
       CD3DX12_SHADER_RESOURCE_VIEW_DESC::StructuredBuffer( size / stride, stride );
+
+  SRVHandle const srv_handle   = m_Bindless->CreateDescriptorHandle( buffer.Get(), srv_desc );
+
+  auto            storage_info = std::allocate_shared<Buffer::StorageBufferInfoImpl>(
+      std::pmr::polymorphic_allocator<byte>{ &m_MemoryPool }, m_Bindless, srv_handle, UAVHandle{} );
+
+  return Buffer{ std::move( buffer ), std::move( allocation ), 0, size, std::move( storage_info ) };
+}
+
+Ember::Buffer Ember::BufferManager::CreateRawStorageBuffer( uint32_t size )
+{
+  uint32_t constexpr static kStride = 4;
+
+  //
+  size = ( size % kStride == 0 ) ? size : size + ( kStride - ( size % kStride ) );
+
+  ComPtr<ID3D12Resource>      buffer;
+  ComPtr<D3D12MA::Allocation> allocation;
+  AllocateBufferImpl( m_Device.Get(), m_GpuAllocator.Get(), size, &allocation, &buffer );
+
+  auto srv_desc                = CD3DX12_SHADER_RESOURCE_VIEW_DESC::RawBuffer( size / kStride, 0 );
+  srv_desc.Format              = DXGI_FORMAT_R32_TYPELESS;
 
   SRVHandle const srv_handle   = m_Bindless->CreateDescriptorHandle( buffer.Get(), srv_desc );
 

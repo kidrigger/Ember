@@ -82,6 +82,7 @@ public:
   [[nodiscard]] SRVHandle                       GetSRVHandle() const;
   [[nodiscard]] UAVHandle                       GetUAVHandle() const;
   [[nodiscard]] CBVHandle                       GetCBVHandle() const;
+  void                                          SetName( LPCWSTR name ) const;
 };
 
 class BufferManager
@@ -99,6 +100,7 @@ public:
   Buffer CreateVertexBuffer( uint32_t size, uint32_t stride );
   Buffer CreateIndexBuffer( uint32_t size, DXGI_FORMAT format );
   Buffer CreateStorageBuffer( uint32_t size, uint32_t stride );
+  Buffer CreateRawStorageBuffer( uint32_t size );
   Buffer CreateReadWriteBuffer( uint32_t size, uint32_t stride );
   Buffer CreateConstantBuffer( uint32_t size );
 };

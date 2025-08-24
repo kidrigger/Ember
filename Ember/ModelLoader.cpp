@@ -237,7 +237,8 @@ void Ember::ModelLoader::ProcessPrimitive(
   using namespace std::string_view_literals;
 
   // VertexStart is per-primitive
-  int32_t const vertex_start = static_cast<int32_t>( context->VertexPositions.size() );
+  int32_t const  vertex_start  = ( int32_t )context->VertexPositions.size();
+  uint32_t const meshlet_start = ( uint32_t )context->Meshlets.size();
 
   ASSERT( primitive.type == cgltf_primitive_type_triangles );
 
@@ -262,6 +263,10 @@ void Ember::ModelLoader::ProcessPrimitive(
   {
     // TODO: Default Material.
     material = TryProcessMaterial( context, primitive.material );
+  }
+  else
+  {
+    material = GetDefaultMaterial( context );
   }
 
   DirectX::BoundingBox     prim_aabb;
@@ -358,9 +363,6 @@ void Ember::ModelLoader::ProcessPrimitive(
   }
   // TODO: Grab other attributes.
 
-  size_t                  vertex_count;
-
-  std::vector<VertexData> quantized_vertex;
   // Tangent Loading
   if ( not has_tangent )
   {
@@ -397,101 +399,100 @@ void Ember::ModelLoader::ProcessPrimitive(
       ENSURE( genTangSpaceDefault( &mikk_t_space_context ) );
     }
 
-    // Quantization
-    {
-      // We will read and write into the same buffer, with different sizes.
-      // As each write (VertexData) is smaller than read (LoadingData)
-      // We can keep writing without bugs.
-      static_assert( sizeof( VertexData ) < sizeof( LoadingData ) );
+    // Weld back to vertex and index buffers.
+    size_t const             unindexed_vertex_count = index_count;
+    LoadingData const* const unindexed_vertices     = ( LoadingData* )scratch.data();
+    std::vector<uint32_t>    remap( unindexed_vertex_count );
+    size_t const             vertex_count = meshopt_generateVertexRemap(
+        remap.data(), nullptr, index_count, unindexed_vertices, unindexed_vertex_count, sizeof( LoadingData ) );
 
-      LoadingData const* read_ptr  = ( LoadingData* )scratch.data();
-      VertexData*        write_ptr = ( VertexData* )scratch.data();
-      for ( int i = 0; i < index_count; i++ )
-      {
-        *write_ptr = QuantizeData( *read_ptr );
-        write_ptr++;
-        read_ptr++;
-      }
-    }
+    loaded_data.resize( vertex_count );
+    loaded_indices.resize( index_count );
 
-    // Mesh Optimizer
-    size_t const            unindexed_vertex_count = index_count;
-    VertexData const* const unindexed_vertices     = ( VertexData* )scratch.data();
-    std::vector<uint32_t>   remap( unindexed_vertex_count );
-    vertex_count = meshopt_generateVertexRemap(
-        remap.data(), nullptr, index_count, scratch.data(), unindexed_vertex_count, sizeof( VertexData ) );
-
-    context->VertexData.resize( vertex_start + vertex_count );
-    context->Indices.resize( index_start + index_count );
-
-    meshopt_remapIndexBuffer( context->Indices.data() + index_start, nullptr, index_count, remap.data() );
+    meshopt_remapIndexBuffer( loaded_indices.data(), nullptr, index_count, remap.data() );
     meshopt_remapVertexBuffer(
-        context->VertexData.data() + vertex_start,
-        unindexed_vertices,
-        unindexed_vertex_count,
-        sizeof( VertexData ),
-        remap.data() );
-
-    scratch.clear();
+        loaded_data.data(), unindexed_vertices, unindexed_vertex_count, sizeof( LoadingData ), remap.data() );
   }
-  else
-  {
 
-    vertex_count = loaded_data.size();
+  size_t const vertex_count = loaded_data.size();
+
+  // Cluster meshlets
+  std::vector<meshopt_Meshlet> meshlets;
+  std::vector<uint32_t>        meshlet_vertices;
+  std::vector<byte>            meshlet_triangles;
+  {
+    size_t max_meshlets = meshopt_buildMeshletsBound( loaded_indices.size(), kMaxVertices, kMaxTriangles );
+    meshlets.resize( max_meshlets );
+    meshlet_vertices.resize( max_meshlets * kMaxVertices );
+    meshlet_triangles.resize( max_meshlets * kMaxTriangles * 3 );
+
+    size_t meshlet_count = meshopt_buildMeshlets(
+        meshlets.data(),
+        meshlet_vertices.data(),
+        meshlet_triangles.data(),
+        loaded_indices.data(),
+        loaded_indices.size(),
+        ( float* )&loaded_data[0].Position,
+        loaded_data.size(),
+        sizeof( LoadingData ),
+        kMaxVertices,
+        kMaxTriangles,
+        kConeWeight );
+    const meshopt_Meshlet& last = meshlets[meshlet_count - 1];
+
+    meshlet_vertices.resize( last.vertex_offset + last.vertex_count );
+    meshlet_triangles.resize( last.triangle_offset + ( ( last.triangle_count * 3 + 3 ) & ~3 ) );
+    meshlets.resize( meshlet_count );
+  }
+
+  // TODO: Something wrong with my understanding of how the meshlet data is used.
+
+  // Quantization
+  {
     scratch.resize( sizeof( VertexData ) * vertex_count );
 
-    // Quantization
-    {
-      LoadingData const* read_ptr  = loaded_data.data();
-      VertexData*        write_ptr = ( VertexData* )scratch.data();
-      for ( int i = 0; i < vertex_count; i++ )
-      {
-        *write_ptr = QuantizeData( *read_ptr );
-        write_ptr++;
-        read_ptr++;
-      }
-    }
-
-    // Mesh Optimizer
-    size_t const            unindexed_vertex_count = vertex_count;
-    VertexData const* const unindexed_vertices     = ( VertexData* )scratch.data();
-    std::vector<uint32_t>   remap( unindexed_vertex_count );
-    vertex_count = meshopt_generateVertexRemap(
-        remap.data(),
-        loaded_indices.data(),
-        index_count,
-        scratch.data(),
-        unindexed_vertex_count,
-        sizeof( VertexData ) );
-
-    context->VertexData.resize( vertex_start + vertex_count );
-    context->Indices.resize( index_start + index_count );
-
-    meshopt_remapIndexBuffer( context->Indices.data() + index_start, loaded_indices.data(), index_count, remap.data() );
-    meshopt_remapVertexBuffer(
-        context->VertexData.data() + vertex_start,
-        unindexed_vertices,
-        unindexed_vertex_count,
-        sizeof( VertexData ),
-        remap.data() );
-  }
-
-  // Finalization
-  context->VertexPositions.resize( vertex_start + vertex_count );
-  {
-    ShadowVertex* write_ptr = ( context->VertexPositions.data() + vertex_start );
-    VertexData*   read_ptr  = context->VertexData.data() + vertex_start;
-
+    LoadingData const* read_ptr  = loaded_data.data();
+    VertexData*        write_ptr = ( VertexData* )scratch.data();
     for ( int i = 0; i < vertex_count; i++ )
     {
-      write_ptr->Px = read_ptr->PositionX;
-      write_ptr->Py = read_ptr->PositionY;
-      write_ptr->Pz = read_ptr->PositionZ;
-      write_ptr->Pw = read_ptr->PositionW;
-      ++write_ptr;
-      ++read_ptr;
+      *write_ptr = QuantizeData( *read_ptr );
+      write_ptr++;
+      read_ptr++;
     }
   }
+
+  // Finalize
+  VertexData* begin = ( VertexData* )scratch.data();
+  VertexData* end   = begin + vertex_count;
+  context->VertexData.insert( context->VertexData.end(), begin, end );
+  context->Indices.insert( context->Indices.end(), loaded_indices.begin(), loaded_indices.end() );
+
+  context->VertexPositions.reserve( context->VertexData.size() );
+
+  std::transform(
+      begin,
+      end,
+      std::back_inserter( context->VertexPositions ),
+      []( VertexData const& vd ) { return ShadowVertex{ vd.PositionX, vd.PositionY, vd.PositionZ, vd.PositionW }; } );
+
+  uint32_t meshlet_vert_start = ( uint32_t )context->MeshletVertices.size();
+  uint32_t triangle_start     = ( uint32_t )context->MeshletTriangles.size();
+  std::ranges::transform(
+      meshlets,
+      std::back_inserter( context->Meshlets ),
+      [&]( meshopt_Meshlet const& m )
+      {
+        return Meshlet{
+          .VertexOffset   = m.vertex_offset + meshlet_vert_start,
+          .TriangleOffset = m.triangle_offset + triangle_start,
+          .VertexCount    = m.vertex_count,
+          .TriangleCount  = m.triangle_count,
+        };
+      } );
+
+  context->MeshletTriangles.insert(
+      context->MeshletTriangles.end(), meshlet_triangles.begin(), meshlet_triangles.end() );
+  context->MeshletVertices.insert( context->MeshletVertices.end(), meshlet_vertices.begin(), meshlet_vertices.end() );
 
   Geometry* geometry = World::GeometryManager().Copy( context->Geometry );
 
@@ -510,9 +511,8 @@ void Ember::ModelLoader::ProcessPrimitive(
             mat  = MaterialComp{ material };
             geom = GeometryComp{ geometry };
             prim = {
-              ( uint32_t )index_start,
-              ( uint32_t )index_count,
-              ( uint32_t )vertex_start,
+              ( uint32_t )index_start,     ( uint32_t )index_count, ( uint32_t )vertex_start,
+              ( uint32_t )meshlets.size(), meshlet_start,
             };
             bb.AABB = prim_aabb;
           } )
@@ -611,6 +611,32 @@ Ember::Material* Ember::ModelLoader::TryProcessMaterial( LoadingContext* context
   return new_material;
 }
 
+Ember::Material* Ember::ModelLoader::GetDefaultMaterial( LoadingContext* context ) const
+{
+  if ( auto location = context->MaterialCache.find( nullptr ); location != context->MaterialCache.end() )
+  {
+    return World::MaterialManager().Copy( location->second );
+  }
+
+  MaterialHandle material_handle = m_MaterialManager->CreateMaterialHandle( {
+      .BaseColorTexture  = SRVHandle{},
+      .NormalTexture     = SRVHandle{},
+      .MetalRoughTexture = SRVHandle{},
+      .EmissiveTexture   = SRVHandle{},
+      .BaseColorFactor   = DirectX::XMFLOAT4{ 1.0f, 1.0f, 1.0f, 1.0f },
+      .EmissiveFactor    = DirectX::XMFLOAT4{ 0.0f, 0.0f, 0.0f, 0.0f },
+      .EmissiveStrength  = 1.0f,
+      .Metal             = 0.0f,
+      .Rough             = 1.0f,
+  } );
+
+  auto           new_material    = World::MaterialManager().Construct(
+      Texture{}, Texture{}, Texture{}, Texture{}, m_MaterialManager, material_handle );
+  context->MaterialCache.insert_or_assign( nullptr, new_material );
+
+  return new_material;
+}
+
 Ember::ModelLoader::ModelLoader(
     RenderDevice* render_device, World* world, TextureLoader* texture_loader, MaterialManager* material_manager )
   : m_RenderDevice{ render_device }
@@ -669,20 +695,51 @@ std::optional<flecs::entity> Ember::ModelLoader::TryLoadModel( char const* filen
     ProcessNode( &context, entity, *current_scene->nodes[node_idx] );
   }
 
+  wchar_t wide_filename[128];
+  mbstowcs_s( nullptr, wide_filename, filename, _TRUNCATE );
+
+  wchar_t    buf[256];
+
   auto const vertex_position_buffer =
-      m_RenderDevice->CreateVertexBuffer( ByteSizeOf( context.VertexPositions ), sizeof( context.VertexPositions[0] ) );
+      m_RenderDevice->CreateVertexBuffer( ByteSizeOf( context.VertexPositions ), StrideOf( context.VertexPositions ) );
+  swprintf_s( buf, L"Vertex Pos %s", wide_filename );
+  vertex_position_buffer.SetName( buf );
   vertex_position_buffer.Write( 0, ByteSizeOf( context.VertexPositions ), DataOf( context.VertexPositions ) );
 
   auto const vertex_data_buffer =
-      m_RenderDevice->CreateStorageBuffer( ByteSizeOf( context.VertexData ), sizeof( context.VertexData[0] ) );
+      m_RenderDevice->CreateStorageBuffer( ByteSizeOf( context.VertexData ), StrideOf( context.VertexData ) );
+  swprintf_s( buf, L"Vertex Data %s", wide_filename );
+  vertex_data_buffer.SetName( buf );
   vertex_data_buffer.Write( 0, ByteSizeOf( context.VertexData ), DataOf( context.VertexData ) );
 
+  auto const meshlet_buffer =
+      m_RenderDevice->CreateStorageBuffer( ByteSizeOf( context.Meshlets ), StrideOf( context.Meshlets ) );
+  swprintf_s( buf, L"Meshlet Data %s", wide_filename );
+  meshlet_buffer.SetName( buf );
+  meshlet_buffer.Write( 0, ByteSizeOf( context.Meshlets ), DataOf( context.Meshlets ) );
+
+  auto const meshlet_triangle_buffer = m_RenderDevice->CreateRawStorageBuffer( ByteSizeOf( context.MeshletTriangles ) );
+  swprintf_s( buf, L"Meshlet Triangle %s", wide_filename );
+  meshlet_triangle_buffer.SetName( buf );
+  meshlet_triangle_buffer.Write( 0, ByteSizeOf( context.MeshletTriangles ), DataOf( context.MeshletTriangles ) );
+
+  auto const meshlet_vertices_buffer =
+      m_RenderDevice->CreateStorageBuffer( ByteSizeOf( context.MeshletVertices ), StrideOf( context.MeshletVertices ) );
+  swprintf_s( buf, L"Meshlet Vertices %s", wide_filename );
+  meshlet_vertices_buffer.SetName( buf );
+  meshlet_vertices_buffer.Write( 0, ByteSizeOf( context.MeshletVertices ), DataOf( context.MeshletVertices ) );
+
   auto const index_buffer = m_RenderDevice->CreateIndexBuffer( ByteSizeOf( context.Indices ), DXGI_FORMAT_R32_UINT );
+  swprintf_s( buf, L"Index %s", wide_filename );
+  index_buffer.SetName( buf );
   index_buffer.Write( 0, ByteSizeOf( context.Indices ), DataOf( context.Indices ) );
 
-  context.Geometry->ShadowVertexBuffer = vertex_position_buffer;
-  context.Geometry->VertexBuffer       = vertex_data_buffer;
-  context.Geometry->IndexBuffer        = index_buffer;
+  context.Geometry->ShadowVertexBuffer     = std::move( vertex_position_buffer );
+  context.Geometry->VertexBuffer           = std::move( vertex_data_buffer );
+  context.Geometry->IndexBuffer            = std::move( index_buffer );
+  context.Geometry->MeshletBuffer          = std::move( meshlet_buffer );
+  context.Geometry->MeshletTrianglesBuffer = std::move( meshlet_triangle_buffer );
+  context.Geometry->MeshletVerticesBuffer  = std::move( meshlet_vertices_buffer );
 
   cgltf_free( gltf_model );
   World::GeometryManager().Destroy( context.Geometry );
