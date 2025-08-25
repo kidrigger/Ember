@@ -3,9 +3,9 @@
 
 cbuffer Block
 {
-  RID  g_EnvCubeHandle;
-  RID  g_OutputCubeHandle;
-  uint g_CubeSide;
+  ResID g_EnvCubeHandle;
+  ResID g_OutputCubeHandle;
+  uint  g_CubeSide;
 }
 
 SamplerState g_Sampler : register( s0, space0 );

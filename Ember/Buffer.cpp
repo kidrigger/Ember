@@ -92,13 +92,11 @@ ID3D12Resource* Ember::Buffer::GetBuffer() const noexcept
 
 uint32_t Ember::Buffer::GetSize() const noexcept
 {
-  ASSERT( m_Buffer );
   return m_Size;
 }
 
 uint32_t Ember::Buffer::GetOffset() const noexcept
 {
-  ASSERT( m_Buffer );
   return m_Offset;
 }
 

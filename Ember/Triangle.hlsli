@@ -3,6 +3,7 @@
 
 #include "Bindless.hlsli"
 #include "Colors.hlsli"
+#include "Geometry.hlsli"
 #include "LightData.hlsli"
 #include "Quantization.hlsli"
 
@@ -17,10 +18,10 @@ struct Camera
 
 struct Material
 {
-  RID           BaseColorTextureIndex;  // 04
-  RID           NormalTextureIndex;     // 08
-  RID           MetalRoughTextureIndex; // 12
-  RID           EmissiveTextureIndex;   // 16
+  ResID         BaseColorTextureIndex;  // 04
+  ResID         NormalTextureIndex;     // 08
+  ResID         MetalRoughTextureIndex; // 12
+  ResID         EmissiveTextureIndex;   // 16
   PackedColor32 BaseColorFactor;        // 20
   PackedColor32 EmissiveFactor;         // 24
   float         EmissiveStrength;       // 28
@@ -101,60 +102,13 @@ struct Material
   }
 };
 
-struct Meshlet
-{
-  uint VertexOffset;
-  uint TriangleOffset;
-  uint VertexCount;
-  uint TriangleCount;
-};
-
 struct Environment
 {
-  RID Skybox;
-  RID DiffuseIrradiance;
-  RID PrefilterMap;
-  RID BrdfLUT;
+  ResID Skybox;
+  ResID DiffuseIrradiance;
+  ResID PrefilterMap;
+  ResID BrdfLUT;
 };
-
-cbuffer Transform : register( b0, space0 )
-{
-  float4x4 g_Model;
-  float4x4 g_InvModel;
-}
-
-cbuffer DrawInfo : register( b1, space0 )
-{
-  RID  g_MaterialIdx;
-  RID  g_VertexBufferIdx;
-  uint g_FirstVertex;
-  RID  g_MeshletBufferIdx;
-  RID  g_MeshletTrianglesIdx;
-  RID  g_MeshletVerticesIdx;
-  uint g_FirstMeshlet;
-  uint g_FirstIndex;
-}
-
-cbuffer BindlessIndex : register( b2, space0 )
-{
-  RID  g_Materials;
-  RID  g_Camera;
-  RID  g_PointLights;
-  uint g_PointLightCount;
-  uint g_ShadowPointLightCount;
-  RID  g_DirLights;
-  uint g_DirLightCount;
-  uint g_ShadowDirLightCount;
-}
-
-cbuffer EnvironmentBlock : register( b3, space0 )
-{
-  Environment g_Env;
-}
-
-SamplerState           g_DefaultSampler : register( s0, space0 );
-SamplerState           g_ClampedSampler : register( s1, space0 );
-SamplerComparisonState g_ShadowSampler : register( s2, space0 );
 
 struct Vertex
 {
@@ -202,6 +156,42 @@ struct VSOut
   float2 TexCoord[2] : TEXCOORD;
 };
 
-typedef VSOut FSIn;
+struct PSIn
+{
+  float4 ScreenPosition : SV_POSITION;
+  float4 Position : POSITION;
+  float3 Normal : NORMAL;
+  float  LinearDepth : LINEAR_DEPTH;
+  float4 Tangent : TANGENT;
+  float4 Color : COLOR;
+  float2 TexCoord[2] : TEXCOORD;
+  MatID  Material : MATERIAL;
+};
+
+cbuffer DrawListBlock : register( b0, space0 )
+{
+  DrawList g_DrawList;
+}
+
+cbuffer BindlessIndex : register( b1, space0 )
+{
+  ResID g_Materials;
+  ResID g_Camera;
+  ResID g_PointLights;
+  uint  g_PointLightCount;
+  uint  g_ShadowPointLightCount;
+  ResID g_DirLights;
+  uint  g_DirLightCount;
+  uint  g_ShadowDirLightCount;
+}
+
+cbuffer EnvironmentBlock : register( b2, space0 )
+{
+  Environment g_Env;
+}
+
+SamplerState           g_DefaultSampler : register( s0, space0 );
+SamplerState           g_ClampedSampler : register( s1, space0 );
+SamplerComparisonState g_ShadowSampler : register( s2, space0 );
 
 #endif

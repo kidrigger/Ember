@@ -54,25 +54,15 @@ float3 GetAmbientInfluence( BRDFCookTorranceGGX brdf, float3 view_dir )
   float3 specular           = prefiltered_color * ( specular_part * env_brdf.x + env_brdf.y );
 
   float3 diffuse            = brdf.Albedo * SampleIrradiance( brdf.Normal );
-  // #ifdef _DEBUG
-  //   if ( ( PushConstant.DebugFlags & USE_DIFFUSE_BIT ) == 0 )
-  //   {
-  //     DiffuseIrradiance = 0.0f.xxx;
-  //   }
-  //   if ( ( PushConstant.DebugFlags & USE_SPECULAR_BIT ) == 0 )
-  //   {
-  //     Specular = 0.0f.xxx;
-  //   }
-  // #endif
 
   return ( diffuse_part * diffuse + specular ) * brdf.Occlusion;
 }
 
 
-float4 TrianglePS( FSIn IN ) : SV_TARGET0
+float4 TrianglePS( PSIn IN ) : SV_TARGET0
 {
   StructuredBuffer<Material> materials = ResourceDescriptorHeap[g_Materials];
-  Material                   mat       = materials[g_MaterialIdx];
+  Material                   mat       = materials[NonUniformResourceIndex( IN.Material )];
 
   float4                     albedo    = IN.Color * mat.GetAlbedo( IN.TexCoord[0], g_DefaultSampler );
   float3 normal      = mat.GetNormal( IN.Normal, IN.Tangent, IN.Position.xyz, IN.TexCoord[0], g_DefaultSampler );

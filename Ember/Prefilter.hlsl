@@ -7,9 +7,9 @@ const static uint kMaxPrefilterLoD = 5;
 
 cbuffer           Block : register( b0, space0 )
 {
-  RID   g_Skybox;
+  ResID g_Skybox;
   uint  g_SkyboxSide;
-  RID   g_OutputTextureHandle;
+  ResID g_OutputTextureHandle;
   uint  g_OutputSide;
   float g_Roughness;
 }

@@ -18,6 +18,8 @@ class Camera;
 
 class BasicApp final : public IApp
 {
+  using RenderQueryType = flecs::query<WorldTransform const, Mesh const, Geometry const, Material const>;
+
   HWND                           m_WindowHandle{ nullptr };
   uint32_t                       m_WindowWidth{ 1280 };
   uint32_t                       m_WindowHeight{ 720 };
@@ -47,10 +49,10 @@ class BasicApp final : public IApp
   std::unique_ptr<LightManager>        m_LightManager;
 
   std::unique_ptr<Environment>         m_Environment;
-  Buffer                               m_PerFrameWorldTransformBuffer[RenderDevice::kNumFrames];
   std::unique_ptr<MaterialManager>     m_MaterialManager;
   World                                m_World;
-  flecs::query<>                       m_WorldTransformQuery;
+  DrawList                             m_DrawList;
+  RenderQueryType                      m_RenderQuery;
 
   void                                 SetupRenderPipeline();
 
@@ -63,7 +65,7 @@ public:
 
   void        LoadContent() override;
   void        Update() override;
-  void        RenderScene( ID3D12GraphicsCommandList6* command_list, uint32_t frame_idx ) const;
+  void        RenderScene( ID3D12GraphicsCommandList6* command_list, uint32_t frame_idx );
   void        Render() override;
   void        UnloadContent() override;
 

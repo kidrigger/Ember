@@ -3,6 +3,8 @@
 #include "Util/Profiling.hpp"
 
 #include "Material.hpp"
+#include "RenderDevice.hpp"
+#include "Util/DataUtil.hpp"
 
 DirectX::XMMATRIX Ember::LocalTransform::GetTransform() const
 {
@@ -122,6 +124,58 @@ Ember::ObjectPool<Ember::MaterialImpl>& Ember::World::MaterialManager()
 {
   static ObjectPool<MaterialImpl> manager;
   return manager;
+}
+
+Ember::DrawList::DrawList( RenderDevice* render_device, uint32_t const frame_count )
+  : m_RenderDevice{ render_device }, m_TransformBuffers{ frame_count }, m_DrawBuffers{ frame_count }
+{}
+
+void Ember::DrawList::PushDraw(
+    WorldTransform const& transform, Mesh const& mesh, Geometry const& geometry, Material const& material )
+{
+  uint32_t const transform_idx = ( uint32_t )m_Transforms.size();
+  m_Transforms.push_back( transform );
+  m_DrawInfos.emplace_back(
+      transform_idx,
+      1,
+      mesh.FirstVertex,
+      mesh.FirstMeshlet,
+      mesh.MeshletCount,
+      geometry->MeshletBuffer.GetSRVHandle(),
+      geometry->MeshletTriangleBuffer.GetSRVHandle(),
+      geometry->MeshletIndexBuffer.GetSRVHandle(),
+      geometry->VertexBuffer.GetSRVHandle(),
+      material->GetHandle() );
+}
+
+Ember::DrawList::Info Ember::DrawList::PrepareFrame( uint32_t const frame_idx )
+{
+  uint32_t const transform_size   = ByteSizeOf( m_Transforms );
+  Buffer*        transform_buffer = &m_TransformBuffers[frame_idx];
+
+  if ( transform_buffer->GetSize() < transform_size )
+  {
+    *transform_buffer = m_RenderDevice->CreateStorageBuffer( transform_size, StrideOf( m_Transforms ) );
+  }
+
+  uint32_t const draw_size   = ByteSizeOf( m_DrawInfos );
+  Buffer*        draw_buffer = &m_DrawBuffers[frame_idx];
+
+  if ( draw_buffer->GetSize() < draw_size )
+  {
+    *draw_buffer = m_RenderDevice->CreateStorageBuffer( draw_size, StrideOf( m_DrawInfos ) );
+  }
+
+  transform_buffer->Write( 0, transform_size, DataOf( m_Transforms ) );
+  draw_buffer->Write( 0, draw_size, DataOf( m_DrawInfos ) );
+
+  return { transform_buffer->GetSRVHandle(), draw_buffer->GetSRVHandle(), CountOf( m_DrawInfos ) };
+}
+
+void Ember::DrawList::Clear()
+{
+  m_Transforms.clear();
+  m_DrawInfos.clear();
 }
 
 Ember::World::World()

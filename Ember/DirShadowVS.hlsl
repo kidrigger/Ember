@@ -7,8 +7,8 @@ cbuffer QuickTransform : register( b0 )
 
 cbuffer LightInfo : register( b1 )
 {
-  RID  g_LightData;
-  uint g_LightIdx;
+  ResID g_LightData;
+  uint  g_LightIdx;
 }
 
 struct VSOut

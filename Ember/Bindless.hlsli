@@ -8,7 +8,8 @@ bool              IsValidHandle( uint handle )
   return handle != kInvalidIndex;
 }
 
-typedef uint RID;
+typedef uint ResID;
+typedef uint MatID;
 typedef uint SamplerID;
 
 #endif

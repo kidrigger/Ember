@@ -3,9 +3,9 @@
 
 cbuffer PCB : register( b0, space0 )
 {
-  RID  g_EqrectHandle;
-  RID  g_OutputCubemapHandle;
-  uint g_CubeSide;
+  ResID g_EqrectHandle;
+  ResID g_OutputCubemapHandle;
+  uint  g_CubeSide;
 }
 
 SamplerState g_EqrectSampler : register( s0, space0 );

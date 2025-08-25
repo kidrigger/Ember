@@ -13,7 +13,7 @@ struct PointLight
   PackedColor32 Color;       // 20
   float         Intensity;   // 24
   float         Attenuation; // 28
-  RID           ShadowIdx;   // 32
+  ResID         ShadowIdx;   // 32
 };
 
 struct DirLight
@@ -24,7 +24,7 @@ struct DirLight
   float         Cascade5;                    // 416
   PackedColor32 Color;                       // 420
   float         Intensity;                   // 424
-  RID           ShadowIdx;                   // 428
+  ResID         ShadowIdx;                   // 428
   uint          Pad;                         // 432
 };
 

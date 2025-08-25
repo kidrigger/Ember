@@ -18,8 +18,6 @@
 #include "Util/PerfCounter.hpp"
 #include "Util/Profiling.hpp"
 
-// #define USE_VERTEX_SHADER 1
-
 void ParseArguments( bool* use_warp, uint32_t* client_width, uint32_t* client_height )
 {
   // Parse Args
@@ -261,8 +259,9 @@ Ember::BasicApp::BasicApp(
   , m_SwapchainFormat{ m_RenderDevice->FetchSwapchainFormat() }
   , m_Camera{ std::make_unique<Camera>() }
   , m_LightManager{ std::make_unique_for_overwrite<LightManager>() }
-  , m_MaterialManager{ std::make_unique_for_overwrite<MaterialManager>() }
   , m_Environment{ std::make_unique<Environment>() }
+  , m_MaterialManager{ std::make_unique_for_overwrite<MaterialManager>() }
+  , m_DrawList{ m_RenderDevice.get(), RenderDevice::kNumFrames }
 {
   m_TextureLoader = std::make_unique_for_overwrite<TextureLoader>();
   TextureLoader::Create( m_TextureLoader.get(), m_RenderDevice.get(), 3 );
@@ -312,17 +311,14 @@ Ember::BasicApp::~BasicApp() // NOLINT(modernize-use-equals-default)
 
 void Ember::BasicApp::SetupRenderPipeline()
 {
-#if defined( USE_VERTEX_SHADER )
-  ComPtr<ID3DBlob> vertex_shader_blob;
-  ERR_ABORT( D3DReadFileToBlob( L"TriangleVS.cso", &vertex_shader_blob ) );
-#else
+  ComPtr<ID3DBlob> amp_shader_blob;
+  ERR_ABORT( D3DReadFileToBlob( L"TriangleAS.cso", &amp_shader_blob ) );
   ComPtr<ID3DBlob> mesh_shader_blob;
   ERR_ABORT( D3DReadFileToBlob( L"TriangleMS.cso", &mesh_shader_blob ) );
-#endif
   ComPtr<ID3DBlob> pixel_shader_blob;
   ERR_ABORT( D3DReadFileToBlob( L"TrianglePS.cso", &pixel_shader_blob ) );
-  ComPtr<ID3DBlob> bg_vertex_shader_blob;
-  ERR_ABORT( D3DReadFileToBlob( L"BackgroundVS.cso", &bg_vertex_shader_blob ) );
+  ComPtr<ID3DBlob> bg_mesh_shader_blob;
+  ERR_ABORT( D3DReadFileToBlob( L"BackgroundMS.cso", &bg_mesh_shader_blob ) );
   ComPtr<ID3DBlob> bg_pixel_shader_blob;
   ERR_ABORT( D3DReadFileToBlob( L"BackgroundPS.cso", &bg_pixel_shader_blob ) );
 
@@ -342,18 +338,17 @@ void Ember::BasicApp::SetupRenderPipeline()
                                 D3D12_COMPARISON_FUNC_LESS_EQUAL, D3D12_STATIC_BORDER_COLOR_OPAQUE_WHITE },
   };
 
-  D3D12_ROOT_SIGNATURE_FLAGS const root_signature_flags =
-      D3D12_ROOT_SIGNATURE_FLAG_CBV_SRV_UAV_HEAP_DIRECTLY_INDEXED |
-      D3D12_ROOT_SIGNATURE_FLAG_SAMPLER_HEAP_DIRECTLY_INDEXED |
-      D3D12_ROOT_SIGNATURE_FLAG_DENY_AMPLIFICATION_SHADER_ROOT_ACCESS |
-      D3D12_ROOT_SIGNATURE_FLAG_DENY_GEOMETRY_SHADER_ROOT_ACCESS |
-      D3D12_ROOT_SIGNATURE_FLAG_DENY_DOMAIN_SHADER_ROOT_ACCESS | D3D12_ROOT_SIGNATURE_FLAG_DENY_HULL_SHADER_ROOT_ACCESS;
+  D3D12_ROOT_SIGNATURE_FLAGS const root_signature_flags = D3D12_ROOT_SIGNATURE_FLAG_CBV_SRV_UAV_HEAP_DIRECTLY_INDEXED |
+                                                          D3D12_ROOT_SIGNATURE_FLAG_SAMPLER_HEAP_DIRECTLY_INDEXED |
+                                                          D3D12_ROOT_SIGNATURE_FLAG_DENY_VERTEX_SHADER_ROOT_ACCESS |
+                                                          D3D12_ROOT_SIGNATURE_FLAG_DENY_GEOMETRY_SHADER_ROOT_ACCESS |
+                                                          D3D12_ROOT_SIGNATURE_FLAG_DENY_DOMAIN_SHADER_ROOT_ACCESS |
+                                                          D3D12_ROOT_SIGNATURE_FLAG_DENY_HULL_SHADER_ROOT_ACCESS;
 
-  CD3DX12_ROOT_PARAMETER1 root_parameters[4];
-  root_parameters[0].InitAsConstants( sizeof( WorldTransform ) / 4, 0 );
-  root_parameters[1].InitAsConstants( sizeof( PerMeshConstants ) / 4, 1 );
-  root_parameters[2].InitAsConstants( sizeof( PerFrameConstants ) / 4, 2 );
-  root_parameters[3].InitAsConstants( sizeof( Environment::GpuRepr ) / 4, 3 );
+  CD3DX12_ROOT_PARAMETER1 root_parameters[3];
+  root_parameters[0].InitAsConstants( sizeof( DrawList::Info ) / 4, 0 );
+  root_parameters[1].InitAsConstants( sizeof( PerFrameConstants ) / 4, 1 );
+  root_parameters[2].InitAsConstants( sizeof( Environment::GpuRepr ) / 4, 2 );
 
   CD3DX12_VERSIONED_ROOT_SIGNATURE_DESC root_signature_desc;
   root_signature_desc.Init_1_1(
@@ -389,13 +384,10 @@ void Ember::BasicApp::SetupRenderPipeline()
 
   struct MainPipelineStream
   {
-    CD3DX12_PIPELINE_STATE_STREAM_ROOT_SIGNATURE     RootSignature;
-    CD3DX12_PIPELINE_STATE_STREAM_PRIMITIVE_TOPOLOGY PrimitiveTopologyType;
-#if defined( USE_VERTEX_SHADER )
-    CD3DX12_PIPELINE_STATE_STREAM_VS VS;
-#else
-    CD3DX12_PIPELINE_STATE_STREAM_MS MS;
-#endif
+    CD3DX12_PIPELINE_STATE_STREAM_ROOT_SIGNATURE        RootSignature;
+    CD3DX12_PIPELINE_STATE_STREAM_PRIMITIVE_TOPOLOGY    PrimitiveTopologyType;
+    CD3DX12_PIPELINE_STATE_STREAM_AS                    AS;
+    CD3DX12_PIPELINE_STATE_STREAM_MS                    MS;
     CD3DX12_PIPELINE_STATE_STREAM_PS                    PS;
     CD3DX12_PIPELINE_STATE_STREAM_RASTERIZER2           Rasterizer;
     CD3DX12_PIPELINE_STATE_STREAM_RENDER_TARGET_FORMATS RTVFormats;
@@ -405,22 +397,19 @@ void Ember::BasicApp::SetupRenderPipeline()
   MainPipelineStream pipeline_stream = {
     .RootSignature         = m_RootSignature.Get(),
     .PrimitiveTopologyType = D3D12_PRIMITIVE_TOPOLOGY_TYPE_TRIANGLE,
-#if defined( USE_VERTEX_SHADER )
-    .VS = CD3DX12_SHADER_BYTECODE( vertex_shader_blob.Get() ),
-#else
-    .MS = CD3DX12_SHADER_BYTECODE( mesh_shader_blob.Get() ),
-#endif
-    .PS         = CD3DX12_SHADER_BYTECODE( pixel_shader_blob.Get() ),
-    .Rasterizer = rasterizer_desc,
-    .RTVFormats = rtv_formats,
-    .DSVFormat  = DXGI_FORMAT_D32_FLOAT,
+    .AS                    = CD3DX12_SHADER_BYTECODE( amp_shader_blob.Get() ),
+    .MS                    = CD3DX12_SHADER_BYTECODE( mesh_shader_blob.Get() ),
+    .PS                    = CD3DX12_SHADER_BYTECODE( pixel_shader_blob.Get() ),
+    .Rasterizer            = rasterizer_desc,
+    .RTVFormats            = rtv_formats,
+    .DSVFormat             = DXGI_FORMAT_D32_FLOAT,
   };
 
   struct BackgroundPipelineStream
   {
     CD3DX12_PIPELINE_STATE_STREAM_ROOT_SIGNATURE        RootSignature;
     CD3DX12_PIPELINE_STATE_STREAM_PRIMITIVE_TOPOLOGY    PrimitiveTopologyType;
-    CD3DX12_PIPELINE_STATE_STREAM_VS                    VS;
+    CD3DX12_PIPELINE_STATE_STREAM_MS                    MS;
     CD3DX12_PIPELINE_STATE_STREAM_PS                    PS;
     CD3DX12_PIPELINE_STATE_STREAM_RASTERIZER2           Rasterizer;
     CD3DX12_PIPELINE_STATE_STREAM_DEPTH_STENCIL         DepthStencil;
@@ -432,7 +421,7 @@ void Ember::BasicApp::SetupRenderPipeline()
   BackgroundPipelineStream bg_pipeline_stream = {
     .RootSignature         = m_RootSignature.Get(),
     .PrimitiveTopologyType = D3D12_PRIMITIVE_TOPOLOGY_TYPE_TRIANGLE,
-    .VS                    = CD3DX12_SHADER_BYTECODE( bg_vertex_shader_blob.Get() ),
+    .MS                    = CD3DX12_SHADER_BYTECODE( bg_mesh_shader_blob.Get() ),
     .PS                    = CD3DX12_SHADER_BYTECODE( bg_pixel_shader_blob.Get() ),
     .Rasterizer            = rasterizer_desc,
     .DepthStencil          = depth_stencil_desc,
@@ -491,23 +480,23 @@ void Ember::BasicApp::LoadContent()
                 lt.Translation = DirectX::XMVectorSet( 0.0f, 1.0f, 5.0f, 1.0f );
               } );
 
-  model                    = m_ModelLoader->TryLoadModel( "DamagedHelmet.glb" )->child_of( rm );
-  LocalTransform* local_tx = model.get_mut<LocalTransform>();
-  local_tx->Scale          = DirectX::XMVectorSet( 0.3f, 0.3f, 0.3f, 0.0f );
-  local_tx->Rotation       = DirectX::XMQuaternionIdentity();
+  model                             = m_ModelLoader->TryLoadModel( "DamagedHelmet.glb" )->child_of( rm );
+  LocalTransform* local_tx          = model.get_mut<LocalTransform>();
+  local_tx->Scale                   = DirectX::XMVectorSet( 0.3f, 0.3f, 0.3f, 0.0f );
+  local_tx->Rotation                = DirectX::XMQuaternionIdentity();
 
-  model                    = m_ModelLoader->TryLoadModel( "NormalTangentTest.glb" ).value();
-  local_tx                 = model.get_mut<LocalTransform>();
-  local_tx->Translation    = DirectX::XMVectorSet( 3.0f, 2.0f, 7.0f, 1.0f );
+  model                             = m_ModelLoader->TryLoadModel( "NormalTangentTest.glb" ).value();
+  local_tx                          = model.get_mut<LocalTransform>();
+  local_tx->Translation             = DirectX::XMVectorSet( 3.0f, 2.0f, 7.0f, 1.0f );
 
-  model                    = m_ModelLoader->TryLoadModel( "NormalTangentMirrorTest.glb" ).value();
-  local_tx                 = model.get_mut<LocalTransform>();
-  local_tx->Translation    = DirectX::XMVectorSet( 6.0f, 2.0f, 7.0f, 1.0f );
+  model                             = m_ModelLoader->TryLoadModel( "NormalTangentMirrorTest.glb" ).value();
+  local_tx                          = model.get_mut<LocalTransform>();
+  local_tx->Translation             = DirectX::XMVectorSet( 6.0f, 2.0f, 7.0f, 1.0f );
 
-  // constexpr char const* kEnvMapFile = "OvercastSoil.hdr";
-  // bool const            env_loaded =
-  //     Environment::TryLoadFrom( m_Environment.get(), m_RenderDevice.get(), m_TextureLoader.get(), kEnvMapFile );
-  // ASSERT( env_loaded );
+  constexpr char const* kEnvMapFile = "OvercastSoil.hdr";
+  bool const            env_loaded =
+      Environment::TryLoadFrom( m_Environment.get(), m_RenderDevice.get(), m_TextureLoader.get(), kEnvMapFile );
+  ASSERT( env_loaded );
 
   SetupRenderPipeline();
 
@@ -529,12 +518,7 @@ void Ember::BasicApp::LoadContent()
   m_PrevMouseX    = g_Input.MousePosX;
   m_PrevMouseY    = g_Input.MousePosY;
 
-  for ( auto& world_tx : m_PerFrameWorldTransformBuffer )
-  {
-    world_tx = m_RenderDevice->CreateStorageBuffer( sizeof( WorldTransform ) * 1'000'000, sizeof( WorldTransform ) );
-  }
-
-  m_WorldTransformQuery = m_World.GetECS().query_builder().with<WorldTransform const>().with<Mesh const>().build();
+  m_RenderQuery   = m_World.GetECS().query<WorldTransform const, Mesh const, Geometry const, Material const>();
 }
 
 void Ember::BasicApp::Update()
@@ -617,7 +601,7 @@ void Ember::BasicApp::Update()
   DebugInfo::Instance().ClearFrame();
 }
 
-void Ember::BasicApp::RenderScene( ID3D12GraphicsCommandList6* command_list, uint32_t frame_idx ) const
+void Ember::BasicApp::RenderScene( ID3D12GraphicsCommandList6* command_list, uint32_t frame_idx )
 {
   ZoneScoped;
 
@@ -664,49 +648,12 @@ void Ember::BasicApp::RenderScene( ID3D12GraphicsCommandList6* command_list, uin
     .DirLightShadowCount  = m_LightManager->GetShadowingDirLightCount(),
   };
 
-  command_list->SetGraphicsRoot32BitConstants( 2, sizeof( PerFrameConstants ) / 4, &constants, 0 );
-  command_list->SetGraphicsRoot32BitConstants( 3, sizeof( Environment::GpuRepr ) / 4, &m_Environment->Repr(), 0 );
+  command_list->SetGraphicsRoot32BitConstants( 1, sizeof( PerFrameConstants ) / 4, &constants, 0 );
+  command_list->SetGraphicsRoot32BitConstants( 2, sizeof( Environment::GpuRepr ) / 4, &m_Environment->Repr(), 0 );
 
-  {
-    m_World.CullFrustum( camera_frustum );
-
-    ZoneScopedN( "RecordCmdList" );
-
-    m_World.GetECS().each(
-        [&]( WorldTransform const& wt,
-             CullInfo const&       cull_info,
-             Mesh const&           mesh,
-             Material const&       material,
-             Geometry const&       geometry )
-        {
-          if ( cull_info.AreAnyCulled( UINT64_MAX ) ) return;
-
-#if defined( USE_VERTEX_SHADER )
-          command_list->IASetIndexBuffer( &geometry->IndexBuffer.GetIndexBufferView() );
-#endif
-
-          PerMeshConstants const mesh_constants = {
-            .MaterialIdx      = material->GetHandle(),
-            .VertexBuffer     = geometry->VertexBuffer.GetSRVHandle(),
-            .FirstVertex      = mesh.FirstVertex,
-            .MeshletBuffer    = geometry->MeshletBuffer.GetSRVHandle(),
-            .MeshletTriangles = geometry->MeshletTrianglesBuffer.GetSRVHandle(),
-            .MeshletVertices  = geometry->MeshletVerticesBuffer.GetSRVHandle(),
-            .FirstMeshlet     = mesh.FirstMeshlet,
-            .FirstIndex       = mesh.FirstIndex,
-          };
-
-          command_list->SetGraphicsRoot32BitConstants( 0, sizeof( WorldTransform ) / 4, &wt, 0 );
-          command_list->SetGraphicsRoot32BitConstants( 1, sizeof( PerMeshConstants ) / 4, &mesh_constants, 0 );
-
-          DebugInfo::Instance().PushDrawCall( mesh.IndexCount );
-#if defined( USE_VERTEX_SHADER )
-          command_list->DrawIndexedInstanced( mesh.IndexCount, 1, mesh.FirstIndex, mesh.FirstVertex, 0 );
-#else
-          command_list->DispatchMesh( mesh.MeshletCount, 1, 1 );
-#endif
-        } );
-  }
+  DrawList::Info const draw_list_info = m_DrawList.PrepareFrame( frame_idx );
+  command_list->SetGraphicsRoot32BitConstants( 0, sizeof( DrawList::Info ) / 4, &draw_list_info, 0 );
+  command_list->DispatchMesh( draw_list_info.DrawCount, 1, 1 );
 }
 
 void Ember::BasicApp::Render()
@@ -719,22 +666,13 @@ void Ember::BasicApp::Render()
 
   DirectX::BoundingFrustum const camera_frustum = m_Camera->GetLastUpdatedFrustum();
 
+  m_DrawList.Clear();
+
   {
     ZoneScopedN( "Upload Transforms" );
-    size_t world_tx_offset = 0;
-    /*m_WorldTransformQuery.run(
-        [&]( flecs::iter& iter )
-        {
-          while ( iter.next() )
-          {
-            auto         tx   = iter.field<WorldTransform const>( 1 );
-
-            size_t const size = iter.count() * sizeof( WorldTransform );
-            m_PerFrameWorldTransformBuffer[frame_idx].Write( world_tx_offset, size, &tx[0] );
-
-            world_tx_offset += size;
-          }
-        } );*/
+    m_RenderQuery.each(
+        [&]( WorldTransform const& wt, Mesh const& mesh, Geometry const& geometry, Material const& material )
+        { m_DrawList.PushDraw( wt, mesh, geometry, material ); } );
   }
 
   // All resources for this frame are guaranteed to be available for CPU modification at this time.
@@ -755,7 +693,7 @@ void Ember::BasicApp::Render()
   RenderScene( command_list.Get(), frame_idx );
 
   command_list->SetPipelineState( m_BackgroundPipeline.Get() );
-  command_list->DrawInstanced( 3, 1, 0, 0 );
+  command_list->DispatchMesh( 1, 1, 1 );
 
   CD3DX12_RESOURCE_BARRIER post_render_barriers[] = {
     CD3DX12_RESOURCE_BARRIER::Transition(

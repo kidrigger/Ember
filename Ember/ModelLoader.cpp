@@ -735,12 +735,12 @@ std::optional<flecs::entity> Ember::ModelLoader::TryLoadModel( char const* filen
   index_buffer.SetName( buf );
   index_buffer.Write( 0, ByteSizeOf( context.Indices ), DataOf( context.Indices ) );
 
-  context.Geometry->ShadowVertexBuffer     = std::move( vertex_position_buffer );
-  context.Geometry->VertexBuffer           = std::move( vertex_data_buffer );
-  context.Geometry->IndexBuffer            = std::move( index_buffer );
-  context.Geometry->MeshletBuffer          = std::move( meshlet_buffer );
-  context.Geometry->MeshletTrianglesBuffer = std::move( meshlet_triangle_buffer );
-  context.Geometry->MeshletVerticesBuffer  = std::move( meshlet_vertices_buffer );
+  context.Geometry->ShadowVertexBuffer    = std::move( vertex_position_buffer );
+  context.Geometry->VertexBuffer          = std::move( vertex_data_buffer );
+  context.Geometry->IndexBuffer           = std::move( index_buffer );
+  context.Geometry->MeshletBuffer         = std::move( meshlet_buffer );
+  context.Geometry->MeshletTriangleBuffer = std::move( meshlet_triangle_buffer );
+  context.Geometry->MeshletIndexBuffer    = std::move( meshlet_vertices_buffer );
 
   cgltf_free( gltf_model );
   World::GeometryManager().Destroy( context.Geometry );

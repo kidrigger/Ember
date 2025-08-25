@@ -8,7 +8,7 @@ cbuffer QuickTransforms : register( b0 )
   float4x4 g_Transform;
   float3   g_LightPosition;
   float    g_FarPlane;
-  RID      g_ProjViewID;
+  ResID    g_ProjViewID;
 }
 
 struct ProjectionTransforms

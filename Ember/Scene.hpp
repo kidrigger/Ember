@@ -11,6 +11,7 @@
 
 namespace Ember
 {
+class RenderDevice;
 class MaterialImpl;
 
 struct LocalTransform
@@ -60,8 +61,8 @@ struct GeometryImpl
   Buffer               VertexBuffer;
   Buffer               IndexBuffer;
   Buffer               MeshletBuffer;
-  Buffer               MeshletVerticesBuffer;
-  Buffer               MeshletTrianglesBuffer;
+  Buffer               MeshletIndexBuffer;
+  Buffer               MeshletTriangleBuffer;
   std::atomic_uint32_t RefCount{ 1 };
 
   uint32_t             AddRef();
@@ -108,6 +109,45 @@ struct Mesh
   uint32_t FirstVertex;
   uint32_t MeshletCount;
   uint32_t FirstMeshlet;
+};
+
+struct alignas( 16 ) MeshDraw
+{
+  uint32_t       FirstTransform;
+  uint32_t       TransformCount;
+  uint32_t       FirstVertex;
+  uint32_t       FirstMeshlet;
+  uint32_t       MeshletCount;
+  SRVHandle      MeshletBuffer;
+  SRVHandle      MeshletTriangleBuffer;
+  SRVHandle      MeshletIndexBuffer;
+  SRVHandle      VertexBuffer;
+  MaterialHandle Material;
+  uint32_t       Padding[2];
+};
+
+class DrawList
+{
+  RenderDevice*               m_RenderDevice;
+  std::vector<WorldTransform> m_Transforms;
+  std::vector<MeshDraw>       m_DrawInfos;
+  std::vector<Buffer>         m_TransformBuffers;
+  std::vector<Buffer>         m_DrawBuffers;
+
+public:
+  struct Info
+  {
+    SRVHandle Transforms;
+    SRVHandle DrawInfos;
+    uint32_t  DrawCount;
+  };
+
+  DrawList( RenderDevice* render_device, uint32_t frame_count );
+
+  void PushDraw(
+      WorldTransform const& transform, Mesh const& draw_info, Geometry const& geometry, Material const& material );
+  Info PrepareFrame( uint32_t frame_idx );
+  void Clear();
 };
 
 class World
