@@ -78,14 +78,14 @@ class ModelLoader
 
   struct LoadingContext
   {
-    std::map<cgltf_material const*, Material*> MaterialCache;
-    Geometry*                                  Geometry;
-    std::vector<Meshlet>                       Meshlets;
-    std::vector<uint32_t>                      MeshletVertices;
-    std::vector<byte>                          MeshletTriangles;
-    std::vector<ShadowVertex>                  VertexPositions;
-    std::vector<VertexData>                    VertexData;
-    std::vector<uint32_t>                      Indices;
+    std::map<cgltf_material const*, MaterialImpl*> MaterialCache;
+    GeometryImpl*                                  Geometry;
+    std::vector<Meshlet>                           Meshlets;
+    std::vector<uint32_t>                          MeshletVertices;
+    std::vector<byte>                              MeshletTriangles;
+    std::vector<ShadowVertex>                      VertexPositions;
+    std::vector<VertexData>                        VertexData;
+    std::vector<uint32_t>                          Indices;
   };
 
   RenderDevice*    m_RenderDevice;
@@ -94,11 +94,11 @@ class ModelLoader
   MaterialManager* m_MaterialManager;
 
   flecs::entity    ProcessNode( LoadingContext* context, flecs::entity parent, cgltf_node const& node );
-  void      ProcessPrimitive( LoadingContext* context, flecs::entity owning, cgltf_primitive const& primitive ) const;
-  void      ProcessMesh( LoadingContext* context, flecs::entity owning, cgltf_mesh const& mesh ) const;
-  bool      TryLoadTexture( Texture* texture, cgltf_image const& image, ColorSpaceOverride color_space_override ) const;
-  Material* TryProcessMaterial( LoadingContext* context, cgltf_material const* material ) const;
-  Material* GetDefaultMaterial( LoadingContext* context ) const;
+  void ProcessPrimitive( LoadingContext* context, flecs::entity owning, cgltf_primitive const& primitive ) const;
+  void ProcessMesh( LoadingContext* context, flecs::entity owning, cgltf_mesh const& mesh ) const;
+  bool TryLoadTexture( Texture* texture, cgltf_image const& image, ColorSpaceOverride color_space_override ) const;
+  MaterialImpl* TryProcessMaterial( LoadingContext* context, cgltf_material const* material ) const;
+  MaterialImpl* GetDefaultMaterial( LoadingContext* context ) const;
 
 public:
   std::optional<flecs::entity> TryLoadModel( char const* filename );

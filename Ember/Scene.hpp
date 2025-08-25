@@ -11,7 +11,7 @@
 
 namespace Ember
 {
-class Material;
+class MaterialImpl;
 
 struct LocalTransform
 {
@@ -54,7 +54,7 @@ struct CullInfo
   void               ClearCulled( uint64_t mask );
 };
 
-struct Geometry
+struct GeometryImpl
 {
   Buffer               ShadowVertexBuffer;
   Buffer               VertexBuffer;
@@ -69,30 +69,36 @@ struct Geometry
   uint32_t             GetRefCount();
 };
 
-struct MaterialComp
+class Material
 {
-  Material* Material{ nullptr };
+  MaterialImpl* m_Impl{ nullptr };
 
-  MaterialComp() = default;
-  explicit MaterialComp( Ember::Material* material );
-  MaterialComp( MaterialComp const& other ) = delete;
-  MaterialComp( MaterialComp&& other ) noexcept;
-  MaterialComp& operator=( MaterialComp const& other ) = delete;
-  MaterialComp& operator=( MaterialComp&& other ) noexcept;
-  ~MaterialComp();
+public:
+  MaterialImpl* operator->() const;
+
+  Material() = default;
+  explicit Material( MaterialImpl* material );
+  Material( Material const& other ) = delete;
+  Material( Material&& other ) noexcept;
+  Material& operator=( Material const& other ) = delete;
+  Material& operator=( Material&& other ) noexcept;
+  ~Material();
 };
 
-struct GeometryComp
+class Geometry
 {
-  Geometry* Geometry{ nullptr };
+  GeometryImpl* m_Impl{ nullptr };
 
-  GeometryComp() = default;
-  explicit GeometryComp( Ember::Geometry* geometry );
-  GeometryComp( GeometryComp const& other ) = delete;
-  GeometryComp( GeometryComp&& other ) noexcept;
-  GeometryComp& operator=( GeometryComp const& other ) = delete;
-  GeometryComp& operator=( GeometryComp&& other ) noexcept;
-  ~GeometryComp();
+public:
+  GeometryImpl* operator->() const;
+
+  Geometry() = default;
+  explicit Geometry( GeometryImpl* geometry );
+  Geometry( Geometry const& other ) = delete;
+  Geometry( Geometry&& other ) noexcept;
+  Geometry& operator=( Geometry const& other ) = delete;
+  Geometry& operator=( Geometry&& other ) noexcept;
+  ~Geometry();
 };
 
 struct Mesh
@@ -113,11 +119,11 @@ class World
   flecs::query<WorldBoundingBox>                                               m_PrimeCollectingWorldAABBQuery;
   flecs::query<WorldBoundingBox, WorldBoundingBox const>                       m_UpdateWorldAABBQuery;
   flecs::query<CullInfo, WorldBoundingBox const, CullInfo const>               m_CullDescentQuery;
-  flecs::query<WorldTransform const, CullInfo const, Mesh const, MaterialComp const, GeometryComp const> m_RenderQuery;
+  flecs::query<WorldTransform const, CullInfo const, Mesh const, Material const, Geometry const> m_RenderQuery;
 
 public:
-  static ObjectPool<Geometry>& GeometryManager();
-  static ObjectPool<Material>& MaterialManager();
+  static ObjectPool<GeometryImpl>& GeometryManager();
+  static ObjectPool<MaterialImpl>& MaterialManager();
 
   World();
 

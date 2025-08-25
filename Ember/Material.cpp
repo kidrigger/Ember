@@ -2,19 +2,19 @@
 
 #include "MaterialManager.hpp"
 
-Ember::Material::ReprInfo::ReprInfo( MaterialManager* const manager, MaterialHandle handle )
+Ember::MaterialImpl::ReprInfo::ReprInfo( MaterialManager* const manager, MaterialHandle handle )
   : Manager{ manager }, Handle{ std::move( handle ) }
 {
   ASSERT( manager );
 }
 
-Ember::Material::ReprInfo::ReprInfo( ReprInfo&& other ) noexcept
+Ember::MaterialImpl::ReprInfo::ReprInfo( ReprInfo&& other ) noexcept
   : Manager{ other.Manager }, Handle{ std::move( other.Handle ) }
 {
   other.Manager = nullptr;
 }
 
-Ember::Material::ReprInfo& Ember::Material::ReprInfo::operator=( ReprInfo&& other ) noexcept
+Ember::MaterialImpl::ReprInfo& Ember::MaterialImpl::ReprInfo::operator=( ReprInfo&& other ) noexcept
 {
   if ( this == &other ) return *this;
   if ( Manager ) Manager->Free( Handle );
@@ -26,34 +26,34 @@ Ember::Material::ReprInfo& Ember::Material::ReprInfo::operator=( ReprInfo&& othe
   return *this;
 }
 
-Ember::Material::ReprInfo::~ReprInfo()
+Ember::MaterialImpl::ReprInfo::~ReprInfo()
 {
   if ( not Manager ) return;
 
   Manager->Free( Handle );
 }
 
-uint32_t Ember::Material::AddRef()
+uint32_t Ember::MaterialImpl::AddRef()
 {
   return ++m_RefCount;
 }
 
-uint32_t Ember::Material::Release()
+uint32_t Ember::MaterialImpl::Release()
 {
   return --m_RefCount;
 }
 
-uint32_t Ember::Material::GetRefCount()
+uint32_t Ember::MaterialImpl::GetRefCount()
 {
   return m_RefCount;
 }
 
-Ember::MaterialHandle Ember::Material::GetHandle() const
+Ember::MaterialHandle Ember::MaterialImpl::GetHandle() const
 {
   return m_Repr.Handle;
 }
 
-Ember::Material::Material(
+Ember::MaterialImpl::MaterialImpl(
     Texture                base_color_texture,
     Texture                normal_texture,
     Texture                metal_rough_texture,

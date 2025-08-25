@@ -256,12 +256,12 @@ void Ember::ModelLoader::ProcessPrimitive(
   loaded_indices.resize( index_count );
   cgltf_accessor_unpack_indices( primitive.indices, loaded_indices.data(), sizeof( uint32_t ), index_count );
 
-  // Material
+  // MaterialImpl
 
-  Material* material = nullptr;
+  MaterialImpl* material = nullptr;
   if ( primitive.material )
   {
-    // TODO: Default Material.
+    // TODO: Default MaterialImpl.
     material = TryProcessMaterial( context, primitive.material );
   }
   else
@@ -494,7 +494,7 @@ void Ember::ModelLoader::ProcessPrimitive(
       context->MeshletTriangles.end(), meshlet_triangles.begin(), meshlet_triangles.end() );
   context->MeshletVertices.insert( context->MeshletVertices.end(), meshlet_vertices.begin(), meshlet_vertices.end() );
 
-  Geometry* geometry = World::GeometryManager().Copy( context->Geometry );
+  GeometryImpl* geometry = World::GeometryManager().Copy( context->Geometry );
 
   ( void )m_World->GetECS()
       .entity()
@@ -504,12 +504,12 @@ void Ember::ModelLoader::ProcessPrimitive(
                CullInfo&,
                WorldBoundingBox&,
                Mesh&             prim,
-               MaterialComp&     mat,
-               GeometryComp&     geom,
+               Material&         mat,
+               Geometry&         geom,
                LocalBoundingBox& bb )
           {
-            mat  = MaterialComp{ material };
-            geom = GeometryComp{ geometry };
+            mat  = Material{ material };
+            geom = Geometry{ geometry };
             prim = {
               ( uint32_t )index_start,     ( uint32_t )index_count, ( uint32_t )vertex_start,
               ( uint32_t )meshlets.size(), meshlet_start,
@@ -519,7 +519,8 @@ void Ember::ModelLoader::ProcessPrimitive(
       .child_of( owning );
 }
 
-Ember::Material* Ember::ModelLoader::TryProcessMaterial( LoadingContext* context, cgltf_material const* material ) const
+Ember::MaterialImpl* Ember::ModelLoader::TryProcessMaterial(
+    LoadingContext* context, cgltf_material const* material ) const
 {
   if ( auto location = context->MaterialCache.find( material ); location != context->MaterialCache.end() )
   {
@@ -603,7 +604,7 @@ Ember::Material* Ember::ModelLoader::TryProcessMaterial( LoadingContext* context
       .Rough             = roughness,
   } );
 
-  Material*      new_material    = World::MaterialManager().Construct(
+  MaterialImpl*  new_material    = World::MaterialManager().Construct(
       base_color_texture, normal_texture, metal_rough_texture, emissive_texture, m_MaterialManager, material_handle );
 
   context->MaterialCache.insert_or_assign( material, new_material );
@@ -611,7 +612,7 @@ Ember::Material* Ember::ModelLoader::TryProcessMaterial( LoadingContext* context
   return new_material;
 }
 
-Ember::Material* Ember::ModelLoader::GetDefaultMaterial( LoadingContext* context ) const
+Ember::MaterialImpl* Ember::ModelLoader::GetDefaultMaterial( LoadingContext* context ) const
 {
   if ( auto location = context->MaterialCache.find( nullptr ); location != context->MaterialCache.end() )
   {

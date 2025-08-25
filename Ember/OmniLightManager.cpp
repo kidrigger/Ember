@@ -409,12 +409,12 @@ void Ember::Internal::OmniLightManager::RenderOmniShadow(
   world.CullSphere( sphere_of_influence );
 
   world.GetECS().each(
-      [&]( WorldTransform const& wt, CullInfo const& cull_info, Mesh const& mesh, GeometryComp const& geometry )
+      [&]( WorldTransform const& wt, CullInfo const& cull_info, Mesh const& mesh, Geometry const& geometry )
       {
         if ( cull_info.AreAnyCulled( 0x1 ) ) return;
 
-        command_list->IASetIndexBuffer( &geometry.Geometry->IndexBuffer.GetIndexBufferView() );
-        command_list->IASetVertexBuffers( 0, 1, &geometry.Geometry->ShadowVertexBuffer.GetVertexBufferView() );
+        command_list->IASetIndexBuffer( &geometry->IndexBuffer.GetIndexBufferView() );
+        command_list->IASetVertexBuffers( 0, 1, &geometry->ShadowVertexBuffer.GetVertexBufferView() );
 
         command_list->SetGraphicsRoot32BitConstants( 0, sizeof( DirectX::XMMATRIX ) / 4, &wt.Transform, 0 );
 

@@ -19,7 +19,7 @@ class MaterialManager
   uint32_t constexpr static kPageIndexMask    = ~kElementIndexMask;
   uint32_t constexpr static kPageIndexOffset  = kElementBits;
 
-  using Page                                  = std::array<Material::GpuRepr, kElementsPerPage>;
+  using Page                                  = std::array<MaterialImpl::GpuRepr, kElementsPerPage>;
 
   RabbitPullingFreeList m_FreeList;
   std::deque<Page>      m_Pages;
@@ -33,7 +33,7 @@ public:
 
   static void Create( MaterialManager* material_manager, RenderDevice* render_device, uint32_t max_materials );
 
-  [[nodiscard]] MaterialHandle CreateMaterialHandle( Material::GpuRepr const& material );
+  [[nodiscard]] MaterialHandle CreateMaterialHandle( MaterialImpl::GpuRepr const& material );
   void                         Free( MaterialHandle handle );
 
   void                         UpdateReprs();

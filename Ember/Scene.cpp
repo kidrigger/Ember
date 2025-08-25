@@ -39,78 +39,88 @@ void Ember::CullInfo::ClearCulled( uint64_t const mask )
   CullMask &= ~mask;
 }
 
-uint32_t Ember::Geometry::AddRef()
+uint32_t Ember::GeometryImpl::AddRef()
 {
   return ++RefCount;
 }
 
-uint32_t Ember::Geometry::Release()
+uint32_t Ember::GeometryImpl::Release()
 {
   return --RefCount;
 }
 
-uint32_t Ember::Geometry::GetRefCount()
+uint32_t Ember::GeometryImpl::GetRefCount()
 {
   return RefCount;
 }
 
-Ember::MaterialComp::MaterialComp( Ember::Material* const material ) : Material{ material }
-{}
-
-Ember::MaterialComp::MaterialComp( MaterialComp&& other ) noexcept : Material{ other.Material }
+Ember::MaterialImpl* Ember::Material::operator->() const
 {
-  other.Material = nullptr;
+  return m_Impl;
 }
 
-Ember::MaterialComp& Ember::MaterialComp::operator=( MaterialComp&& other ) noexcept
+Ember::Material::Material( Ember::MaterialImpl* const material ) : m_Impl{ material }
+{}
+
+Ember::Material::Material( Material&& other ) noexcept : m_Impl{ other.m_Impl }
+{
+  other.m_Impl = nullptr;
+}
+
+Ember::Material& Ember::Material::operator=( Material&& other ) noexcept
 {
   if ( this == &other ) return *this;
 
-  World::MaterialManager().Destroy( Material );
-  Material       = other.Material;
-  other.Material = nullptr;
+  World::MaterialManager().Destroy( m_Impl );
+  m_Impl       = other.m_Impl;
+  other.m_Impl = nullptr;
 
   return *this;
 }
 
-Ember::MaterialComp::~MaterialComp()
+Ember::Material::~Material()
 {
-  World::MaterialManager().Destroy( Material );
+  World::MaterialManager().Destroy( m_Impl );
 }
 
-Ember::GeometryComp::GeometryComp( Ember::Geometry* const geometry ) : Geometry{ geometry }
+Ember::GeometryImpl* Ember::Geometry::operator->() const
+{
+  return m_Impl;
+}
+
+Ember::Geometry::Geometry( Ember::GeometryImpl* const geometry ) : m_Impl{ geometry }
 {}
 
-Ember::GeometryComp::GeometryComp( GeometryComp&& other ) noexcept : Geometry{ other.Geometry }
+Ember::Geometry::Geometry( Geometry&& other ) noexcept : m_Impl{ other.m_Impl }
 {
-  other.Geometry = nullptr;
+  other.m_Impl = nullptr;
 }
 
-Ember::GeometryComp& Ember::GeometryComp::operator=( GeometryComp&& other ) noexcept
+Ember::Geometry& Ember::Geometry::operator=( Geometry&& other ) noexcept
 {
   if ( this == &other ) return *this;
 
-  World::GeometryManager().Destroy( Geometry );
-  Geometry       = other.Geometry;
-  other.Geometry = nullptr;
+  World::GeometryManager().Destroy( m_Impl );
+  m_Impl       = other.m_Impl;
+  other.m_Impl = nullptr;
 
   return *this;
 }
 
-Ember::GeometryComp::~GeometryComp()
+Ember::Geometry::~Geometry()
 {
-  World::GeometryManager().Destroy( Geometry );
+  World::GeometryManager().Destroy( m_Impl );
 }
 
-Ember::ObjectPool<Ember::Geometry>& Ember::World::GeometryManager()
+Ember::ObjectPool<Ember::GeometryImpl>& Ember::World::GeometryManager()
 {
-  static ObjectPool<Geometry> manager;
+  static ObjectPool<GeometryImpl> manager;
   return manager;
 }
 
-Ember::ObjectPool<Ember::Material>& Ember::World::MaterialManager()
+Ember::ObjectPool<Ember::MaterialImpl>& Ember::World::MaterialManager()
 {
-  static ObjectPool<Material> manager;
+  static ObjectPool<MaterialImpl> manager;
   return manager;
 }
 
@@ -137,8 +147,7 @@ Ember::World::World()
       m_Ecs.query_builder<CullInfo, WorldBoundingBox const, CullInfo const>().term_at( 2 ).parent().cascade().build();
 
   m_RenderQuery =
-      m_Ecs.query_builder<WorldTransform const, CullInfo const, Mesh const, MaterialComp const, GeometryComp const>()
-          .build();
+      m_Ecs.query_builder<WorldTransform const, CullInfo const, Mesh const, Material const, Geometry const>().build();
 }
 
 void Ember::World::Update( float ) const

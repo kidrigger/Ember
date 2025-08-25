@@ -676,22 +676,22 @@ void Ember::BasicApp::RenderScene( ID3D12GraphicsCommandList6* command_list, uin
         [&]( WorldTransform const& wt,
              CullInfo const&       cull_info,
              Mesh const&           mesh,
-             MaterialComp const&   material,
-             GeometryComp const&   geometry )
+             Material const&       material,
+             Geometry const&       geometry )
         {
           if ( cull_info.AreAnyCulled( UINT64_MAX ) ) return;
 
 #if defined( USE_VERTEX_SHADER )
-          command_list->IASetIndexBuffer( &geometry.Geometry->IndexBuffer.GetIndexBufferView() );
+          command_list->IASetIndexBuffer( &geometry->IndexBuffer.GetIndexBufferView() );
 #endif
 
           PerMeshConstants const mesh_constants = {
-            .MaterialIdx      = material.Material->GetHandle(),
-            .VertexBuffer     = geometry.Geometry->VertexBuffer.GetSRVHandle(),
+            .MaterialIdx      = material->GetHandle(),
+            .VertexBuffer     = geometry->VertexBuffer.GetSRVHandle(),
             .FirstVertex      = mesh.FirstVertex,
-            .MeshletBuffer    = geometry.Geometry->MeshletBuffer.GetSRVHandle(),
-            .MeshletTriangles = geometry.Geometry->MeshletTrianglesBuffer.GetSRVHandle(),
-            .MeshletVertices  = geometry.Geometry->MeshletVerticesBuffer.GetSRVHandle(),
+            .MeshletBuffer    = geometry->MeshletBuffer.GetSRVHandle(),
+            .MeshletTriangles = geometry->MeshletTrianglesBuffer.GetSRVHandle(),
+            .MeshletVertices  = geometry->MeshletVerticesBuffer.GetSRVHandle(),
             .FirstMeshlet     = mesh.FirstMeshlet,
             .FirstIndex       = mesh.FirstIndex,
           };

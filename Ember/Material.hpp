@@ -8,7 +8,7 @@ namespace Ember
 {
 class MaterialManager;
 
-class Material
+class MaterialImpl
 {
 public:
   struct alignas( 16 ) GpuRepr
@@ -56,7 +56,7 @@ public:
 
   MaterialHandle GetHandle() const;
 
-  Material(
+  MaterialImpl(
       Texture          base_color_texture,
       Texture          normal_texture,
       Texture          metal_rough_texture,
