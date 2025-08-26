@@ -39,8 +39,10 @@ void TriangleMS(
   StructuredBuffer<Vertex>    vertex_buffer     = ResourceDescriptorHeap[meshlet_draw.VertexBuffer];
   ConstantBuffer<Camera>      camera            = ResourceDescriptorHeap[g_Camera];
 
-  Meshlet                     meshlet   = meshlets[NonUniformResourceIndex( IN.GroupID.x + meshlet_draw.FirstMeshlet )];
-  Transform                   transform = transforms[NonUniformResourceIndex( meshlet_draw.Transform )];
+  uint                        meshlet_idx       = meshlet_draw.MeshletID[IN.GroupID.x] + meshlet_draw.FirstMeshlet;
+
+  Meshlet                     meshlet           = meshlets[NonUniformResourceIndex( meshlet_idx )];
+  Transform                   transform         = transforms[NonUniformResourceIndex( meshlet_draw.Transform )];
 
   SetMeshOutputCounts( meshlet.VertexCount, meshlet.TriangleCount );
 

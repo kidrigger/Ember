@@ -135,17 +135,27 @@ void Ember::DrawList::PushDraw(
 {
   uint32_t const transform_idx = ( uint32_t )m_Transforms.size();
   m_Transforms.push_back( transform );
-  m_DrawInfos.emplace_back(
-      transform_idx,
-      1,
-      mesh.FirstVertex,
-      mesh.FirstMeshlet,
-      mesh.MeshletCount,
-      geometry->MeshletBuffer.GetSRVHandle(),
-      geometry->MeshletTriangleBuffer.GetSRVHandle(),
-      geometry->MeshletIndexBuffer.GetSRVHandle(),
-      geometry->VertexBuffer.GetSRVHandle(),
-      material->GetHandle() );
+
+  int remaining_meshlets = ( int )mesh.MeshletCount;
+  int meshlet_offset     = ( int )mesh.FirstMeshlet;
+
+  while ( remaining_meshlets > 0 )
+  {
+    m_DrawInfos.emplace_back(
+        transform_idx,
+        1,
+        mesh.FirstVertex,
+        meshlet_offset,
+        std::min( remaining_meshlets, 32 ),
+        geometry->MeshletBuffer.GetSRVHandle(),
+        geometry->MeshletTriangleBuffer.GetSRVHandle(),
+        geometry->MeshletIndexBuffer.GetSRVHandle(),
+        geometry->VertexBuffer.GetSRVHandle(),
+        material->GetHandle() );
+
+    remaining_meshlets -= 32;
+    meshlet_offset     += 32;
+  }
 }
 
 Ember::DrawList::Info Ember::DrawList::PrepareFrame( uint32_t const frame_idx )

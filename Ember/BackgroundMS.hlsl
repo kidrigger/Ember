@@ -1,5 +1,5 @@
-#include "Utility.hlsli"
 #include "Triangle.hlsli"
+#include "Utility.hlsli"
 
 struct BackgroundOut
 {
@@ -19,7 +19,7 @@ void BackgroundMS( uint3 dt_id : SV_DispatchThreadID, out vertices BackgroundOut
 {
   ConstantBuffer<Camera> camera = ResourceDescriptorHeap[g_Camera];
 
-  SetMeshOutputCounts(3, 1);
+  SetMeshOutputCounts( 3, 1 );
 
   for ( int i = 0; i < 3; i++ )
   {

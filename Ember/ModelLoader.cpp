@@ -482,11 +482,28 @@ void Ember::ModelLoader::ProcessPrimitive(
       std::back_inserter( context->Meshlets ),
       [&]( meshopt_Meshlet const& m )
       {
+        meshopt_Bounds bounds = meshopt_computeMeshletBounds(
+            meshlet_vertices.data() + m.vertex_offset,
+            meshlet_triangles.data() + m.triangle_offset,
+            m.triangle_count,
+            ( float* )&loaded_data[0].Position,
+            vertex_count,
+            StrideOf( loaded_data ) );
+
+        uint16_t const center_x = meshopt_quantizeHalf( bounds.center[0] );
+        uint16_t const center_y = meshopt_quantizeHalf( bounds.center[1] );
+        uint16_t const center_z = meshopt_quantizeHalf( bounds.center[2] );
+        uint16_t const radius   = meshopt_quantizeHalf( bounds.radius );
+
         return Meshlet{
           .VertexOffset   = m.vertex_offset + meshlet_vert_start,
           .TriangleOffset = m.triangle_offset + triangle_start,
           .VertexCount    = m.vertex_count,
           .TriangleCount  = m.triangle_count,
+          .CenterX        = center_x,
+          .CenterY        = center_y,
+          .CenterZ        = center_z,
+          .Radius         = radius,
         };
       } );
 

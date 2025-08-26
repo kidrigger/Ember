@@ -14,6 +14,7 @@ struct Camera
   float4x4 View;
   float4x4 InvView;
   float4   Position;
+  float4   CullInfo; // x = h_slope, y = v_slope, z = near, w = far
 };
 
 struct Material
@@ -110,39 +111,17 @@ struct Environment
   ResID BrdfLUT;
 };
 
-struct Vertex
+struct MeshletPayload
 {
-  half4         Position;    // 08
-  uint          Normal;      // 12
-  uint          Tangent;     // 16
-  PackedColor32 Color;       // 20
-  half2         TexCoord[2]; // 28
-  uint          Padding0;    // 32
-
-  float4        GetPosition()
-  {
-    return Position;
-  }
-
-  float4 GetNormal()
-  {
-    return float4( 2.0f * UnpackR10G10B10A2Unorm( Normal ).xyz - 1.0f, 0.0f );
-  }
-
-  float4 GetTangent()
-  {
-    return 2.0f * UnpackR10G10B10A2Unorm( Tangent ) - 1.0f;
-  }
-
-  float4 GetColor()
-  {
-    return UnpackColor32( Color );
-  }
-
-  float2 GetTexCoord( uint idx )
-  {
-    return TexCoord[idx];
-  }
+  uint MeshletID[32];
+  uint Transform;
+  uint FirstVertex;
+  uint FirstMeshlet;
+  ResID MeshletBuffer;
+  ResID MeshletTriangleBuffer;
+  ResID MeshletIndexBuffer;
+  ResID VertexBuffer;
+  MatID Material;
 };
 
 struct VSOut

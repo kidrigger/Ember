@@ -68,6 +68,10 @@ struct Meshlet
   uint32_t TriangleOffset;
   uint32_t VertexCount;
   uint32_t TriangleCount;
+  uint16_t CenterX;
+  uint16_t CenterY;
+  uint16_t CenterZ;
+  uint16_t Radius;
 };
 
 class ModelLoader

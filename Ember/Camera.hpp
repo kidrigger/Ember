@@ -17,6 +17,7 @@ public:
     DirectX::XMMATRIX View{ DirectX::XMMatrixIdentity() };
     DirectX::XMMATRIX InvView{ DirectX::XMMatrixIdentity() };
     DirectX::XMVECTOR Position{ DirectX::XMVectorZero() };
+    DirectX::XMFLOAT4 CullInfo{ 1.0f, 1.0f, 0.1f, 100.0f };
   };
 
 private:

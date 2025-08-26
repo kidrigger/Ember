@@ -480,23 +480,23 @@ void Ember::BasicApp::LoadContent()
                 lt.Translation = DirectX::XMVectorSet( 0.0f, 1.0f, 5.0f, 1.0f );
               } );
 
-  model                             = m_ModelLoader->TryLoadModel( "DamagedHelmet.glb" )->child_of( rm );
-  LocalTransform* local_tx          = model.get_mut<LocalTransform>();
-  local_tx->Scale                   = DirectX::XMVectorSet( 0.3f, 0.3f, 0.3f, 0.0f );
-  local_tx->Rotation                = DirectX::XMQuaternionIdentity();
+  model                    = m_ModelLoader->TryLoadModel( "DamagedHelmet.glb" )->child_of( rm );
+  LocalTransform* local_tx = model.get_mut<LocalTransform>();
+  local_tx->Scale          = DirectX::XMVectorSet( 0.3f, 0.3f, 0.3f, 0.0f );
+  local_tx->Rotation       = DirectX::XMQuaternionIdentity();
 
-  model                             = m_ModelLoader->TryLoadModel( "NormalTangentTest.glb" ).value();
-  local_tx                          = model.get_mut<LocalTransform>();
-  local_tx->Translation             = DirectX::XMVectorSet( 3.0f, 2.0f, 7.0f, 1.0f );
+  model                    = m_ModelLoader->TryLoadModel( "NormalTangentTest.glb" ).value();
+  local_tx                 = model.get_mut<LocalTransform>();
+  local_tx->Translation    = DirectX::XMVectorSet( 3.0f, 2.0f, 7.0f, 1.0f );
 
-  model                             = m_ModelLoader->TryLoadModel( "NormalTangentMirrorTest.glb" ).value();
-  local_tx                          = model.get_mut<LocalTransform>();
-  local_tx->Translation             = DirectX::XMVectorSet( 6.0f, 2.0f, 7.0f, 1.0f );
+  model                    = m_ModelLoader->TryLoadModel( "NormalTangentMirrorTest.glb" ).value();
+  local_tx                 = model.get_mut<LocalTransform>();
+  local_tx->Translation    = DirectX::XMVectorSet( 6.0f, 2.0f, 7.0f, 1.0f );
 
-  constexpr char const* kEnvMapFile = "OvercastSoil.hdr";
-  bool const            env_loaded =
-      Environment::TryLoadFrom( m_Environment.get(), m_RenderDevice.get(), m_TextureLoader.get(), kEnvMapFile );
-  ASSERT( env_loaded );
+  // constexpr char const* kEnvMapFile = "OvercastSoil.hdr";
+  // bool const            env_loaded =
+  //     Environment::TryLoadFrom( m_Environment.get(), m_RenderDevice.get(), m_TextureLoader.get(), kEnvMapFile );
+  // ASSERT( env_loaded );
 
   SetupRenderPipeline();
 
@@ -537,14 +537,17 @@ void Ember::BasicApp::Update()
   float const               yaw            = m_Camera->GetYaw();
   swprintf_s(
       m_SprintfBuffer,
-      L"Ember %ux%u | frame time: %.2lf ms (%.2lf fps) | MeshDraws: %llu, Primitives: %llu | Camera: %.2f %.2f %.2f @ "
-      L"%.2f %.2f",
+      L"Ember %ux%u"
+      L" | frame time: %.2lf ms (%.2lf fps)"
+      L"| MeshDraws: %llu, Primitives: %llu, MeshletCount: %llu "
+      L"| Camera: %.2f %.2f %.2f @ %.2f %.2f",
       m_WindowWidth,
       m_WindowHeight,
       avg_delta_ms,
       avg_fps,
       pipeline_stats.ASInvocations,
       pipeline_stats.MSPrimitives,
+      pipeline_stats.MSInvocations,
       cam_pos.m128_f32[0],
       cam_pos.m128_f32[1],
       cam_pos.m128_f32[2],
