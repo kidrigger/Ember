@@ -5,7 +5,6 @@
 #include <utility>
 
 #include "Camera.hpp"
-#include "DebugInfo.hpp"
 #include "Environment.hpp"
 #include "LightManager.hpp"
 #include "Material.hpp"
@@ -291,7 +290,8 @@ void Ember::BasicApp::Create( BasicApp* app, HINSTANCE const instance_handle )
   auto render_device = std::make_unique_for_overwrite<RenderDevice>();
   RenderDevice::Create( render_device.get(), window_handle, use_warp );
 
-  auto perf_counter          = std::make_unique<PerfCounter>();
+  auto perf_counter = std::make_unique_for_overwrite<PerfCounter>();
+  PerfCounter::Create( perf_counter.get(), render_device->GetDevice().Get(), RenderDevice::kNumFrames );
 
   auto render_target_manager = std::make_unique_for_overwrite<RenderTargetManager>();
   RenderTargetManager::Create( render_target_manager.get(), render_device.get() );
@@ -527,25 +527,24 @@ void Ember::BasicApp::Update()
 
   m_PerfCounter->Tick();
 
-  double const              avg_delta_ms    = m_PerfCounter->GetAvgFrameTime();
-  double const              avg_fps         = 1000.0f / avg_delta_ms;
+  double const              avg_delta_ms   = m_PerfCounter->GetAvgFrameTime();
+  double const              avg_fps        = 1000.0f / avg_delta_ms;
 
-  size_t const              vertex_count    = DebugInfo::Instance().GetVertexCount();
-  size_t const              draw_call_count = DebugInfo::Instance().GetDrawCallCount();
+  auto&                     pipeline_stats = m_PerfCounter->GetPipelineStats();
 
-  DirectX::FXMVECTOR const& cam_pos         = m_Camera->GetPosition();
-  float const               pitch           = m_Camera->GetPitch();
-  float const               yaw             = m_Camera->GetYaw();
+  DirectX::FXMVECTOR const& cam_pos        = m_Camera->GetPosition();
+  float const               pitch          = m_Camera->GetPitch();
+  float const               yaw            = m_Camera->GetYaw();
   swprintf_s(
       m_SprintfBuffer,
-      L"Ember %ux%u | frame time: %.2lf ms (%.2lf fps) | DrawCalls: %llu, Vertices: %llu | Camera: %.2f %.2f %.2f @ "
+      L"Ember %ux%u | frame time: %.2lf ms (%.2lf fps) | MeshDraws: %llu, Primitives: %llu | Camera: %.2f %.2f %.2f @ "
       L"%.2f %.2f",
       m_WindowWidth,
       m_WindowHeight,
       avg_delta_ms,
       avg_fps,
-      draw_call_count,
-      vertex_count,
+      pipeline_stats.ASInvocations,
+      pipeline_stats.MSPrimitives,
       cam_pos.m128_f32[0],
       cam_pos.m128_f32[1],
       cam_pos.m128_f32[2],
@@ -597,8 +596,6 @@ void Ember::BasicApp::Update()
   m_World.Update( delta_seconds );
 
   g_Input.Update();
-
-  DebugInfo::Instance().ClearFrame();
 }
 
 void Ember::BasicApp::RenderScene( ID3D12GraphicsCommandList6* command_list, uint32_t frame_idx )
@@ -681,6 +678,9 @@ void Ember::BasicApp::Render()
     CD3DX12_RESOURCE_BARRIER::Transition( backbuffer, D3D12_RESOURCE_STATE_PRESENT, D3D12_RESOURCE_STATE_COPY_DEST ),
   };
 
+  m_PerfCounter->UpdatePipelineStats( frame_idx );
+  m_PerfCounter->BeginQuery( command_list.Get(), frame_idx );
+
   command_list->ResourceBarrier( CountOf( top_of_renderpass_barriers ), DataOf( top_of_renderpass_barriers ) );
   m_TextureLoader->FlushBarriers( command_list.Get() );
 
@@ -709,6 +709,8 @@ void Ember::BasicApp::Render()
         m_RenderTexture.GetTexture(), D3D12_RESOURCE_STATE_COPY_SOURCE, D3D12_RESOURCE_STATE_RENDER_TARGET ),
   };
   command_list->ResourceBarrier( CountOf( bottom_of_renderpass_barriers ), DataOf( bottom_of_renderpass_barriers ) );
+
+  m_PerfCounter->EndQuery( command_list.Get(), frame_idx );
 
   m_RenderDevice->ExecuteCommandList( std::move( command_list ) );
 

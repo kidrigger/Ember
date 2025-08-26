@@ -221,9 +221,6 @@
     <ClInclude Include="Camera.hpp">
       <Filter>Header Files\Scene</Filter>
     </ClInclude>
-    <ClInclude Include="DebugInfo.hpp">
-      <Filter>Header Files\Debug</Filter>
-    </ClInclude>
     <ClInclude Include="Util\FlatMap.hpp">
       <Filter>Header Files\Util</Filter>
     </ClInclude>
@@ -348,6 +345,7 @@
     <FxCompile Include="TriangleAS.hlsl">
       <Filter>Shaders\Meshes</Filter>
     </FxCompile>
+    <FxCompile Include="BackgroundMS.hlsl" />
   </ItemGroup>
   <ItemGroup>
     <CopyFileToFolders Include="Assets\container2.png">

@@ -1,4 +1,9 @@
-﻿# Plan for Ember development
+﻿# Additional Information
+
+config flag STRIP_META_INFO is used to remove all the device profiling information from the build.
+Possibly good for deployment.
+
+# Plan for Ember development
 
 - [X] Open a window
 - [X] Setup D3D12 Device Interface

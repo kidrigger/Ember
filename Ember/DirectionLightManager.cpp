@@ -1,6 +1,5 @@
 #include "DirectionLightManager.hpp"
 
-#include "DebugInfo.hpp"
 #include "ModelLoader.hpp"
 #include "RenderDevice.hpp"
 #include "RenderTargetManager.hpp"
@@ -454,7 +453,6 @@ void Ember::Internal::DirectionLightManager::RenderDirShadow(
 
         command_list->SetGraphicsRoot32BitConstants( 0, sizeof( DirectX::XMMATRIX ) / 4, &wt.Transform, 0 );
 
-        DebugInfo::Instance().PushDrawCall( mesh.IndexCount );
         command_list->DrawIndexedInstanced(
             mesh.IndexCount, kNumCascades, mesh.FirstIndex, ( INT )mesh.FirstVertex, 0 );
       } );

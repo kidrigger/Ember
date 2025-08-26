@@ -194,27 +194,30 @@ void Ember::RenderDevice::Create( RenderDevice* render_device, HWND window_handl
 #endif
   }
 
+  // Verify UAV load support for R11G11B10_FLOAT
   {
     D3D12_FEATURE_DATA_D3D12_OPTIONS feature_data;
     ZeroMemory( &feature_data, sizeof( feature_data ) );
-    if ( SUCCEEDED(
-             device->CheckFeatureSupport( D3D12_FEATURE_D3D12_OPTIONS, &feature_data, sizeof( feature_data ) ) ) )
-    {
-      if ( feature_data.TypedUAVLoadAdditionalFormats )
-      {
-        D3D12_FEATURE_DATA_FORMAT_SUPPORT format_support = { DXGI_FORMAT_R11G11B10_FLOAT,
-                                                             D3D12_FORMAT_SUPPORT1_NONE,
-                                                             D3D12_FORMAT_SUPPORT2_NONE };
-        if ( SUCCEEDED( device->CheckFeatureSupport(
-                 D3D12_FEATURE_FORMAT_SUPPORT, &format_support, sizeof( format_support ) ) ) )
-        {
+    ERR_ABORT( device->CheckFeatureSupport( D3D12_FEATURE_D3D12_OPTIONS, &feature_data, sizeof( feature_data ) ) );
+    ERR_ABORT( feature_data.TypedUAVLoadAdditionalFormats );
 
-          ASSERT(
-              format_support.Support2 &
-              ( D3D12_FORMAT_SUPPORT2_UAV_TYPED_LOAD | D3D12_FORMAT_SUPPORT2_UAV_TYPED_STORE ) );
-        }
-      }
-    }
+    D3D12_FEATURE_DATA_FORMAT_SUPPORT format_support = {
+      DXGI_FORMAT_R11G11B10_FLOAT,
+      D3D12_FORMAT_SUPPORT1_NONE,
+      D3D12_FORMAT_SUPPORT2_NONE,
+    };
+
+    ERR_ABORT( device->CheckFeatureSupport( D3D12_FEATURE_FORMAT_SUPPORT, &format_support, sizeof( format_support ) ) );
+    ENSURE(
+        format_support.Support2 & ( D3D12_FORMAT_SUPPORT2_UAV_TYPED_LOAD | D3D12_FORMAT_SUPPORT2_UAV_TYPED_STORE ) );
+  }
+
+  // Verify Mesh Shader and stats support
+  {
+    D3D12_FEATURE_DATA_D3D12_OPTIONS9 feature_data;
+    ZeroMemory( &feature_data, sizeof( feature_data ) );
+    ERR_ABORT( device->CheckFeatureSupport( D3D12_FEATURE_D3D12_OPTIONS9, &feature_data, sizeof( feature_data ) ) );
+    ENSURE( feature_data.MeshShaderPipelineStatsSupported );
   }
 
   ComPtr<D3D12MA::Allocator> allocator;
