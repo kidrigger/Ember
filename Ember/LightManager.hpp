@@ -44,8 +44,9 @@ public:
 
   //
   void RenderAllShadows(
-      ID3D12GraphicsCommandList*      command_list,
+      ID3D12GraphicsCommandList6*     command_list,
       World const&                    world,
+      DrawList::Info const&           draw_list,
       RenderTargetManager const&      rtm,
       DirectX::BoundingFrustum const& camera_frustum,
       uint32_t                        frame_idx ) const;

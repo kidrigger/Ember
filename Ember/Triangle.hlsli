@@ -113,10 +113,10 @@ struct Environment
 
 struct MeshletPayload
 {
-  uint MeshletID[32];
-  uint Transform;
-  uint FirstVertex;
-  uint FirstMeshlet;
+  uint  MeshletID[32];
+  uint  Transform;
+  uint  FirstVertex;
+  uint  FirstMeshlet;
   ResID MeshletBuffer;
   ResID MeshletTriangleBuffer;
   ResID MeshletIndexBuffer;
@@ -124,7 +124,7 @@ struct MeshletPayload
   MatID Material;
 };
 
-struct VSOut
+struct MSVertexOut
 {
   float4 ScreenPosition : SV_POSITION;
   float4 Position : POSITION;

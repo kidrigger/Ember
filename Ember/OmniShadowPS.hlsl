@@ -1,8 +1,8 @@
 #include "OmniShadow.hlsli"
 
-FSOut OmniShadowPS( FSIn IN )
+PSOut OmniShadowPS( PSIn IN )
 {
-  FSOut OUT;
+  PSOut OUT;
 
   float light_dist = length( IN.WorldPosition.xyz - g_LightPosition );
 

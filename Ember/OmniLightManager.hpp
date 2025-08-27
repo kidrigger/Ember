@@ -20,6 +20,8 @@ namespace Internal
 
 class OmniLightManager
 {
+  using BumpAllocator                             = std::pmr::monotonic_buffer_resource;
+
   uint16_t constexpr static kMaxOmniLights        = 32;
   uint32_t constexpr static kOmniShadowResolution = 1024;
 
@@ -48,6 +50,8 @@ class OmniLightManager
   uint16_t                          m_TotalLightCount{ 0 };
   uint16_t                          m_ShadowingLightCount{ 0 };
   uint8_t                           m_DirtyFrames{ 0 };
+
+  BumpAllocator                     m_BumpAlloc;
 
   static_assert( std::numeric_limits<std::remove_cvref_t<decltype( m_IndirectionMap[0] )>>::max() > kMaxOmniLights );
 
@@ -80,17 +84,17 @@ public:
 
   //
   void RenderAllShadows(
-      ID3D12GraphicsCommandList*      command_list,
-      World const&                    world,
+      ID3D12GraphicsCommandList6*     command_list,
+      DrawList::Info const&           draw_list,
       RenderTargetManager const&      rtm,
-      DirectX::BoundingFrustum const& camera_frustum ) const;
+      DirectX::BoundingFrustum const& camera_frustum );
 
   void RenderOmniShadow(
-      ID3D12GraphicsCommandList* command_list,
-      World const&               world,
-      RenderTargetManager const& rtm,
-      OmniLight const&           omni_light,
-      Texture const&             texture ) const;
+      ID3D12GraphicsCommandList6* command_list,
+      DrawList::Info const&       draw_list,
+      RenderTargetManager const&  rtm,
+      OmniLight const&            omni_light,
+      Texture const&              texture ) const;
 };
 } // namespace Internal
 

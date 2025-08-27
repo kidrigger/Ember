@@ -5,6 +5,19 @@
 #include "Util/DataUtil.hpp"
 #include "Util/Profiling.hpp"
 
+namespace
+{
+struct PackedData
+{
+  Ember::DrawList::Info DrawList;
+  Ember::CBVHandle      ProjViewHandle;
+  DirectX::XMFLOAT3     Position;
+  float                 FarPlane;
+};
+
+static_assert( sizeof( PackedData ) == 32 );
+} // namespace
+
 Ember::Internal::OmniLightManager::OmniLightManager(
     RenderDevice*               render_device,
     Buffer                      projection_buffer,
@@ -56,22 +69,25 @@ void Ember::Internal::OmniLightManager::Create(
         render_device->CreateStorageBuffer( sizeof( OmniLight ) * kMaxOmniLights, sizeof( OmniLight ) ) );
   }
 
-  ComPtr<ID3DBlob> shadow_vs;
-  ERR_ABORT( D3DReadFileToBlob( L"OmniShadowVS.cso", &shadow_vs ) );
+  ComPtr<ID3DBlob> shadow_amp_shader;
+  ERR_ABORT( D3DReadFileToBlob( L"OmniShadowAS.cso", &shadow_amp_shader ) );
 
-  ComPtr<ID3DBlob> shadow_ps;
-  ERR_ABORT( D3DReadFileToBlob( L"OmniShadowPS.cso", &shadow_ps ) );
+  ComPtr<ID3DBlob> shadow_mesh_shader;
+  ERR_ABORT( D3DReadFileToBlob( L"OmniShadowMS.cso", &shadow_mesh_shader ) );
 
-  D3D12_ROOT_SIGNATURE_FLAGS const root_signature_flags =
-      D3D12_ROOT_SIGNATURE_FLAG_ALLOW_INPUT_ASSEMBLER_INPUT_LAYOUT |
-      D3D12_ROOT_SIGNATURE_FLAG_CBV_SRV_UAV_HEAP_DIRECTLY_INDEXED |
-      D3D12_ROOT_SIGNATURE_FLAG_SAMPLER_HEAP_DIRECTLY_INDEXED | D3D12_ROOT_SIGNATURE_FLAG_DENY_MESH_SHADER_ROOT_ACCESS |
-      D3D12_ROOT_SIGNATURE_FLAG_DENY_AMPLIFICATION_SHADER_ROOT_ACCESS |
-      D3D12_ROOT_SIGNATURE_FLAG_DENY_GEOMETRY_SHADER_ROOT_ACCESS |
-      D3D12_ROOT_SIGNATURE_FLAG_DENY_DOMAIN_SHADER_ROOT_ACCESS | D3D12_ROOT_SIGNATURE_FLAG_DENY_HULL_SHADER_ROOT_ACCESS;
+  ComPtr<ID3DBlob> shadow_pixel_shader;
+  ERR_ABORT( D3DReadFileToBlob( L"OmniShadowPS.cso", &shadow_pixel_shader ) );
+
+  D3D12_ROOT_SIGNATURE_FLAGS const root_signature_flags = D3D12_ROOT_SIGNATURE_FLAG_ALLOW_INPUT_ASSEMBLER_INPUT_LAYOUT |
+                                                          D3D12_ROOT_SIGNATURE_FLAG_CBV_SRV_UAV_HEAP_DIRECTLY_INDEXED |
+                                                          D3D12_ROOT_SIGNATURE_FLAG_SAMPLER_HEAP_DIRECTLY_INDEXED |
+                                                          D3D12_ROOT_SIGNATURE_FLAG_DENY_GEOMETRY_SHADER_ROOT_ACCESS |
+                                                          D3D12_ROOT_SIGNATURE_FLAG_DENY_VERTEX_SHADER_ROOT_ACCESS |
+                                                          D3D12_ROOT_SIGNATURE_FLAG_DENY_DOMAIN_SHADER_ROOT_ACCESS |
+                                                          D3D12_ROOT_SIGNATURE_FLAG_DENY_HULL_SHADER_ROOT_ACCESS;
 
   CD3DX12_ROOT_PARAMETER1 root_parameter;
-  root_parameter.InitAsConstants( 2 * sizeof( DirectX::XMMATRIX ) / 4 + sizeof( float ), 0 );
+  root_parameter.InitAsConstants( sizeof( PackedData ) / 4, 0 );
 
   CD3DX12_VERSIONED_ROOT_SIGNATURE_DESC root_signature_desc;
   root_signature_desc.Init_1_1( 1, &root_parameter, 0, nullptr, root_signature_flags );
@@ -90,11 +106,6 @@ void Ember::Internal::OmniLightManager::Create(
       root_signature_blob->GetBufferSize(),
       IID_PPV_ARGS( &shadow_root_sig ) ) );
 
-  D3D12_INPUT_LAYOUT_DESC input_layout = {
-    .pInputElementDescs = DataOf( ShadowVertex::kInputElementDesc ),
-    .NumElements        = CountOf( ShadowVertex::kInputElementDesc ),
-  };
-
   // We scale everything with -z for Left-Handed to Right-Handed correction.
   // So, Front becomes Clockwise instead of the counter-clockwise used in the engine.
   CD3DX12_RASTERIZER_DESC2 rasterizer_desc{ D3D12_DEFAULT };
@@ -104,9 +115,9 @@ void Ember::Internal::OmniLightManager::Create(
   struct PipelineStream
   {
     CD3DX12_PIPELINE_STATE_STREAM_ROOT_SIGNATURE       RootSignature;
-    CD3DX12_PIPELINE_STATE_STREAM_INPUT_LAYOUT         InputLayout;
     CD3DX12_PIPELINE_STATE_STREAM_PRIMITIVE_TOPOLOGY   PrimitiveTopologyType;
-    CD3DX12_PIPELINE_STATE_STREAM_VS                   VS;
+    CD3DX12_PIPELINE_STATE_STREAM_AS                   AS;
+    CD3DX12_PIPELINE_STATE_STREAM_MS                   MS;
     CD3DX12_PIPELINE_STATE_STREAM_PS                   PS;
     CD3DX12_PIPELINE_STATE_STREAM_RASTERIZER2          Rasterizer;
     CD3DX12_PIPELINE_STATE_STREAM_DEPTH_STENCIL_FORMAT DSVFormat;
@@ -114,10 +125,10 @@ void Ember::Internal::OmniLightManager::Create(
 
   PipelineStream pipeline_stream{
     .RootSignature         = shadow_root_sig.Get(),
-    .InputLayout           = input_layout,
     .PrimitiveTopologyType = D3D12_PRIMITIVE_TOPOLOGY_TYPE_TRIANGLE,
-    .VS                    = CD3DX12_SHADER_BYTECODE( shadow_vs.Get() ),
-    .PS                    = CD3DX12_SHADER_BYTECODE( shadow_ps.Get() ),
+    .AS                    = CD3DX12_SHADER_BYTECODE( shadow_amp_shader.Get() ),
+    .MS                    = CD3DX12_SHADER_BYTECODE( shadow_mesh_shader.Get() ),
+    .PS                    = CD3DX12_SHADER_BYTECODE( shadow_pixel_shader.Get() ),
     .Rasterizer            = rasterizer_desc,
     .DSVFormat             = DXGI_FORMAT_D16_UNORM,
   };
@@ -339,10 +350,10 @@ uint16_t Ember::Internal::OmniLightManager::GetShadowingOmniLightCount() const
 }
 
 void Ember::Internal::OmniLightManager::RenderAllShadows(
-    ID3D12GraphicsCommandList*      command_list,
-    World const&                    world,
+    ID3D12GraphicsCommandList6*     command_list,
+    DrawList::Info const&           draw_list,
     RenderTargetManager const&      rtm,
-    DirectX::BoundingFrustum const& camera_frustum ) const
+    DirectX::BoundingFrustum const& camera_frustum )
 {
   ZoneScoped;
   command_list->SetGraphicsRootSignature( m_RootSignature.Get() );
@@ -350,6 +361,26 @@ void Ember::Internal::OmniLightManager::RenderAllShadows(
   command_list->SetDescriptorHeaps( CountOf( bindless_desc_heaps ), DataOf( bindless_desc_heaps ) );
   command_list->SetPipelineState( m_Pipeline.Get() );
   command_list->IASetPrimitiveTopology( D3D_PRIMITIVE_TOPOLOGY_TRIANGLELIST );
+
+  D3D12_RECT const     scissor  = { 0, 0, kOmniShadowResolution, kOmniShadowResolution };
+  D3D12_VIEWPORT const viewport = { 0, 0, kOmniShadowResolution, kOmniShadowResolution, 0.0f, 1.0f };
+
+  command_list->RSSetScissorRects( 1, &scissor );
+  command_list->RSSetViewports( 1, &viewport );
+
+  std::pmr::vector<CD3DX12_RESOURCE_BARRIER> barriers{ m_ShadowsInUse.Size(),
+                                                       std::pmr::polymorphic_allocator( &m_BumpAlloc ) };
+  auto&                                      textures = m_ShadowsInUse.Values();
+  std::ranges::transform(
+      textures,
+      barriers.begin(),
+      []( Texture const& tex )
+      {
+        return CD3DX12_RESOURCE_BARRIER::Transition(
+            tex.GetTexture(), D3D12_RESOURCE_STATE_DEPTH_WRITE, D3D12_RESOURCE_STATE_PIXEL_SHADER_RESOURCE );
+      } );
+
+  command_list->ResourceBarrier( CountOf( barriers ), DataOf( barriers ) );
 
   for ( auto const& [handle, texture] : m_ShadowsInUse )
   {
@@ -362,65 +393,41 @@ void Ember::Internal::OmniLightManager::RenderAllShadows(
     DirectX::BoundingSphere sphere_of_influence{ light.Position, light.Range };
     if ( camera_frustum.Contains( sphere_of_influence ) == DirectX::DISJOINT ) continue;
 
-    RenderOmniShadow( command_list, world, rtm, light, texture );
+    RenderOmniShadow( command_list, draw_list, rtm, light, texture );
   }
+
+  std::ranges::transform(
+      textures,
+      barriers.begin(),
+      []( Texture const& tex )
+      {
+        return CD3DX12_RESOURCE_BARRIER::Transition(
+            tex.GetTexture(), D3D12_RESOURCE_STATE_PIXEL_SHADER_RESOURCE, D3D12_RESOURCE_STATE_DEPTH_WRITE );
+      } );
+
+  command_list->ResourceBarrier( CountOf( barriers ), DataOf( barriers ) );
 }
 
 void Ember::Internal::OmniLightManager::RenderOmniShadow(
-    ID3D12GraphicsCommandList* command_list,
-    World const&               world,
-    RenderTargetManager const& rtm,
-    OmniLight const&           omni_light,
-    Texture const&             texture ) const
+    ID3D12GraphicsCommandList6* command_list,
+    DrawList::Info const&       draw_list,
+    RenderTargetManager const&  rtm,
+    OmniLight const&            omni_light,
+    Texture const&              texture ) const
 {
   ZoneScoped;
 
-  auto top_of_shadow_barrier = CD3DX12_RESOURCE_BARRIER::Transition(
-      texture.GetTexture(), D3D12_RESOURCE_STATE_PIXEL_SHADER_RESOURCE, D3D12_RESOURCE_STATE_DEPTH_WRITE );
-  command_list->ResourceBarrier( 1, &top_of_shadow_barrier );
-
   rtm.ClearDepthStencilView( command_list, texture, D3D12_CLEAR_FLAG_DEPTH, 1.0f, 0 );
 
-  D3D12_RECT const     scissor  = { 0, 0, kOmniShadowResolution, kOmniShadowResolution };
-  D3D12_VIEWPORT const viewport = { 0, 0, kOmniShadowResolution, kOmniShadowResolution, 0.0f, 1.0f };
-
-  command_list->RSSetScissorRects( 1, &scissor );
-  command_list->RSSetViewports( 1, &viewport );
-
-  struct PackedData
-  {
-    DirectX::XMFLOAT3 Position;
-    float             FarPlane;
-    CBVHandle         ProjViewHandle;
-  };
   PackedData const packed_data{
+    .DrawList       = draw_list,
+    .ProjViewHandle = m_ShadowProjectionBuffer.GetCBVHandle(),
     .Position       = omni_light.Position,
     .FarPlane       = omni_light.Range,
-    .ProjViewHandle = m_ShadowProjectionBuffer.GetCBVHandle(),
   };
-  command_list->SetGraphicsRoot32BitConstants(
-      0, sizeof( PackedData ) / 4, &packed_data, sizeof( DirectX::XMMATRIX ) / 4 );
+  command_list->SetGraphicsRoot32BitConstants( 0, sizeof( PackedData ) / 4, &packed_data, 0 );
 
   rtm.OMSetRenderTargets( command_list, 0, nullptr, &texture );
 
-  DirectX::BoundingSphere const sphere_of_influence{ omni_light.Position, omni_light.Range };
-
-  world.CullSphere( sphere_of_influence );
-
-  world.GetECS().each(
-      [&]( WorldTransform const& wt, CullInfo const& cull_info, Mesh const& mesh, Geometry const& geometry )
-      {
-        if ( cull_info.AreAnyCulled( 0x1 ) ) return;
-
-        command_list->IASetIndexBuffer( &geometry->IndexBuffer.GetIndexBufferView() );
-        command_list->IASetVertexBuffers( 0, 1, &geometry->ShadowVertexBuffer.GetVertexBufferView() );
-
-        command_list->SetGraphicsRoot32BitConstants( 0, sizeof( DirectX::XMMATRIX ) / 4, &wt.Transform, 0 );
-
-        command_list->DrawIndexedInstanced( mesh.IndexCount, 6, mesh.FirstIndex, mesh.FirstVertex, 0 );
-      } );
-
-  auto bottom_of_shadow_barrier = CD3DX12_RESOURCE_BARRIER::Transition(
-      texture.GetTexture(), D3D12_RESOURCE_STATE_DEPTH_WRITE, D3D12_RESOURCE_STATE_PIXEL_SHADER_RESOURCE );
-  command_list->ResourceBarrier( 1, &bottom_of_shadow_barrier );
+  command_list->DispatchMesh( draw_list.DrawCount, 1, 1 );
 }

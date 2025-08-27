@@ -15,8 +15,8 @@ bool IsCulled( float3 center, float radius )
   float4                 far_plane    = float4( 0, 0, 1, -camera.CullInfo.w );
   float4                 right_plane  = normalize( float4( -1, 0, -camera.CullInfo.x, 0 ) );
   float4                 left_plane   = normalize( float4( 1, 0, -camera.CullInfo.x, 0 ) );
-  float4                 top_plane    = normalize( float4( 0, -1, -camera.CullInfo.x, 0 ) );
-  float4                 bottom_plane = normalize( float4( 0, 1, -camera.CullInfo.x, 0 ) );
+  float4                 top_plane    = normalize( float4( 0, -1, -camera.CullInfo.y, 0 ) );
+  float4                 bottom_plane = normalize( float4( 0, 1, -camera.CullInfo.y, 0 ) );
 
   if ( PlaneSignedDistance( near_plane, vs_center ) < -radius ) return true;
   if ( PlaneSignedDistance( left_plane, vs_center ) < -radius ) return true;

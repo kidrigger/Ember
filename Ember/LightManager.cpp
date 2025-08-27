@@ -87,12 +87,13 @@ uint16_t Ember::LightManager::GetShadowingDirLightCount() const
 }
 
 void Ember::LightManager::RenderAllShadows(
-    ID3D12GraphicsCommandList*      command_list,
+    ID3D12GraphicsCommandList6*     command_list,
     World const&                    world,
+    DrawList::Info const&           draw_list,
     RenderTargetManager const&      rtm,
     DirectX::BoundingFrustum const& camera_frustum,
     uint32_t const                  frame_idx ) const
 {
-  m_OmniLightManager->RenderAllShadows( command_list, world, rtm, camera_frustum );
+  m_OmniLightManager->RenderAllShadows( command_list, draw_list, rtm, camera_frustum );
   m_DirLightManager->RenderAllShadows( command_list, world, rtm, camera_frustum, frame_idx );
 }

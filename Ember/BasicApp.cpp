@@ -601,7 +601,8 @@ void Ember::BasicApp::Update()
   g_Input.Update();
 }
 
-void Ember::BasicApp::RenderScene( ID3D12GraphicsCommandList6* command_list, uint32_t frame_idx )
+void Ember::BasicApp::RenderScene(
+    ID3D12GraphicsCommandList6* command_list, DrawList::Info const& draw_list_info, uint32_t frame_idx )
 {
   ZoneScoped;
 
@@ -651,7 +652,6 @@ void Ember::BasicApp::RenderScene( ID3D12GraphicsCommandList6* command_list, uin
   command_list->SetGraphicsRoot32BitConstants( 1, sizeof( PerFrameConstants ) / 4, &constants, 0 );
   command_list->SetGraphicsRoot32BitConstants( 2, sizeof( Environment::GpuRepr ) / 4, &m_Environment->Repr(), 0 );
 
-  DrawList::Info const draw_list_info = m_DrawList.PrepareFrame( frame_idx );
   command_list->SetGraphicsRoot32BitConstants( 0, sizeof( DrawList::Info ) / 4, &draw_list_info, 0 );
   command_list->DispatchMesh( draw_list_info.DrawCount, 1, 1 );
 }
@@ -660,9 +660,12 @@ void Ember::BasicApp::Render()
 {
   ZoneScoped;
 
-  ID3D12Resource*                backbuffer     = m_RenderDevice->GetCurrentBackbuffer();
-  Context::CommandList           command_list   = m_RenderDevice->GetGraphicsCommandList();
-  uint32_t const                 frame_idx      = m_RenderDevice->GetCurrentFrameIndex();
+  ID3D12Resource*      backbuffer   = m_RenderDevice->GetCurrentBackbuffer();
+  Context::CommandList command_list = m_RenderDevice->GetGraphicsCommandList();
+  uint32_t const       frame_idx    = m_RenderDevice->GetCurrentFrameIndex();
+
+  // All resources for this frame are guaranteed to be available for CPU modification at this time.
+  // Clear Backbuffer
 
   DirectX::BoundingFrustum const camera_frustum = m_Camera->GetLastUpdatedFrustum();
 
@@ -674,12 +677,11 @@ void Ember::BasicApp::Render()
         [&]( WorldTransform const& wt, Mesh const& mesh, Geometry const& geometry, Material const& material )
         { m_DrawList.PushDraw( wt, mesh, geometry, material ); } );
   }
-
-  // All resources for this frame are guaranteed to be available for CPU modification at this time.
-  // Clear Backbuffer
   CD3DX12_RESOURCE_BARRIER top_of_renderpass_barriers[] = {
     CD3DX12_RESOURCE_BARRIER::Transition( backbuffer, D3D12_RESOURCE_STATE_PRESENT, D3D12_RESOURCE_STATE_COPY_DEST ),
   };
+
+  DrawList::Info const draw_list_info = m_DrawList.PrepareFrame( frame_idx );
 
   m_PerfCounter->UpdatePipelineStats( frame_idx );
   m_PerfCounter->BeginQuery( command_list.Get(), frame_idx );
@@ -687,13 +689,14 @@ void Ember::BasicApp::Render()
   command_list->ResourceBarrier( CountOf( top_of_renderpass_barriers ), DataOf( top_of_renderpass_barriers ) );
   m_TextureLoader->FlushBarriers( command_list.Get() );
 
-  m_LightManager->RenderAllShadows( command_list.Get(), m_World, *m_RenderTargetManager, camera_frustum, frame_idx );
+  m_LightManager->RenderAllShadows(
+      command_list.Get(), m_World, draw_list_info, *m_RenderTargetManager, camera_frustum, frame_idx );
 
   FLOAT constexpr kBlack[4] = {};
   m_RenderTargetManager->ClearRenderTargetView( command_list.Get(), m_RenderTexture, kBlack );
   m_RenderTargetManager->ClearDepthStencilView( command_list.Get(), m_DepthTexture, D3D12_CLEAR_FLAG_DEPTH, 1.0f, 0 );
 
-  RenderScene( command_list.Get(), frame_idx );
+  RenderScene( command_list.Get(), draw_list_info, frame_idx );
 
   command_list->SetPipelineState( m_BackgroundPipeline.Get() );
   command_list->DispatchMesh( 1, 1, 1 );

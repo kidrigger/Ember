@@ -63,9 +63,10 @@ public:
       std::unique_ptr<PerfCounter>         perf_counter,
       std::unique_ptr<RenderTargetManager> render_target_manager );
 
-  void        LoadContent() override;
-  void        Update() override;
-  void        RenderScene( ID3D12GraphicsCommandList6* command_list, uint32_t frame_idx );
+  void LoadContent() override;
+  void Update() override;
+  void RenderScene(
+      ID3D12GraphicsCommandList6* command_list, DrawList::Info const& draw_list_info, uint32_t frame_idx );
   void        Render() override;
   void        UnloadContent() override;
 
