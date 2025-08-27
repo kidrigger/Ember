@@ -1,16 +1,5 @@
 #include "LightData.hlsli"
 
-cbuffer QuickTransform : register( b0 )
-{
-  float4x4 g_Transform;
-}
-
-cbuffer LightInfo : register( b1 )
-{
-  ResID g_LightData;
-  uint  g_LightIdx;
-}
-
 struct VSOut
 {
   float4 ScreenPosition : SV_POSITION;

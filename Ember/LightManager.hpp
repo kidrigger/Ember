@@ -14,6 +14,7 @@ namespace Ember
 class RenderDevice;
 class RenderTargetManager;
 class World;
+class Camera;
 
 class LightManager
 {
@@ -44,12 +45,11 @@ public:
 
   //
   void RenderAllShadows(
-      ID3D12GraphicsCommandList6*     command_list,
-      World const&                    world,
-      DrawList::Info const&           draw_list,
-      RenderTargetManager const&      rtm,
-      DirectX::BoundingFrustum const& camera_frustum,
-      uint32_t                        frame_idx ) const;
+      ID3D12GraphicsCommandList6* command_list,
+      DrawList::Info const&       draw_list,
+      RenderTargetManager const&  rtm,
+      Camera const&               camera,
+      uint32_t                    frame_idx ) const;
 };
 
 } // namespace Ember

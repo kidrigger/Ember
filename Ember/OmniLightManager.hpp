@@ -13,6 +13,8 @@
 
 namespace Ember
 {
+
+class Camera;
 struct RenderCommandQueue;
 
 namespace Internal
@@ -84,10 +86,10 @@ public:
 
   //
   void RenderAllShadows(
-      ID3D12GraphicsCommandList6*     command_list,
-      DrawList::Info const&           draw_list,
-      RenderTargetManager const&      rtm,
-      DirectX::BoundingFrustum const& camera_frustum );
+      ID3D12GraphicsCommandList6* command_list,
+      DrawList::Info const&       draw_list,
+      RenderTargetManager const&  rtm,
+      Camera const&               camera );
 
   void RenderOmniShadow(
       ID3D12GraphicsCommandList6* command_list,

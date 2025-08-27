@@ -2,20 +2,11 @@
 #define TRIANGLE_HLSLI_
 
 #include "Bindless.hlsli"
+#include "Camera.hlsli"
 #include "Colors.hlsli"
 #include "Geometry.hlsli"
 #include "LightData.hlsli"
 #include "Quantization.hlsli"
-
-struct Camera
-{
-  float4x4 Projection;
-  float4x4 InvProj;
-  float4x4 View;
-  float4x4 InvView;
-  float4   Position;
-  float4   CullInfo; // x = h_slope, y = v_slope, z = near, w = far
-};
 
 struct Material
 {

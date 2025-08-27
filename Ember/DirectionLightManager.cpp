@@ -1,11 +1,25 @@
 #include "DirectionLightManager.hpp"
 
+#include "Camera.hpp"
 #include "ModelLoader.hpp"
 #include "RenderDevice.hpp"
 #include "RenderTargetManager.hpp"
 #include "Scene.hpp"
 #include "Util/DataUtil.hpp"
 #include "Util/Profiling.hpp"
+
+#include <meshoptimizer.h>
+
+namespace
+{
+struct PackedData
+{
+  Ember::DrawList::Info DrawList;
+  Ember::SRVHandle      LightData;
+  uint32_t              LightIdx;
+  Ember::CBVHandle      CameraBuffer;
+};
+} // namespace
 
 void Ember::Internal::DirectionLightManager::SetDirty()
 {
@@ -96,24 +110,25 @@ void Ember::Internal::DirectionLightManager::Create(
         render_device->CreateStorageBuffer( sizeof( DirLight ) * kMaxDirLights, sizeof( DirLight ) ) );
   }
 
-  ComPtr<ID3DBlob> shadow_vs;
-  ERR_ABORT( D3DReadFileToBlob( L"DirShadowVS.cso", &shadow_vs ) );
+  ComPtr<ID3DBlob> shadow_amp_shader;
+  ERR_ABORT( D3DReadFileToBlob( L"DirShadowAS.cso", &shadow_amp_shader ) );
 
-  ComPtr<ID3DBlob> shadow_ps;
-  ERR_ABORT( D3DReadFileToBlob( L"DirShadowPS.cso", &shadow_ps ) );
+  ComPtr<ID3DBlob> shadow_mesh_shader;
+  ERR_ABORT( D3DReadFileToBlob( L"DirShadowMS.cso", &shadow_mesh_shader ) );
 
-  D3D12_ROOT_SIGNATURE_FLAGS const root_signature_flags =
-      D3D12_ROOT_SIGNATURE_FLAG_ALLOW_INPUT_ASSEMBLER_INPUT_LAYOUT |
-      D3D12_ROOT_SIGNATURE_FLAG_CBV_SRV_UAV_HEAP_DIRECTLY_INDEXED |
-      D3D12_ROOT_SIGNATURE_FLAG_SAMPLER_HEAP_DIRECTLY_INDEXED |
-      D3D12_ROOT_SIGNATURE_FLAG_DENY_PIXEL_SHADER_ROOT_ACCESS | D3D12_ROOT_SIGNATURE_FLAG_DENY_MESH_SHADER_ROOT_ACCESS |
-      D3D12_ROOT_SIGNATURE_FLAG_DENY_AMPLIFICATION_SHADER_ROOT_ACCESS |
-      D3D12_ROOT_SIGNATURE_FLAG_DENY_GEOMETRY_SHADER_ROOT_ACCESS |
-      D3D12_ROOT_SIGNATURE_FLAG_DENY_DOMAIN_SHADER_ROOT_ACCESS | D3D12_ROOT_SIGNATURE_FLAG_DENY_HULL_SHADER_ROOT_ACCESS;
+  ComPtr<ID3DBlob> shadow_pixel_shader;
+  ERR_ABORT( D3DReadFileToBlob( L"DirShadowPS.cso", &shadow_pixel_shader ) );
 
-  CD3DX12_ROOT_PARAMETER1 root_parameters[2];
-  root_parameters[0].InitAsConstants( sizeof( DirectX::XMMATRIX ) / 4, 0 );
-  root_parameters[1].InitAsConstants( 2, 1 );
+  D3D12_ROOT_SIGNATURE_FLAGS const root_signature_flags = D3D12_ROOT_SIGNATURE_FLAG_CBV_SRV_UAV_HEAP_DIRECTLY_INDEXED |
+                                                          D3D12_ROOT_SIGNATURE_FLAG_SAMPLER_HEAP_DIRECTLY_INDEXED |
+                                                          D3D12_ROOT_SIGNATURE_FLAG_DENY_PIXEL_SHADER_ROOT_ACCESS |
+                                                          D3D12_ROOT_SIGNATURE_FLAG_DENY_VERTEX_SHADER_ROOT_ACCESS |
+                                                          D3D12_ROOT_SIGNATURE_FLAG_DENY_GEOMETRY_SHADER_ROOT_ACCESS |
+                                                          D3D12_ROOT_SIGNATURE_FLAG_DENY_DOMAIN_SHADER_ROOT_ACCESS |
+                                                          D3D12_ROOT_SIGNATURE_FLAG_DENY_HULL_SHADER_ROOT_ACCESS;
+
+  CD3DX12_ROOT_PARAMETER1 root_parameters[1];
+  root_parameters[0].InitAsConstants( sizeof( PackedData ) / 4, 0 );
 
   CD3DX12_VERSIONED_ROOT_SIGNATURE_DESC root_signature_desc;
   root_signature_desc.Init_1_1(
@@ -133,11 +148,6 @@ void Ember::Internal::DirectionLightManager::Create(
       root_signature_blob->GetBufferSize(),
       IID_PPV_ARGS( &shadow_root_sig ) ) );
 
-  D3D12_INPUT_LAYOUT_DESC input_layout = {
-    .pInputElementDescs = DataOf( ShadowVertex::kInputElementDesc ),
-    .NumElements        = CountOf( ShadowVertex::kInputElementDesc ),
-  };
-
   CD3DX12_RASTERIZER_DESC2 rasterizer_desc{ D3D12_DEFAULT };
   rasterizer_desc.FrontCounterClockwise = TRUE;
   rasterizer_desc.CullMode              = D3D12_CULL_MODE_FRONT;
@@ -145,9 +155,9 @@ void Ember::Internal::DirectionLightManager::Create(
   struct PipelineStream
   {
     CD3DX12_PIPELINE_STATE_STREAM_ROOT_SIGNATURE       RootSignature;
-    CD3DX12_PIPELINE_STATE_STREAM_INPUT_LAYOUT         InputLayout;
     CD3DX12_PIPELINE_STATE_STREAM_PRIMITIVE_TOPOLOGY   PrimitiveTopologyType;
-    CD3DX12_PIPELINE_STATE_STREAM_VS                   VS;
+    CD3DX12_PIPELINE_STATE_STREAM_AS                   AS;
+    CD3DX12_PIPELINE_STATE_STREAM_MS                   MS;
     CD3DX12_PIPELINE_STATE_STREAM_PS                   PS;
     CD3DX12_PIPELINE_STATE_STREAM_RASTERIZER2          Rasterizer;
     CD3DX12_PIPELINE_STATE_STREAM_DEPTH_STENCIL_FORMAT DSVFormat;
@@ -155,10 +165,10 @@ void Ember::Internal::DirectionLightManager::Create(
 
   PipelineStream pipeline_stream{
     .RootSignature         = shadow_root_sig.Get(),
-    .InputLayout           = input_layout,
     .PrimitiveTopologyType = D3D12_PRIMITIVE_TOPOLOGY_TYPE_TRIANGLE,
-    .VS                    = CD3DX12_SHADER_BYTECODE( shadow_vs.Get() ),
-    .PS                    = CD3DX12_SHADER_BYTECODE( shadow_ps.Get() ),
+    .AS                    = CD3DX12_SHADER_BYTECODE( shadow_amp_shader.Get() ),
+    .MS                    = CD3DX12_SHADER_BYTECODE( shadow_mesh_shader.Get() ),
+    .PS                    = CD3DX12_SHADER_BYTECODE( shadow_pixel_shader.Get() ),
     .Rasterizer            = rasterizer_desc,
     .DSVFormat             = DXGI_FORMAT_D16_UNORM,
   };
@@ -310,11 +320,11 @@ uint16_t Ember::Internal::DirectionLightManager::GetShadowingDirLightCount() con
 }
 
 void Ember::Internal::DirectionLightManager::RenderAllShadows(
-    ID3D12GraphicsCommandList*      command_list,
-    World const&                    world,
-    RenderTargetManager const&      rtm,
-    DirectX::BoundingFrustum const& camera_frustum,
-    uint32_t const                  frame_idx )
+    ID3D12GraphicsCommandList6* command_list,
+    DrawList::Info const&       draw_info,
+    RenderTargetManager const&  rtm,
+    Camera const&               camera,
+    uint32_t const              frame_idx )
 {
   ZoneScoped;
   command_list->SetGraphicsRootSignature( m_RootSignature.Get() );
@@ -322,9 +332,25 @@ void Ember::Internal::DirectionLightManager::RenderAllShadows(
   command_list->SetDescriptorHeaps( CountOf( bindless_desc_heaps ), DataOf( bindless_desc_heaps ) );
   command_list->SetPipelineState( m_Pipeline.Get() );
   command_list->IASetPrimitiveTopology( D3D_PRIMITIVE_TOPOLOGY_TRIANGLELIST );
-  command_list->SetGraphicsRoot32BitConstant( 1, ( UINT )m_DataBuffers[frame_idx].GetSRVHandle(), 0 );
 
-  world.ClearCull();
+  D3D12_RECT const     scissor  = { 0, 0, kDirShadowResolution, kDirShadowResolution };
+  D3D12_VIEWPORT const viewport = { 0, 0, kDirShadowResolution, kDirShadowResolution, 0.0f, 1.0f };
+
+  command_list->RSSetScissorRects( 1, &scissor );
+  command_list->RSSetViewports( 1, &viewport );
+
+  static std::vector<CD3DX12_RESOURCE_BARRIER> barriers;
+  barriers.resize( m_ShadowsInUse.Size() );
+
+  std::ranges::transform(
+      m_ShadowsInUse.Values(),
+      barriers.begin(),
+      []( Texture const& tex )
+      {
+        return CD3DX12_RESOURCE_BARRIER::Transition(
+            tex.GetTexture(), D3D12_RESOURCE_STATE_PIXEL_SHADER_RESOURCE, D3D12_RESOURCE_STATE_DEPTH_WRITE );
+      } );
+  command_list->ResourceBarrier( CountOf( barriers ), DataOf( barriers ) );
 
   for ( auto const& [handle, texture] : m_ShadowsInUse )
   {
@@ -332,32 +358,35 @@ void Ember::Internal::DirectionLightManager::RenderAllShadows(
     ASSERT( handle.GetGeneration() == m_HandleGeneration[index] );
     DirLight* light = &m_LightData[index];
 
-    RenderDirShadow( command_list, world, rtm, light, texture, camera_frustum, index );
+    RenderDirShadow( command_list, draw_info, rtm, light, texture, camera, frame_idx, index );
   }
+
+  std::ranges::transform(
+      m_ShadowsInUse.Values(),
+      barriers.begin(),
+      []( Texture const& tex )
+      {
+        return CD3DX12_RESOURCE_BARRIER::Transition(
+            tex.GetTexture(), D3D12_RESOURCE_STATE_DEPTH_WRITE, D3D12_RESOURCE_STATE_PIXEL_SHADER_RESOURCE );
+      } );
+  command_list->ResourceBarrier( CountOf( barriers ), DataOf( barriers ) );
 }
 
 void Ember::Internal::DirectionLightManager::RenderDirShadow(
-    ID3D12GraphicsCommandList*      command_list,
-    World const&                    world,
-    RenderTargetManager const&      rtm,
-    DirLight*                       dir_light,
-    Texture const&                  texture,
-    DirectX::BoundingFrustum const& camera_frust,
-    uint32_t const                  light_index )
+    ID3D12GraphicsCommandList6* command_list,
+    DrawList::Info const&       draw_info,
+    RenderTargetManager const&  rtm,
+    DirLight*                   dir_light,
+    Texture const&              texture,
+    Camera const&               camera,
+    uint32_t const              frame_index,
+    uint32_t const              light_index )
 {
   ZoneScoped;
 
-  auto top_of_shadow_barrier = CD3DX12_RESOURCE_BARRIER::Transition(
-      texture.GetTexture(), D3D12_RESOURCE_STATE_PIXEL_SHADER_RESOURCE, D3D12_RESOURCE_STATE_DEPTH_WRITE );
-  command_list->ResourceBarrier( 1, &top_of_shadow_barrier );
+  DirectX::BoundingFrustum const& camera_frust = camera.GetLastUpdatedFrustum();
 
   rtm.ClearDepthStencilView( command_list, texture, D3D12_CLEAR_FLAG_DEPTH, 1.0f, 0 );
-
-  D3D12_RECT const     scissor  = { 0, 0, kDirShadowResolution, kDirShadowResolution };
-  D3D12_VIEWPORT const viewport = { 0, 0, kDirShadowResolution, kDirShadowResolution, 0.0f, 1.0f };
-
-  command_list->RSSetScissorRects( 1, &scissor );
-  command_list->RSSetViewports( 1, &viewport );
 
   // Setup Light-Space basis
   DirectX::FXMVECTOR direction = XMLoadFloat3( &dir_light->Direction );
@@ -395,7 +424,6 @@ void Ember::Internal::DirectionLightManager::RenderDirShadow(
   // Copy cascades to GPU
   memcpy( dir_light->Cascades, &cascades[1], ByteSizeOf( dir_light->Cascades ) );
 
-  DirectX::BoundingOrientedBox bounding_oriented_boxes[kNumCascades];
   for ( int cascade_id = 0; cascade_id < kNumCascades; cascade_id++ )
   {
     DirectX::BoundingFrustum frustum = camera_frust;
@@ -419,19 +447,9 @@ void Ember::Internal::DirectionLightManager::RenderDirShadow(
     DirectX::FXMMATRIX view = DirectX::XMMatrixLookToRH( focus, direction, ls_up );
     DirectX::FXMMATRIX projection =
         DirectX::XMMatrixOrthographicRH( ws_bs.Radius * 2.0f, ws_bs.Radius * 2.0f, -ws_bs.Radius, ws_bs.Radius );
-
-    //  Infinitely long cull for shadow.
-    DirectX::XMFLOAT4 box_orientation;
-    XMStoreFloat4( &box_orientation, ls_to_world_orientation );
-
-    DirectX::XMFLOAT3  box_center;
-    DirectX::FXMVECTOR box_offset = DirectX::XMVectorScale( direction, -1e6f );
-    XMStoreFloat3( &box_center, DirectX::XMVectorAdd( focus, box_offset ) );
-    bounding_oriented_boxes[cascade_id] = {
-      box_center, { ws_bs.Radius, ws_bs.Radius, 1e6f + ws_bs.Radius },
-       box_orientation
-    };
-    world.CullBox( bounding_oriented_boxes[cascade_id], 1llu << cascade_id );
+    ASSERT_M(
+        projection.r[0].m128_f32[0] == projection.r[1].m128_f32[1],
+        "The Amplification shader expects a square projection" );
 
     DirectX::FXMMATRIX proj_view            = XMMatrixMultiply( view, projection );
     dir_light->LightSpaceMatrix[cascade_id] = proj_view;
@@ -439,25 +457,14 @@ void Ember::Internal::DirectionLightManager::RenderDirShadow(
 
   SetDirty();
 
-  command_list->SetGraphicsRoot32BitConstant( 1, light_index, 1 );
+  PackedData packed_data{
+    .DrawList     = draw_info,
+    .LightData    = m_DataBuffers[frame_index].GetSRVHandle(),
+    .LightIdx     = light_index,
+    .CameraBuffer = camera.GetLastUpdatedBuffer(),
+  };
+  command_list->SetGraphicsRoot32BitConstants( 0, sizeof( packed_data ) / 4, &packed_data, 0 );
   rtm.OMSetRenderTargets( command_list, 0, nullptr, &texture );
 
-  uint64_t constexpr kCullMask = ( 1 << kNumCascades ) - 1;
-  world.GetECS().each(
-      [&]( WorldTransform const& wt, CullInfo const& cull_info, Mesh const& mesh, Geometry const& geometry )
-      {
-        if ( cull_info.AreAllCulled( kCullMask ) ) return;
-
-        command_list->IASetIndexBuffer( &geometry->IndexBuffer.GetIndexBufferView() );
-        command_list->IASetVertexBuffers( 0, 1, &geometry->ShadowVertexBuffer.GetVertexBufferView() );
-
-        command_list->SetGraphicsRoot32BitConstants( 0, sizeof( DirectX::XMMATRIX ) / 4, &wt.Transform, 0 );
-
-        command_list->DrawIndexedInstanced(
-            mesh.IndexCount, kNumCascades, mesh.FirstIndex, ( INT )mesh.FirstVertex, 0 );
-      } );
-
-  auto bottom_of_shadow_barrier = CD3DX12_RESOURCE_BARRIER::Transition(
-      texture.GetTexture(), D3D12_RESOURCE_STATE_DEPTH_WRITE, D3D12_RESOURCE_STATE_PIXEL_SHADER_RESOURCE );
-  command_list->ResourceBarrier( 1, &bottom_of_shadow_barrier );
+  command_list->DispatchMesh( draw_info.DrawCount, 1, 1 );
 }

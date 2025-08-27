@@ -18,12 +18,19 @@ void Ember::Camera::UpdateRepr()
   {
     m_Repr.Projection =
         DirectX::XMMatrixPerspectiveFovRH( m_HorizontalFoV / m_AspectRatio, m_AspectRatio, 0.1f, 100.0f );
-    m_Repr.InvProj    = XMMatrixInverse( nullptr, m_Repr.Projection );
+    m_Repr.InvProj       = XMMatrixInverse( nullptr, m_Repr.Projection );
 
-    m_Repr.CullInfo.x = std::tan( m_HorizontalFoV * 0.5f );
-    m_Repr.CullInfo.y = std::tan( m_HorizontalFoV / m_AspectRatio * 0.5f );
-    m_Repr.CullInfo.z = 0.1f;
-    m_Repr.CullInfo.w = 100.0f;
+    m_Repr.FrustumInfo.x = std::tan( m_HorizontalFoV * 0.5f );
+    m_Repr.FrustumInfo.y = std::tan( m_HorizontalFoV / m_AspectRatio * 0.5f );
+    m_Repr.FrustumInfo.z = 0.1f;
+    m_Repr.FrustumInfo.w = 100.0f;
+  }
+
+  if ( m_DirtyFlags )
+  {
+    DirectX::BoundingFrustum frustum;
+    DirectX::BoundingFrustum::CreateFromMatrix( frustum, m_Repr.Projection, true );
+    frustum.Transform( m_Frustum, m_Repr.InvView );
   }
 
   m_DirtyFlags = 0;
@@ -49,7 +56,8 @@ DirectX::FXMVECTOR& Ember::Camera::GetPosition() const
 
 void Ember::Camera::SetPosition( DirectX::FXMVECTOR& position )
 {
-  m_Repr.Position = DirectX::XMVectorSetW( position, 1.0f );
+  m_Repr.Position  = DirectX::XMVectorSetW( position, 1.0f );
+  m_DirtyFlags    |= kViewDirtyBit;
 }
 
 void Ember::Camera::LocalTranslate( float const dx, float const dy, float const dz )
@@ -90,20 +98,43 @@ void Ember::Camera::SetHorizontalFoV( float const fov )
   m_DirtyFlags    |= kProjDirtyBit;
 }
 
+DirectX::XMMATRIX const& Ember::Camera::GetView() const
+{
+  return m_Repr.View;
+}
+
+DirectX::XMMATRIX const& Ember::Camera::GetInvView() const
+{
+  return m_Repr.InvView;
+}
+
+DirectX::XMMATRIX const& Ember::Camera::GetProj() const
+{
+  return m_Repr.Projection;
+}
+
+DirectX::XMMATRIX const& Ember::Camera::GetInvProj() const
+{
+  return m_Repr.InvProj;
+}
+
 Ember::CBVHandle Ember::Camera::PrepareFrame( uint32_t const frame_index )
 {
   UpdateRepr();
 
   m_CameraBuffer[frame_index].Write( 0, sizeof( m_Repr ), &m_Repr );
 
-  return m_CameraBuffer[frame_index].GetCBVHandle();
+  m_LastFrameHandle = m_CameraBuffer[frame_index].GetCBVHandle();
+
+  return m_LastFrameHandle;
 }
 
-DirectX::BoundingFrustum Ember::Camera::GetLastUpdatedFrustum() const
+Ember::CBVHandle Ember::Camera::GetLastUpdatedBuffer() const
 {
-  DirectX::BoundingFrustum frustum;
-  DirectX::BoundingFrustum frustum_out;
-  DirectX::BoundingFrustum::CreateFromMatrix( frustum, m_Repr.Projection, true );
-  frustum.Transform( frustum_out, m_Repr.InvView );
-  return frustum_out;
+  return m_LastFrameHandle;
+}
+
+DirectX::BoundingFrustum const& Ember::Camera::GetLastUpdatedFrustum() const
+{
+  return m_Frustum;
 }

@@ -1,5 +1,6 @@
 #include "OmniLightManager.hpp"
 
+#include "Camera.hpp"
 #include "ModelLoader.hpp"
 #include "RenderTargetManager.hpp"
 #include "Util/DataUtil.hpp"
@@ -350,12 +351,15 @@ uint16_t Ember::Internal::OmniLightManager::GetShadowingOmniLightCount() const
 }
 
 void Ember::Internal::OmniLightManager::RenderAllShadows(
-    ID3D12GraphicsCommandList6*     command_list,
-    DrawList::Info const&           draw_list,
-    RenderTargetManager const&      rtm,
-    DirectX::BoundingFrustum const& camera_frustum )
+    ID3D12GraphicsCommandList6* command_list,
+    DrawList::Info const&       draw_list,
+    RenderTargetManager const&  rtm,
+    Camera const&               camera )
 {
   ZoneScoped;
+
+  DirectX::BoundingFrustum const& camera_frustum = camera.GetLastUpdatedFrustum();
+
   command_list->SetGraphicsRootSignature( m_RootSignature.Get() );
   auto bindless_desc_heaps = m_RenderDevice->GetBindlessDescriptorHeaps();
   command_list->SetDescriptorHeaps( CountOf( bindless_desc_heaps ), DataOf( bindless_desc_heaps ) );
@@ -371,13 +375,14 @@ void Ember::Internal::OmniLightManager::RenderAllShadows(
   std::pmr::vector<CD3DX12_RESOURCE_BARRIER> barriers{ m_ShadowsInUse.Size(),
                                                        std::pmr::polymorphic_allocator( &m_BumpAlloc ) };
   auto&                                      textures = m_ShadowsInUse.Values();
+
   std::ranges::transform(
       textures,
       barriers.begin(),
       []( Texture const& tex )
       {
         return CD3DX12_RESOURCE_BARRIER::Transition(
-            tex.GetTexture(), D3D12_RESOURCE_STATE_DEPTH_WRITE, D3D12_RESOURCE_STATE_PIXEL_SHADER_RESOURCE );
+            tex.GetTexture(), D3D12_RESOURCE_STATE_PIXEL_SHADER_RESOURCE, D3D12_RESOURCE_STATE_DEPTH_WRITE );
       } );
 
   command_list->ResourceBarrier( CountOf( barriers ), DataOf( barriers ) );
@@ -402,7 +407,7 @@ void Ember::Internal::OmniLightManager::RenderAllShadows(
       []( Texture const& tex )
       {
         return CD3DX12_RESOURCE_BARRIER::Transition(
-            tex.GetTexture(), D3D12_RESOURCE_STATE_PIXEL_SHADER_RESOURCE, D3D12_RESOURCE_STATE_DEPTH_WRITE );
+            tex.GetTexture(), D3D12_RESOURCE_STATE_DEPTH_WRITE, D3D12_RESOURCE_STATE_PIXEL_SHADER_RESOURCE );
       } );
 
   command_list->ResourceBarrier( CountOf( barriers ), DataOf( barriers ) );

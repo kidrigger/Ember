@@ -34,7 +34,7 @@ void OmniShadowMS(
   StructuredBuffer<Meshlet>            meshlets          = ResourceDescriptorHeap[mesh_draw.MeshletBuffer];
   StructuredBuffer<uint>               meshlet_indices   = ResourceDescriptorHeap[mesh_draw.MeshletIndexBuffer];
   ByteAddressBuffer                    meshlet_triangles = ResourceDescriptorHeap[mesh_draw.MeshletTriangleBuffer];
-  StructuredBuffer<Vertex>             vertex_buffer     = ResourceDescriptorHeap[mesh_draw.VertexBuffer];
+  StructuredBuffer<half4>              vertex_buffer     = ResourceDescriptorHeap[mesh_draw.ShadowVertexBuffer];
   ConstantBuffer<ProjectionTransforms> proj_view         = ResourceDescriptorHeap[g_ProjViewID];
 
   uint                                 meshlet_idx       = amp_payload.MeshletID[IN.GroupID.x] + mesh_draw.FirstMeshlet;
@@ -52,9 +52,9 @@ void OmniShadowMS(
   {
     uint   index          = meshlet_indices[meshlet.VertexOffset + i];
 
-    Vertex vertex         = vertex_buffer[index + mesh_draw.FirstVertex];
+    float4 vertex         = vertex_buffer[index + mesh_draw.FirstVertex];
 
-    float4 world_position = mul( transform.Model, vertex.GetPosition() );
+    float4 world_position = mul( transform.Model, vertex );
 
     float4 pos            = mul( proj_view.Views[view_idx], float4( world_position.xyz - g_LightPosition, 1.0f ) );
 

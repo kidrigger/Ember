@@ -606,7 +606,7 @@ void Ember::BasicApp::RenderScene(
 {
   ZoneScoped;
 
-  CBVHandle const camera_cbv                    = m_Camera->PrepareFrame( frame_idx );
+  CBVHandle const camera_cbv                    = m_Camera->GetLastUpdatedBuffer();
   auto const [omni_light_srv, dir_light_srv]    = m_LightManager->PrepareFrame( frame_idx );
   SRVHandle const                materials_srv  = m_MaterialManager->PrepareFrame();
 
@@ -667,7 +667,7 @@ void Ember::BasicApp::Render()
   // All resources for this frame are guaranteed to be available for CPU modification at this time.
   // Clear Backbuffer
 
-  DirectX::BoundingFrustum const camera_frustum = m_Camera->GetLastUpdatedFrustum();
+  m_Camera->PrepareFrame( frame_idx );
 
   m_DrawList.Clear();
 
@@ -689,8 +689,7 @@ void Ember::BasicApp::Render()
   command_list->ResourceBarrier( CountOf( top_of_renderpass_barriers ), DataOf( top_of_renderpass_barriers ) );
   m_TextureLoader->FlushBarriers( command_list.Get() );
 
-  m_LightManager->RenderAllShadows(
-      command_list.Get(), m_World, draw_list_info, *m_RenderTargetManager, camera_frustum, frame_idx );
+  m_LightManager->RenderAllShadows( command_list.Get(), draw_list_info, *m_RenderTargetManager, *m_Camera, frame_idx );
 
   FLOAT constexpr kBlack[4] = {};
   m_RenderTargetManager->ClearRenderTargetView( command_list.Get(), m_RenderTexture, kBlack );

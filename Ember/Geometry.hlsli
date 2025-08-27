@@ -65,9 +65,9 @@ struct MeshDraw
   ResID MeshletTriangleBuffer;
   ResID MeshletIndexBuffer;
   ResID VertexBuffer;
+  ResID ShadowVertexBuffer;
   MatID Material;
   uint  Pad0;
-  uint  Pad1;
 };
 
 struct DrawList

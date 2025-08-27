@@ -6,6 +6,7 @@
 #include "Buffer.hpp"
 #include "Color.hpp"
 #include "LightHandle.hpp"
+#include "Scene.hpp"
 #include "Texture.hpp"
 #include "Util/DirectXHeaders.hpp"
 #include "Util/FlatMap.hpp"
@@ -15,6 +16,8 @@ namespace Ember
 class World;
 class RenderTargetManager;
 class RenderDevice;
+class Camera;
+
 namespace Internal
 {
 
@@ -88,20 +91,21 @@ public:
 
   //
   void RenderAllShadows(
-      ID3D12GraphicsCommandList*      command_list,
-      World const&                    world,
-      RenderTargetManager const&      rtm,
-      DirectX::BoundingFrustum const& camera_frustum,
-      uint32_t                        frame_idx );
+      ID3D12GraphicsCommandList6* command_list,
+      DrawList::Info const&       draw_info,
+      RenderTargetManager const&  rtm,
+      Camera const&               camera,
+      uint32_t                    frame_idx );
 
   void RenderDirShadow(
-      ID3D12GraphicsCommandList*      command_list,
-      World const&                    world,
-      RenderTargetManager const&      rtm,
-      DirLight*                       dir_light,
-      Texture const&                  texture,
-      DirectX::BoundingFrustum const& camera_frust,
-      uint32_t                        light_index );
+      ID3D12GraphicsCommandList6* command_list,
+      DrawList::Info const&       draw_info,
+      RenderTargetManager const&  rtm,
+      DirLight*                   dir_light,
+      Texture const&              texture,
+      Camera const&               camera,
+      uint32_t                    frame_index,
+      uint32_t                    light_index );
 };
 
 } // namespace Internal

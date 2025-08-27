@@ -295,6 +295,12 @@
     <None Include="Geometry.hlsli">
       <Filter>Shaders</Filter>
     </None>
+    <None Include="Camera.hlsli">
+      <Filter>Shaders\Utils</Filter>
+    </None>
+    <None Include="DirShadow.hlsli">
+      <Filter>Shaders\Shadows</Filter>
+    </None>
   </ItemGroup>
   <ItemGroup>
     <FxCompile Include="EqrectToCube.hlsl">
@@ -345,7 +351,21 @@
     <FxCompile Include="TriangleAS.hlsl">
       <Filter>Shaders\Meshes</Filter>
     </FxCompile>
-    <FxCompile Include="BackgroundMS.hlsl" />
+    <FxCompile Include="BackgroundMS.hlsl">
+      <Filter>Shaders\Shadows</Filter>
+    </FxCompile>
+    <FxCompile Include="DirShadowAS.hlsl">
+      <Filter>Shaders\Shadows</Filter>
+    </FxCompile>
+    <FxCompile Include="DirShadowMS.hlsl">
+      <Filter>Shaders\Shadows</Filter>
+    </FxCompile>
+    <FxCompile Include="OmniShadowAS.hlsl">
+      <Filter>Shaders\Shadows</Filter>
+    </FxCompile>
+    <FxCompile Include="OmniShadowMS.hlsl">
+      <Filter>Shaders\Shadows</Filter>
+    </FxCompile>
   </ItemGroup>
   <ItemGroup>
     <CopyFileToFolders Include="Assets\container2.png">

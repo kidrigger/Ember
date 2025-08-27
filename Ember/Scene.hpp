@@ -122,8 +122,9 @@ struct alignas( 16 ) MeshDraw
   SRVHandle      MeshletTriangleBuffer;
   SRVHandle      MeshletIndexBuffer;
   SRVHandle      VertexBuffer;
+  SRVHandle      ShadowBuffer;
   MaterialHandle Material;
-  uint32_t       Padding[2];
+  uint32_t       Padding;
 };
 
 class DrawList

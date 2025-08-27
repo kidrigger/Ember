@@ -719,7 +719,7 @@ std::optional<flecs::entity> Ember::ModelLoader::TryLoadModel( char const* filen
   wchar_t    buf[256];
 
   auto const vertex_position_buffer =
-      m_RenderDevice->CreateVertexBuffer( ByteSizeOf( context.VertexPositions ), StrideOf( context.VertexPositions ) );
+      m_RenderDevice->CreateStorageBuffer( ByteSizeOf( context.VertexPositions ), StrideOf( context.VertexPositions ) );
   swprintf_s( buf, L"Vertex Pos %s", wide_filename );
   vertex_position_buffer.SetName( buf );
   vertex_position_buffer.Write( 0, ByteSizeOf( context.VertexPositions ), DataOf( context.VertexPositions ) );

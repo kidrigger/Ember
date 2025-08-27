@@ -151,6 +151,7 @@ void Ember::DrawList::PushDraw(
         geometry->MeshletTriangleBuffer.GetSRVHandle(),
         geometry->MeshletIndexBuffer.GetSRVHandle(),
         geometry->VertexBuffer.GetSRVHandle(),
+        geometry->ShadowVertexBuffer.GetSRVHandle(),
         material->GetHandle() );
 
     remaining_meshlets -= 32;
