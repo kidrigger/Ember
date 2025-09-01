@@ -187,6 +187,11 @@ void Ember::DrawList::Clear()
   m_DrawInfos.clear();
 }
 
+size_t Ember::DrawList::Size() const
+{
+  return m_DrawInfos.size();
+}
+
 Ember::World::World()
 {
   m_UpdateRootWorldTransformQuery =

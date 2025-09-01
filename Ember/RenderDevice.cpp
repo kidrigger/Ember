@@ -66,6 +66,11 @@ ComPtr<D3D12MA::Allocator> Ember::RenderDevice::GetAllocator() noexcept
   return m_Allocator;
 }
 
+ID3D12CommandQueue* Ember::RenderDevice::GetDirectQueue() const
+{
+  return m_DirectContext.GetCommandQueue();
+}
+
 DXGI_FORMAT Ember::RenderDevice::FetchSwapchainFormat() const
 {
   DXGI_SWAP_CHAIN_DESC desc;
@@ -251,7 +256,7 @@ void Ember::RenderDevice::Create( RenderDevice* render_device, HWND window_handl
       .SampleDesc  = { 1, 0 },
       .BufferUsage = DXGI_USAGE_RENDER_TARGET_OUTPUT,
       .BufferCount = kNumFrames,
-      .Scaling     = DXGI_SCALING_STRETCH,
+      .Scaling     = DXGI_SCALING_NONE,
       .SwapEffect  = DXGI_SWAP_EFFECT_FLIP_DISCARD,
       .AlphaMode   = DXGI_ALPHA_MODE_UNSPECIFIED,
       .Flags       = is_tearing_supported ? DXGI_SWAP_CHAIN_FLAG_ALLOW_TEARING : ( UINT )0,
@@ -392,6 +397,12 @@ Ember::SamplerHandle Ember::RenderDevice::CreateSamplerHandle( D3D12_SAMPLER_DES
   return m_Bindless->CreateSamplerHandle( sampler_desc );
 }
 
+Ember::RawDescriptorHandle Ember::RenderDevice::AllocateRawDescriptorHandle(
+    D3D12_CPU_DESCRIPTOR_HANDLE* cpu_desc, D3D12_GPU_DESCRIPTOR_HANDLE* gpu_desc ) const noexcept
+{
+  return m_Bindless->AllocateRawDescriptor( cpu_desc, gpu_desc );
+}
+
 std::array<ID3D12DescriptorHeap*, 2> Ember::RenderDevice::GetBindlessDescriptorHeaps() const
 {
   return m_Bindless->GetBindlessDescriptorHeaps();
@@ -408,6 +419,11 @@ void Ember::RenderDevice::FreeHandle( SRVHandle const handle ) const
 }
 
 void Ember::RenderDevice::FreeHandle( UAVHandle const handle ) const
+{
+  m_Bindless->Free( handle );
+}
+
+void Ember::RenderDevice::FreeHandle( RawDescriptorHandle const handle ) const
 {
   m_Bindless->Free( handle );
 }

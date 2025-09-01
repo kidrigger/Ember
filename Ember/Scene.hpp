@@ -147,8 +147,9 @@ public:
 
   void PushDraw(
       WorldTransform const& transform, Mesh const& mesh, Geometry const& geometry, Material const& material );
-  Info PrepareFrame( uint32_t frame_idx );
-  void Clear();
+  Info   PrepareFrame( uint32_t frame_idx );
+  void   Clear();
+  size_t Size() const;
 };
 
 class World

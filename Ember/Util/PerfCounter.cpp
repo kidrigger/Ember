@@ -69,26 +69,27 @@ void Ember::PerfCounter::Tick()
   ::QueryPerformanceCounter( &perf_counter ); // Always returns true on Win XP or later.
   ::QueryPerformanceFrequency( &freq );       // Always returns true on Win XP or later.
 
-  m_FrameTimeMs  = ( 1000.0 * ( perf_counter.QuadPart - m_PrevQueryPerfCounter.QuadPart ) ) / ( double )freq.QuadPart;
+  m_FrameTimeMs  = ( float )( ( double )( 1000 * ( perf_counter.QuadPart - m_PrevQueryPerfCounter.QuadPart ) ) /
+                             ( double )freq.QuadPart );
 
   m_BufferSumMs -= m_256FrameAvgBuffer[m_AvgBufferHead];
   m_BufferSumMs += m_FrameTimeMs;
   m_256FrameAvgBuffer[m_AvgBufferHead++]  = m_FrameTimeMs;
   m_AvgBufferHead                        %= 256;
 
-  m_SampleCount                           = std::min( m_SampleCount + 1.0f, kSampleCount );
+  m_SampleCount                           = std::min( m_SampleCount + 1.0f, ( float )kSampleCount );
 
   m_PrevQueryPerfCounter                  = perf_counter;
 }
 
-double Ember::PerfCounter::GetAvgFrameTime() const
+float Ember::PerfCounter::GetAvgFrameTime() const
 {
   return m_BufferSumMs / m_SampleCount;
 }
 
-double Ember::PerfCounter::GetDeltaMilliSeconds() const
+float Ember::PerfCounter::GetDeltaMilliSeconds() const
 {
-  return std::clamp( m_FrameTimeMs, 0.0, kMaxDeltaMs );
+  return std::clamp( m_FrameTimeMs, 0.0f, kMaxDeltaMs );
 }
 
 D3D12_QUERY_DATA_PIPELINE_STATISTICS1 const& Ember::PerfCounter::GetPipelineStats() const
@@ -131,4 +132,9 @@ void Ember::PerfCounter::UpdatePipelineStats( uint32_t const frame_index )
     m_QueryReadbackBuffers[frame_index]->Unmap( 0, nullptr );
   }
 #endif
+}
+
+float const* Ember::PerfCounter::GetDeltaValues() const
+{
+  return m_256FrameAvgBuffer;
 }

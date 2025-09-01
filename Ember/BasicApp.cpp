@@ -18,6 +18,12 @@
 #include "Util/PerfCounter.hpp"
 #include "Util/Profiling.hpp"
 
+#include "imgui.h"
+#include "imgui_impl_dx12.h"
+#include "imgui_impl_win32.h"
+
+std::unordered_map<SIZE_T, Ember::RawDescriptorHandle> g_ImguiHandleMap;
+
 void ParseArguments( bool* use_warp, uint32_t* client_width, uint32_t* client_height )
 {
   // Parse Args
@@ -86,9 +92,15 @@ struct Input
 
 } // namespace
 
+// Forward declare message handler from imgui_impl_win32.cpp
+// ReSharper disable once CppInconsistentNaming
+extern IMGUI_IMPL_API LRESULT ImGui_ImplWin32_WndProcHandler( HWND, UINT, WPARAM, LPARAM );
+
 // Window callback function.
 LRESULT CALLBACK WndProc( HWND const window_handle, UINT const message, WPARAM const w_param, LPARAM const l_param )
 {
+  if ( ImGui_ImplWin32_WndProcHandler( window_handle, message, w_param, l_param ) ) return true;
+
   switch ( message )
   {
     case WM_PAINT:
@@ -266,6 +278,55 @@ Ember::BasicApp::BasicApp(
 {
   m_TextureLoader = std::make_unique_for_overwrite<TextureLoader>();
   TextureLoader::Create( m_TextureLoader.get(), m_RenderDevice.get(), 3 );
+
+  ImGui_ImplWin32_EnableDpiAwareness();
+  float main_scale =
+      ImGui_ImplWin32_GetDpiScaleForMonitor( ::MonitorFromPoint( POINT{ 0, 0 }, MONITOR_DEFAULTTOPRIMARY ) );
+  // Setup Dear ImGui context
+  IMGUI_CHECKVERSION();
+  ImGui::CreateContext();
+  ImGuiIO& io = ImGui::GetIO();
+  ( void )io;
+  io.ConfigFlags |= ImGuiConfigFlags_NavEnableKeyboard; // Enable Keyboard Controls
+  io.ConfigFlags |= ImGuiConfigFlags_NavEnableGamepad;  // Enable Gamepad Controls
+  io.ConfigFlags |= ImGuiConfigFlags_DockingEnable;
+  io.ConfigFlags |= ImGuiConfigFlags_DpiEnableScaleFonts;
+
+  // Setup Dear ImGui style
+  ImGui::StyleColorsDark();
+  ImGuiStyle& style = ImGui::GetStyle();
+  style.ScaleAllSizes( main_scale ); // Bake a fixed style scale. (until we have a solution for dynamic style scaling,
+                                     // changing this requires resetting Style + calling this again)
+
+  // Setup Platform/Renderer backends
+  ImGui_ImplWin32_Init( window_handle );
+
+  ImGui_ImplDX12_InitInfo init_info = {};
+  init_info.Device                  = m_RenderDevice->GetDevice().Get();
+  init_info.CommandQueue            = m_RenderDevice->GetDirectQueue();
+  init_info.NumFramesInFlight       = RenderDevice::kNumFrames;
+  init_info.RTVFormat               = DXGI_FORMAT_R8G8B8A8_UNORM;
+  init_info.DSVFormat               = DXGI_FORMAT_UNKNOWN;
+  // Allocating SRV descriptors (for textures) is up to the application, so we provide callbacks.
+  // (current version of the backend will only allocate one descriptor, future versions will need to allocate more)
+  init_info.SrvDescriptorHeap    = m_RenderDevice->GetBindlessDescriptorHeaps()[0];
+  init_info.SrvDescriptorAllocFn = []( ImGui_ImplDX12_InitInfo* init_info,
+                                       D3D12_CPU_DESCRIPTOR_HANDLE* out_cpu_handle,
+                                       D3D12_GPU_DESCRIPTOR_HANDLE* out_gpu_handle )
+  {
+    RenderDevice const* render_device = ( RenderDevice* )init_info->UserData;
+    g_ImguiHandleMap[out_cpu_handle->ptr] =
+        render_device->AllocateRawDescriptorHandle( out_cpu_handle, out_gpu_handle );
+  };
+  init_info.SrvDescriptorFreeFn =
+      []( ImGui_ImplDX12_InitInfo* init_info, D3D12_CPU_DESCRIPTOR_HANDLE cpu_handle, D3D12_GPU_DESCRIPTOR_HANDLE )
+  {
+    RenderDevice const* render_device = ( RenderDevice* )init_info->UserData;
+    render_device->FreeHandle( g_ImguiHandleMap[cpu_handle.ptr] );
+    g_ImguiHandleMap.erase( cpu_handle.ptr );
+  };
+  init_info.UserData = m_RenderDevice.get();
+  ImGui_ImplDX12_Init( &init_info );
 }
 
 void Ember::BasicApp::Create( BasicApp* app, HINSTANCE const instance_handle )
@@ -530,14 +591,16 @@ void Ember::BasicApp::Update()
 
   m_PerfCounter->Tick();
 
-  double const              avg_delta_ms   = m_PerfCounter->GetAvgFrameTime();
-  double const              avg_fps        = 1000.0f / avg_delta_ms;
+  double const      avg_delta_ms   = m_PerfCounter->GetAvgFrameTime();
+  double const      avg_fps        = 1000.0f / avg_delta_ms;
 
-  auto&                     pipeline_stats = m_PerfCounter->GetPipelineStats();
+  auto&             pipeline_stats = m_PerfCounter->GetPipelineStats();
 
-  DirectX::FXMVECTOR const& cam_pos        = m_Camera->GetPosition();
-  float const               pitch          = m_Camera->GetPitch();
-  float const               yaw            = m_Camera->GetYaw();
+  DirectX::XMFLOAT3 cam_pos;
+  XMStoreFloat3( &cam_pos, m_Camera->GetPosition() );
+
+  float const cam_pitch = m_Camera->GetPitch();
+  float const cam_yaw   = m_Camera->GetYaw();
   swprintf_s(
       m_SprintfBuffer,
       L"Ember %ux%u"
@@ -551,15 +614,59 @@ void Ember::BasicApp::Update()
       pipeline_stats.ASInvocations,
       pipeline_stats.MSPrimitives,
       pipeline_stats.MSInvocations,
-      cam_pos.m128_f32[0],
-      cam_pos.m128_f32[1],
-      cam_pos.m128_f32[2],
-      yaw,
-      pitch );
+      cam_pos.x,
+      cam_pos.y,
+      cam_pos.z,
+      cam_yaw,
+      cam_pitch );
 
   SetWindowText( m_WindowHandle, m_SprintfBuffer );
 
-  float const delta_seconds = ( float )m_PerfCounter->GetDeltaMilliSeconds() * 0.001f;
+  ImGui_ImplDX12_NewFrame();
+  ImGui_ImplWin32_NewFrame();
+  ImGui::NewFrame();
+
+  {
+    ImGui::Begin( "Ember Info" ); // Create a window called "Hello, world!" and append into it.
+
+    ImGui::Text( "Resolution: %ux%u", m_WindowWidth, m_WindowHeight );
+    ImGui::Text( "Frame Time %.3lf ms (%.2lf FPS)", avg_delta_ms, avg_fps );
+    ImGui::PlotLines(
+        "FrameTime",
+        m_PerfCounter->GetDeltaValues(),
+        PerfCounter::kSampleCount,
+        0,
+        nullptr,
+        0,
+        PerfCounter::kMaxDeltaMs );
+    ImGui::Text( "MeshDraws: %llu", m_DrawList.Size() );
+    ImGui::Text( "AS Invocation: %llu", pipeline_stats.ASInvocations );
+    ImGui::Text( "MS Invocation: %llu", pipeline_stats.MSInvocations );
+    ImGui::Text( "MS Primitives: %llu", pipeline_stats.MSPrimitives );
+    ImGui::Text( "Total Primitives: %llu", pipeline_stats.CPrimitives );
+    ImGui::End();
+  }
+
+  {
+    ImGui::Begin( "Camera" );
+
+    float gi_cam_yaw_pitch[] = { cam_yaw, cam_pitch };
+    if ( ImGui::DragFloat2( "Yaw & Pitch", gi_cam_yaw_pitch, 0.01f ) )
+    {
+      m_Camera->SetYawPitch( gi_cam_yaw_pitch[0], gi_cam_yaw_pitch[1] );
+    }
+    float gi_cam_pos[] = { cam_pos.x, cam_pos.y, cam_pos.z };
+    if ( ImGui::DragFloat3( "Position", gi_cam_pos, 0.1f ) )
+    {
+      m_Camera->SetPosition( gi_cam_pos[0], gi_cam_pos[1], gi_cam_pos[2] );
+    }
+    ImGui::End();
+  }
+
+  // Rendering
+  ImGui::Render();
+
+  float const delta_seconds = m_PerfCounter->GetDeltaMilliSeconds() * 0.001f;
 
   m_TextureLoader->Update();
 
@@ -609,11 +716,9 @@ void Ember::BasicApp::RenderScene(
 {
   ZoneScoped;
 
-  CBVHandle const camera_cbv                    = m_Camera->GetLastUpdatedBuffer();
-  auto const [omni_light_srv, dir_light_srv]    = m_LightManager->PrepareFrame( frame_idx );
-  SRVHandle const                materials_srv  = m_MaterialManager->PrepareFrame();
-
-  DirectX::BoundingFrustum const camera_frustum = m_Camera->GetLastUpdatedFrustum();
+  CBVHandle const camera_cbv                 = m_Camera->GetLastUpdatedBuffer();
+  auto const [omni_light_srv, dir_light_srv] = m_LightManager->PrepareFrame( frame_idx );
+  SRVHandle const materials_srv              = m_MaterialManager->PrepareFrame();
 
   // Viewport and scissor
   D3D12_VIEWPORT const viewport = {
@@ -702,6 +807,7 @@ void Ember::BasicApp::Render()
 
   command_list->SetPipelineState( m_BackgroundPipeline.Get() );
   command_list->DispatchMesh( 1, 1, 1 );
+  ImGui_ImplDX12_RenderDrawData( ImGui::GetDrawData(), command_list.Get() );
 
   CD3DX12_RESOURCE_BARRIER post_render_barriers[] = {
     CD3DX12_RESOURCE_BARRIER::Transition(
@@ -710,6 +816,7 @@ void Ember::BasicApp::Render()
   command_list->ResourceBarrier( CountOf( post_render_barriers ), DataOf( post_render_barriers ) );
 
   command_list->CopyResource( backbuffer, m_RenderTexture.GetTexture() );
+
 
   CD3DX12_RESOURCE_BARRIER bottom_of_renderpass_barriers[] = {
     CD3DX12_RESOURCE_BARRIER::Transition( backbuffer, D3D12_RESOURCE_STATE_COPY_DEST, D3D12_RESOURCE_STATE_PRESENT ),
@@ -726,7 +833,13 @@ void Ember::BasicApp::Render()
 }
 
 void Ember::BasicApp::UnloadContent()
-{}
+{
+  m_RenderDevice->WaitIdle();
+
+  ImGui_ImplDX12_Shutdown();
+  ImGui_ImplWin32_Shutdown();
+  ImGui::DestroyContext();
+}
 
 void Ember::BasicApp::Resize()
 {

@@ -124,6 +124,31 @@ Ember::UAVHandle Ember::BindlessManager::CreateDescriptorHandle(
   return UAVHandle{ index };
 }
 
+Ember::RawDescriptorHandle Ember::BindlessManager::AllocateRawDescriptor(
+    D3D12_CPU_DESCRIPTOR_HANDLE* cpu_desc, D3D12_GPU_DESCRIPTOR_HANDLE* gpu_desc )
+{
+  std::lock_guard                     lock_guard{ m_ResourceDescriptorLock };
+
+  uint32_t const                      index = m_ResourceFreeList.Allocate();
+
+  CD3DX12_CPU_DESCRIPTOR_HANDLE const cpu_descriptor_handle{
+    m_ResourceDescriptorHeap->GetCPUDescriptorHandleForHeapStart(),
+    ( int )index,
+    m_ResourceDescriptorIncrement,
+  };
+
+  CD3DX12_GPU_DESCRIPTOR_HANDLE const gpu_descriptor_handle{
+    m_ResourceDescriptorHeap->GetGPUDescriptorHandleForHeapStart(),
+    ( int )index,
+    m_ResourceDescriptorIncrement,
+  };
+
+  *cpu_desc = cpu_descriptor_handle;
+  *gpu_desc = gpu_descriptor_handle;
+
+  return RawDescriptorHandle{ index };
+}
+
 Ember::SamplerHandle Ember::BindlessManager::CreateSamplerHandle( D3D12_SAMPLER_DESC const& sampler_desc )
 {
   std::lock_guard                     lock_guard{ m_SamplerDescriptorLock };
@@ -154,6 +179,12 @@ void Ember::BindlessManager::Free( UAVHandle const handle )
 }
 
 void Ember::BindlessManager::Free( CBVHandle const handle )
+{
+  if ( handle.IsNull() ) return;
+  m_ResourceFreeList.Free( handle.GetInner() );
+}
+
+void Ember::BindlessManager::Free( RawDescriptorHandle const handle )
 {
   if ( handle.IsNull() ) return;
   m_ResourceFreeList.Free( handle.GetInner() );

@@ -45,6 +45,7 @@ public:
   //
   [[nodiscard]] DirectX::XMVECTOR const& GetPosition() const;
   void                                   SetPosition( DirectX::FXMVECTOR const& position );
+  void                                   SetPosition( float x, float y, float z );
   void                                   LocalTranslate( float dx, float dy, float dz );
   [[nodiscard]] float                    GetYaw() const;
   [[nodiscard]] float                    GetPitch() const;

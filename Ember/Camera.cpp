@@ -60,6 +60,12 @@ void Ember::Camera::SetPosition( DirectX::FXMVECTOR& position )
   m_DirtyFlags    |= kViewDirtyBit;
 }
 
+void Ember::Camera::SetPosition( float const x, float const y, float const z )
+{
+  m_Repr.Position  = DirectX::XMVectorSet( x, y, z, 1.0f );
+  m_DirtyFlags    |= kViewDirtyBit;
+}
+
 void Ember::Camera::LocalTranslate( float const dx, float const dy, float const dz )
 {
   auto delta = DirectX::XMVector3Rotate(

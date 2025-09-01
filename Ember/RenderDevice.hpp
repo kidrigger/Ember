@@ -67,6 +67,8 @@ public:
 
   ComPtr<ID3D12Device2>                    GetDevice() noexcept;
   ComPtr<D3D12MA::Allocator>               GetAllocator() noexcept;
+  ID3D12CommandQueue*                      GetDirectQueue() const;
+
   DXGI_FORMAT                              FetchSwapchainFormat() const;
   [[nodiscard]] D3D_ROOT_SIGNATURE_VERSION FetchHighestRootSignatureVersion() const;
 
@@ -91,11 +93,14 @@ public:
       ID3D12Resource* resource, D3D12_SHADER_RESOURCE_VIEW_DESC const& srv_desc ) const noexcept;
   [[nodiscard]] UAVHandle CreateBindlessHandle(
       ID3D12Resource* resource, D3D12_UNORDERED_ACCESS_VIEW_DESC const& uav_desc ) const noexcept;
-  [[nodiscard]] SamplerHandle CreateSamplerHandle( D3D12_SAMPLER_DESC const& sampler_desc ) const noexcept;
+  [[nodiscard]] SamplerHandle       CreateSamplerHandle( D3D12_SAMPLER_DESC const& sampler_desc ) const noexcept;
+  [[nodiscard]] RawDescriptorHandle AllocateRawDescriptorHandle(
+      D3D12_CPU_DESCRIPTOR_HANDLE* cpu_desc, D3D12_GPU_DESCRIPTOR_HANDLE* gpu_desc ) const noexcept;
   [[nodiscard]] std::array<ID3D12DescriptorHeap*, 2> GetBindlessDescriptorHeaps() const;
   void                                               FreeHandle( CBVHandle handle ) const;
   void                                               FreeHandle( SRVHandle handle ) const;
   void                                               FreeHandle( UAVHandle handle ) const;
+  void                                               FreeHandle( RawDescriptorHandle handle ) const;
   void                                               FreeHandle( SamplerHandle handle ) const;
 
   // Wait until the all queues have finished all commands.

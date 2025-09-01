@@ -45,12 +45,15 @@ public:
       ID3D12Resource* resource, D3D12_UNORDERED_ACCESS_VIEW_DESC const& uav_desc );
   [[nodiscard]] UAVHandle CreateDescriptorHandle(
       ID3D12Resource* resource, ID3D12Resource* counter, D3D12_UNORDERED_ACCESS_VIEW_DESC const& uav_desc );
+  [[nodiscard]] RawDescriptorHandle AllocateRawDescriptor(
+      D3D12_CPU_DESCRIPTOR_HANDLE* cpu_desc, D3D12_GPU_DESCRIPTOR_HANDLE* gpu_desc );
 
   [[nodiscard]] SamplerHandle                        CreateSamplerHandle( D3D12_SAMPLER_DESC const& sampler_desc );
 
   void                                               Free( SRVHandle handle );
   void                                               Free( UAVHandle handle );
   void                                               Free( CBVHandle handle );
+  void                                               Free( RawDescriptorHandle handle );
   void                                               Free( SamplerHandle handle );
 
   [[nodiscard]] std::array<ID3D12DescriptorHeap*, 2> GetBindlessDescriptorHeaps() const;

@@ -8,6 +8,14 @@
     "tracy",
     "flecs",
     "mikktspace",
-    "meshoptimizer"
+    "meshoptimizer",
+    {
+      "name": "imgui",
+      "features": [
+        "dx12-binding",
+        "win32-binding",
+        "docking-experimental"
+      ]
+    }
   ]
 }

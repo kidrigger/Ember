@@ -55,6 +55,7 @@ TYPED_HANDLE( SRV, BindlessManager );
 TYPED_HANDLE( UAV, BindlessManager );
 TYPED_HANDLE( CBV, BindlessManager );
 TYPED_HANDLE( Sampler, BindlessManager );
+TYPED_HANDLE( RawDescriptor, BindlessManager );
 TYPED_HANDLE( Material, MaterialManager );
 TYPED_HANDLE( Geometry, GeometryManager );
 
