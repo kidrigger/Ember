@@ -46,4 +46,16 @@ float3 GetCubeDir( float2 face_xy, uint layer, float texel_size )
   }
 }
 
+float4 TransformBoundingSphere( in float4x4 transformation, float4 sphere )
+{
+  float3 center = mul( transformation, float4( sphere.xyz, 1.0f ) ).xyz;
+
+  float  sx     = transformation[0][0];
+  float  sy     = transformation[1][1];
+  float  sz     = transformation[2][2];
+  float  scale  = sqrt( max( sx * sx, max( sy * sy, sz * sz ) ) );
+
+  return float4( center, scale * sphere.w );
+}
+
 #endif

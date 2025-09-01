@@ -36,14 +36,15 @@ void OmniShadowAS( uint3 group_id : SV_GroupID, uint3 local_id : SV_GroupThreadI
     Meshlet                     meshlet          = meshlet_buffer.Load<Meshlet>( meshlet_addr );
 
     StructuredBuffer<Transform> transform_buffer = ResourceDescriptorHeap[g_DrawList.Transforms];
-    float4x4                    model = transform_buffer[NonUniformResourceIndex( current_draw.FirstTransform )].Model;
-    float3                      ws_center = mul( model, float4( meshlet.BoundingSphere.xyz, 1.0f ) ).xyz;
+    float4x4                    model  = transform_buffer[NonUniformResourceIndex( current_draw.FirstTransform )].Model;
+    float4                      bounds = TransformBoundingSphere( model, meshlet.BoundingSphere );
 
     bool                        is_view_visible[6];
     [unroll] for ( int i = 0; i < 6; i++ )
     {
-      float4 ls_position  = mul( proj_view.Views[i], float4( ws_center - g_LightPosition, 1.0f ) );
-      is_view_visible[i]  = !IsCulled( ls_position.xyz, meshlet.BoundingSphere.w );
+      // We know this is only translation and orientation. No need for whole transform
+      float4 ls_position  = mul( proj_view.Views[i], float4( bounds.xyz - g_LightPosition, 1.0f ) );
+      is_view_visible[i]  = !IsCulled( ls_position.xyz, bounds.w );
       visible_count      += is_view_visible[i] ? 1 : 0;
     }
 

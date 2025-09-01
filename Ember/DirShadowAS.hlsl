@@ -36,23 +36,29 @@ void DirShadowAS( uint3 group_id : SV_GroupID, uint3 local_id : SV_GroupThreadID
     uint                        meshlet_addr     = sizeof( Meshlet ) * ( current_draw.FirstMeshlet + meshlet_idx );
     Meshlet                     meshlet          = meshlet_buffer.Load<Meshlet>( meshlet_addr );
     float4x4                    model            = transform_buffer[current_draw.FirstTransform].Model;
-    float4                      ws_center        = mul( model, float4( meshlet.BoundingSphere.xyz, 1.0f ) );
+    float4                      ws_bounds        = TransformBoundingSphere( model, meshlet.BoundingSphere );
 
-    bool                        is_view_visible[6];
-    [unroll] for ( int i = 0; i < 6; i++ )
+    float3                      light_dir        = light_data[g_LightIdx].Direction;
+
+    bool                        is_view_visible[NUM_CASCADES];
+    [unroll] for ( int i = 0; i < NUM_CASCADES; i++ )
     {
-      float4x4 light_mat   = light_data[g_LightIdx].LightSpaceMat[i];
-      float4   ndc_center  = mul( light_mat, ws_center );
-      float3   bounds      = abs( mul( light_mat, float4( meshlet.BoundingSphere.www, 1.0f ) ).xyz );
+      float4 cascade_cull_info = g_CullParams[i];
+      float3 point_to_center   = ( cascade_cull_info.xyz - ws_bounds.xyz );
+      float  proj_on_dir       = dot( point_to_center, light_dir );
 
-      is_view_visible[i]   = !IsCulled( ndc_center.xyz, bounds );
-      visible_count       += is_view_visible[i] ? 1 : 0;
+      // If the proj_on_dir is positive, i.e. center is closer than focus, we use cylinder calculation.
+      // If it is farther, then we use spherical - forming a capsule shape with one end at focus, the other at INF.
+      float dist = proj_on_dir > 0 ? length( point_to_center - proj_on_dir * light_dir ) : length( point_to_center );
+
+      is_view_visible[i]  = dist < cascade_cull_info.w + ws_bounds.w;
+      visible_count      += is_view_visible[i] ? 1 : 0;
     }
 
     if ( visible_count > 0 )
     {
       uint write_idx = WavePrefixSum( visible_count );
-      [unroll] for ( int i = 0; i < 6; i++ )
+      [unroll] for ( int i = 0; i < NUM_CASCADES; i++ )
       {
         if ( is_view_visible[i] )
         {

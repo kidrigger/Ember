@@ -14,10 +14,15 @@ cbuffer QuickTransforms : register( b0 )
   ResID    g_Camera;
 }
 
+cbuffer LightCullParameters : register( b1 )
+{
+  float4 g_CullParams[NUM_CASCADES];
+}
+
 struct MeshletPayload
 {
-  uint MeshletID[192];
-  uint ViewID[192];
+  uint MeshletID[32 * NUM_CASCADES];
+  uint ViewID[32 * NUM_CASCADES];
   uint MeshDrawID;
 };
 

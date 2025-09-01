@@ -127,8 +127,9 @@ void Ember::Internal::DirectionLightManager::Create(
                                                           D3D12_ROOT_SIGNATURE_FLAG_DENY_DOMAIN_SHADER_ROOT_ACCESS |
                                                           D3D12_ROOT_SIGNATURE_FLAG_DENY_HULL_SHADER_ROOT_ACCESS;
 
-  CD3DX12_ROOT_PARAMETER1 root_parameters[1];
+  CD3DX12_ROOT_PARAMETER1 root_parameters[2];
   root_parameters[0].InitAsConstants( sizeof( PackedData ) / 4, 0 );
+  root_parameters[1].InitAsConstants( kNumCascades * sizeof( DirectX::XMFLOAT4 ) / 4, 1 );
 
   CD3DX12_VERSIONED_ROOT_SIGNATURE_DESC root_signature_desc;
   root_signature_desc.Init_1_1(
@@ -424,6 +425,7 @@ void Ember::Internal::DirectionLightManager::RenderDirShadow(
   // Copy cascades to GPU
   memcpy( dir_light->Cascades, &cascades[1], ByteSizeOf( dir_light->Cascades ) );
 
+  DirectX::XMFLOAT4 cull_params[kNumCascades];
   for ( int cascade_id = 0; cascade_id < kNumCascades; cascade_id++ )
   {
     DirectX::BoundingFrustum frustum = camera_frust;
@@ -443,6 +445,9 @@ void Ember::Internal::DirectionLightManager::RenderDirShadow(
         DirectX::XMVectorFloor( DirectX::XMVectorScale( XMLoadFloat3( &ws_bs.Center ), texel_per_world ) ),
         world_per_texel );
 
+    DirectX::XMFLOAT3 focus_v3;
+    XMStoreFloat3( &focus_v3, focus );
+
     // Create 'shadow camera view and projections
     DirectX::FXMMATRIX view = DirectX::XMMatrixLookToRH( focus, direction, ls_up );
     DirectX::FXMMATRIX projection =
@@ -450,6 +455,8 @@ void Ember::Internal::DirectionLightManager::RenderDirShadow(
     ASSERT_M(
         projection.r[0].m128_f32[0] == projection.r[1].m128_f32[1],
         "The Amplification shader expects a square projection" );
+
+    cull_params[cascade_id]                 = { focus_v3.x, focus_v3.y, focus_v3.z, ws_bs.Radius };
 
     DirectX::FXMMATRIX proj_view            = XMMatrixMultiply( view, projection );
     dir_light->LightSpaceMatrix[cascade_id] = proj_view;
@@ -466,5 +473,6 @@ void Ember::Internal::DirectionLightManager::RenderDirShadow(
   command_list->SetGraphicsRoot32BitConstants( 0, sizeof( packed_data ) / 4, &packed_data, 0 );
   rtm.OMSetRenderTargets( command_list, 0, nullptr, &texture );
 
+  command_list->SetGraphicsRoot32BitConstants( 1, ByteSizeOf( cull_params ) / 4, DataOf( cull_params ), 0 );
   command_list->DispatchMesh( draw_info.DrawCount, 1, 1 );
 }

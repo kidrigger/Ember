@@ -151,7 +151,7 @@
       <Filter>Source Files\Graphics</Filter>
     </ClCompile>
     <ClCompile Include="GeometryManager.cpp">
-      <Filter>Source Files</Filter>
+      <Filter>Source Files\Graphics</Filter>
     </ClCompile>
   </ItemGroup>
   <ItemGroup>
@@ -242,9 +242,6 @@
     <ClInclude Include="DirectionLightManager.hpp">
       <Filter>Header Files\Scene</Filter>
     </ClInclude>
-    <ClInclude Include="DeviceHandle.hpp">
-      <Filter>Header Files</Filter>
-    </ClInclude>
     <ClInclude Include="Util\RabbitPullingFreeList.hpp">
       <Filter>Header Files\Util</Filter>
     </ClInclude>
@@ -255,7 +252,10 @@
       <Filter>Header Files\Graphics</Filter>
     </ClInclude>
     <ClInclude Include="GeometryManager.hpp">
-      <Filter>Header Files</Filter>
+      <Filter>Header Files\Graphics</Filter>
+    </ClInclude>
+    <ClInclude Include="DeviceHandle.hpp">
+      <Filter>Header Files\Graphics</Filter>
     </ClInclude>
   </ItemGroup>
   <ItemGroup>
