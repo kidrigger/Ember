@@ -8,12 +8,10 @@ const static float kNearPlane = 0.01f;
 
 cbuffer            QuickTransforms : register( b0 )
 {
-  ResID  g_Transforms;
-  ResID  g_MeshDraws;
-  uint   g_MeshDrawCount;
-  ResID  g_ProjViewID;
-  float3 g_LightPosition;
-  float  g_FarPlane;
+  DrawList g_DrawList;
+  float3   g_LightPosition;
+  float    g_FarPlane;
+  ResID    g_ProjViewID;
 }
 
 struct ProjectionTransforms

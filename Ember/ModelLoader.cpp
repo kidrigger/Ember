@@ -656,11 +656,16 @@ Ember::MaterialImpl* Ember::ModelLoader::GetDefaultMaterial( LoadingContext* con
 }
 
 Ember::ModelLoader::ModelLoader(
-    RenderDevice* render_device, World* world, TextureLoader* texture_loader, MaterialManager* material_manager )
+    RenderDevice*    render_device,
+    World*           world,
+    TextureLoader*   texture_loader,
+    MaterialManager* material_manager,
+    GeometryManager* geometry_manager )
   : m_RenderDevice{ render_device }
   , m_World{ world }
   , m_TextureLoader{ texture_loader }
   , m_MaterialManager{ material_manager }
+  , m_GeometryManager{ geometry_manager }
 {}
 
 std::optional<flecs::entity> Ember::ModelLoader::TryLoadModel( char const* filename )
@@ -716,7 +721,107 @@ std::optional<flecs::entity> Ember::ModelLoader::TryLoadModel( char const* filen
   wchar_t wide_filename[128];
   mbstowcs_s( nullptr, wide_filename, filename, _TRUNCATE );
 
-  wchar_t    buf[256];
+  wchar_t            buf[256];
+
+  GeometryAllocation geom;
+  uint32_t           vertex_position_offset;
+  uint32_t           vertex_data_offset;
+  uint32_t           meshlet_offset;
+  uint32_t           meshlet_triangle_offset;
+  uint32_t           meshlet_vertices_offset;
+  {
+    uint32_t vertex_position_size       = ByteSizeOf( context.VertexPositions );
+    uint32_t vertex_data_size           = ByteSizeOf( context.VertexData );
+    uint32_t meshlet_size               = ByteSizeOf( context.Meshlets );
+    uint32_t meshlet_triangle_size      = ByteSizeOf( context.MeshletTriangles );
+    uint32_t meshlet_vertices_size      = ByteSizeOf( context.MeshletVertices );
+
+    uint32_t vertex_position_alignment  = StrideOf( context.VertexPositions );
+    uint32_t vertex_data_alignment      = StrideOf( context.VertexData );
+    uint32_t meshlet_alignment          = StrideOf( context.Meshlets );
+    uint32_t meshlet_triangle_alignment = 4;
+    uint32_t meshlet_vertices_alignment = StrideOf( context.MeshletVertices );
+
+    uint32_t largest_alignment          = 4;
+    largest_alignment                   = std::max( largest_alignment, vertex_position_alignment );
+    largest_alignment                   = std::max( largest_alignment, vertex_data_alignment );
+    largest_alignment                   = std::max( largest_alignment, meshlet_alignment );
+    largest_alignment                   = std::max( largest_alignment, meshlet_triangle_alignment );
+    largest_alignment                   = std::max( largest_alignment, meshlet_vertices_alignment );
+
+    uint32_t const total_size = vertex_position_size + vertex_data_size + meshlet_size + meshlet_triangle_size +
+                                meshlet_vertices_size + largest_alignment * 5;
+
+    geom                             = m_GeometryManager->CreateGeometry( total_size, largest_alignment );
+
+    uint32_t const base_offset_begin = geom.GetOffsetInBytes();
+    uint32_t const base_offset_end   = base_offset_begin + total_size;
+
+    uint32_t       offset            = base_offset_begin;
+
+    vertex_position_offset           = offset + ( vertex_position_alignment - ( offset % vertex_position_alignment ) );
+    offset                           = vertex_position_offset + vertex_position_size;
+    ASSERT( offset <= base_offset_end );
+
+    vertex_data_offset = offset + ( vertex_data_alignment - ( offset % vertex_data_alignment ) );
+    offset             = vertex_data_offset + vertex_data_size;
+    ASSERT( offset <= base_offset_end );
+
+    meshlet_offset = offset + ( meshlet_alignment - ( offset % meshlet_alignment ) );
+    offset         = meshlet_offset + meshlet_size;
+    ASSERT( offset <= base_offset_end );
+
+    meshlet_triangle_offset = offset + ( meshlet_triangle_alignment - ( offset % meshlet_triangle_alignment ) );
+    offset                  = meshlet_triangle_offset + meshlet_triangle_size;
+    ASSERT( offset <= base_offset_end );
+
+    meshlet_vertices_offset = offset + ( meshlet_vertices_alignment - ( offset % meshlet_vertices_alignment ) );
+    offset                  = meshlet_vertices_offset + meshlet_vertices_size;
+    ASSERT( offset <= base_offset_end );
+
+    ASSERT( meshlet_offset % meshlet_alignment == 0 );
+    ASSERT( meshlet_triangle_offset % meshlet_triangle_alignment == 0 );
+    ASSERT( meshlet_vertices_offset % meshlet_vertices_alignment == 0 );
+
+    for ( auto& meshlet : context.Meshlets )
+    {
+      meshlet.TriangleOffset += meshlet_triangle_offset;
+      meshlet.VertexOffset   += meshlet_vertices_offset / 4;
+    }
+
+    geom.Write(
+        vertex_position_offset - base_offset_begin,
+        ByteSizeOf( context.VertexPositions ),
+        DataOf( context.VertexPositions ) );
+    geom.Write(
+        vertex_data_offset - base_offset_begin, ByteSizeOf( context.VertexData ), DataOf( context.VertexData ) );
+    geom.Write( meshlet_offset - base_offset_begin, ByteSizeOf( context.Meshlets ), DataOf( context.Meshlets ) );
+    geom.Write(
+        meshlet_triangle_offset - base_offset_begin,
+        ByteSizeOf( context.MeshletTriangles ),
+        DataOf( context.MeshletTriangles ) );
+    geom.Write(
+        meshlet_vertices_offset - base_offset_begin,
+        ByteSizeOf( context.MeshletVertices ),
+        DataOf( context.MeshletVertices ) );
+  }
+
+  std::queue<flecs::entity> bfs_subtree;
+  bfs_subtree.push( entity );
+  while ( not bfs_subtree.empty() )
+  {
+    flecs::entity ent = bfs_subtree.front();
+    bfs_subtree.pop();
+
+    ent.get(
+        [&]( Mesh& mesh )
+        {
+          mesh.FirstVertex  += vertex_data_offset / sizeof( VertexData );
+          mesh.FirstMeshlet += meshlet_offset / sizeof( Meshlet );
+        } );
+
+    ent.children( [&]( flecs::entity child ) { bfs_subtree.push( child ); } );
+  }
 
   auto const vertex_position_buffer =
       m_RenderDevice->CreateStorageBuffer( ByteSizeOf( context.VertexPositions ), StrideOf( context.VertexPositions ) );
@@ -730,8 +835,7 @@ std::optional<flecs::entity> Ember::ModelLoader::TryLoadModel( char const* filen
   vertex_data_buffer.SetName( buf );
   vertex_data_buffer.Write( 0, ByteSizeOf( context.VertexData ), DataOf( context.VertexData ) );
 
-  auto const meshlet_buffer =
-      m_RenderDevice->CreateStorageBuffer( ByteSizeOf( context.Meshlets ), StrideOf( context.Meshlets ) );
+  auto const meshlet_buffer = m_RenderDevice->CreateRawStorageBuffer( ByteSizeOf( context.Meshlets ) );
   swprintf_s( buf, L"Meshlet Data %s", wide_filename );
   meshlet_buffer.SetName( buf );
   meshlet_buffer.Write( 0, ByteSizeOf( context.Meshlets ), DataOf( context.Meshlets ) );
@@ -741,8 +845,7 @@ std::optional<flecs::entity> Ember::ModelLoader::TryLoadModel( char const* filen
   meshlet_triangle_buffer.SetName( buf );
   meshlet_triangle_buffer.Write( 0, ByteSizeOf( context.MeshletTriangles ), DataOf( context.MeshletTriangles ) );
 
-  auto const meshlet_vertices_buffer =
-      m_RenderDevice->CreateStorageBuffer( ByteSizeOf( context.MeshletVertices ), StrideOf( context.MeshletVertices ) );
+  auto const meshlet_vertices_buffer = m_RenderDevice->CreateRawStorageBuffer( ByteSizeOf( context.MeshletVertices ) );
   swprintf_s( buf, L"Meshlet Vertices %s", wide_filename );
   meshlet_vertices_buffer.SetName( buf );
   meshlet_vertices_buffer.Write( 0, ByteSizeOf( context.MeshletVertices ), DataOf( context.MeshletVertices ) );
@@ -752,6 +855,7 @@ std::optional<flecs::entity> Ember::ModelLoader::TryLoadModel( char const* filen
   index_buffer.SetName( buf );
   index_buffer.Write( 0, ByteSizeOf( context.Indices ), DataOf( context.Indices ) );
 
+  context.Geometry->GeometryAlloc         = std::move( geom );
   context.Geometry->ShadowVertexBuffer    = std::move( vertex_position_buffer );
   context.Geometry->VertexBuffer          = std::move( vertex_data_buffer );
   context.Geometry->IndexBuffer           = std::move( index_buffer );

@@ -6,6 +6,7 @@
 
 #include "Camera.hpp"
 #include "Environment.hpp"
+#include "GeometryManager.hpp"
 #include "LightManager.hpp"
 #include "Material.hpp"
 #include "MaterialManager.hpp"
@@ -260,7 +261,8 @@ Ember::BasicApp::BasicApp(
   , m_LightManager{ std::make_unique_for_overwrite<LightManager>() }
   , m_Environment{ std::make_unique<Environment>() }
   , m_MaterialManager{ std::make_unique_for_overwrite<MaterialManager>() }
-  , m_DrawList{ m_RenderDevice.get(), RenderDevice::kNumFrames }
+  , m_GeometryManager{ std::make_unique_for_overwrite<GeometryManager>() }
+  , m_DrawList{ m_RenderDevice.get(), m_GeometryManager.get(), RenderDevice::kNumFrames }
 {
   m_TextureLoader = std::make_unique_for_overwrite<TextureLoader>();
   TextureLoader::Create( m_TextureLoader.get(), m_RenderDevice.get(), 3 );
@@ -463,9 +465,10 @@ void Ember::BasicApp::LoadContent()
   m_LightManager->AddShadowingDirLight( { 1.0f, -1.0f, 0.0f }, Color32::White(), 12.0f );
 
   MaterialManager::Create( m_MaterialManager.get(), m_RenderDevice.get(), 10'000 );
+  GeometryManager::Create( m_GeometryManager.get(), m_RenderDevice.get(), 256_MiB );
 
-  m_ModelLoader =
-      std::make_unique<ModelLoader>( m_RenderDevice.get(), &m_World, m_TextureLoader.get(), m_MaterialManager.get() );
+  m_ModelLoader = std::make_unique<ModelLoader>(
+      m_RenderDevice.get(), &m_World, m_TextureLoader.get(), m_MaterialManager.get(), m_GeometryManager.get() );
 
   // Setup Scene Geometry
   flecs::entity       model = m_ModelLoader->TryLoadModel( "Bistro.glb" ).value().set_name( "Scene" );

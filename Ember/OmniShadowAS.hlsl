@@ -24,17 +24,18 @@ void OmniShadowAS( uint3 group_id : SV_GroupID, uint3 local_id : SV_GroupThreadI
   uint                                 visible_count = 0;
   MeshletPayload                       pl;
 
-  StructuredBuffer<MeshDraw>           mesh_draws   = ResourceDescriptorHeap[g_MeshDraws];
+  StructuredBuffer<MeshDraw>           mesh_draws   = ResourceDescriptorHeap[g_DrawList.MeshDraws];
   MeshDraw                             current_draw = mesh_draws[NonUniformResourceIndex( mesh_draw_idx )];
 
   ConstantBuffer<ProjectionTransforms> proj_view    = ResourceDescriptorHeap[g_ProjViewID];
 
   if ( meshlet_idx < current_draw.MeshletCount )
   {
-    StructuredBuffer<Meshlet> meshlet_buffer = ResourceDescriptorHeap[current_draw.MeshletBuffer];
-    Meshlet meshlet = meshlet_buffer[NonUniformResourceIndex( current_draw.FirstMeshlet + meshlet_idx )];
+    ByteAddressBuffer           meshlet_buffer   = ResourceDescriptorHeap[g_DrawList.Geometry];
+    uint                        meshlet_addr     = sizeof( Meshlet ) * ( current_draw.FirstMeshlet + meshlet_idx );
+    Meshlet                     meshlet          = meshlet_buffer.Load<Meshlet>( meshlet_addr );
 
-    StructuredBuffer<Transform> transform_buffer = ResourceDescriptorHeap[g_Transforms];
+    StructuredBuffer<Transform> transform_buffer = ResourceDescriptorHeap[g_DrawList.Transforms];
     float4x4                    model = transform_buffer[NonUniformResourceIndex( current_draw.FirstTransform )].Model;
     float3                      ws_center = mul( model, float4( meshlet.BoundingSphere.xyz, 1.0f ) ).xyz;
 

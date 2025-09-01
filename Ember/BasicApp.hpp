@@ -50,6 +50,7 @@ class BasicApp final : public IApp
 
   std::unique_ptr<Environment>         m_Environment;
   std::unique_ptr<MaterialManager>     m_MaterialManager;
+  std::unique_ptr<GeometryManager>     m_GeometryManager;
   World                                m_World;
   DrawList                             m_DrawList;
   RenderQueryType                      m_RenderQuery;

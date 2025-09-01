@@ -126,8 +126,11 @@ Ember::ObjectPool<Ember::MaterialImpl>& Ember::World::MaterialManager()
   return manager;
 }
 
-Ember::DrawList::DrawList( RenderDevice* render_device, uint32_t const frame_count )
-  : m_RenderDevice{ render_device }, m_TransformBuffers{ frame_count }, m_DrawBuffers{ frame_count }
+Ember::DrawList::DrawList( RenderDevice* render_device, GeometryManager* geometry_manager, uint32_t const frame_count )
+  : m_RenderDevice{ render_device }
+  , m_GeometryManager{ geometry_manager }
+  , m_TransformBuffers{ frame_count }
+  , m_DrawBuffers{ frame_count }
 {}
 
 void Ember::DrawList::PushDraw(
@@ -142,17 +145,7 @@ void Ember::DrawList::PushDraw(
   while ( remaining_meshlets > 0 )
   {
     m_DrawInfos.emplace_back(
-        transform_idx,
-        1,
-        mesh.FirstVertex,
-        meshlet_offset,
-        std::min( remaining_meshlets, 32 ),
-        geometry->MeshletBuffer.GetSRVHandle(),
-        geometry->MeshletTriangleBuffer.GetSRVHandle(),
-        geometry->MeshletIndexBuffer.GetSRVHandle(),
-        geometry->VertexBuffer.GetSRVHandle(),
-        geometry->ShadowVertexBuffer.GetSRVHandle(),
-        material->GetHandle() );
+        transform_idx, 1, mesh.FirstVertex, meshlet_offset, std::min( remaining_meshlets, 32 ), material->GetHandle() );
 
     remaining_meshlets -= 32;
     meshlet_offset     += 32;
@@ -180,7 +173,12 @@ Ember::DrawList::Info Ember::DrawList::PrepareFrame( uint32_t const frame_idx )
   transform_buffer->Write( 0, transform_size, DataOf( m_Transforms ) );
   draw_buffer->Write( 0, draw_size, DataOf( m_DrawInfos ) );
 
-  return { transform_buffer->GetSRVHandle(), draw_buffer->GetSRVHandle(), CountOf( m_DrawInfos ) };
+  return {
+    transform_buffer->GetSRVHandle(),
+    draw_buffer->GetSRVHandle(),
+    CountOf( m_DrawInfos ),
+    m_GeometryManager->GetSRVHandle(),
+  };
 }
 
 void Ember::DrawList::Clear()

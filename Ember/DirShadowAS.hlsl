@@ -23,17 +23,18 @@ void DirShadowAS( uint3 group_id : SV_GroupID, uint3 local_id : SV_GroupThreadID
   uint                       visible_count = 0;
   MeshletPayload             pl;
 
-  StructuredBuffer<MeshDraw> mesh_draws   = ResourceDescriptorHeap[g_MeshDraws];
+  StructuredBuffer<MeshDraw> mesh_draws   = ResourceDescriptorHeap[g_DrawList.MeshDraws];
   MeshDraw                   current_draw = mesh_draws[NonUniformResourceIndex( mesh_draw_idx )];
 
   StructuredBuffer<DirLight> light_data   = ResourceDescriptorHeap[g_LightData];
 
   if ( meshlet_idx < current_draw.MeshletCount )
   {
-    StructuredBuffer<Meshlet>   meshlet_buffer   = ResourceDescriptorHeap[current_draw.MeshletBuffer];
-    StructuredBuffer<Transform> transform_buffer = ResourceDescriptorHeap[g_Transforms];
+    ByteAddressBuffer           meshlet_buffer   = ResourceDescriptorHeap[g_DrawList.Geometry];
+    StructuredBuffer<Transform> transform_buffer = ResourceDescriptorHeap[g_DrawList.Transforms];
 
-    Meshlet                     meshlet          = meshlet_buffer[current_draw.FirstMeshlet + meshlet_idx];
+    uint                        meshlet_addr     = sizeof( Meshlet ) * ( current_draw.FirstMeshlet + meshlet_idx );
+    Meshlet                     meshlet          = meshlet_buffer.Load<Meshlet>( meshlet_addr );
     float4x4                    model            = transform_buffer[current_draw.FirstTransform].Model;
     float4                      ws_center        = mul( model, float4( meshlet.BoundingSphere.xyz, 1.0f ) );
 

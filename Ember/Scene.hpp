@@ -9,6 +9,8 @@
 
 #include <flecs.h>
 
+#include "GeometryManager.hpp"
+
 namespace Ember
 {
 class RenderDevice;
@@ -57,6 +59,7 @@ struct CullInfo
 
 struct GeometryImpl
 {
+  GeometryAllocation   GeometryAlloc;
   Buffer               ShadowVertexBuffer;
   Buffer               VertexBuffer;
   Buffer               IndexBuffer;
@@ -118,18 +121,14 @@ struct alignas( 16 ) MeshDraw
   uint32_t       FirstVertex;
   uint32_t       FirstMeshlet;
   uint32_t       MeshletCount;
-  SRVHandle      MeshletBuffer;
-  SRVHandle      MeshletTriangleBuffer;
-  SRVHandle      MeshletIndexBuffer;
-  SRVHandle      VertexBuffer;
-  SRVHandle      ShadowBuffer;
   MaterialHandle Material;
-  uint32_t       Padding;
+  uint32_t       Padding[2];
 };
 
 class DrawList
 {
   RenderDevice*               m_RenderDevice;
+  GeometryManager*            m_GeometryManager;
   std::vector<WorldTransform> m_Transforms;
   std::vector<MeshDraw>       m_DrawInfos;
   std::vector<Buffer>         m_TransformBuffers;
@@ -141,12 +140,13 @@ public:
     SRVHandle Transforms;
     SRVHandle DrawInfos;
     uint32_t  DrawCount;
+    SRVHandle GeometryHandle;
   };
 
-  DrawList( RenderDevice* render_device, uint32_t frame_count );
+  DrawList( RenderDevice* render_device, GeometryManager* geometry_manager, uint32_t frame_count );
 
   void PushDraw(
-      WorldTransform const& transform, Mesh const& draw_info, Geometry const& geometry, Material const& material );
+      WorldTransform const& transform, Mesh const& mesh, Geometry const& geometry, Material const& material );
   Info PrepareFrame( uint32_t frame_idx );
   void Clear();
 };

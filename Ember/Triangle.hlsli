@@ -108,10 +108,6 @@ struct MeshletPayload
   uint  Transform;
   uint  FirstVertex;
   uint  FirstMeshlet;
-  ResID MeshletBuffer;
-  ResID MeshletTriangleBuffer;
-  ResID MeshletIndexBuffer;
-  ResID VertexBuffer;
   MatID Material;
 };
 

@@ -5,6 +5,21 @@
 namespace Ember
 {
 
+constexpr uint32_t operator""_KiB( size_t const kibs )
+{
+  return ( uint32_t )kibs * ( 1 << 10 );
+}
+
+constexpr uint32_t operator""_MiB( size_t const mibs )
+{
+  return ( uint32_t )mibs * ( 1 << 20 );
+}
+
+constexpr size_t operator""_GiB( size_t const gibs )
+{
+  return gibs * ( 1 << 30 );
+}
+
 constexpr uint32_t ByteSizeOf( std::ranges::contiguous_range auto& range )
 {
   return ( uint32_t )( std::ranges::size( range ) * sizeof( std::ranges::range_value_t<decltype( range )> ) );

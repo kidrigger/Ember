@@ -350,7 +350,7 @@ void Ember::Internal::DirectionLightManager::RenderAllShadows(
         return CD3DX12_RESOURCE_BARRIER::Transition(
             tex.GetTexture(), D3D12_RESOURCE_STATE_PIXEL_SHADER_RESOURCE, D3D12_RESOURCE_STATE_DEPTH_WRITE );
       } );
-  command_list->ResourceBarrier( CountOf( barriers ), DataOf( barriers ) );
+  if ( not barriers.empty() ) command_list->ResourceBarrier( CountOf( barriers ), DataOf( barriers ) );
 
   for ( auto const& [handle, texture] : m_ShadowsInUse )
   {
@@ -369,7 +369,7 @@ void Ember::Internal::DirectionLightManager::RenderAllShadows(
         return CD3DX12_RESOURCE_BARRIER::Transition(
             tex.GetTexture(), D3D12_RESOURCE_STATE_DEPTH_WRITE, D3D12_RESOURCE_STATE_PIXEL_SHADER_RESOURCE );
       } );
-  command_list->ResourceBarrier( CountOf( barriers ), DataOf( barriers ) );
+  if ( not barriers.empty() ) command_list->ResourceBarrier( CountOf( barriers ), DataOf( barriers ) );
 }
 
 void Ember::Internal::DirectionLightManager::RenderDirShadow(

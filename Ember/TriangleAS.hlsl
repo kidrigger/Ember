@@ -41,8 +41,10 @@ void TriangleAS( uint3 group_id : SV_GroupID, uint3 local_id : SV_GroupThreadID 
 
   if ( meshlet_idx < current_draw.MeshletCount )
   {
-    StructuredBuffer<Meshlet> meshlet_buffer = ResourceDescriptorHeap[current_draw.MeshletBuffer];
-    Meshlet meshlet = meshlet_buffer[NonUniformResourceIndex( current_draw.FirstMeshlet + meshlet_idx )];
+    ByteAddressBuffer           meshlet_buffer   = ResourceDescriptorHeap[g_DrawList.Geometry];
+
+    uint                        meshlet_addr     = sizeof( Meshlet ) * ( current_draw.FirstMeshlet + meshlet_idx );
+    Meshlet                     meshlet          = meshlet_buffer.Load<Meshlet>( meshlet_addr );
 
     StructuredBuffer<Transform> transform_buffer = ResourceDescriptorHeap[g_DrawList.Transforms];
     float4x4                    model = transform_buffer[NonUniformResourceIndex( current_draw.FirstTransform )].Model;
@@ -55,14 +57,10 @@ void TriangleAS( uint3 group_id : SV_GroupID, uint3 local_id : SV_GroupThreadID 
       pl.MeshletID[out_idx] = meshlet_idx;
     }
 
-    pl.Transform             = current_draw.FirstTransform;
-    pl.FirstVertex           = current_draw.FirstVertex;
-    pl.FirstMeshlet          = current_draw.FirstMeshlet;
-    pl.MeshletBuffer         = current_draw.MeshletBuffer;
-    pl.MeshletTriangleBuffer = current_draw.MeshletTriangleBuffer;
-    pl.MeshletIndexBuffer    = current_draw.MeshletIndexBuffer;
-    pl.VertexBuffer          = current_draw.VertexBuffer;
-    pl.Material              = current_draw.Material;
+    pl.Transform    = current_draw.FirstTransform;
+    pl.FirstVertex  = current_draw.FirstVertex;
+    pl.FirstMeshlet = current_draw.FirstMeshlet;
+    pl.Material     = current_draw.Material;
   }
 
   DispatchMesh( WaveActiveCountBits( is_visible ), 1, 1, pl );

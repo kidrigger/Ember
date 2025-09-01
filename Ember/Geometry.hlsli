@@ -47,11 +47,11 @@ struct Transform
 
 struct Meshlet
 {
-  uint  VertexOffset;
-  uint  TriangleOffset;
-  uint  VertexCount;
-  uint  TriangleCount;
-  half4 BoundingSphere; // xyz = center, w = radius
+  uint  VertexOffset;   // 04
+  uint  TriangleOffset; // 08
+  uint  VertexCount;    // 12
+  uint  TriangleCount;  // 16
+  half4 BoundingSphere; // 24 // xyz = center, w = radius
 };
 
 struct MeshDraw
@@ -61,13 +61,9 @@ struct MeshDraw
   uint  FirstVertex;
   uint  FirstMeshlet;
   uint  MeshletCount;
-  ResID MeshletBuffer;
-  ResID MeshletTriangleBuffer;
-  ResID MeshletIndexBuffer;
-  ResID VertexBuffer;
-  ResID ShadowVertexBuffer;
   MatID Material;
   uint  Pad0;
+  uint  Pad1;
 };
 
 struct DrawList
@@ -75,6 +71,7 @@ struct DrawList
   ResID Transforms;
   ResID MeshDraws;
   uint  MeshDrawCount;
+  ResID Geometry;
 };
 
 

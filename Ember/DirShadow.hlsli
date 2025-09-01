@@ -8,12 +8,10 @@
 
 cbuffer QuickTransforms : register( b0 )
 {
-  ResID g_Transforms;
-  ResID g_MeshDraws;
-  uint  g_MeshDrawCount;
-  ResID g_LightData;
-  uint  g_LightIdx;
-  ResID g_Camera;
+  DrawList g_DrawList;
+  ResID    g_LightData;
+  uint     g_LightIdx;
+  ResID    g_Camera;
 }
 
 struct MeshletPayload

@@ -1,5 +1,4 @@
 #pragma once
-#include <vector>
 
 #include "Buffer.hpp"
 #include "Material.hpp"

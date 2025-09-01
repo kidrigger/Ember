@@ -33,24 +33,25 @@ void TriangleMS(
     out primitives MSPrimitiveOut materials[MAX_TRIANGLES] )
 {
   StructuredBuffer<Transform> transforms        = ResourceDescriptorHeap[g_DrawList.Transforms];
-  StructuredBuffer<Meshlet>   meshlets          = ResourceDescriptorHeap[meshlet_draw.MeshletBuffer];
-  StructuredBuffer<uint>      meshlet_indices   = ResourceDescriptorHeap[meshlet_draw.MeshletIndexBuffer];
-  ByteAddressBuffer           meshlet_triangles = ResourceDescriptorHeap[meshlet_draw.MeshletTriangleBuffer];
-  StructuredBuffer<Vertex>    vertex_buffer     = ResourceDescriptorHeap[meshlet_draw.VertexBuffer];
+  ByteAddressBuffer           meshlets          = ResourceDescriptorHeap[g_DrawList.Geometry];
+  ByteAddressBuffer           meshlet_indices   = ResourceDescriptorHeap[g_DrawList.Geometry];
+  ByteAddressBuffer           meshlet_triangles = ResourceDescriptorHeap[g_DrawList.Geometry];
+  ByteAddressBuffer           vertex_buffer     = ResourceDescriptorHeap[g_DrawList.Geometry];
   ConstantBuffer<Camera>      camera            = ResourceDescriptorHeap[g_Camera];
 
   uint                        meshlet_idx       = meshlet_draw.MeshletID[IN.GroupID.x] + meshlet_draw.FirstMeshlet;
+  uint                        meshlet_addr      = sizeof( Meshlet ) * meshlet_idx;
 
-  Meshlet                     meshlet           = meshlets[NonUniformResourceIndex( meshlet_idx )];
+  Meshlet                     meshlet           = meshlets.Load<Meshlet>( meshlet_addr );
   Transform                   transform         = transforms[NonUniformResourceIndex( meshlet_draw.Transform )];
 
   SetMeshOutputCounts( meshlet.VertexCount, meshlet.TriangleCount );
 
   for ( int i = IN.LocalID.x; i < meshlet.VertexCount; i += 32 )
   {
-    uint   index      = meshlet_indices[NonUniformResourceIndex( meshlet.VertexOffset + i )];
+    uint   index      = meshlet_indices.Load( sizeof( uint ) * ( meshlet.VertexOffset + i ) );
 
-    Vertex vertex     = vertex_buffer[NonUniformResourceIndex( index + meshlet_draw.FirstVertex )];
+    Vertex vertex     = vertex_buffer.Load<Vertex>( sizeof( Vertex ) * ( index + meshlet_draw.FirstVertex ) );
 
     float4 world_pos  = mul( transform.Model, vertex.GetPosition() );
     float4 clip_pos   = mul( camera.View, world_pos );

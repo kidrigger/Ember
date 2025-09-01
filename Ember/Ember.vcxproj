@@ -298,6 +298,7 @@
     <ClCompile Include="CgltfImpl.cpp" />
     <ClCompile Include="DirectionLightManager.cpp" />
     <ClCompile Include="Environment.cpp" />
+    <ClCompile Include="GeometryManager.cpp" />
     <ClCompile Include="IApp.cpp" />
     <ClCompile Include="LightManager.cpp" />
     <ClCompile Include="LightHandle.cpp" />
@@ -328,6 +329,7 @@
     <ClInclude Include="Color.hpp" />
     <ClInclude Include="DirectionLightManager.hpp" />
     <ClInclude Include="Environment.hpp" />
+    <ClInclude Include="GeometryManager.hpp" />
     <ClInclude Include="IApp.hpp" />
     <ClInclude Include="LightManager.hpp" />
     <ClInclude Include="LightHandle.hpp" />

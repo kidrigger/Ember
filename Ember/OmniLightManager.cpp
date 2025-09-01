@@ -11,12 +11,12 @@ namespace
 struct PackedData
 {
   Ember::DrawList::Info DrawList;
-  Ember::CBVHandle      ProjViewHandle;
   DirectX::XMFLOAT3     Position;
   float                 FarPlane;
+  Ember::CBVHandle      ProjViewHandle;
 };
 
-static_assert( sizeof( PackedData ) == 32 );
+static_assert( sizeof( PackedData ) == 36 );
 } // namespace
 
 Ember::Internal::OmniLightManager::OmniLightManager(
@@ -385,7 +385,7 @@ void Ember::Internal::OmniLightManager::RenderAllShadows(
             tex.GetTexture(), D3D12_RESOURCE_STATE_PIXEL_SHADER_RESOURCE, D3D12_RESOURCE_STATE_DEPTH_WRITE );
       } );
 
-  command_list->ResourceBarrier( CountOf( barriers ), DataOf( barriers ) );
+  if ( not barriers.empty() ) command_list->ResourceBarrier( CountOf( barriers ), DataOf( barriers ) );
 
   for ( auto const& [handle, texture] : m_ShadowsInUse )
   {
@@ -410,7 +410,7 @@ void Ember::Internal::OmniLightManager::RenderAllShadows(
             tex.GetTexture(), D3D12_RESOURCE_STATE_DEPTH_WRITE, D3D12_RESOURCE_STATE_PIXEL_SHADER_RESOURCE );
       } );
 
-  command_list->ResourceBarrier( CountOf( barriers ), DataOf( barriers ) );
+  if ( not barriers.empty() ) command_list->ResourceBarrier( CountOf( barriers ), DataOf( barriers ) );
 }
 
 void Ember::Internal::OmniLightManager::RenderOmniShadow(
@@ -426,9 +426,9 @@ void Ember::Internal::OmniLightManager::RenderOmniShadow(
 
   PackedData const packed_data{
     .DrawList       = draw_list,
-    .ProjViewHandle = m_ShadowProjectionBuffer.GetCBVHandle(),
     .Position       = omni_light.Position,
     .FarPlane       = omni_light.Range,
+    .ProjViewHandle = m_ShadowProjectionBuffer.GetCBVHandle(),
   };
   command_list->SetGraphicsRoot32BitConstants( 0, sizeof( PackedData ) / 4, &packed_data, 0 );
 
