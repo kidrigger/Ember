@@ -135,10 +135,10 @@ float4 TrianglePS( PSIn IN ) : SV_TARGET0
       float3 light_dir = dir_lights[light_idx].Direction;
       float  intensity = dir_lights[light_idx].Intensity;
 
-      float  cascade   = step( dir_lights[light_idx].Cascade5, IN.LinearDepth );
-      for ( int i = 0; i < 4; i++ )
+      float  cascade   = 0;
+      [unroll] for ( int i = 0; i < NUM_CASCADES - 1; i++ )
       {
-        cascade += step( dir_lights[light_idx].Cascades0To4[i], IN.LinearDepth );
+        cascade += step( dir_lights[light_idx].Cascades[i], IN.LinearDepth );
       }
 
       float4 ls_position  = mul( dir_lights[light_idx].LightSpaceMat[cascade], IN.Position );
