@@ -20,11 +20,12 @@ struct DirLight
 {
   float4x4      LightSpaceMat[NUM_CASCADES]; // 384
   float3        Direction;                   // 396
-  float         Cascades[5];                 // 416
-  PackedColor32 Color;                       // 420
-  float         Intensity;                   // 424
-  ResID         ShadowIdx;                   // 428
-  uint          Pad;                         // 432
+  PackedColor32 Color;                       // 400
+  float         Intensity;                   // 404
+  ResID         ShadowIdx;                   // 408
+  uint          Pad0;                        // 412
+  uint          Pad1;                        // 416
+  float4        CascadesSph[NUM_CASCADES];   // 512
 };
 
 #endif

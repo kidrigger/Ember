@@ -413,17 +413,14 @@ void Ember::Internal::DirectionLightManager::RenderDirShadow(
   // Light-Space <-> World Space Orientations
   DirectX::FXMVECTOR world_to_ls_orientation =
       XMQuaternionRotationMatrix( DirectX::XMMatrixLookToRH( DirectX::XMVectorZero(), direction, ls_up ) );
-  DirectX::FXMVECTOR ls_to_world_orientation = DirectX::XMQuaternionInverse( world_to_ls_orientation );
 
-  float              cascades[kNumCascades + 1];
+  float cascades[kNumCascades + 1];
   for ( int i = 0; i <= kNumCascades; i++ )
   {
     float c_log = camera_frust.Near * pow( camera_frust.Far / camera_frust.Near, ( float )i / ( float )kNumCascades );
     float c_uni = std::lerp( camera_frust.Near, camera_frust.Far, ( float )i / ( float )kNumCascades );
     cascades[i] = std::lerp( c_log, c_uni, kCascadeLambda );
   }
-  // Copy cascades to GPU
-  memcpy( dir_light->Cascades, &cascades[1], ByteSizeOf( dir_light->Cascades ) );
 
   DirectX::XMFLOAT4 cull_params[kNumCascades];
   for ( int cascade_id = 0; cascade_id < kNumCascades; cascade_id++ )
@@ -441,9 +438,12 @@ void Ember::Internal::DirectionLightManager::RenderDirShadow(
 
     // The shadow map is centered here.
     // Rounding the focus to texel increments to keep the
-    DirectX::FXMVECTOR focus = DirectX::XMVectorScale(
-        DirectX::XMVectorFloor( DirectX::XMVectorScale( XMLoadFloat3( &ws_bs.Center ), texel_per_world ) ),
-        world_per_texel );
+    DirectX::FXMVECTOR focus = DirectX::XMVector3InverseRotate(
+        DirectX::XMVectorScale(
+            DirectX::XMVectorFloor( DirectX::XMVectorScale(
+                DirectX::XMVector3Rotate( XMLoadFloat3( &ws_bs.Center ), world_to_ls_orientation ), texel_per_world ) ),
+            world_per_texel ),
+        world_to_ls_orientation );
 
     DirectX::XMFLOAT3 focus_v3;
     XMStoreFloat3( &focus_v3, focus );
@@ -460,6 +460,7 @@ void Ember::Internal::DirectionLightManager::RenderDirShadow(
 
     DirectX::FXMMATRIX proj_view            = XMMatrixMultiply( view, projection );
     dir_light->LightSpaceMatrix[cascade_id] = proj_view;
+    dir_light->CascadeSph[cascade_id]       = cull_params[cascade_id];
   }
 
   SetDirty();

@@ -556,6 +556,7 @@
     <None Include="DirShadow.hlsli" />
     <None Include="Geometry.hlsli" />
     <None Include="LightData.hlsli" />
+    <None Include="Math.hlsli" />
     <None Include="OmniShadow.hlsli" />
     <None Include="Quantization.hlsli" />
     <None Include="Utility.hlsli" />

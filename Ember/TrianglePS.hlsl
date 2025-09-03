@@ -1,6 +1,6 @@
-#include "Triangle.hlsli"
-
+#include "Math.hlsli"
 #include "PBR.hlsli"
+#include "Triangle.hlsli"
 
 float3 SampleIrradiance( float3 direction )
 {
@@ -135,10 +135,13 @@ float4 TrianglePS( PSIn IN ) : SV_TARGET0
       float3 light_dir = dir_lights[light_idx].Direction;
       float  intensity = dir_lights[light_idx].Intensity;
 
-      float  cascade   = 0;
-      [unroll] for ( int i = 0; i < NUM_CASCADES - 1; i++ )
+      int    cascade   = 0;
+      [unroll] for ( int i = 0; i < NUM_CASCADES; i++ )
       {
-        cascade += step( dir_lights[light_idx].Cascades[i], IN.LinearDepth );
+        if ( PointInsideSphere( IN.Position.xyz, dir_lights[light_idx].CascadesSph[i] ) )
+        {
+          cascade = i;
+        }
       }
 
       float4 ls_position  = mul( dir_lights[light_idx].LightSpaceMat[cascade], IN.Position );

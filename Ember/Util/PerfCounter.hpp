@@ -5,6 +5,10 @@
 #include "DirectXHeaders.hpp"
 #include "Runtime.hpp"
 
+#if defined( NDEBUG )
+#define STRIP_META_INFO
+#endif
+
 namespace Ember
 {
 

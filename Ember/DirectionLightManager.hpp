@@ -40,11 +40,11 @@ class DirectionLightManager
   {
     DirectX::XMMATRIX LightSpaceMatrix[kNumCascades]; // 384
     DirectX::XMFLOAT3 Direction{ 0.0f, -1.0f, 0.0f }; // 396
-    float             Cascades[kNumCascades - 1];     // 416
-    Color32           Color;                          // 420
-    float             Intensity;                      // 424
-    SRVHandle         ShadowMap;                      // 428
-    uint32_t          Padding;                        // 432
+    Color32           Color;                          // 400
+    float             Intensity;                      // 404
+    SRVHandle         ShadowMap;                      // 408
+    uint32_t          Padding[2];                     // 416
+    DirectX::XMFLOAT4 CascadeSph[kNumCascades];       // 508
   };
   static_assert( sizeof( DirLight ) % 16 == 0 );
 

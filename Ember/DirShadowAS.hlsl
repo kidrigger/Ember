@@ -40,8 +40,9 @@ void DirShadowAS( uint3 group_id : SV_GroupID, uint3 local_id : SV_GroupThreadID
 
     float3                      light_dir        = light_data[g_LightIdx].Direction;
 
+    bool                        is_inside_prev   = false;
     bool                        is_view_visible[NUM_CASCADES];
-    [unroll] for ( int i = 0; i < NUM_CASCADES; i++ )
+    [unroll] for ( int i = NUM_CASCADES - 1; i >= 0; i-- )
     {
       float4 cascade_cull_info = g_CullParams[i];
       float3 point_to_center   = ( cascade_cull_info.xyz - ws_bounds.xyz );
@@ -51,7 +52,10 @@ void DirShadowAS( uint3 group_id : SV_GroupID, uint3 local_id : SV_GroupThreadID
       // If it is farther, then we use spherical - forming a capsule shape with one end at focus, the other at INF.
       float dist = proj_on_dir > 0 ? length( point_to_center - proj_on_dir * light_dir ) : length( point_to_center );
 
-      is_view_visible[i]  = dist < cascade_cull_info.w + ws_bounds.w;
+      bool  is_outside    = dist > cascade_cull_info.w + ws_bounds.w;
+
+      is_view_visible[i]  = !is_outside;
+
       visible_count      += is_view_visible[i] ? 1 : 0;
     }
 
