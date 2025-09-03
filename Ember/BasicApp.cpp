@@ -601,26 +601,6 @@ void Ember::BasicApp::Update()
 
   float const cam_pitch = m_Camera->GetPitch();
   float const cam_yaw   = m_Camera->GetYaw();
-  swprintf_s(
-      m_SprintfBuffer,
-      L"Ember %ux%u"
-      L" | frame time: %.2lf ms (%.2lf fps)"
-      L"| MeshDraws: %llu, Primitives: %llu, MeshletCount: %llu "
-      L"| Camera: %.2f %.2f %.2f @ %.2f %.2f",
-      m_WindowWidth,
-      m_WindowHeight,
-      avg_delta_ms,
-      avg_fps,
-      pipeline_stats.ASInvocations,
-      pipeline_stats.MSPrimitives,
-      pipeline_stats.MSInvocations,
-      cam_pos.x,
-      cam_pos.y,
-      cam_pos.z,
-      cam_yaw,
-      cam_pitch );
-
-  SetWindowText( m_WindowHandle, m_SprintfBuffer );
 
   ImGui_ImplDX12_NewFrame();
   ImGui_ImplWin32_NewFrame();
@@ -639,6 +619,11 @@ void Ember::BasicApp::Update()
         nullptr,
         0,
         PerfCounter::kMaxDeltaMs );
+
+    if ( ImGui::Button( "Gather Invocation Info" ) )
+    {
+      m_PerfCounter->GatherPipelineStatistics();
+    }
     ImGui::Text( "MeshDraws: %llu", m_DrawList.Size() );
     ImGui::Text( "AS Invocation: %llu", pipeline_stats.ASInvocations );
     ImGui::Text( "MS Invocation: %llu", pipeline_stats.MSInvocations );
@@ -866,4 +851,7 @@ void Ember::BasicApp::Resize()
   } );
 
   m_Camera->SetAspectRatio( ( float )m_WindowWidth / ( float )m_WindowHeight );
+
+  swprintf_s( m_SprintfBuffer, L"Ember %ux%u", m_WindowWidth, m_WindowHeight );
+  SetWindowText( m_WindowHandle, m_SprintfBuffer );
 }

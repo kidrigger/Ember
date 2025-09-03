@@ -97,39 +97,54 @@ D3D12_QUERY_DATA_PIPELINE_STATISTICS1 const& Ember::PerfCounter::GetPipelineStat
   return m_PipelineStats;
 }
 
-void Ember::PerfCounter::BeginQuery( ID3D12GraphicsCommandList* command_list, uint32_t frame_index ) const
+void Ember::PerfCounter::GatherPipelineStatistics()
+{
+  m_GatherPipelineStatistics = kPipelineStatsFrameGatherCount;
+}
+
+void Ember::PerfCounter::BeginQuery( ID3D12GraphicsCommandList* command_list, uint32_t const frame_index ) const
 {
 #if not defined( STRIP_META_INFO )
-  command_list->BeginQuery( m_QueryHeaps[frame_index].Get(), D3D12_QUERY_TYPE_PIPELINE_STATISTICS1, 0 );
+  if ( m_GatherPipelineStatistics )
+  {
+    command_list->BeginQuery( m_QueryHeaps[frame_index].Get(), D3D12_QUERY_TYPE_PIPELINE_STATISTICS1, 0 );
+  }
 #endif
 }
 
-void Ember::PerfCounter::EndQuery( ID3D12GraphicsCommandList* command_list, uint32_t frame_index ) const
+void Ember::PerfCounter::EndQuery( ID3D12GraphicsCommandList* command_list, uint32_t const frame_index ) const
 {
 #if not defined( STRIP_META_INFO )
-  command_list->EndQuery( m_QueryHeaps[frame_index].Get(), D3D12_QUERY_TYPE_PIPELINE_STATISTICS1, 0 );
-  command_list->ResolveQueryData(
-      m_QueryHeaps[frame_index].Get(),
-      D3D12_QUERY_TYPE_PIPELINE_STATISTICS1,
-      0,
-      1,
-      m_QueryReadbackBuffers[frame_index].Get(),
-      0 );
+  if ( m_GatherPipelineStatistics )
+  {
+    command_list->EndQuery( m_QueryHeaps[frame_index].Get(), D3D12_QUERY_TYPE_PIPELINE_STATISTICS1, 0 );
+    command_list->ResolveQueryData(
+        m_QueryHeaps[frame_index].Get(),
+        D3D12_QUERY_TYPE_PIPELINE_STATISTICS1,
+        0,
+        1,
+        m_QueryReadbackBuffers[frame_index].Get(),
+        0 );
+  }
 #endif
 }
 
 void Ember::PerfCounter::UpdatePipelineStats( uint32_t const frame_index )
 {
 #if not defined( STRIP_META_INFO )
-  ASSERT( frame_index < m_QueryReadbackBuffers.size() );
-
-  // Map the readback buffer and copy the stats.
-  D3D12_RANGE read_range{ 0, sizeof( D3D12_QUERY_DATA_PIPELINE_STATISTICS1 ) };
-  void*       data = nullptr;
-  if ( SUCCEEDED( m_QueryReadbackBuffers[frame_index]->Map( 0, &read_range, &data ) ) )
+  if ( m_GatherPipelineStatistics )
   {
-    memcpy( &m_PipelineStats, data, sizeof( D3D12_QUERY_DATA_PIPELINE_STATISTICS1 ) );
-    m_QueryReadbackBuffers[frame_index]->Unmap( 0, nullptr );
+    ASSERT( frame_index < m_QueryReadbackBuffers.size() );
+
+    // Map the readback buffer and copy the stats.
+    D3D12_RANGE read_range{ 0, sizeof( D3D12_QUERY_DATA_PIPELINE_STATISTICS1 ) };
+    void*       data = nullptr;
+    if ( SUCCEEDED( m_QueryReadbackBuffers[frame_index]->Map( 0, &read_range, &data ) ) )
+    {
+      memcpy( &m_PipelineStats, data, sizeof( D3D12_QUERY_DATA_PIPELINE_STATISTICS1 ) );
+      m_QueryReadbackBuffers[frame_index]->Unmap( 0, nullptr );
+    }
+    m_GatherPipelineStatistics--;
   }
 #endif
 }
