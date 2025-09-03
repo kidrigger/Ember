@@ -490,10 +490,26 @@ void Ember::ModelLoader::ProcessPrimitive(
             vertex_count,
             StrideOf( loaded_data ) );
 
-        uint16_t const center_x = meshopt_quantizeHalf( bounds.center[0] );
-        uint16_t const center_y = meshopt_quantizeHalf( bounds.center[1] );
-        uint16_t const center_z = meshopt_quantizeHalf( bounds.center[2] );
-        uint16_t const radius   = meshopt_quantizeHalf( bounds.radius );
+        uint16_t const center_x  = meshopt_quantizeHalf( bounds.center[0] );
+        uint16_t const center_y  = meshopt_quantizeHalf( bounds.center[1] );
+        uint16_t const center_z  = meshopt_quantizeHalf( bounds.center[2] );
+        uint16_t const radius    = meshopt_quantizeHalf( bounds.radius );
+
+        uint32_t const cone_info = ( meshopt_quantizeUnorm( 0.5f * bounds.cone_axis[0] + 0.5f, 8 ) ) |
+                                   ( meshopt_quantizeUnorm( 0.5f * bounds.cone_axis[1] + 0.5f, 8 ) << 8 ) |
+                                   ( meshopt_quantizeUnorm( 0.5f * bounds.cone_axis[2] + 0.5f, 8 ) << 16 ) |
+                                   ( meshopt_quantizeUnorm( 0.5f * bounds.cone_cutoff + 0.5f, 8 ) << 24 );
+
+        uint8_t apex[3];
+        for ( int i = 0; i < 3; i++ )
+        {
+          float ap  = bounds.cone_apex[i];
+          ap       -= bounds.center[i];
+          ap       /= bounds.radius;
+          ap        = 0.5f + 0.5f * ap;
+          apex[i]   = ( uint8_t )meshopt_quantizeUnorm( ap, 8 );
+        }
+        uint32_t const cone_apex = apex[0] | apex[1] << 8 | apex[2] << 16;
 
         return Meshlet{
           .VertexOffset   = m.vertex_offset + meshlet_vert_start,
@@ -504,6 +520,8 @@ void Ember::ModelLoader::ProcessPrimitive(
           .CenterY        = center_y,
           .CenterZ        = center_z,
           .Radius         = radius,
+          .ConeInfo       = cone_info,
+          .ConeApexOffset = cone_apex,
         };
       } );
 

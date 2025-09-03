@@ -1,19 +1,8 @@
 #include "DirShadow.hlsli"
+#include "Math.hlsli"
 #include "Utility.hlsli"
 
-bool IsCulled( float3 ndc_center, float3 ndc_bounds )
-{
-  if ( ndc_center.x + ndc_bounds.x < -1.0f ) return true;
-  if ( ndc_center.x - ndc_bounds.x > 1.0f ) return true;
-  if ( ndc_center.y + ndc_bounds.y < -1.0f ) return true;
-  if ( ndc_center.y - ndc_bounds.y > 1.0f ) return true;
-  if ( ndc_center.z - ndc_bounds.z > 1.0f ) return true;
-
-  // -- We don't cull against near plane. 'Infinite'.
-  // if ( ndc_center.z + ndc_bounds.z < 0.0f ) return true;
-
-  return false;
-}
+groupshared MeshletPayload pl;
 
 NUM_THREADS( 32, 1, 1 )
 void DirShadowAS( uint3 group_id : SV_GroupID, uint3 local_id : SV_GroupThreadID )
@@ -21,12 +10,11 @@ void DirShadowAS( uint3 group_id : SV_GroupID, uint3 local_id : SV_GroupThreadID
   uint                       mesh_draw_idx = group_id.x;
   uint                       meshlet_idx   = local_id.x;
   uint                       visible_count = 0;
-  MeshletPayload             pl;
 
-  StructuredBuffer<MeshDraw> mesh_draws   = ResourceDescriptorHeap[g_DrawList.MeshDraws];
-  MeshDraw                   current_draw = mesh_draws[NonUniformResourceIndex( mesh_draw_idx )];
+  StructuredBuffer<MeshDraw> mesh_draws    = ResourceDescriptorHeap[g_DrawList.MeshDraws];
+  MeshDraw                   current_draw  = mesh_draws[NonUniformResourceIndex( mesh_draw_idx )];
 
-  StructuredBuffer<DirLight> light_data   = ResourceDescriptorHeap[g_LightData];
+  StructuredBuffer<DirLight> light_data    = ResourceDescriptorHeap[g_LightData];
 
   if ( meshlet_idx < current_draw.MeshletCount )
   {
@@ -73,7 +61,10 @@ void DirShadowAS( uint3 group_id : SV_GroupID, uint3 local_id : SV_GroupThreadID
       }
     }
 
-    pl.MeshDrawID = mesh_draw_idx;
+    if ( local_id.x == 0 )
+    {
+      pl.MeshDrawID = mesh_draw_idx;
+    }
   }
 
   DispatchMesh( WaveActiveSum( visible_count ), 1, 1, pl );

@@ -21,4 +21,14 @@ float4 UnpackR10G10B10A2Snorm( uint input )
   return result;
 }
 
+float4 UnpackR8G8B8A8Unorm( uint input )
+{
+  float4 result;
+  result.r = ( input & 0xFF ) / 255.0f;
+  result.g = ( ( input >> 8 ) & 0xFF ) / 255.0f;
+  result.b = ( ( input >> 16 ) & 0xFF ) / 255.0f;
+  result.a = ( ( input >> 24 ) & 0xFF ) / 255.0f;
+  return result;
+}
+
 #endif

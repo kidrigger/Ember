@@ -52,6 +52,8 @@ struct Meshlet
   uint  VertexCount;    // 12
   uint  TriangleCount;  // 16
   half4 BoundingSphere; // 24 // xyz = center, w = radius
+  uint  ConeInfo;       // 28 // xyz = axis, w = cutoff
+  uint  ConeApex;       // 32 // xyz = offset
 };
 
 struct MeshDraw

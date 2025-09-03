@@ -1,3 +1,4 @@
+#include "Math.hlsli"
 #include "OmniShadow.hlsli"
 #include "Utility.hlsli"
 
@@ -16,18 +17,19 @@ bool IsCulled( float3 ls_center, float radius )
   return false;
 }
 
+groupshared MeshletPayload pl;
+
 NUM_THREADS( 32, 1, 1 )
 void OmniShadowAS( uint3 group_id : SV_GroupID, uint3 local_id : SV_GroupThreadID )
 {
   uint                                 mesh_draw_idx = group_id.x;
   uint                                 meshlet_idx   = local_id.x;
   uint                                 visible_count = 0;
-  MeshletPayload                       pl;
 
-  StructuredBuffer<MeshDraw>           mesh_draws   = ResourceDescriptorHeap[g_DrawList.MeshDraws];
-  MeshDraw                             current_draw = mesh_draws[NonUniformResourceIndex( mesh_draw_idx )];
+  StructuredBuffer<MeshDraw>           mesh_draws    = ResourceDescriptorHeap[g_DrawList.MeshDraws];
+  MeshDraw                             current_draw  = mesh_draws[NonUniformResourceIndex( mesh_draw_idx )];
 
-  ConstantBuffer<ProjectionTransforms> proj_view    = ResourceDescriptorHeap[g_ProjViewID];
+  ConstantBuffer<ProjectionTransforms> proj_view     = ResourceDescriptorHeap[g_ProjViewID];
 
   if ( meshlet_idx < current_draw.MeshletCount )
   {
@@ -62,7 +64,10 @@ void OmniShadowAS( uint3 group_id : SV_GroupID, uint3 local_id : SV_GroupThreadI
       }
     }
 
-    pl.MeshDrawID = mesh_draw_idx;
+    if ( local_id.x == 0 )
+    {
+      pl.MeshDrawID = mesh_draw_idx;
+    }
   }
 
   DispatchMesh( WaveActiveSum( visible_count ), 1, 1, pl );

@@ -307,6 +307,9 @@
     <None Include="DirShadow.hlsli">
       <Filter>Shaders\Shadows</Filter>
     </None>
+    <None Include="Math.hlsli">
+      <Filter>Shaders\Utils</Filter>
+    </None>
   </ItemGroup>
   <ItemGroup>
     <FxCompile Include="EqrectToCube.hlsl">

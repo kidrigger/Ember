@@ -72,6 +72,8 @@ struct Meshlet
   uint16_t CenterY;
   uint16_t CenterZ;
   uint16_t Radius;
+  uint32_t ConeInfo;
+  uint32_t ConeApexOffset;
 };
 
 class ModelLoader

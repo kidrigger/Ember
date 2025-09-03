@@ -1,32 +1,27 @@
+#include "Math.hlsli"
 #include "Triangle.hlsli"
 #include "Utility.hlsli"
 
-float PlaneSignedDistance( float4 plane, float3 position )
+bool FrustumCull( float4 vs_bounds, float4 frust )
 {
-  return dot( plane.xyz, position ) - plane.w;
-}
+  float4 near_plane   = float4( 0, 0, -1, frust.z );
+  float4 far_plane    = float4( 0, 0, 1, -frust.w );
+  float4 right_plane  = normalize( float4( -1, 0, -frust.x, 0 ) );
+  float4 left_plane   = normalize( float4( 1, 0, -frust.x, 0 ) );
+  float4 top_plane    = normalize( float4( 0, -1, -frust.y, 0 ) );
+  float4 bottom_plane = normalize( float4( 0, 1, -frust.y, 0 ) );
 
-bool IsCulled( float3 center, float radius )
-{
-  ConstantBuffer<Camera> camera       = ResourceDescriptorHeap[g_Camera];
-  float3                 vs_center    = mul( camera.View, float4( center, 1.0f ) ).xyz;
-
-  float4                 near_plane   = float4( 0, 0, -1, camera.CullInfo.z );
-  float4                 far_plane    = float4( 0, 0, 1, -camera.CullInfo.w );
-  float4                 right_plane  = normalize( float4( -1, 0, -camera.CullInfo.x, 0 ) );
-  float4                 left_plane   = normalize( float4( 1, 0, -camera.CullInfo.x, 0 ) );
-  float4                 top_plane    = normalize( float4( 0, -1, -camera.CullInfo.y, 0 ) );
-  float4                 bottom_plane = normalize( float4( 0, 1, -camera.CullInfo.y, 0 ) );
-
-  if ( PlaneSignedDistance( near_plane, vs_center ) < -radius ) return true;
-  if ( PlaneSignedDistance( left_plane, vs_center ) < -radius ) return true;
-  if ( PlaneSignedDistance( right_plane, vs_center ) < -radius ) return true;
-  if ( PlaneSignedDistance( far_plane, vs_center ) < -radius ) return true;
-  if ( PlaneSignedDistance( bottom_plane, vs_center ) < -radius ) return true;
-  if ( PlaneSignedDistance( top_plane, vs_center ) < -radius ) return true;
+  if ( PlaneSignedDistance( near_plane, vs_bounds.xyz ) < -vs_bounds.w ) return true;
+  if ( PlaneSignedDistance( left_plane, vs_bounds.xyz ) < -vs_bounds.w ) return true;
+  if ( PlaneSignedDistance( right_plane, vs_bounds.xyz ) < -vs_bounds.w ) return true;
+  if ( PlaneSignedDistance( far_plane, vs_bounds.xyz ) < -vs_bounds.w ) return true;
+  if ( PlaneSignedDistance( bottom_plane, vs_bounds.xyz ) < -vs_bounds.w ) return true;
+  if ( PlaneSignedDistance( top_plane, vs_bounds.xyz ) < -vs_bounds.w ) return true;
 
   return false;
 }
+
+groupshared MeshletPayload pl;
 
 NUM_THREADS( 32, 1, 1 )
 void TriangleAS( uint3 group_id : SV_GroupID, uint3 local_id : SV_GroupThreadID )
@@ -34,10 +29,11 @@ void TriangleAS( uint3 group_id : SV_GroupID, uint3 local_id : SV_GroupThreadID 
   uint                       mesh_draw_idx = group_id.x;
   uint                       meshlet_idx   = local_id.x;
   bool                       is_visible    = false;
-  MeshletPayload             pl;
 
-  StructuredBuffer<MeshDraw> mesh_draws   = ResourceDescriptorHeap[g_DrawList.MeshDraws];
-  MeshDraw                   current_draw = mesh_draws[NonUniformResourceIndex( mesh_draw_idx )];
+  StructuredBuffer<MeshDraw> mesh_draws    = ResourceDescriptorHeap[g_DrawList.MeshDraws];
+  MeshDraw                   current_draw  = mesh_draws[NonUniformResourceIndex( mesh_draw_idx )];
+
+  ConstantBuffer<Camera>     camera        = ResourceDescriptorHeap[g_Camera];
 
   if ( meshlet_idx < current_draw.MeshletCount )
   {
@@ -49,7 +45,10 @@ void TriangleAS( uint3 group_id : SV_GroupID, uint3 local_id : SV_GroupThreadID 
     StructuredBuffer<Transform> transform_buffer = ResourceDescriptorHeap[g_DrawList.Transforms];
     float4x4                    model = transform_buffer[NonUniformResourceIndex( current_draw.FirstTransform )].Model;
 
-    is_visible = !IsCulled( mul( model, float4( meshlet.BoundingSphere.xyz, 1.0f ) ).xyz, meshlet.BoundingSphere.w );
+    float4                      ws_bounds = TransformBoundingSphere( model, meshlet.BoundingSphere );
+    float4                      vs_bounds = TransformBoundingSphere( camera.View, ws_bounds );
+
+    is_visible                            = !FrustumCull( vs_bounds, camera.CullInfo );
 
     if ( is_visible )
     {
@@ -57,10 +56,13 @@ void TriangleAS( uint3 group_id : SV_GroupID, uint3 local_id : SV_GroupThreadID 
       pl.MeshletID[out_idx] = meshlet_idx;
     }
 
-    pl.Transform    = current_draw.FirstTransform;
-    pl.FirstVertex  = current_draw.FirstVertex;
-    pl.FirstMeshlet = current_draw.FirstMeshlet;
-    pl.Material     = current_draw.Material;
+    if ( local_id.x == 0 )
+    {
+      pl.Transform    = current_draw.FirstTransform;
+      pl.FirstVertex  = current_draw.FirstVertex;
+      pl.FirstMeshlet = current_draw.FirstMeshlet;
+      pl.Material     = current_draw.Material;
+    }
   }
 
   DispatchMesh( WaveActiveCountBits( is_visible ), 1, 1, pl );

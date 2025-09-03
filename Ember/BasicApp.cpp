@@ -538,10 +538,10 @@ void Ember::BasicApp::LoadContent()
       m_World.GetECS()
           .entity( "HelmetRotator" )
           .insert(
-              []( LocalTransform& lt, WorldTransform&, RotatingModel& rm, WorldBoundingBox&, CullInfo& )
+              []( LocalTransform& local_tx, WorldTransform&, RotatingModel& rot_model, WorldBoundingBox&, CullInfo& )
               {
-                rm.Speed       = 20.0f;
-                lt.Translation = DirectX::XMVectorSet( 0.0f, 1.0f, 5.0f, 1.0f );
+                rot_model.Speed      = 20.0f;
+                local_tx.Translation = DirectX::XMVectorSet( 0.0f, 1.0f, 5.0f, 1.0f );
               } );
 
   model                    = m_ModelLoader->TryLoadModel( "DamagedHelmet.glb" )->child_of( rm );
@@ -607,7 +607,7 @@ void Ember::BasicApp::Update()
   ImGui::NewFrame();
 
   {
-    ImGui::Begin( "Ember Info" ); // Create a window called "Hello, world!" and append into it.
+    ImGui::Begin( "Ember Info" );
 
     ImGui::Text( "Resolution: %ux%u", m_WindowWidth, m_WindowHeight );
     ImGui::Text( "Frame Time %.3lf ms (%.2lf FPS)", avg_delta_ms, avg_fps );
@@ -620,15 +620,27 @@ void Ember::BasicApp::Update()
         0,
         PerfCounter::kMaxDeltaMs );
 
-    if ( ImGui::Button( "Gather Invocation Info" ) )
-    {
-      m_PerfCounter->GatherPipelineStatistics();
-    }
     ImGui::Text( "MeshDraws: %llu", m_DrawList.Size() );
-    ImGui::Text( "AS Invocation: %llu", pipeline_stats.ASInvocations );
-    ImGui::Text( "MS Invocation: %llu", pipeline_stats.MSInvocations );
-    ImGui::Text( "MS Primitives: %llu", pipeline_stats.MSPrimitives );
-    ImGui::Text( "Total Primitives: %llu", pipeline_stats.CPrimitives );
+    if ( ImGui::CollapsingHeader( "Pipeline Stats" ) )
+    {
+      if ( ImGui::Button( "Gather Invocation Info" ) )
+      {
+        m_PerfCounter->GatherPipelineStatistics();
+      }
+      ImGui::Text( "IA Vertices: %llu", pipeline_stats.IAVertices );
+      ImGui::Text( "IA Primitives: %llu", pipeline_stats.IAPrimitives );
+      ImGui::Text( "VS Invocation: %llu", pipeline_stats.VSInvocations );
+      ImGui::Text( "GS Invocation: %llu", pipeline_stats.GSInvocations );
+      ImGui::Text( "C Invocation: %llu", pipeline_stats.CInvocations );
+      ImGui::Text( "C Primitives: %llu", pipeline_stats.CPrimitives );
+      ImGui::Text( "PS Invocation: %llu", pipeline_stats.PSInvocations );
+      ImGui::Text( "HS Invocation: %llu", pipeline_stats.HSInvocations );
+      ImGui::Text( "DS Invocation: %llu", pipeline_stats.DSInvocations );
+      ImGui::Text( "CS Invocation: %llu", pipeline_stats.CSInvocations );
+      ImGui::Text( "AS Invocation: %llu", pipeline_stats.ASInvocations );
+      ImGui::Text( "MS Invocation: %llu", pipeline_stats.MSInvocations );
+      ImGui::Text( "MS Primitives: %llu", pipeline_stats.MSPrimitives );
+    }
     ImGui::End();
   }
 
