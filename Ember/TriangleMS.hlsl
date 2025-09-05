@@ -1,3 +1,4 @@
+#include "Math.hlsli"
 #include "Triangle.hlsli"
 #include "Utility.hlsli"
 
@@ -8,11 +9,6 @@ struct MSIn
 {
   uint3 GroupID : SV_GroupID;
   uint3 LocalID : SV_GroupThreadID;
-};
-
-struct MSPrimitiveOut
-{
-  MatID Material : MATERIAL;
 };
 
 uint3 GetBytes( uint2 value, uint sub_offset )
@@ -80,5 +76,8 @@ void TriangleMS(
     tris[i]               = GetBytes( data, sub_offset );
 
     materials[i].Material = meshlet_draw.Material;
+#ifndef STRIP_DEBUG_CONFIG
+    materials[i].MeshletColor = UnpackColor32( SimpleHash( meshlet_idx ) ).rgb;
+#endif
   }
 }

@@ -122,6 +122,12 @@ struct MSVertexOut
   float2 TexCoord[2] : TEXCOORD;
 };
 
+struct MSPrimitiveOut
+{
+  float3 MeshletColor : MESHLET_COLOR;
+  MatID  Material : MATERIAL;
+};
+
 struct PSIn
 {
   float4 ScreenPosition : SV_POSITION;
@@ -131,6 +137,7 @@ struct PSIn
   float4 Tangent : TANGENT;
   float4 Color : COLOR;
   float2 TexCoord[2] : TEXCOORD;
+  float3 MeshletColor : MESHLET_COLOR;
   MatID  Material : MATERIAL;
 };
 
@@ -149,6 +156,7 @@ cbuffer BindlessIndex : register( b1, space0 )
   ResID g_DirLights;
   uint  g_DirLightCount;
   uint  g_ShadowDirLightCount;
+  ResID g_ConfigID;
 }
 
 cbuffer EnvironmentBlock : register( b2, space0 )

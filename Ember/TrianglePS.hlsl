@@ -1,3 +1,4 @@
+#include "DebugConfig.hlsli"
 #include "Math.hlsli"
 #include "PBR.hlsli"
 #include "Triangle.hlsli"
@@ -58,21 +59,67 @@ float3 GetAmbientInfluence( BRDFCookTorranceGGX brdf, float3 view_dir )
   return ( diffuse_part * diffuse + specular ) * brdf.Occlusion;
 }
 
+float3 GetAmbientInfluence( BRDFCookTorranceGGX brdf, float3 view_dir, bool use_diffuse, bool use_spec )
+{
+  float cosine_factor =
+      max( dot( brdf.Normal, view_dir ), 0.0f ); // Normal instead of Halfway since there's no halfway in ambient.
+
+  float3 f_0             = 0.04f;
+  f_0                    = lerp( f_0, brdf.Albedo, brdf.Metallic );
+  float3 specular_part   = FresnelSchlickRoughness( cosine_factor, f_0, brdf.Roughness );
+  float3 diffuse_part    = 1.0f - specular_part;
+
+  diffuse_part          *= 1.0f - brdf.Metallic; // Metals don't have diffuse/refractions.
+
+  float3 reflection_dir  = reflect( -view_dir, brdf.Normal );
+
+  float3 specular        = 0.0f.xxx;
+  float3 diffuse         = 0.0f.xxx;
+  if ( use_spec )
+  {
+    float  n_dot_v           = max( dot( brdf.Normal, view_dir ), 0.0f );
+    float3 prefiltered_color = SamplePrefiltered( reflection_dir, brdf.Roughness ).rgb;
+    float2 env_brdf          = SampleBrdfLut( n_dot_v, brdf.Roughness );
+    specular                 = prefiltered_color * ( specular_part * env_brdf.x + env_brdf.y );
+  }
+  if ( use_diffuse )
+  {
+    diffuse = brdf.Albedo * SampleIrradiance( brdf.Normal );
+  }
+
+  return ( diffuse_part * diffuse + specular ) * brdf.Occlusion;
+}
 
 float4 TrianglePS( PSIn IN ) : SV_TARGET0
 {
+  ConstantBuffer<Camera>     camera    = ResourceDescriptorHeap[g_Camera];
   StructuredBuffer<Material> materials = ResourceDescriptorHeap[g_Materials];
-  Material                   mat       = materials[NonUniformResourceIndex( IN.Material )];
 
-  float4                     albedo    = IN.Color * mat.GetAlbedo( IN.TexCoord[0], g_DefaultSampler );
-  float3 normal      = mat.GetNormal( IN.Normal, IN.Tangent, IN.Position.xyz, IN.TexCoord[0], g_DefaultSampler );
-  float2 metal_rough = mat.GetMetalRough( IN.TexCoord[0], g_DefaultSampler );
-  float3 emissive    = mat.GetEmissive( IN.TexCoord[0], g_DefaultSampler );
+#ifndef STRIP_DEBUG_CONFIG
+  ConstantBuffer<DebugConfig> config = ResourceDescriptorHeap[g_ConfigID];
+  if ( config.VisualizeMeshlets )
+  {
+    return float4( IN.MeshletColor, 1.0f );
+  }
+#endif
 
-  ConstantBuffer<Camera> camera   = ResourceDescriptorHeap[g_Camera];
-  float3                 view_dir = normalize( camera.Position.xyz - IN.Position.xyz );
+  Material mat         = materials[NonUniformResourceIndex( IN.Material )];
 
-  BRDFCookTorranceGGX    brdf;
+  float4   albedo      = IN.Color * mat.GetAlbedo( IN.TexCoord[0], g_DefaultSampler );
+  float3   normal      = mat.GetNormal( IN.Normal, IN.Tangent, IN.Position.xyz, IN.TexCoord[0], g_DefaultSampler );
+  float2   metal_rough = mat.GetMetalRough( IN.TexCoord[0], g_DefaultSampler );
+  float3   emissive    = mat.GetEmissive( IN.TexCoord[0], g_DefaultSampler );
+
+#ifndef STRIP_DEBUG_CONFIG
+  if ( config.ShowLightOnly )
+  {
+    albedo = float4( 0.5f, 0.5f, 0.5f, 1.0f );
+  }
+#endif
+
+  float3              view_dir = normalize( camera.Position.xyz - IN.Position.xyz );
+
+  BRDFCookTorranceGGX brdf;
   brdf.Albedo          = albedo.xyz;
   brdf.Metallic        = metal_rough.r;
   brdf.Normal          = normal.xyz;
@@ -172,9 +219,14 @@ float4 TrianglePS( PSIn IN ) : SV_TARGET0
     }
   }
 
+#ifdef STRIP_DEBUG_CONFIG
   float3 ambient_contrib = GetAmbientInfluence( brdf, view_dir );
+#else
+  float3 ambient_contrib =
+      GetAmbientInfluence( brdf, view_dir, !config.RemoveDiffuseContrib, !config.RemoveSpecularContrib );
+#endif
 
-  float3 total_contrib   = emissive + point_contrib + dir_contrib + ambient_contrib;
+  float3 total_contrib = emissive + point_contrib + dir_contrib + ambient_contrib;
 
   return float4( LinearToSrgb( total_contrib ), albedo.a );
 }

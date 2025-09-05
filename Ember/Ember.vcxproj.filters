@@ -67,6 +67,9 @@
     <Filter Include="Shaders\Meshes">
       <UniqueIdentifier>{adc7aab0-8972-4e53-b006-c56043c1d5ec}</UniqueIdentifier>
     </Filter>
+    <Filter Include="Shaders\DebugVis">
+      <UniqueIdentifier>{69c153bc-6ff2-42f9-aeb9-c912b0617738}</UniqueIdentifier>
+    </Filter>
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="Main.cpp">
@@ -310,6 +313,9 @@
     <None Include="Math.hlsli">
       <Filter>Shaders\Utils</Filter>
     </None>
+    <None Include="DebugConfig.hlsli">
+      <Filter>Shaders\Utils</Filter>
+    </None>
   </ItemGroup>
   <ItemGroup>
     <FxCompile Include="EqrectToCube.hlsl">
@@ -360,9 +366,6 @@
     <FxCompile Include="TriangleAS.hlsl">
       <Filter>Shaders\Meshes</Filter>
     </FxCompile>
-    <FxCompile Include="BackgroundMS.hlsl">
-      <Filter>Shaders\Shadows</Filter>
-    </FxCompile>
     <FxCompile Include="DirShadowAS.hlsl">
       <Filter>Shaders\Shadows</Filter>
     </FxCompile>
@@ -374,6 +377,9 @@
     </FxCompile>
     <FxCompile Include="OmniShadowMS.hlsl">
       <Filter>Shaders\Shadows</Filter>
+    </FxCompile>
+    <FxCompile Include="BackgroundMS.hlsl">
+      <Filter>Shaders</Filter>
     </FxCompile>
   </ItemGroup>
   <ItemGroup>

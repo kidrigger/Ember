@@ -90,6 +90,20 @@ struct Input
   }
 } g_Input;
 
+struct DebugConfig
+{
+  uint32_t ShowDebugUI                  = true;
+  uint32_t ShowWireframe                = false;
+  uint32_t ShowLightOnly                = false;
+
+  uint32_t HideSkybox                   = false;
+  uint32_t RemoveDiffuseContrib         = false;
+  uint32_t RemoveSpecularContrib        = false;
+
+  uint32_t DisableMeshletFrustumCulling = false;
+  uint32_t VisualizeMeshlets            = false;
+} g_Debug;
+
 } // namespace
 
 // Forward declare message handler from imgui_impl_win32.cpp
@@ -244,6 +258,7 @@ struct PerFrameConstants
   Ember::SRVHandle DirLightBuffer;
   uint32_t         DirLightCount;
   uint32_t         DirLightShadowCount;
+  Ember::CBVHandle ConfigBuffer;
 };
 
 struct PerMeshConstants
@@ -510,6 +525,9 @@ void Ember::BasicApp::LoadContent()
 {
   ERR_ABORT( ::ShowWindow( m_WindowHandle, SW_SHOW ) );
 
+  // Setup Debug
+  m_ConfigurationBuffer = m_RenderDevice->CreateConstantBuffer( sizeof( DebugConfig ) );
+
   // Setup Camera
   Camera::Create( m_Camera.get(), m_RenderDevice.get(), RenderDevice::kNumFrames );
 
@@ -523,7 +541,7 @@ void Ember::BasicApp::LoadContent()
   m_LightManager->AddShadowingOmniLight( { 15.0f, 2.0f, 12.0f }, 10.0f, Color32::Blue(), 15.0f );
   m_LightManager->AddShadowingOmniLight( { 0.0f, 2.0f, 5.0f }, 10.0f, Color32::Green(), 15.0f );
   m_LightManager->AddShadowingOmniLight( { -15.0f, 2.0f, -5.0f }, 10.0f, Color32::Red(), 25.0f );
-  m_LightManager->AddShadowingDirLight( { 1.0f, -1.0f, 0.0f }, Color32::White(), 12.0f );
+  m_LightManager->AddShadowingDirLight( { 1.0f, -1.0f, 0.0f }, Color32::White(), 5.0f );
 
   MaterialManager::Create( m_MaterialManager.get(), m_RenderDevice.get(), 10'000 );
   GeometryManager::Create( m_GeometryManager.get(), m_RenderDevice.get(), 256_MiB );
@@ -544,23 +562,15 @@ void Ember::BasicApp::LoadContent()
                 local_tx.Translation = DirectX::XMVectorSet( 0.0f, 1.0f, 5.0f, 1.0f );
               } );
 
-  model                    = m_ModelLoader->TryLoadModel( "DamagedHelmet.glb" )->child_of( rm );
-  LocalTransform* local_tx = model.get_mut<LocalTransform>();
-  local_tx->Scale          = DirectX::XMVectorSet( 0.3f, 0.3f, 0.3f, 0.0f );
-  local_tx->Rotation       = DirectX::XMQuaternionIdentity();
+  model                             = m_ModelLoader->TryLoadModel( "DamagedHelmet.glb" )->child_of( rm );
+  LocalTransform* local_tx          = model.get_mut<LocalTransform>();
+  local_tx->Scale                   = DirectX::XMVectorSet( 0.3f, 0.3f, 0.3f, 0.0f );
+  local_tx->Rotation                = DirectX::XMQuaternionIdentity();
 
-  model                    = m_ModelLoader->TryLoadModel( "NormalTangentTest.glb" ).value();
-  local_tx                 = model.get_mut<LocalTransform>();
-  local_tx->Translation    = DirectX::XMVectorSet( 3.0f, 2.0f, 7.0f, 1.0f );
-
-  model                    = m_ModelLoader->TryLoadModel( "NormalTangentMirrorTest.glb" ).value();
-  local_tx                 = model.get_mut<LocalTransform>();
-  local_tx->Translation    = DirectX::XMVectorSet( 6.0f, 2.0f, 7.0f, 1.0f );
-
-  // constexpr char const* kEnvMapFile = "OvercastSoil.hdr";
-  // bool const            env_loaded =
-  //     Environment::TryLoadFrom( m_Environment.get(), m_RenderDevice.get(), m_TextureLoader.get(), kEnvMapFile );
-  // ASSERT( env_loaded );
+  constexpr char const* kEnvMapFile = "OvercastSoil.hdr";
+  bool const            env_loaded =
+      Environment::TryLoadFrom( m_Environment.get(), m_RenderDevice.get(), m_TextureLoader.get(), kEnvMapFile );
+  ASSERT( env_loaded );
 
   SetupRenderPipeline();
 
@@ -606,59 +616,100 @@ void Ember::BasicApp::Update()
   ImGui_ImplWin32_NewFrame();
   ImGui::NewFrame();
 
+  if ( g_Debug.ShowDebugUI )
   {
-    ImGui::Begin( "Ember Info" );
-
-    ImGui::Text( "Resolution: %ux%u", m_WindowWidth, m_WindowHeight );
-    ImGui::Text( "Frame Time %.3lf ms (%.2lf FPS)", avg_delta_ms, avg_fps );
-    ImGui::PlotLines(
-        "FrameTime",
-        m_PerfCounter->GetDeltaValues(),
-        PerfCounter::kSampleCount,
-        0,
-        nullptr,
-        0,
-        PerfCounter::kMaxDeltaMs );
-
-    ImGui::Text( "MeshDraws: %llu", m_DrawList.Size() );
-    if ( ImGui::CollapsingHeader( "Pipeline Stats" ) )
     {
-      if ( ImGui::Button( "Gather Invocation Info" ) )
+      ImGui::Begin( "Ember Info" );
+
+      ImGui::Text( "Resolution: %ux%u", m_WindowWidth, m_WindowHeight );
+      ImGui::Text( "Frame Time %.3lf ms (%.2lf FPS)", avg_delta_ms, avg_fps );
+      ImGui::PlotLines(
+          "FrameTime",
+          m_PerfCounter->GetDeltaValues(),
+          PerfCounter::kSampleCount,
+          0,
+          nullptr,
+          0,
+          PerfCounter::kMaxDeltaMs );
+
+      ImGui::Text( "MeshDraws: %llu", m_DrawList.Size() );
+      if ( ImGui::CollapsingHeader( "Pipeline Stats" ) )
       {
-        m_PerfCounter->GatherPipelineStatistics();
+        if ( ImGui::Button( "Gather Invocation Info" ) )
+        {
+          m_PerfCounter->GatherPipelineStatistics();
+        }
+        ImGui::Text( "IA Vertices: %llu", pipeline_stats.IAVertices );
+        ImGui::Text( "IA Primitives: %llu", pipeline_stats.IAPrimitives );
+        ImGui::Text( "VS Invocation: %llu", pipeline_stats.VSInvocations );
+        ImGui::Text( "GS Invocation: %llu", pipeline_stats.GSInvocations );
+        ImGui::Text( "C Invocation: %llu", pipeline_stats.CInvocations );
+        ImGui::Text( "C Primitives: %llu", pipeline_stats.CPrimitives );
+        ImGui::Text( "PS Invocation: %llu", pipeline_stats.PSInvocations );
+        ImGui::Text( "HS Invocation: %llu", pipeline_stats.HSInvocations );
+        ImGui::Text( "DS Invocation: %llu", pipeline_stats.DSInvocations );
+        ImGui::Text( "CS Invocation: %llu", pipeline_stats.CSInvocations );
+        ImGui::Text( "AS Invocation: %llu", pipeline_stats.ASInvocations );
+        ImGui::Text( "MS Invocation: %llu", pipeline_stats.MSInvocations );
+        ImGui::Text( "MS Primitives: %llu", pipeline_stats.MSPrimitives );
       }
-      ImGui::Text( "IA Vertices: %llu", pipeline_stats.IAVertices );
-      ImGui::Text( "IA Primitives: %llu", pipeline_stats.IAPrimitives );
-      ImGui::Text( "VS Invocation: %llu", pipeline_stats.VSInvocations );
-      ImGui::Text( "GS Invocation: %llu", pipeline_stats.GSInvocations );
-      ImGui::Text( "C Invocation: %llu", pipeline_stats.CInvocations );
-      ImGui::Text( "C Primitives: %llu", pipeline_stats.CPrimitives );
-      ImGui::Text( "PS Invocation: %llu", pipeline_stats.PSInvocations );
-      ImGui::Text( "HS Invocation: %llu", pipeline_stats.HSInvocations );
-      ImGui::Text( "DS Invocation: %llu", pipeline_stats.DSInvocations );
-      ImGui::Text( "CS Invocation: %llu", pipeline_stats.CSInvocations );
-      ImGui::Text( "AS Invocation: %llu", pipeline_stats.ASInvocations );
-      ImGui::Text( "MS Invocation: %llu", pipeline_stats.MSInvocations );
-      ImGui::Text( "MS Primitives: %llu", pipeline_stats.MSPrimitives );
+      ImGui::End();
     }
-    ImGui::End();
+
+    {
+      ImGui::Begin( "Debug" );
+      {
+        bool scratch;
+        scratch = ( bool )g_Debug.ShowWireframe;
+        ImGui::Checkbox( "Show Wireframe", &scratch );
+        g_Debug.ShowWireframe = ( uint32_t )scratch;
+
+        scratch               = ( bool )g_Debug.ShowLightOnly;
+        ImGui::Checkbox( "Show Light Only", &scratch );
+        g_Debug.ShowLightOnly = ( uint32_t )scratch;
+
+
+        scratch               = ( bool )g_Debug.HideSkybox;
+        ImGui::Checkbox( "Hide Skybox", &scratch );
+        g_Debug.HideSkybox = ( uint32_t )scratch;
+
+        scratch            = ( bool )g_Debug.RemoveDiffuseContrib;
+        ImGui::Checkbox( "Remove Diffuse Contribution", &scratch );
+        g_Debug.RemoveDiffuseContrib = ( uint32_t )scratch;
+
+        scratch                      = ( bool )g_Debug.RemoveSpecularContrib;
+        ImGui::Checkbox( "Remove Specular Contribution", &scratch );
+        g_Debug.RemoveSpecularContrib = ( uint32_t )scratch;
+
+        scratch                       = ( bool )g_Debug.DisableMeshletFrustumCulling;
+        ImGui::Checkbox( "Disable Meshlet Frustum Culling", &scratch );
+        g_Debug.DisableMeshletFrustumCulling = ( uint32_t )scratch;
+
+        scratch                              = ( bool )g_Debug.VisualizeMeshlets;
+        ImGui::Checkbox( "Visualize Meshlets", &scratch );
+        g_Debug.VisualizeMeshlets = ( uint32_t )scratch;
+      }
+      ImGui::End();
+    }
+
+    {
+      ImGui::Begin( "Camera" );
+
+      float gi_cam_yaw_pitch[] = { cam_yaw, cam_pitch };
+      if ( ImGui::DragFloat2( "Yaw & Pitch", gi_cam_yaw_pitch, 0.01f ) )
+      {
+        m_Camera->SetYawPitch( gi_cam_yaw_pitch[0], gi_cam_yaw_pitch[1] );
+      }
+      float gi_cam_pos[] = { cam_pos.x, cam_pos.y, cam_pos.z };
+      if ( ImGui::DragFloat3( "Position", gi_cam_pos, 0.1f ) )
+      {
+        m_Camera->SetPosition( gi_cam_pos[0], gi_cam_pos[1], gi_cam_pos[2] );
+      }
+      ImGui::End();
+    }
   }
 
-  {
-    ImGui::Begin( "Camera" );
-
-    float gi_cam_yaw_pitch[] = { cam_yaw, cam_pitch };
-    if ( ImGui::DragFloat2( "Yaw & Pitch", gi_cam_yaw_pitch, 0.01f ) )
-    {
-      m_Camera->SetYawPitch( gi_cam_yaw_pitch[0], gi_cam_yaw_pitch[1] );
-    }
-    float gi_cam_pos[] = { cam_pos.x, cam_pos.y, cam_pos.z };
-    if ( ImGui::DragFloat3( "Position", gi_cam_pos, 0.1f ) )
-    {
-      m_Camera->SetPosition( gi_cam_pos[0], gi_cam_pos[1], gi_cam_pos[2] );
-    }
-    ImGui::End();
-  }
+  m_ConfigurationBuffer.Write( 0, sizeof( g_Debug ), &g_Debug );
 
   // Rendering
   ImGui::Render();
@@ -752,6 +803,7 @@ void Ember::BasicApp::RenderScene(
     .DirLightBuffer       = dir_light_srv,
     .DirLightCount        = m_LightManager->GetDirLightCount(),
     .DirLightShadowCount  = m_LightManager->GetShadowingDirLightCount(),
+    .ConfigBuffer         = m_ConfigurationBuffer.GetCBVHandle(),
   };
 
   command_list->SetGraphicsRoot32BitConstants( 1, sizeof( PerFrameConstants ) / 4, &constants, 0 );
@@ -802,8 +854,11 @@ void Ember::BasicApp::Render()
 
   RenderScene( command_list.Get(), draw_list_info, frame_idx );
 
-  command_list->SetPipelineState( m_BackgroundPipeline.Get() );
-  command_list->DispatchMesh( 1, 1, 1 );
+  if ( not g_Debug.HideSkybox )
+  {
+    command_list->SetPipelineState( m_BackgroundPipeline.Get() );
+    command_list->DispatchMesh( 1, 1, 1 );
+  }
   ImGui_ImplDX12_RenderDrawData( ImGui::GetDrawData(), command_list.Get() );
 
   CD3DX12_RESOURCE_BARRIER post_render_barriers[] = {

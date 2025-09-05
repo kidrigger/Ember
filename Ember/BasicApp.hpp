@@ -45,6 +45,7 @@ class BasicApp final : public IApp
   std::unique_ptr<Camera>              m_Camera;
   uint32_t                             m_PrevMouseX{ 0 };
   uint32_t                             m_PrevMouseY{ 0 };
+  Buffer                               m_ConfigurationBuffer;
 
   std::unique_ptr<LightManager>        m_LightManager;
 

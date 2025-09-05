@@ -553,6 +553,7 @@
     <None Include="Bindless.hlsli" />
     <None Include="Camera.hlsli" />
     <None Include="Colors.hlsli" />
+    <None Include="DebugConfig.hlsli" />
     <None Include="DirShadow.hlsli" />
     <None Include="Geometry.hlsli" />
     <None Include="LightData.hlsli" />
@@ -594,6 +595,10 @@
       <ShaderType Condition="'$(Configuration)|$(Platform)'=='RenderDoc_Compat|x64'">Vertex</ShaderType>
       <ShaderType Condition="'$(Configuration)|$(Platform)'=='Release|x64'">Vertex</ShaderType>
       <ShaderType Condition="'$(Configuration)|$(Platform)'=='ReleaseWithDebug|x64'">Vertex</ShaderType>
+      <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">true</ExcludedFromBuild>
+      <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='RenderDoc_Compat|x64'">true</ExcludedFromBuild>
+      <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='ReleaseWithDebug|x64'">true</ExcludedFromBuild>
+      <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='Release|x64'">true</ExcludedFromBuild>
     </FxCompile>
     <FxCompile Include="BrdfLUT.hlsl">
       <ShaderType Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">Compute</ShaderType>

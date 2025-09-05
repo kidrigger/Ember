@@ -1,3 +1,4 @@
+#include "DebugConfig.hlsli"
 #include "Math.hlsli"
 #include "Triangle.hlsli"
 #include "Utility.hlsli"
@@ -26,6 +27,10 @@ groupshared MeshletPayload pl;
 NUM_THREADS( 32, 1, 1 )
 void TriangleAS( uint3 group_id : SV_GroupID, uint3 local_id : SV_GroupThreadID )
 {
+#ifndef STRIP_DEBUG_CONFIG
+  ConstantBuffer<DebugConfig> config = ResourceDescriptorHeap[g_ConfigID];
+#endif
+
   uint                       mesh_draw_idx = group_id.x;
   uint                       meshlet_idx   = local_id.x;
   bool                       is_visible    = false;
@@ -48,7 +53,18 @@ void TriangleAS( uint3 group_id : SV_GroupID, uint3 local_id : SV_GroupThreadID 
     float4                      ws_bounds = TransformBoundingSphere( model, meshlet.BoundingSphere );
     float4                      vs_bounds = TransformBoundingSphere( camera.View, ws_bounds );
 
-    is_visible                            = !FrustumCull( vs_bounds, camera.CullInfo );
+#ifndef STRIP_DEBUG_CONFIG
+    if ( !config.DisableMeshletFrustumCulling )
+    {
+      is_visible = !FrustumCull( vs_bounds, camera.CullInfo );
+    }
+    else
+    {
+      is_visible = true;
+    }
+#else
+    is_visible = !FrustumCull( vs_bounds, camera.CullInfo );
+#endif
 
     if ( is_visible )
     {
