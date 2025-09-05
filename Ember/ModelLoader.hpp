@@ -3,6 +3,7 @@
 #include <cgltf.h>
 #include <map>
 
+#include "Float16.hpp"
 #include "Scene.hpp"
 #include "TextureLoader.hpp"
 #include "Util/DirectXHeaders.hpp"
@@ -27,10 +28,10 @@ constexpr D3D12_INPUT_ELEMENT_DESC PerVertexInput(
 
 struct ShadowVertex
 {
-  uint16_t                                  Px;
-  uint16_t                                  Py;
-  uint16_t                                  Pz;
-  uint16_t                                  Pw;
+  Float16                                   Px;
+  Float16                                   Py;
+  Float16                                   Pz;
+  Float16                                   Pw;
 
   constexpr static D3D12_INPUT_ELEMENT_DESC kInputElementDesc[] = {
     PerVertexInput( "POSITION", 0, DXGI_FORMAT_R16G16B16A16_FLOAT, 0 ),
@@ -39,17 +40,17 @@ struct ShadowVertex
 
 struct alignas( 16 ) VertexData
 {
-  uint16_t                                  PositionX;        // 02
-  uint16_t                                  PositionY;        // 04
-  uint16_t                                  PositionZ;        // 06
-  uint16_t                                  PositionW;        // 08
+  Float16                                   PositionX;        // 02
+  Float16                                   PositionY;        // 04
+  Float16                                   PositionZ;        // 06
+  Float16                                   PositionW;        // 08
   uint32_t                                  QuantizedNormal;  // 12
   uint32_t                                  QuantizedTangent; // 16
   Color32                                   Color;            // 20
-  uint16_t                                  TexCoord0X;       // 22
-  uint16_t                                  TexCoord0Y;       // 24
-  uint16_t                                  TexCoord1X;       // 26
-  uint16_t                                  TexCoord1Y;       // 28
+  Float16                                   TexCoord0X;       // 22
+  Float16                                   TexCoord0Y;       // 24
+  Float16                                   TexCoord1X;       // 26
+  Float16                                   TexCoord1Y;       // 28
   uint32_t                                  Padding0;         // 32
 
   constexpr static D3D12_INPUT_ELEMENT_DESC kInputElementDesc[] = {
@@ -68,10 +69,10 @@ struct Meshlet
   uint32_t TriangleOffset;
   uint32_t VertexCount;
   uint32_t TriangleCount;
-  uint16_t CenterX;
-  uint16_t CenterY;
-  uint16_t CenterZ;
-  uint16_t Radius;
+  Float16  CenterX;
+  Float16  CenterY;
+  Float16  CenterZ;
+  Float16  Radius;
   uint32_t ConeInfo;
   uint32_t ConeApexOffset;
 };

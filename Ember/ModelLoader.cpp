@@ -72,11 +72,6 @@ void GetTexCoord( SMikkTSpaceContext const* ctx, float out_tex[], int const face
 
 Ember::VertexData QuantizeData( LoadingData const& in_data )
 {
-  uint16_t const    p_x = meshopt_quantizeHalf( in_data.Position.x );
-  uint16_t const    p_y = meshopt_quantizeHalf( in_data.Position.y );
-  uint16_t const    p_z = meshopt_quantizeHalf( in_data.Position.z );
-  uint16_t const    p_w = meshopt_quantizeHalf( 1.0f );
-
   DirectX::XMFLOAT3 norm;
   XMStoreFloat3( &norm, DirectX::XMVector3Normalize( XMLoadFloat3( &in_data.Normal ) ) );
   uint32_t const normal = meshopt_quantizeUnorm( norm.x * 0.5f + 0.5f, 10 ) |
@@ -90,23 +85,18 @@ Ember::VertexData QuantizeData( LoadingData const& in_data )
                            ( meshopt_quantizeUnorm( tang.z * 0.5f + 0.5f, 10 ) << 20 ) |
                            ( meshopt_quantizeUnorm( in_data.Tangent.w * 0.5f + 0.5f, 2 ) ) << 30;
 
-  uint16_t const uv0_x = meshopt_quantizeHalf( in_data.TexCoord0.x );
-  uint16_t const uv0_y = meshopt_quantizeHalf( in_data.TexCoord0.y );
-  uint16_t const uv1_x = meshopt_quantizeHalf( in_data.TexCoord1.x );
-  uint16_t const uv1_y = meshopt_quantizeHalf( in_data.TexCoord1.y );
-
   return Ember::VertexData{
-    .PositionX        = p_x,
-    .PositionY        = p_y,
-    .PositionZ        = p_z,
-    .PositionW        = p_w,
+    .PositionX        = in_data.Position.x,
+    .PositionY        = in_data.Position.y,
+    .PositionZ        = in_data.Position.z,
+    .PositionW        = 1,
     .QuantizedNormal  = normal,
     .QuantizedTangent = tangent,
     .Color            = in_data.Color,
-    .TexCoord0X       = uv0_x,
-    .TexCoord0Y       = uv0_y,
-    .TexCoord1X       = uv1_x,
-    .TexCoord1Y       = uv1_y,
+    .TexCoord0X       = in_data.TexCoord0.x,
+    .TexCoord0Y       = in_data.TexCoord0.y,
+    .TexCoord1X       = in_data.TexCoord1.x,
+    .TexCoord1Y       = in_data.TexCoord1.y,
   };
 }
 
@@ -490,11 +480,6 @@ void Ember::ModelLoader::ProcessPrimitive(
             vertex_count,
             StrideOf( loaded_data ) );
 
-        uint16_t const center_x  = meshopt_quantizeHalf( bounds.center[0] );
-        uint16_t const center_y  = meshopt_quantizeHalf( bounds.center[1] );
-        uint16_t const center_z  = meshopt_quantizeHalf( bounds.center[2] );
-        uint16_t const radius    = meshopt_quantizeHalf( bounds.radius );
-
         uint32_t const cone_info = ( meshopt_quantizeUnorm( 0.5f * bounds.cone_axis[0] + 0.5f, 8 ) ) |
                                    ( meshopt_quantizeUnorm( 0.5f * bounds.cone_axis[1] + 0.5f, 8 ) << 8 ) |
                                    ( meshopt_quantizeUnorm( 0.5f * bounds.cone_axis[2] + 0.5f, 8 ) << 16 ) |
@@ -516,10 +501,10 @@ void Ember::ModelLoader::ProcessPrimitive(
           .TriangleOffset = m.triangle_offset + triangle_start,
           .VertexCount    = m.vertex_count,
           .TriangleCount  = m.triangle_count,
-          .CenterX        = center_x,
-          .CenterY        = center_y,
-          .CenterZ        = center_z,
-          .Radius         = radius,
+          .CenterX        = bounds.center[0],
+          .CenterY        = bounds.center[1],
+          .CenterZ        = bounds.center[2],
+          .Radius         = bounds.radius,
           .ConeInfo       = cone_info,
           .ConeApexOffset = cone_apex,
         };
