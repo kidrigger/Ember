@@ -352,7 +352,7 @@ uint16_t Ember::Internal::OmniLightManager::GetShadowingOmniLightCount() const
 
 void Ember::Internal::OmniLightManager::RenderAllShadows(
     ID3D12GraphicsCommandList6* command_list,
-    DrawList::Info const&       draw_list,
+    DrawList::Batches const&    draw_list,
     RenderTargetManager const&  rtm,
     Camera const&               camera )
 {
@@ -415,7 +415,7 @@ void Ember::Internal::OmniLightManager::RenderAllShadows(
 
 void Ember::Internal::OmniLightManager::RenderOmniShadow(
     ID3D12GraphicsCommandList6* command_list,
-    DrawList::Info const&       draw_list,
+    DrawList::Batches const&    draw_list,
     RenderTargetManager const&  rtm,
     OmniLight const&            omni_light,
     Texture const&              texture ) const
@@ -425,7 +425,7 @@ void Ember::Internal::OmniLightManager::RenderOmniShadow(
   rtm.ClearDepthStencilView( command_list, texture, D3D12_CLEAR_FLAG_DEPTH, 1.0f, 0 );
 
   PackedData const packed_data{
-    .DrawList       = draw_list,
+    .DrawList       = draw_list.Opaque,
     .Position       = omni_light.Position,
     .FarPlane       = omni_light.Range,
     .ProjViewHandle = m_ShadowProjectionBuffer.GetCBVHandle(),
@@ -434,5 +434,5 @@ void Ember::Internal::OmniLightManager::RenderOmniShadow(
 
   rtm.OMSetRenderTargets( command_list, 0, nullptr, &texture );
 
-  command_list->DispatchMesh( draw_list.DrawCount, 1, 1 );
+  command_list->DispatchMesh( draw_list.Opaque.DrawCount, 1, 1 );
 }

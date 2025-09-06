@@ -8,6 +8,13 @@ namespace Ember
 {
 class MaterialManager;
 
+enum class AlphaMode
+{
+  kOpaque,
+  kMask,
+  kBlend,
+};
+
 class MaterialImpl
 {
 public:
@@ -46,15 +53,17 @@ private:
   Texture              m_MetalRoughTexture;
   Texture              m_EmissiveTexture;
   ReprInfo             m_Repr;
+  AlphaMode            m_AlphaMode{ AlphaMode::kOpaque };
 
   std::atomic_uint32_t m_RefCount{ 1 };
 
 public:
-  uint32_t       AddRef();
-  uint32_t       Release();
-  uint32_t       GetRefCount();
+  uint32_t                     AddRef();
+  uint32_t                     Release();
+  uint32_t                     GetRefCount();
 
-  MaterialHandle GetHandle() const;
+  [[nodiscard]] MaterialHandle GetHandle() const;
+  [[nodiscard]] AlphaMode      GetAlphaMode() const;
 
   MaterialImpl(
       Texture          base_color_texture,
@@ -62,7 +71,8 @@ public:
       Texture          metal_rough_texture,
       Texture          emissive_texture,
       MaterialManager* material_manager,
-      MaterialHandle   handle );
+      MaterialHandle   handle,
+      AlphaMode        alpha_mode );
 };
 
 } // namespace Ember

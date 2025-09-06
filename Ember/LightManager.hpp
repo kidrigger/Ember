@@ -46,7 +46,7 @@ public:
   //
   void RenderAllShadows(
       ID3D12GraphicsCommandList6* command_list,
-      DrawList::Info const&       draw_list,
+      DrawList::Batches const&    draw_list,
       RenderTargetManager const&  rtm,
       Camera const&               camera,
       uint32_t                    frame_idx ) const;

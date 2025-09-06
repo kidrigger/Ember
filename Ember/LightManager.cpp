@@ -88,7 +88,7 @@ uint16_t Ember::LightManager::GetShadowingDirLightCount() const
 
 void Ember::LightManager::RenderAllShadows(
     ID3D12GraphicsCommandList6* command_list,
-    DrawList::Info const&       draw_list,
+    DrawList::Batches const&    draw_list,
     RenderTargetManager const&  rtm,
     Camera const&               camera,
     uint32_t const              frame_idx ) const

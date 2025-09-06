@@ -260,6 +260,9 @@
     <ClInclude Include="DeviceHandle.hpp">
       <Filter>Header Files\Graphics</Filter>
     </ClInclude>
+    <ClInclude Include="Float16.hpp">
+      <Filter>Header Files</Filter>
+    </ClInclude>
   </ItemGroup>
   <ItemGroup>
     <None Include="..\.clang-format">
@@ -315,6 +318,9 @@
     </None>
     <None Include="DebugConfig.hlsli">
       <Filter>Shaders\Utils</Filter>
+    </None>
+    <None Include="TrianglePSCommon.hlsli">
+      <Filter>Shaders\Meshes</Filter>
     </None>
   </ItemGroup>
   <ItemGroup>
@@ -381,6 +387,12 @@
     <FxCompile Include="BackgroundMS.hlsl">
       <Filter>Shaders</Filter>
     </FxCompile>
+    <FxCompile Include="TriangleAlphaTestPS.hlsl">
+      <Filter>Shaders\Meshes</Filter>
+    </FxCompile>
+    <FxCompile Include="TriangleAlphaBlendPS.hlsl">
+      <Filter>Shaders\Meshes</Filter>
+    </FxCompile>
   </ItemGroup>
   <ItemGroup>
     <CopyFileToFolders Include="Assets\container2.png">
@@ -438,6 +450,9 @@
       <Filter>Resource Files\Assets\Scenes</Filter>
     </CopyFileToFolders>
     <CopyFileToFolders Include="Assets\ModdedCompareRoughness.glb">
+      <Filter>Resource Files\Assets\Scenes</Filter>
+    </CopyFileToFolders>
+    <CopyFileToFolders Include="Assets\AlphaBlendModeTest.glb">
       <Filter>Resource Files\Assets\Scenes</Filter>
     </CopyFileToFolders>
   </ItemGroup>

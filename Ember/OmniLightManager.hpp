@@ -87,13 +87,13 @@ public:
   //
   void RenderAllShadows(
       ID3D12GraphicsCommandList6* command_list,
-      DrawList::Info const&       draw_list,
+      DrawList::Batches const&    draw_list,
       RenderTargetManager const&  rtm,
       Camera const&               camera );
 
   void RenderOmniShadow(
       ID3D12GraphicsCommandList6* command_list,
-      DrawList::Info const&       draw_list,
+      DrawList::Batches const&    draw_list,
       RenderTargetManager const&  rtm,
       OmniLight const&            omni_light,
       Texture const&              texture ) const;

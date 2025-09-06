@@ -609,8 +609,25 @@ Ember::MaterialImpl* Ember::ModelLoader::TryProcessMaterial(
     }
   }
 
-  float const    metallic        = material->pbr_metallic_roughness.metallic_factor;
-  float const    roughness       = material->pbr_metallic_roughness.roughness_factor;
+  float const metallic     = material->pbr_metallic_roughness.metallic_factor;
+  float const roughness    = material->pbr_metallic_roughness.roughness_factor;
+  float const alpha_cutoff = material->alpha_cutoff;
+
+  AlphaMode   alpha_mode;
+  switch ( material->alpha_mode )
+  {
+    case cgltf_alpha_mode_opaque:
+      alpha_mode = AlphaMode::kOpaque;
+      break;
+    case cgltf_alpha_mode_mask:
+      alpha_mode = AlphaMode::kMask;
+      break;
+    case cgltf_alpha_mode_blend:
+      alpha_mode = AlphaMode::kBlend;
+      break;
+    default:
+      UNREACHABLE;
+  }
 
   MaterialHandle material_handle = m_MaterialManager->CreateMaterialHandle( {
       .BaseColorTexture  = base_color_texture ? base_color_texture.GetSRVHandle() : SRVHandle{},
@@ -622,10 +639,17 @@ Ember::MaterialImpl* Ember::ModelLoader::TryProcessMaterial(
       .EmissiveStrength  = emissive_strength,
       .Metal             = metallic,
       .Rough             = roughness,
+      .AlphaCutoff       = alpha_cutoff,
   } );
 
   MaterialImpl*  new_material    = World::MaterialManager().Construct(
-      base_color_texture, normal_texture, metal_rough_texture, emissive_texture, m_MaterialManager, material_handle );
+      base_color_texture,
+      normal_texture,
+      metal_rough_texture,
+      emissive_texture,
+      m_MaterialManager,
+      material_handle,
+      alpha_mode );
 
   context->MaterialCache.insert_or_assign( material, new_material );
 
@@ -652,7 +676,7 @@ Ember::MaterialImpl* Ember::ModelLoader::GetDefaultMaterial( LoadingContext* con
   } );
 
   auto           new_material    = World::MaterialManager().Construct(
-      Texture{}, Texture{}, Texture{}, Texture{}, m_MaterialManager, material_handle );
+      Texture{}, Texture{}, Texture{}, Texture{}, m_MaterialManager, material_handle, AlphaMode::kOpaque );
   context->MaterialCache.insert_or_assign( nullptr, new_material );
 
   return new_material;

@@ -127,15 +127,27 @@ Ember::ObjectPool<Ember::MaterialImpl>& Ember::World::MaterialManager()
 }
 
 Ember::DrawList::DrawList( RenderDevice* render_device, GeometryManager* geometry_manager, uint32_t const frame_count )
-  : m_RenderDevice{ render_device }
-  , m_GeometryManager{ geometry_manager }
-  , m_TransformBuffers{ frame_count }
-  , m_DrawBuffers{ frame_count }
+  : m_RenderDevice{ render_device }, m_GeometryManager{ geometry_manager }, m_FrameResources{ frame_count }
 {}
 
-void Ember::DrawList::PushDraw(
-    WorldTransform const& transform, Mesh const& mesh, Geometry const& geometry, Material const& material )
+void Ember::DrawList::PushDraw( WorldTransform const& transform, Mesh const& mesh, Material const& material )
 {
+  std::vector<MeshDraw>* draw_infos;
+  switch ( material->GetAlphaMode() )
+  {
+    case AlphaMode::kOpaque:
+      draw_infos = &m_OpaqueDrawInfos;
+      break;
+    case AlphaMode::kMask:
+      draw_infos = &m_AlphaTestedDrawInfos;
+      break;
+    case AlphaMode::kBlend:
+      draw_infos = &m_AlphaBlendedDrawInfos;
+      break;
+    default:
+      UNREACHABLE;
+  }
+
   uint32_t const transform_idx = ( uint32_t )m_Transforms.size();
   m_Transforms.push_back( transform );
 
@@ -144,7 +156,7 @@ void Ember::DrawList::PushDraw(
 
   while ( remaining_meshlets > 0 )
   {
-    m_DrawInfos.emplace_back(
+    draw_infos->emplace_back(
         transform_idx, 1, mesh.FirstVertex, meshlet_offset, std::min( remaining_meshlets, 32 ), material->GetHandle() );
 
     remaining_meshlets -= 32;
@@ -152,44 +164,79 @@ void Ember::DrawList::PushDraw(
   }
 }
 
-Ember::DrawList::Info Ember::DrawList::PrepareFrame( uint32_t const frame_idx )
+namespace
 {
-  uint32_t const transform_size   = ByteSizeOf( m_Transforms );
-  Buffer*        transform_buffer = &m_TransformBuffers[frame_idx];
 
-  if ( transform_buffer->GetSize() < transform_size )
+void ResizedWrite(
+    Ember::RenderDevice* render_device, Ember::Buffer* buffer, std::ranges::contiguous_range auto const& draws )
+{
+  uint32_t const draw_size = ByteSizeOf( draws );
+
+  if ( buffer->GetSize() < draw_size )
   {
-    *transform_buffer = m_RenderDevice->CreateStorageBuffer( transform_size, StrideOf( m_Transforms ) );
+    *buffer = render_device->CreateStorageBuffer( draw_size, StrideOf( draws ) );
   }
+  buffer->Write( 0, draw_size, DataOf( draws ) );
+}
+} // namespace
 
-  uint32_t const draw_size   = ByteSizeOf( m_DrawInfos );
-  Buffer*        draw_buffer = &m_DrawBuffers[frame_idx];
+Ember::DrawList::Batches Ember::DrawList::PrepareFrame( uint32_t const frame_idx )
+{
+  FrameResources& resources = m_FrameResources[frame_idx];
 
-  if ( draw_buffer->GetSize() < draw_size )
-  {
-    *draw_buffer = m_RenderDevice->CreateStorageBuffer( draw_size, StrideOf( m_DrawInfos ) );
-  }
-
-  transform_buffer->Write( 0, transform_size, DataOf( m_Transforms ) );
-  draw_buffer->Write( 0, draw_size, DataOf( m_DrawInfos ) );
+  ResizedWrite( m_RenderDevice, &resources.TransformBuffer, m_Transforms );
+  ResizedWrite( m_RenderDevice, &resources.OpaqueDrawBuffer, m_OpaqueDrawInfos );
+  ResizedWrite( m_RenderDevice, &resources.AlphaTestedDrawBuffer, m_AlphaTestedDrawInfos );
+  ResizedWrite( m_RenderDevice, &resources.AlphaBlendedDrawBuffer, m_AlphaBlendedDrawInfos );
 
   return {
-    transform_buffer->GetSRVHandle(),
-    draw_buffer->GetSRVHandle(),
-    CountOf( m_DrawInfos ),
-    m_GeometryManager->GetSRVHandle(),
+    .Opaque = {
+      resources.TransformBuffer.GetSRVHandle(),
+      resources.OpaqueDrawBuffer.GetSRVHandle(),
+      CountOf( m_OpaqueDrawInfos ),
+      m_GeometryManager->GetSRVHandle(),
+    },
+    .AlphaTested = {
+      resources.TransformBuffer.GetSRVHandle(),
+      resources.AlphaTestedDrawBuffer.GetSRVHandle(),
+      CountOf( m_AlphaTestedDrawInfos ),
+      m_GeometryManager->GetSRVHandle(),
+    },
+    .AlphaBlended = {
+      resources.TransformBuffer.GetSRVHandle(),
+      resources.AlphaBlendedDrawBuffer.GetSRVHandle(),
+      CountOf( m_AlphaBlendedDrawInfos ),
+      m_GeometryManager->GetSRVHandle(),
+    }
   };
 }
 
 void Ember::DrawList::Clear()
 {
   m_Transforms.clear();
-  m_DrawInfos.clear();
+  m_OpaqueDrawInfos.clear();
+  m_AlphaTestedDrawInfos.clear();
+  m_AlphaBlendedDrawInfos.clear();
 }
 
-size_t Ember::DrawList::Size() const
+size_t Ember::DrawList::GetOpaqueCount() const
 {
-  return m_DrawInfos.size();
+  return m_OpaqueDrawInfos.size();
+}
+
+size_t Ember::DrawList::GetAlphaTestedCount() const
+{
+  return m_AlphaTestedDrawInfos.size();
+}
+
+size_t Ember::DrawList::GetAlphaBlendedCount() const
+{
+  return m_AlphaBlendedDrawInfos.size();
+}
+
+size_t Ember::DrawList::GetTotalCount() const
+{
+  return m_OpaqueDrawInfos.size() + m_AlphaBlendedDrawInfos.size() + m_AlphaTestedDrawInfos.size();
 }
 
 Ember::World::World()

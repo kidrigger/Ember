@@ -322,7 +322,7 @@ uint16_t Ember::Internal::DirectionLightManager::GetShadowingDirLightCount() con
 
 void Ember::Internal::DirectionLightManager::RenderAllShadows(
     ID3D12GraphicsCommandList6* command_list,
-    DrawList::Info const&       draw_info,
+    DrawList::Batches const&    draw_info,
     RenderTargetManager const&  rtm,
     Camera const&               camera,
     uint32_t const              frame_idx )
@@ -375,7 +375,7 @@ void Ember::Internal::DirectionLightManager::RenderAllShadows(
 
 void Ember::Internal::DirectionLightManager::RenderDirShadow(
     ID3D12GraphicsCommandList6* command_list,
-    DrawList::Info const&       draw_info,
+    DrawList::Batches const&    draw_info,
     RenderTargetManager const&  rtm,
     DirLight*                   dir_light,
     Texture const&              texture,
@@ -466,7 +466,7 @@ void Ember::Internal::DirectionLightManager::RenderDirShadow(
   SetDirty();
 
   PackedData packed_data{
-    .DrawList     = draw_info,
+    .DrawList     = draw_info.Opaque,
     .LightData    = m_DataBuffers[frame_index].GetSRVHandle(),
     .LightIdx     = light_index,
     .CameraBuffer = camera.GetLastUpdatedBuffer(),
@@ -474,6 +474,7 @@ void Ember::Internal::DirectionLightManager::RenderDirShadow(
   command_list->SetGraphicsRoot32BitConstants( 0, sizeof( packed_data ) / 4, &packed_data, 0 );
   rtm.OMSetRenderTargets( command_list, 0, nullptr, &texture );
 
+  // TODO: Alpha tested + Blended
   command_list->SetGraphicsRoot32BitConstants( 1, ByteSizeOf( cull_params ) / 4, DataOf( cull_params ), 0 );
-  command_list->DispatchMesh( draw_info.DrawCount, 1, 1 );
+  command_list->DispatchMesh( draw_info.Opaque.DrawCount, 1, 1 );
 }

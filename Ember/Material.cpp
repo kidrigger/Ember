@@ -53,16 +53,23 @@ Ember::MaterialHandle Ember::MaterialImpl::GetHandle() const
   return m_Repr.Handle;
 }
 
+Ember::AlphaMode Ember::MaterialImpl::GetAlphaMode() const
+{
+  return m_AlphaMode;
+}
+
 Ember::MaterialImpl::MaterialImpl(
     Texture                base_color_texture,
     Texture                normal_texture,
     Texture                metal_rough_texture,
     Texture                emissive_texture,
     MaterialManager* const material_manager,
-    MaterialHandle         handle )
+    MaterialHandle         handle,
+    AlphaMode              alpha_mode )
   : m_BaseColorTexture{ std::move( base_color_texture ) }
   , m_NormalTexture{ std::move( normal_texture ) }
   , m_MetalRoughTexture{ std::move( metal_rough_texture ) }
   , m_EmissiveTexture{ std::move( emissive_texture ) }
   , m_Repr{ material_manager, handle }
+  , m_AlphaMode{ alpha_mode }
 {}

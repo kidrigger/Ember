@@ -395,6 +395,11 @@ void Ember::BasicApp::SetupRenderPipeline()
   ERR_ABORT( D3DReadFileToBlob( L"TriangleMS.cso", &mesh_shader_blob ) );
   ComPtr<ID3DBlob> pixel_shader_blob;
   ERR_ABORT( D3DReadFileToBlob( L"TrianglePS.cso", &pixel_shader_blob ) );
+  ComPtr<ID3DBlob> alpha_tested_pixel_shader_blob;
+  ERR_ABORT( D3DReadFileToBlob( L"TriangleAlphaTestPS.cso", &alpha_tested_pixel_shader_blob ) );
+  ComPtr<ID3DBlob> alpha_blended_pixel_shader_blob;
+  ERR_ABORT( D3DReadFileToBlob( L"TriangleAlphaBlendPS.cso", &alpha_blended_pixel_shader_blob ) );
+
   ComPtr<ID3DBlob> bg_mesh_shader_blob;
   ERR_ABORT( D3DReadFileToBlob( L"BackgroundMS.cso", &bg_mesh_shader_blob ) );
   ComPtr<ID3DBlob> bg_pixel_shader_blob;
@@ -453,12 +458,10 @@ void Ember::BasicApp::SetupRenderPipeline()
   };
 
   CD3DX12_RASTERIZER_DESC2 rasterizer_desc{ D3D12_DEFAULT };
-  rasterizer_desc.FrontCounterClockwise = true;
+  rasterizer_desc.FrontCounterClockwise = TRUE;
   rasterizer_desc.CullMode              = D3D12_CULL_MODE_BACK;
 
   CD3DX12_DEPTH_STENCIL_DESC depth_stencil_desc{ D3D12_DEFAULT };
-  depth_stencil_desc.DepthEnable = TRUE;
-  depth_stencil_desc.DepthFunc   = D3D12_COMPARISON_FUNC_LESS;
 
   struct MainPipelineStream
   {
@@ -467,6 +470,7 @@ void Ember::BasicApp::SetupRenderPipeline()
     CD3DX12_PIPELINE_STATE_STREAM_AS                    AS;
     CD3DX12_PIPELINE_STATE_STREAM_MS                    MS;
     CD3DX12_PIPELINE_STATE_STREAM_PS                    PS;
+    CD3DX12_PIPELINE_STATE_STREAM_BLEND_DESC            Blending;
     CD3DX12_PIPELINE_STATE_STREAM_RASTERIZER2           Rasterizer;
     CD3DX12_PIPELINE_STATE_STREAM_RENDER_TARGET_FORMATS RTVFormats;
     CD3DX12_PIPELINE_STATE_STREAM_DEPTH_STENCIL_FORMAT  DSVFormat;
@@ -478,10 +482,39 @@ void Ember::BasicApp::SetupRenderPipeline()
     .AS                    = CD3DX12_SHADER_BYTECODE( amp_shader_blob.Get() ),
     .MS                    = CD3DX12_SHADER_BYTECODE( mesh_shader_blob.Get() ),
     .PS                    = CD3DX12_SHADER_BYTECODE( pixel_shader_blob.Get() ),
+    .Blending              = CD3DX12_BLEND_DESC{ D3D12_DEFAULT },
     .Rasterizer            = rasterizer_desc,
     .RTVFormats            = rtv_formats,
     .DSVFormat             = DXGI_FORMAT_D32_FLOAT,
   };
+
+  D3D12_PIPELINE_STATE_STREAM_DESC const pipeline_state_stream_desc = {
+    .SizeInBytes                   = sizeof pipeline_stream,
+    .pPipelineStateSubobjectStream = &pipeline_stream,
+  };
+
+  ERR_ABORT( device->CreatePipelineState( &pipeline_state_stream_desc, IID_PPV_ARGS( &m_OpaquePBRPipeline ) ) );
+
+  pipeline_stream.PS = CD3DX12_SHADER_BYTECODE( alpha_tested_pixel_shader_blob.Get() );
+  ERR_ABORT( device->CreatePipelineState( &pipeline_state_stream_desc, IID_PPV_ARGS( &m_AlphaTestedPBRPipeline ) ) );
+
+  CD3DX12_BLEND_DESC blend_desc{ D3D12_DEFAULT };
+  blend_desc.RenderTarget[0] = {
+    .BlendEnable           = TRUE,
+    .LogicOpEnable         = FALSE,
+    .SrcBlend              = D3D12_BLEND_SRC_ALPHA,
+    .DestBlend             = D3D12_BLEND_INV_SRC_ALPHA,
+    .BlendOp               = D3D12_BLEND_OP_ADD,
+    .SrcBlendAlpha         = D3D12_BLEND_ONE,
+    .DestBlendAlpha        = D3D12_BLEND_ZERO,
+    .BlendOpAlpha          = D3D12_BLEND_OP_ADD,
+    .LogicOp               = D3D12_LOGIC_OP_NOOP,
+    .RenderTargetWriteMask = D3D12_COLOR_WRITE_ENABLE_ALL,
+  };
+
+  pipeline_stream.PS       = CD3DX12_SHADER_BYTECODE( alpha_blended_pixel_shader_blob.Get() );
+  pipeline_stream.Blending = blend_desc;
+  ERR_ABORT( device->CreatePipelineState( &pipeline_state_stream_desc, IID_PPV_ARGS( &m_AlphaBlendedPBRPipeline ) ) );
 
   struct BackgroundPipelineStream
   {
@@ -506,13 +539,6 @@ void Ember::BasicApp::SetupRenderPipeline()
     .RTVFormats            = rtv_formats,
     .DSVFormat             = DXGI_FORMAT_D32_FLOAT,
   };
-
-  D3D12_PIPELINE_STATE_STREAM_DESC const pipeline_state_stream_desc = {
-    .SizeInBytes                   = sizeof pipeline_stream,
-    .pPipelineStateSubobjectStream = &pipeline_stream,
-  };
-
-  ERR_ABORT( device->CreatePipelineState( &pipeline_state_stream_desc, IID_PPV_ARGS( &m_MainPipeline ) ) );
 
   D3D12_PIPELINE_STATE_STREAM_DESC const bg_pipeline_state_stream_desc = {
     .SizeInBytes                   = sizeof bg_pipeline_stream,
@@ -565,6 +591,11 @@ void Ember::BasicApp::LoadContent()
   model                             = m_ModelLoader->TryLoadModel( "DamagedHelmet.glb" )->child_of( rm );
   LocalTransform* local_tx          = model.get_mut<LocalTransform>();
   local_tx->Scale                   = DirectX::XMVectorSet( 0.3f, 0.3f, 0.3f, 0.0f );
+  local_tx->Rotation                = DirectX::XMQuaternionIdentity();
+
+  model                             = m_ModelLoader->TryLoadModel( "AlphaBlendModeTest.glb" ).value();
+  local_tx                          = model.get_mut<LocalTransform>();
+  local_tx->Translation             = DirectX::XMVectorSet( 5.0f, 2.0f, 7.0f, 1.0f );
   local_tx->Rotation                = DirectX::XMQuaternionIdentity();
 
   constexpr char const* kEnvMapFile = "OvercastSoil.hdr";
@@ -632,7 +663,14 @@ void Ember::BasicApp::Update()
           0,
           PerfCounter::kMaxDeltaMs );
 
-      ImGui::Text( "MeshDraws: %llu", m_DrawList.Size() );
+      if ( ImGui::CollapsingHeader( "MeshDraws" ) )
+      {
+        ImGui::Text( "Total: %llu", m_DrawList.GetTotalCount() );
+        ImGui::Text( "Opaque: %llu", m_DrawList.GetOpaqueCount() );
+        ImGui::Text( "Alpha Tested: %llu", m_DrawList.GetAlphaTestedCount() );
+        ImGui::Text( "Alpha Blended: %llu", m_DrawList.GetAlphaBlendedCount() );
+      }
+
       if ( ImGui::CollapsingHeader( "Pipeline Stats" ) )
       {
         if ( ImGui::Button( "Gather Invocation Info" ) )
@@ -760,7 +798,7 @@ void Ember::BasicApp::Update()
 }
 
 void Ember::BasicApp::RenderScene(
-    ID3D12GraphicsCommandList6* command_list, DrawList::Info const& draw_list_info, uint32_t frame_idx )
+    ID3D12GraphicsCommandList6* command_list, DrawList::Batches const& draw_list_info_list, uint32_t frame_idx )
 {
   ZoneScoped;
 
@@ -784,9 +822,7 @@ void Ember::BasicApp::RenderScene(
     .bottom = ( LONG )m_WindowHeight,
   };
 
-  command_list->SetPipelineState( m_MainPipeline.Get() );
   command_list->SetGraphicsRootSignature( m_RootSignature.Get() );
-  command_list->IASetPrimitiveTopology( D3D_PRIMITIVE_TOPOLOGY_TRIANGLELIST );
 
   auto bindless_desc_heaps = m_RenderDevice->GetBindlessDescriptorHeaps();
   command_list->SetDescriptorHeaps( CountOf( bindless_desc_heaps ), DataOf( bindless_desc_heaps ) );
@@ -809,8 +845,18 @@ void Ember::BasicApp::RenderScene(
   command_list->SetGraphicsRoot32BitConstants( 1, sizeof( PerFrameConstants ) / 4, &constants, 0 );
   command_list->SetGraphicsRoot32BitConstants( 2, sizeof( Environment::GpuRepr ) / 4, &m_Environment->Repr(), 0 );
 
-  command_list->SetGraphicsRoot32BitConstants( 0, sizeof( DrawList::Info ) / 4, &draw_list_info, 0 );
-  command_list->DispatchMesh( draw_list_info.DrawCount, 1, 1 );
+  command_list->SetPipelineState( m_OpaquePBRPipeline.Get() );
+  command_list->SetGraphicsRoot32BitConstants( 0, sizeof( DrawList::Info ) / 4, &draw_list_info_list.Opaque, 0 );
+  command_list->DispatchMesh( draw_list_info_list.Opaque.DrawCount, 1, 1 );
+
+  command_list->SetPipelineState( m_AlphaTestedPBRPipeline.Get() );
+  command_list->SetGraphicsRoot32BitConstants( 0, sizeof( DrawList::Info ) / 4, &draw_list_info_list.AlphaTested, 0 );
+  command_list->DispatchMesh( draw_list_info_list.AlphaTested.DrawCount, 1, 1 );
+
+  // TODO: Sort transparent objects back to front
+  command_list->SetPipelineState( m_AlphaBlendedPBRPipeline.Get() );
+  command_list->SetGraphicsRoot32BitConstants( 0, sizeof( DrawList::Info ) / 4, &draw_list_info_list.AlphaBlended, 0 );
+  command_list->DispatchMesh( draw_list_info_list.AlphaBlended.DrawCount, 1, 1 );
 }
 
 void Ember::BasicApp::Render()
@@ -832,13 +878,13 @@ void Ember::BasicApp::Render()
     ZoneScopedN( "Upload Transforms" );
     m_RenderQuery.each(
         [&]( WorldTransform const& wt, Mesh const& mesh, Geometry const& geometry, Material const& material )
-        { m_DrawList.PushDraw( wt, mesh, geometry, material ); } );
+        { m_DrawList.PushDraw( wt, mesh, material ); } );
   }
   CD3DX12_RESOURCE_BARRIER top_of_renderpass_barriers[] = {
     CD3DX12_RESOURCE_BARRIER::Transition( backbuffer, D3D12_RESOURCE_STATE_PRESENT, D3D12_RESOURCE_STATE_COPY_DEST ),
   };
 
-  DrawList::Info const draw_list_info = m_DrawList.PrepareFrame( frame_idx );
+  DrawList::Batches const draw_list_info = m_DrawList.PrepareFrame( frame_idx );
 
   m_PerfCounter->UpdatePipelineStats( frame_idx );
   m_PerfCounter->BeginQuery( command_list.Get(), frame_idx );

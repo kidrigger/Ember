@@ -1,7 +1,7 @@
 #include "DebugConfig.hlsli"
 #include "TrianglePSCommon.hlsli"
 
-float4 TrianglePS( PSIn IN ) : SV_TARGET0
+float4 TriangleAlphaTestPS( PSIn IN ) : SV_TARGET0
 {
   ConstantBuffer<Camera>     camera    = ResourceDescriptorHeap[g_Camera];
   StructuredBuffer<Material> materials = ResourceDescriptorHeap[g_Materials];
@@ -14,12 +14,15 @@ float4 TrianglePS( PSIn IN ) : SV_TARGET0
   }
 #endif
 
-  Material mat         = materials[NonUniformResourceIndex( IN.Material )];
+  Material mat    = materials[NonUniformResourceIndex( IN.Material )];
 
-  float4   albedo      = IN.Color * mat.GetAlbedo( IN.TexCoord[0], g_DefaultSampler );
-  float3   normal      = mat.GetNormal( IN.Normal, IN.Tangent, IN.Position.xyz, IN.TexCoord[0], g_DefaultSampler );
-  float2   metal_rough = mat.GetMetalRough( IN.TexCoord[0], g_DefaultSampler );
-  float3   emissive    = mat.GetEmissive( IN.TexCoord[0], g_DefaultSampler );
+  float4   albedo = IN.Color * mat.GetAlbedo( IN.TexCoord[0], g_DefaultSampler );
+
+  if ( albedo.a < mat.AlphaCutoff ) discard;
+
+  float3 normal      = mat.GetNormal( IN.Normal, IN.Tangent, IN.Position.xyz, IN.TexCoord[0], g_DefaultSampler );
+  float2 metal_rough = mat.GetMetalRough( IN.TexCoord[0], g_DefaultSampler );
+  float3 emissive    = mat.GetEmissive( IN.TexCoord[0], g_DefaultSampler );
 
 #ifndef STRIP_DEBUG_CONFIG
   if ( config.ShowLightOnly )

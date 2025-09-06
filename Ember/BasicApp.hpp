@@ -34,7 +34,9 @@ class BasicApp final : public IApp
 
   // PBR Pipeline
   ComPtr<ID3D12RootSignature>          m_RootSignature;
-  ComPtr<ID3D12PipelineState>          m_MainPipeline;
+  ComPtr<ID3D12PipelineState>          m_OpaquePBRPipeline;
+  ComPtr<ID3D12PipelineState>          m_AlphaTestedPBRPipeline;
+  ComPtr<ID3D12PipelineState>          m_AlphaBlendedPBRPipeline;
   ComPtr<ID3D12PipelineState>          m_BackgroundPipeline;
 
   std::unique_ptr<RenderTargetManager> m_RenderTargetManager;
@@ -68,7 +70,7 @@ public:
   void LoadContent() override;
   void Update() override;
   void RenderScene(
-      ID3D12GraphicsCommandList6* command_list, DrawList::Info const& draw_list_info, uint32_t frame_idx );
+      ID3D12GraphicsCommandList6* command_list, DrawList::Batches const& draw_list_info, uint32_t frame_idx );
   void        Render() override;
   void        UnloadContent() override;
 

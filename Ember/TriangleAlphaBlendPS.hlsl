@@ -1,7 +1,7 @@
 #include "DebugConfig.hlsli"
 #include "TrianglePSCommon.hlsli"
 
-float4 TrianglePS( PSIn IN ) : SV_TARGET0
+float4 TriangleAlphaBlendPS( PSIn IN ) : SV_TARGET0
 {
   ConstantBuffer<Camera>     camera    = ResourceDescriptorHeap[g_Camera];
   StructuredBuffer<Material> materials = ResourceDescriptorHeap[g_Materials];
@@ -17,6 +17,7 @@ float4 TrianglePS( PSIn IN ) : SV_TARGET0
   Material mat         = materials[NonUniformResourceIndex( IN.Material )];
 
   float4   albedo      = IN.Color * mat.GetAlbedo( IN.TexCoord[0], g_DefaultSampler );
+
   float3   normal      = mat.GetNormal( IN.Normal, IN.Tangent, IN.Position.xyz, IN.TexCoord[0], g_DefaultSampler );
   float2   metal_rough = mat.GetMetalRough( IN.TexCoord[0], g_DefaultSampler );
   float3   emissive    = mat.GetEmissive( IN.TexCoord[0], g_DefaultSampler );
@@ -50,5 +51,5 @@ float4 TrianglePS( PSIn IN ) : SV_TARGET0
 
   float3 total_contrib = emissive + point_contrib + dir_contrib + ambient_contrib;
 
-  return float4( LinearToSrgb( total_contrib ), 1.0f );
+  return float4( LinearToSrgb( total_contrib ), albedo.a );
 }

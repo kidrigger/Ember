@@ -127,12 +127,22 @@ struct alignas( 16 ) MeshDraw
 
 class DrawList
 {
+  struct FrameResources
+  {
+    Buffer TransformBuffer;
+    Buffer OpaqueDrawBuffer;
+    Buffer AlphaTestedDrawBuffer;
+    Buffer AlphaBlendedDrawBuffer;
+  };
+
   RenderDevice*               m_RenderDevice;
   GeometryManager*            m_GeometryManager;
+
   std::vector<WorldTransform> m_Transforms;
-  std::vector<MeshDraw>       m_DrawInfos;
-  std::vector<Buffer>         m_TransformBuffers;
-  std::vector<Buffer>         m_DrawBuffers;
+  std::vector<MeshDraw>       m_OpaqueDrawInfos;
+  std::vector<MeshDraw>       m_AlphaTestedDrawInfos;
+  std::vector<MeshDraw>       m_AlphaBlendedDrawInfos;
+  std::vector<FrameResources> m_FrameResources;
 
 public:
   struct Info
@@ -143,13 +153,22 @@ public:
     SRVHandle GeometryHandle;
   };
 
+  struct Batches
+  {
+    Info Opaque;
+    Info AlphaTested;
+    Info AlphaBlended;
+  };
+
   DrawList( RenderDevice* render_device, GeometryManager* geometry_manager, uint32_t frame_count );
 
-  void PushDraw(
-      WorldTransform const& transform, Mesh const& mesh, Geometry const& geometry, Material const& material );
-  Info   PrepareFrame( uint32_t frame_idx );
-  void   Clear();
-  size_t Size() const;
+  void                  PushDraw( WorldTransform const& transform, Mesh const& mesh, Material const& material );
+  [[nodiscard]] Batches PrepareFrame( uint32_t frame_idx );
+  void                  Clear();
+  [[nodiscard]] size_t  GetOpaqueCount() const;
+  [[nodiscard]] size_t  GetAlphaTestedCount() const;
+  [[nodiscard]] size_t  GetAlphaBlendedCount() const;
+  [[nodiscard]] size_t  GetTotalCount() const;
 };
 
 class World
