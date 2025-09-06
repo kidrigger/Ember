@@ -60,8 +60,9 @@ void DirShadowMS(
     float4 screen_position  = mul( light_data[g_LightIdx].LightSpaceMat[view_idx], world_position );
     screen_position        /= screen_position.w;
 
-    // Saturation allows objects behind the near plane to cast shadows.
-    screen_position.z = saturate( screen_position.z );
+    // Min 0 allows objects behind the near plane to cast shadows.
+    // while still allowing max depth precision due to tight bounds for 0-1.
+    screen_position.z = max( screen_position.z, 0.0f );
 
     // Manually calculating the projection
     verts[i].ScreenPosition = screen_position;

@@ -876,9 +876,8 @@ void Ember::BasicApp::Render()
 
   {
     ZoneScopedN( "Upload Transforms" );
-    m_RenderQuery.each(
-        [&]( WorldTransform const& wt, Mesh const& mesh, Geometry const& geometry, Material const& material )
-        { m_DrawList.PushDraw( wt, mesh, material ); } );
+    m_RenderQuery.each( [&]( WorldTransform const& wt, Mesh const& mesh, Geometry const&, Material const& material )
+                        { m_DrawList.PushDraw( wt, mesh, material ); } );
   }
   CD3DX12_RESOURCE_BARRIER top_of_renderpass_barriers[] = {
     CD3DX12_RESOURCE_BARRIER::Transition( backbuffer, D3D12_RESOURCE_STATE_PRESENT, D3D12_RESOURCE_STATE_COPY_DEST ),
