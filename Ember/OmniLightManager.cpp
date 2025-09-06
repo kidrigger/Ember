@@ -420,6 +420,7 @@ void Ember::Internal::OmniLightManager::RenderOmniShadow(
     OmniLight const&            omni_light,
     Texture const&              texture ) const
 {
+  PIXScopedEvent( command_list, PIX_COLOR_DEFAULT, "Render Omni Shadow %u", ( uint32_t )( &omni_light - m_LightData ) );
   ZoneScoped;
 
   rtm.ClearDepthStencilView( command_list, texture, D3D12_CLEAR_FLAG_DEPTH, 1.0f, 0 );

@@ -383,6 +383,7 @@ void Ember::Internal::DirectionLightManager::RenderDirShadow(
     uint32_t const              frame_index,
     uint32_t const              light_index )
 {
+  PIXScopedEvent( command_list, PIX_COLOR_DEFAULT, "Render Directional Shadow %u", light_index );
   ZoneScoped;
 
   DirectX::BoundingFrustum const& camera_frust = camera.GetLastUpdatedFrustum();

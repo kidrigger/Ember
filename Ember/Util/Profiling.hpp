@@ -1,6 +1,6 @@
 #pragma once
 
-#if defined( NDEBUG ) or defined( RELDEBUG )
+#if defined( PROFILE )
 #define TRACY_ENABLE
 #endif
 
@@ -8,3 +8,5 @@
 
 #define WIN32_LEAN_AND_MEAN
 #include <tracy/Tracy.hpp>
+
+#include <pix3.h>

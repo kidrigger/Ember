@@ -1,6 +1,7 @@
 #include "LightManager.hpp"
 
 #include "OmniLightManager.hpp"
+#include "Util/Profiling.hpp"
 
 Ember::LightManager::LightManager(
     std::unique_ptr<Internal::OmniLightManager>      omni_light_manager,
@@ -93,6 +94,7 @@ void Ember::LightManager::RenderAllShadows(
     Camera const&               camera,
     uint32_t const              frame_idx ) const
 {
+  PIXScopedEvent( command_list, PIX_COLOR_DEFAULT, "Render All Shadows" );
   m_OmniLightManager->RenderAllShadows( command_list, draw_list, rtm, camera );
   m_DirLightManager->RenderAllShadows( command_list, draw_list, rtm, camera, frame_idx );
 }

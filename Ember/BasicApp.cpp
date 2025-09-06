@@ -800,7 +800,12 @@ void Ember::BasicApp::Update()
 void Ember::BasicApp::RenderScene(
     ID3D12GraphicsCommandList6* command_list, DrawList::Batches const& draw_list_info_list, uint32_t frame_idx )
 {
+  PIXScopedEvent( command_list, PIX_COLOR_DEFAULT, "Render Scene" );
   ZoneScoped;
+
+  FLOAT constexpr kBlack[4] = {};
+  m_RenderTargetManager->ClearRenderTargetView( command_list, m_RenderTexture, kBlack );
+  m_RenderTargetManager->ClearDepthStencilView( command_list, m_DepthTexture, D3D12_CLEAR_FLAG_DEPTH, 1.0f, 0 );
 
   CBVHandle const camera_cbv                 = m_Camera->GetLastUpdatedBuffer();
   auto const [omni_light_srv, dir_light_srv] = m_LightManager->PrepareFrame( frame_idx );
@@ -879,6 +884,7 @@ void Ember::BasicApp::Render()
     m_RenderQuery.each( [&]( WorldTransform const& wt, Mesh const& mesh, Geometry const&, Material const& material )
                         { m_DrawList.PushDraw( wt, mesh, material ); } );
   }
+
   CD3DX12_RESOURCE_BARRIER top_of_renderpass_barriers[] = {
     CD3DX12_RESOURCE_BARRIER::Transition( backbuffer, D3D12_RESOURCE_STATE_PRESENT, D3D12_RESOURCE_STATE_COPY_DEST ),
   };
@@ -893,18 +899,21 @@ void Ember::BasicApp::Render()
 
   m_LightManager->RenderAllShadows( command_list.Get(), draw_list_info, *m_RenderTargetManager, *m_Camera, frame_idx );
 
-  FLOAT constexpr kBlack[4] = {};
-  m_RenderTargetManager->ClearRenderTargetView( command_list.Get(), m_RenderTexture, kBlack );
-  m_RenderTargetManager->ClearDepthStencilView( command_list.Get(), m_DepthTexture, D3D12_CLEAR_FLAG_DEPTH, 1.0f, 0 );
-
   RenderScene( command_list.Get(), draw_list_info, frame_idx );
 
   if ( not g_Debug.HideSkybox )
   {
+    ZoneScopedN( "Render Skybox" );
+    PIXScopedEvent( command_list.Get(), PIX_COLOR_DEFAULT, "Render Skybox" );
     command_list->SetPipelineState( m_BackgroundPipeline.Get() );
     command_list->DispatchMesh( 1, 1, 1 );
   }
-  ImGui_ImplDX12_RenderDrawData( ImGui::GetDrawData(), command_list.Get() );
+
+  {
+    ZoneScopedN( "ImGUI" );
+    PIXScopedEvent( command_list.Get(), PIX_COLOR_DEFAULT, "ImGUI" );
+    ImGui_ImplDX12_RenderDrawData( ImGui::GetDrawData(), command_list.Get() );
+  }
 
   CD3DX12_RESOURCE_BARRIER post_render_barriers[] = {
     CD3DX12_RESOURCE_BARRIER::Transition(
@@ -913,7 +922,6 @@ void Ember::BasicApp::Render()
   command_list->ResourceBarrier( CountOf( post_render_barriers ), DataOf( post_render_barriers ) );
 
   command_list->CopyResource( backbuffer, m_RenderTexture.GetTexture() );
-
 
   CD3DX12_RESOURCE_BARRIER bottom_of_renderpass_barriers[] = {
     CD3DX12_RESOURCE_BARRIER::Transition( backbuffer, D3D12_RESOURCE_STATE_COPY_DEST, D3D12_RESOURCE_STATE_PRESENT ),
@@ -924,9 +932,15 @@ void Ember::BasicApp::Render()
 
   m_PerfCounter->EndQuery( command_list.Get(), frame_idx );
 
-  m_RenderDevice->ExecuteCommandList( std::move( command_list ) );
+  {
+    ZoneScopedN( "Execute" );
+    m_RenderDevice->ExecuteCommandList( std::move( command_list ) );
+  }
 
-  m_RenderDevice->Present();
+  {
+    ZoneScopedN( "Present" );
+    m_RenderDevice->Present();
+  }
 }
 
 void Ember::BasicApp::UnloadContent()
