@@ -2,6 +2,7 @@
 
 #include "Color.hpp"
 #include "DeviceHandle.hpp"
+#include "Float16.hpp"
 #include "Texture.hpp"
 
 namespace Ember
@@ -26,12 +27,10 @@ public:
     SRVHandle EmissiveTexture;   // 16
     Color32   BaseColorFactor;   // 20
     Color32   EmissiveFactor;    // 24
-    float     EmissiveStrength;  // 28
-    float     Metal;             // 32
-    float     Rough;             // 36
-    float     AlphaCutoff;       // 40
-    uint32_t  Padding0;          // 44
-    uint32_t  Padding1;          // 48
+    Float16   EmissiveStrength;  // 26
+    Float16   Metal;             // 28
+    Float16   Rough;             // 30
+    Float16   AlphaCutoff;       // 32
   };
 
 private:

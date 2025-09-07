@@ -561,12 +561,12 @@ Ember::MaterialImpl* Ember::ModelLoader::TryProcessMaterial(
     0.0f,
   };
 
-  auto const emissive_strength = std::max( material->emissive_strength.emissive_strength, 1.0f ) * max_em;
+  Float16 const emissive_strength = std::max( material->emissive_strength.emissive_strength, 1.0f ) * max_em;
 
-  Texture    base_color_texture;
-  Texture    normal_texture;
-  Texture    metal_rough_texture;
-  Texture    emissive_texture;
+  Texture       base_color_texture;
+  Texture       normal_texture;
+  Texture       metal_rough_texture;
+  Texture       emissive_texture;
 
   if ( material->pbr_metallic_roughness.base_color_texture.texture )
   {
@@ -608,11 +608,11 @@ Ember::MaterialImpl* Ember::ModelLoader::TryProcessMaterial(
     }
   }
 
-  float const metallic     = material->pbr_metallic_roughness.metallic_factor;
-  float const roughness    = material->pbr_metallic_roughness.roughness_factor;
-  float const alpha_cutoff = material->alpha_cutoff;
+  Float16 const metallic     = material->pbr_metallic_roughness.metallic_factor;
+  Float16 const roughness    = material->pbr_metallic_roughness.roughness_factor;
+  Float16 const alpha_cutoff = material->alpha_cutoff;
 
-  AlphaMode   alpha_mode;
+  AlphaMode     alpha_mode;
   switch ( material->alpha_mode )
   {
     case cgltf_alpha_mode_opaque:
@@ -742,11 +742,6 @@ std::optional<flecs::entity> Ember::ModelLoader::TryLoadModel( char const* filen
   {
     ProcessNode( &context, entity, *current_scene->nodes[node_idx] );
   }
-
-  wchar_t wide_filename[128];
-  mbstowcs_s( nullptr, wide_filename, filename, _TRUNCATE );
-
-  wchar_t            buf[256];
 
   GeometryAllocation geom;
   uint32_t           vertex_position_offset;

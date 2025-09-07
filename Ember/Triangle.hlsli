@@ -16,12 +16,10 @@ struct Material
   ResID         EmissiveTextureIndex;   // 16
   PackedColor32 BaseColorFactor;        // 20
   PackedColor32 EmissiveFactor;         // 24
-  float         EmissiveStrength;       // 28
-  float         Metal;                  // 32
-  float         Rough;                  // 36
-  float         AlphaCutoff;            // 40
-  float         Pad0;                   // 44
-  float         Pad1;                   // 48
+  half          EmissiveStrength;       // 26
+  half          Metal;                  // 28
+  half          Rough;                  // 30
+  half          AlphaCutoff;            // 32
 
   float4        GetAlbedo( float2 in_texcoord, SamplerState texture_sampler )
   {
@@ -33,7 +31,6 @@ struct Material
     }
     return albedo;
   }
-
 
   float3 GetNormal(
       float3 in_normal, float4 in_tangent, float3 in_position, float2 in_texcoord, SamplerState texture_sampler )
