@@ -743,6 +743,9 @@ void Ember::BasicApp::Update()
       {
         m_Camera->SetPosition( gi_cam_pos[0], gi_cam_pos[1], gi_cam_pos[2] );
       }
+
+      ImGui::Text( "Mouse Position: %u %u", g_Input.MousePosX, g_Input.MousePosY );
+
       ImGui::End();
     }
   }
@@ -955,7 +958,7 @@ void Ember::BasicApp::UnloadContent()
 void Ember::BasicApp::Resize()
 {
   RECT rect;
-  ::GetWindowRect( m_WindowHandle, &rect );
+  ::GetClientRect( m_WindowHandle, &rect );
 
   m_WindowWidth  = rect.right - rect.left;
   m_WindowHeight = rect.bottom - rect.top;

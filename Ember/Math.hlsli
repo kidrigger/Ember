@@ -14,12 +14,13 @@ float PlaneSignedDistance( float4 plane, float3 position )
 
 float4 TransformBoundingSphere( in float4x4 transformation, float4 sphere )
 {
-  float3 center = mul( transformation, float4( sphere.xyz, 1.0f ) ).xyz;
+  float3   center = mul( transformation, float4( sphere.xyz, 1.0f ) ).xyz;
 
-  float  sx     = transformation[0][0];
-  float  sy     = transformation[1][1];
-  float  sz     = transformation[2][2];
-  float  scale  = sqrt( max( sx * sx, max( sy * sy, sz * sz ) ) );
+  float4x4 ttx    = transpose( transformation );
+  float    sx     = dot( ttx[0], ttx[0] );
+  float    sy     = dot( ttx[1], ttx[1] );
+  float    sz     = dot( ttx[2], ttx[2] );
+  float    scale  = sqrt( max( sx, max( sy, sz ) ) );
 
   return float4( center, scale * sphere.w );
 }
