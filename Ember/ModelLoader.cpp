@@ -190,7 +190,7 @@ flecs::entity Ember::ModelLoader::ProcessNode( LoadingContext* context, flecs::e
   }
 
   auto const my_node = m_World->GetECS().entity().child_of( parent ).insert(
-      [&]( LocalTransform& lt, WorldTransform&, WorldBoundingBox&, CullInfo& )
+      [&]( LocalTransform& lt, WorldTransform&, WorldBoundingBox& )
       {
         lt.Translation = translation;
         lt.Rotation    = rotation;
@@ -521,7 +521,6 @@ void Ember::ModelLoader::ProcessPrimitive(
       .insert(
           [&]( WorldTransform&,
                LocalTransform&,
-               CullInfo&,
                WorldBoundingBox&,
                Mesh&             prim,
                Material&         mat,
@@ -734,8 +733,7 @@ std::optional<flecs::entity> Ember::ModelLoader::TryLoadModel( char const* filen
     return {};
   }
 
-  auto entity =
-      m_World->GetECS().entity().insert( [&]( LocalTransform&, WorldTransform&, WorldBoundingBox&, CullInfo& ) {} );
+  auto entity = m_World->GetECS().entity().insert( [&]( LocalTransform&, WorldTransform&, WorldBoundingBox& ) {} );
 
   LoadingContext     context       = { .Geometry = World::GeometryManager().Construct() };
 
@@ -850,45 +848,7 @@ std::optional<flecs::entity> Ember::ModelLoader::TryLoadModel( char const* filen
     ent.children( [&]( flecs::entity child ) { bfs_subtree.push( child ); } );
   }
 
-  auto const vertex_position_buffer =
-      m_RenderDevice->CreateStorageBuffer( ByteSizeOf( context.VertexPositions ), StrideOf( context.VertexPositions ) );
-  swprintf_s( buf, L"Vertex Pos %s", wide_filename );
-  vertex_position_buffer.SetName( buf );
-  vertex_position_buffer.Write( 0, ByteSizeOf( context.VertexPositions ), DataOf( context.VertexPositions ) );
-
-  auto const vertex_data_buffer =
-      m_RenderDevice->CreateStorageBuffer( ByteSizeOf( context.VertexData ), StrideOf( context.VertexData ) );
-  swprintf_s( buf, L"Vertex Data %s", wide_filename );
-  vertex_data_buffer.SetName( buf );
-  vertex_data_buffer.Write( 0, ByteSizeOf( context.VertexData ), DataOf( context.VertexData ) );
-
-  auto const meshlet_buffer = m_RenderDevice->CreateRawStorageBuffer( ByteSizeOf( context.Meshlets ) );
-  swprintf_s( buf, L"Meshlet Data %s", wide_filename );
-  meshlet_buffer.SetName( buf );
-  meshlet_buffer.Write( 0, ByteSizeOf( context.Meshlets ), DataOf( context.Meshlets ) );
-
-  auto const meshlet_triangle_buffer = m_RenderDevice->CreateRawStorageBuffer( ByteSizeOf( context.MeshletTriangles ) );
-  swprintf_s( buf, L"Meshlet Triangle %s", wide_filename );
-  meshlet_triangle_buffer.SetName( buf );
-  meshlet_triangle_buffer.Write( 0, ByteSizeOf( context.MeshletTriangles ), DataOf( context.MeshletTriangles ) );
-
-  auto const meshlet_vertices_buffer = m_RenderDevice->CreateRawStorageBuffer( ByteSizeOf( context.MeshletVertices ) );
-  swprintf_s( buf, L"Meshlet Vertices %s", wide_filename );
-  meshlet_vertices_buffer.SetName( buf );
-  meshlet_vertices_buffer.Write( 0, ByteSizeOf( context.MeshletVertices ), DataOf( context.MeshletVertices ) );
-
-  auto const index_buffer = m_RenderDevice->CreateIndexBuffer( ByteSizeOf( context.Indices ), DXGI_FORMAT_R32_UINT );
-  swprintf_s( buf, L"Index %s", wide_filename );
-  index_buffer.SetName( buf );
-  index_buffer.Write( 0, ByteSizeOf( context.Indices ), DataOf( context.Indices ) );
-
-  context.Geometry->GeometryAlloc         = std::move( geom );
-  context.Geometry->ShadowVertexBuffer    = std::move( vertex_position_buffer );
-  context.Geometry->VertexBuffer          = std::move( vertex_data_buffer );
-  context.Geometry->IndexBuffer           = std::move( index_buffer );
-  context.Geometry->MeshletBuffer         = std::move( meshlet_buffer );
-  context.Geometry->MeshletTriangleBuffer = std::move( meshlet_triangle_buffer );
-  context.Geometry->MeshletIndexBuffer    = std::move( meshlet_vertices_buffer );
+  context.Geometry->GeometryAlloc = std::move( geom );
 
   cgltf_free( gltf_model );
   World::GeometryManager().Destroy( context.Geometry );

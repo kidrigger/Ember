@@ -47,25 +47,9 @@ struct WorldBoundingBox
   bool IsInit() const;
 };
 
-struct CullInfo
-{
-  uint64_t           CullMask{ 0 };
-
-  [[nodiscard]] bool AreAnyCulled( uint64_t mask ) const;
-  [[nodiscard]] bool AreAllCulled( uint64_t mask ) const;
-  void               SetCulled( uint64_t mask );
-  void               ClearCulled( uint64_t mask );
-};
-
 struct GeometryImpl
 {
   GeometryAllocation   GeometryAlloc;
-  Buffer               ShadowVertexBuffer;
-  Buffer               VertexBuffer;
-  Buffer               IndexBuffer;
-  Buffer               MeshletBuffer;
-  Buffer               MeshletIndexBuffer;
-  Buffer               MeshletTriangleBuffer;
   std::atomic_uint32_t RefCount{ 1 };
 
   uint32_t             AddRef();
@@ -179,8 +163,6 @@ class World
   flecs::query<WorldBoundingBox, LocalBoundingBox const, WorldTransform const> m_PrimeActualWorldAABBQuery;
   flecs::query<WorldBoundingBox>                                               m_PrimeCollectingWorldAABBQuery;
   flecs::query<WorldBoundingBox, WorldBoundingBox const>                       m_UpdateWorldAABBQuery;
-  flecs::query<CullInfo, WorldBoundingBox const, CullInfo const>               m_CullDescentQuery;
-  flecs::query<WorldTransform const, CullInfo const, Mesh const, Material const, Geometry const> m_RenderQuery;
 
 public:
   static ObjectPool<GeometryImpl>& GeometryManager();
@@ -189,10 +171,6 @@ public:
   World();
 
   void Update( float delta_seconds ) const;
-  void ClearCull( uint64_t cull_mask = UINT64_MAX ) const;
-  void CullFrustum( DirectX::BoundingFrustum const& frustum ) const;
-  void CullSphere( DirectX::BoundingSphere const& sphere ) const;
-  void CullBox( DirectX::BoundingOrientedBox const& bob, uint64_t cull_mask ) const;
 
   //
   flecs::world const& GetECS() const;

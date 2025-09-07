@@ -582,7 +582,7 @@ void Ember::BasicApp::LoadContent()
       m_World.GetECS()
           .entity( "HelmetRotator" )
           .insert(
-              []( LocalTransform& local_tx, WorldTransform&, RotatingModel& rot_model, WorldBoundingBox&, CullInfo& )
+              []( LocalTransform& local_tx, WorldTransform&, RotatingModel& rot_model, WorldBoundingBox& )
               {
                 rot_model.Speed      = 20.0f;
                 local_tx.Translation = DirectX::XMVectorSet( 0.0f, 1.0f, 5.0f, 1.0f );
