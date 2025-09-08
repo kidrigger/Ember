@@ -935,15 +935,8 @@ void Ember::BasicApp::Render()
 
   m_PerfCounter->EndQuery( command_list.Get(), frame_idx );
 
-  {
-    ZoneScopedN( "Execute" );
-    m_RenderDevice->ExecuteCommandList( std::move( command_list ) );
-  }
-
-  {
-    ZoneScopedN( "Present" );
-    m_RenderDevice->Present();
-  }
+  m_RenderDevice->ExecuteCommandList( std::move( command_list ) );
+  m_RenderDevice->Present();
 }
 
 void Ember::BasicApp::UnloadContent()

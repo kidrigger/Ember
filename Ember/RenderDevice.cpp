@@ -7,6 +7,7 @@
 #include "Util/DataUtil.hpp"
 #include "Util/DirectXHeaders.hpp"
 #include "Util/HelperUtils.hpp"
+#include "Util/Profiling.hpp"
 #include "Util/Runtime.hpp"
 
 #pragma comment( lib, "d3d12.lib" )
@@ -476,11 +477,13 @@ CD3DX12_CPU_DESCRIPTOR_HANDLE Ember::RenderDevice::GetCurrentDSVCpuDescriptorHan
 
 void Ember::RenderDevice::ExecuteCommandList( Context::CommandList&& command_list )
 {
+  ZoneScoped;
   m_DirectContext.Submit( std::move( command_list ) );
 }
 
 void Ember::RenderDevice::Present()
 {
+  ZoneScoped;
   bool const is_vsync_enabled = IsVsyncEnabled();
   bool const allow_tearing    = IsTearingSupported() and not is_vsync_enabled;
   UINT const sync_interval    = is_vsync_enabled ? 1 : 0;
@@ -490,10 +493,13 @@ void Ember::RenderDevice::Present()
 
   m_FrameReceipts[m_CurrentBackbufferIndex] = m_DirectContext.Signal();
 
-  // At the end of the queue, we wait for the next frame.
-  m_CurrentBackbufferIndex = m_Swapchain->GetCurrentBackBufferIndex();
+  {
+    ZoneScopedN( "Wait For Next Frame" );
+    // At the end of the queue, we wait for the next frame.
+    m_CurrentBackbufferIndex = m_Swapchain->GetCurrentBackBufferIndex();
 
-  m_DirectContext.WaitOn( m_FrameReceipts[m_CurrentBackbufferIndex] );
+    m_DirectContext.WaitOn( m_FrameReceipts[m_CurrentBackbufferIndex] );
+  }
 }
 
 bool Ember::RenderDevice::IsVsyncEnabled() const
