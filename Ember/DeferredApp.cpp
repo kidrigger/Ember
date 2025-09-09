@@ -1,4 +1,4 @@
-#include "BasicApp.hpp"
+#include "DeferredApp.hpp"
 
 #include <cstdint>
 #include <unordered_set>
@@ -73,7 +73,7 @@ struct PerMeshConstants
   uint32_t              FirstIndex;
 };
 
-Ember::BasicApp::BasicApp(
+Ember::DeferredApp::DeferredApp(
     HWND                                 window_handle,
     std::unique_ptr<RenderDevice>        render_device,
     std::unique_ptr<PerfCounter>         perf_counter,
@@ -144,7 +144,7 @@ Ember::BasicApp::BasicApp(
   ImGui_ImplDX12_Init( &init_info );
 }
 
-void Ember::BasicApp::Create( BasicApp* app, HINSTANCE const instance_handle )
+void Ember::DeferredApp::Create( DeferredApp* app, HINSTANCE const instance_handle )
 {
   // Windows 10 Creators update adds Per Monitor V2 DPI awareness context.
   // Using this awareness context allows the client area of the window
@@ -174,7 +174,7 @@ void Ember::BasicApp::Create( BasicApp* app, HINSTANCE const instance_handle )
   auto render_target_manager = std::make_unique_for_overwrite<RenderTargetManager>();
   RenderTargetManager::Create( render_target_manager.get(), render_device.get() );
 
-  new ( app ) BasicApp{
+  new ( app ) DeferredApp{
     window_handle,
     std::move( render_device ),
     std::move( perf_counter ),
@@ -182,21 +182,27 @@ void Ember::BasicApp::Create( BasicApp* app, HINSTANCE const instance_handle )
   };
 }
 
-Ember::BasicApp::~BasicApp() // NOLINT(modernize-use-equals-default)
+Ember::DeferredApp::~DeferredApp() // NOLINT(modernize-use-equals-default)
 {
   m_RenderDevice->WaitIdle();
 }
 
-void Ember::BasicApp::SetupRenderPipeline()
+void Ember::DeferredApp::SetupRenderPipeline()
 {
   ComPtr<ID3DBlob> amp_shader_blob;
   ERR_ABORT( D3DReadFileToBlob( L"TriangleAS.cso", &amp_shader_blob ) );
   ComPtr<ID3DBlob> mesh_shader_blob;
   ERR_ABORT( D3DReadFileToBlob( L"TriangleMS.cso", &mesh_shader_blob ) );
-  ComPtr<ID3DBlob> pixel_shader_blob;
-  ERR_ABORT( D3DReadFileToBlob( L"TrianglePS.cso", &pixel_shader_blob ) );
-  ComPtr<ID3DBlob> alpha_tested_pixel_shader_blob;
-  ERR_ABORT( D3DReadFileToBlob( L"TriangleAlphaTestPS.cso", &alpha_tested_pixel_shader_blob ) );
+  ComPtr<ID3DBlob> gbuffer_shader_blob;
+  ERR_ABORT( D3DReadFileToBlob( L"TriangleGBufferPS.cso", &gbuffer_shader_blob ) );
+  ComPtr<ID3DBlob> gbuffer_alpha_tested_shader_blob;
+  ERR_ABORT( D3DReadFileToBlob( L"TriangleAlphaTestGBufferPS.cso", &gbuffer_alpha_tested_shader_blob ) );
+
+  ComPtr<ID3DBlob> merge_mesh_shader_blob;
+  ERR_ABORT( D3DReadFileToBlob( L"GBufferLightingMS.cso", &merge_mesh_shader_blob ) );
+  ComPtr<ID3DBlob> merge_pixel_shader_blob;
+  ERR_ABORT( D3DReadFileToBlob( L"GBufferLightingPS.cso", &merge_pixel_shader_blob ) );
+
   ComPtr<ID3DBlob> alpha_blended_pixel_shader_blob;
   ERR_ABORT( D3DReadFileToBlob( L"TriangleAlphaBlendPS.cso", &alpha_blended_pixel_shader_blob ) );
 
@@ -252,10 +258,31 @@ void Ember::BasicApp::SetupRenderPipeline()
       root_signature_blob->GetBufferSize(),
       IID_PPV_ARGS( &m_RootSignature ) ) );
 
-  D3D12_RT_FORMAT_ARRAY rtv_formats{
-    .RTFormats        = { DXGI_FORMAT_R8G8B8A8_UNORM },
-    .NumRenderTargets = 1,
-  };
+  CD3DX12_ROOT_PARAMETER1 merge_root_parameters[3];
+  merge_root_parameters[0].InitAsConstants( 7, 0 );
+  merge_root_parameters[1].InitAsConstants( sizeof( PerFrameConstants ) / 4, 1 );
+  merge_root_parameters[2].InitAsConstants( sizeof( Environment::GpuRepr ) / 4, 2 );
+
+  CD3DX12_VERSIONED_ROOT_SIGNATURE_DESC merge_root_signature_desc;
+  merge_root_signature_desc.Init_1_1(
+      CountOf( merge_root_parameters ),
+      DataOf( merge_root_parameters ),
+      CountOf( static_sampler_desc ),
+      DataOf( static_sampler_desc ),
+      root_signature_flags );
+
+  ERR_ABORT( D3DX12SerializeVersionedRootSignature(
+      &merge_root_signature_desc, root_signature_version, &root_signature_blob, &error_blob ) );
+
+  ERR_ABORT( device->CreateRootSignature(
+      0,
+      root_signature_blob->GetBufferPointer(),
+      root_signature_blob->GetBufferSize(),
+      IID_PPV_ARGS( &m_MergeRootSignature ) ) );
+
+  D3D12_RT_FORMAT_ARRAY gbuffer_rt_formats{};
+  gbuffer_rt_formats.NumRenderTargets = CountOf( kGBufferFormats );
+  memcpy( gbuffer_rt_formats.RTFormats, DataOf( kGBufferFormats ), ByteSizeOf( kGBufferFormats ) );
 
   CD3DX12_RASTERIZER_DESC2 rasterizer_desc{ D3D12_DEFAULT };
   rasterizer_desc.FrontCounterClockwise = TRUE;
@@ -281,10 +308,10 @@ void Ember::BasicApp::SetupRenderPipeline()
     .PrimitiveTopologyType = D3D12_PRIMITIVE_TOPOLOGY_TYPE_TRIANGLE,
     .AS                    = CD3DX12_SHADER_BYTECODE( amp_shader_blob.Get() ),
     .MS                    = CD3DX12_SHADER_BYTECODE( mesh_shader_blob.Get() ),
-    .PS                    = CD3DX12_SHADER_BYTECODE( pixel_shader_blob.Get() ),
+    .PS                    = CD3DX12_SHADER_BYTECODE( gbuffer_shader_blob.Get() ),
     .Blending              = CD3DX12_BLEND_DESC{ D3D12_DEFAULT },
     .Rasterizer            = rasterizer_desc,
-    .RTVFormats            = rtv_formats,
+    .RTVFormats            = gbuffer_rt_formats,
     .DSVFormat             = DXGI_FORMAT_D32_FLOAT,
   };
 
@@ -293,10 +320,40 @@ void Ember::BasicApp::SetupRenderPipeline()
     .pPipelineStateSubobjectStream = &pipeline_stream,
   };
 
-  ERR_ABORT( device->CreatePipelineState( &pipeline_state_stream_desc, IID_PPV_ARGS( &m_OpaquePBRPipeline ) ) );
+  ERR_ABORT( device->CreatePipelineState( &pipeline_state_stream_desc, IID_PPV_ARGS( &m_GBufferPipeline ) ) );
 
-  pipeline_stream.PS = CD3DX12_SHADER_BYTECODE( alpha_tested_pixel_shader_blob.Get() );
-  ERR_ABORT( device->CreatePipelineState( &pipeline_state_stream_desc, IID_PPV_ARGS( &m_AlphaTestedPBRPipeline ) ) );
+  pipeline_stream.PS = CD3DX12_SHADER_BYTECODE( gbuffer_alpha_tested_shader_blob.Get() );
+  ERR_ABORT(
+      device->CreatePipelineState( &pipeline_state_stream_desc, IID_PPV_ARGS( &m_AlphaTestedGBufferPipeline ) ) );
+
+  struct MergePipelineStream
+  {
+    CD3DX12_PIPELINE_STATE_STREAM_ROOT_SIGNATURE        RootSignature;
+    CD3DX12_PIPELINE_STATE_STREAM_PRIMITIVE_TOPOLOGY    PrimitiveTopologyType;
+    CD3DX12_PIPELINE_STATE_STREAM_MS                    MS;
+    CD3DX12_PIPELINE_STATE_STREAM_PS                    PS;
+    CD3DX12_PIPELINE_STATE_STREAM_RENDER_TARGET_FORMATS RTVFormats;
+  };
+
+  D3D12_RT_FORMAT_ARRAY final_rt_formats{
+    .RTFormats        = { DXGI_FORMAT_R8G8B8A8_UNORM },
+    .NumRenderTargets = 1,
+  };
+
+  MergePipelineStream merge_pipeline_stream = {
+    .RootSignature         = m_MergeRootSignature.Get(),
+    .PrimitiveTopologyType = D3D12_PRIMITIVE_TOPOLOGY_TYPE_TRIANGLE,
+    .MS                    = CD3DX12_SHADER_BYTECODE( merge_mesh_shader_blob.Get() ),
+    .PS                    = CD3DX12_SHADER_BYTECODE( merge_pixel_shader_blob.Get() ),
+    .RTVFormats            = final_rt_formats,
+  };
+
+  D3D12_PIPELINE_STATE_STREAM_DESC const merge_pipeline_state_stream_desc = {
+    .SizeInBytes                   = sizeof merge_pipeline_stream,
+    .pPipelineStateSubobjectStream = &merge_pipeline_stream,
+  };
+
+  ERR_ABORT( device->CreatePipelineState( &merge_pipeline_state_stream_desc, IID_PPV_ARGS( &m_MergePipeline ) ) );
 
   CD3DX12_BLEND_DESC blend_desc{ D3D12_DEFAULT };
   blend_desc.RenderTarget[0] = {
@@ -324,7 +381,10 @@ void Ember::BasicApp::SetupRenderPipeline()
       CountOf( bg_root_parameters ), DataOf( bg_root_parameters ), 1, &static_sampler_desc[0], root_signature_flags );
 
   ERR_ABORT( D3DX12SerializeVersionedRootSignature(
-      &bg_root_signature_desc, root_signature_version, root_signature_blob.ReleaseAndGetAddressOf(), &error_blob ) );
+      &bg_root_signature_desc,
+      root_signature_version,
+      root_signature_blob.ReleaseAndGetAddressOf(),
+      error_blob.ReleaseAndGetAddressOf() ) );
 
   ERR_ABORT( device->CreateRootSignature(
       0,
@@ -352,7 +412,7 @@ void Ember::BasicApp::SetupRenderPipeline()
     .PS                    = CD3DX12_SHADER_BYTECODE( bg_pixel_shader_blob.Get() ),
     .Rasterizer            = rasterizer_desc,
     .DepthStencil          = depth_stencil_desc,
-    .RTVFormats            = rtv_formats,
+    .RTVFormats            = final_rt_formats,
     .DSVFormat             = DXGI_FORMAT_D32_FLOAT,
   };
 
@@ -363,7 +423,7 @@ void Ember::BasicApp::SetupRenderPipeline()
   ERR_ABORT( device->CreatePipelineState( &bg_pipeline_state_stream_desc, IID_PPV_ARGS( &m_BackgroundPipeline ) ) );
 }
 
-void Ember::BasicApp::LoadContent()
+void Ember::DeferredApp::LoadContent()
 {
   ERR_ABORT( ::ShowWindow( m_WindowHandle, SW_SHOW ) );
 
@@ -421,6 +481,18 @@ void Ember::BasicApp::LoadContent()
 
   SetupRenderPipeline();
 
+  for ( int i = 0; i < kGBufferCount; i++ )
+  {
+    m_GBuffer[i] = m_RenderDevice->CreateTexture2D( {
+        .Format    = kGBufferFormats[i],
+        .Width     = m_WindowWidth,
+        .Height    = m_WindowHeight,
+        .Usage     = TextureUsage::kRenderTarget,
+        .MipLevels = MipLevels::kBase,
+        .InitState = D3D12_RESOURCE_STATE_PIXEL_SHADER_RESOURCE,
+    } );
+  }
+
   m_RenderTexture = m_RenderDevice->CreateTexture2D( {
       .Format    = m_SwapchainFormat,
       .Width     = m_WindowWidth,
@@ -441,7 +513,7 @@ void Ember::BasicApp::LoadContent()
   m_RenderQuery   = m_World.GetECS().query<WorldTransform const, Mesh const, Geometry const, Material const>();
 }
 
-void Ember::BasicApp::Update()
+void Ember::DeferredApp::Update()
 {
   ZoneScoped;
 
@@ -559,7 +631,8 @@ void Ember::BasicApp::Update()
         m_Camera->SetPosition( gi_cam_pos[0], gi_cam_pos[1], gi_cam_pos[2] );
       }
 
-      ImGui::Text( "Mouse Position: %u %u", m_PrevMouse.x, m_PrevMouse.y );
+      DirectX::XMUINT2 mouse_position = Input::Instance().GetMousePosition();
+      ImGui::Text( "Mouse Position: %u %u", mouse_position.x, mouse_position.y );
 
       ImGui::End();
     }
@@ -615,13 +688,14 @@ void Ember::BasicApp::Update()
   Input::Instance().Update();
 }
 
-void Ember::BasicApp::RenderScene(
+void Ember::DeferredApp::RenderScene(
     ID3D12GraphicsCommandList6* command_list, DrawList::Batches const& draw_list_info_list, uint32_t frame_idx )
 {
   PIXScopedEvent( command_list, PIX_COLOR_DEFAULT, "Render Scene" );
   ZoneScoped;
 
   FLOAT constexpr kBlack[4] = {};
+  m_RenderTargetManager->ClearRenderTargetViews( command_list, CountOf( m_GBuffer ), DataOf( m_GBuffer ), kBlack );
   m_RenderTargetManager->ClearRenderTargetView( command_list, m_RenderTexture, kBlack );
   m_RenderTargetManager->ClearDepthStencilView( command_list, m_DepthTexture, D3D12_CLEAR_FLAG_DEPTH, 1.0f, 0 );
 
@@ -651,7 +725,7 @@ void Ember::BasicApp::RenderScene(
   command_list->SetDescriptorHeaps( CountOf( bindless_desc_heaps ), DataOf( bindless_desc_heaps ) );
   command_list->RSSetViewports( 1, &viewport );
   command_list->RSSetScissorRects( 1, &scissor );
-  m_RenderTargetManager->OMSetRenderTargets( command_list, 1, &m_RenderTexture, &m_DepthTexture );
+  m_RenderTargetManager->OMSetRenderTargets( command_list, CountOf( m_GBuffer ), DataOf( m_GBuffer ), &m_DepthTexture );
 
   PerFrameConstants const constants = {
     .MaterialsBuffer      = materials_srv,
@@ -668,21 +742,63 @@ void Ember::BasicApp::RenderScene(
   command_list->SetGraphicsRoot32BitConstants( 1, sizeof( PerFrameConstants ) / 4, &constants, 0 );
   command_list->SetGraphicsRoot32BitConstants( 2, sizeof( Environment::GpuRepr ) / 4, &m_Environment->Repr(), 0 );
 
-  command_list->SetPipelineState( m_OpaquePBRPipeline.Get() );
+  command_list->SetPipelineState( m_GBufferPipeline.Get() );
   command_list->SetGraphicsRoot32BitConstants( 0, sizeof( DrawList::Info ) / 4, &draw_list_info_list.Opaque, 0 );
   command_list->DispatchMesh( draw_list_info_list.Opaque.DrawCount, 1, 1 );
 
-  command_list->SetPipelineState( m_AlphaTestedPBRPipeline.Get() );
+  command_list->SetPipelineState( m_AlphaTestedGBufferPipeline.Get() );
   command_list->SetGraphicsRoot32BitConstants( 0, sizeof( DrawList::Info ) / 4, &draw_list_info_list.AlphaTested, 0 );
   command_list->DispatchMesh( draw_list_info_list.AlphaTested.DrawCount, 1, 1 );
 
+  m_RenderTargetManager->OMSetRenderTargets( command_list, 1, &m_RenderTexture, nullptr );
+
+  CD3DX12_RESOURCE_BARRIER gbuffer_barrier[kGBufferCount];
+  for ( int i = 0; i < kGBufferCount; i++ )
+  {
+    gbuffer_barrier[i] = CD3DX12_RESOURCE_BARRIER::Transition(
+        m_GBuffer[i].GetTexture(), D3D12_RESOURCE_STATE_RENDER_TARGET, D3D12_RESOURCE_STATE_PIXEL_SHADER_RESOURCE );
+  }
+  command_list->ResourceBarrier( CountOf( gbuffer_barrier ), DataOf( gbuffer_barrier ) );
+
+  command_list->SetGraphicsRootSignature( m_MergeRootSignature.Get() );
+  command_list->SetPipelineState( m_MergePipeline.Get() );
+
+  SRVHandle gbuffer_handles[kGBufferCount];
+
+  for ( int i = 0; i < kGBufferCount; i++ )
+  {
+    gbuffer_handles[i] = m_GBuffer[i].GetSRVHandle();
+  }
+
+  command_list->SetGraphicsRoot32BitConstants( 0, CountOf( gbuffer_handles ), DataOf( gbuffer_handles ), 0 );
+  command_list->SetGraphicsRoot32BitConstants( 1, sizeof( PerFrameConstants ) / 4, &constants, 0 );
+  command_list->SetGraphicsRoot32BitConstants( 2, sizeof( Environment::GpuRepr ) / 4, &m_Environment->Repr(), 0 );
+  command_list->DispatchMesh( 1, 1, 1 );
+
+  if ( not g_Debug.HideSkybox )
+  {
+    ZoneScopedN( "Render Skybox" );
+    PIXScopedEvent( command_list, PIX_COLOR_DEFAULT, "Render Skybox" );
+    m_RenderTargetManager->OMSetRenderTargets( command_list, 1, &m_RenderTexture, &m_DepthTexture );
+
+    command_list->SetGraphicsRootSignature( m_BackgroundRootSignature.Get() );
+    command_list->SetGraphicsRoot32BitConstant( 0, ( UINT )m_Camera->GetLastUpdatedBuffer(), 0 );
+    command_list->SetGraphicsRoot32BitConstant( 0, ( UINT )m_Environment->Repr().Skybox, 1 );
+    command_list->SetPipelineState( m_BackgroundPipeline.Get() );
+    command_list->DispatchMesh( 1, 1, 1 );
+  }
+
   // TODO: Sort transparent objects back to front
+
+  command_list->SetGraphicsRootSignature( m_RootSignature.Get() );
   command_list->SetPipelineState( m_AlphaBlendedPBRPipeline.Get() );
   command_list->SetGraphicsRoot32BitConstants( 0, sizeof( DrawList::Info ) / 4, &draw_list_info_list.AlphaBlended, 0 );
+  command_list->SetGraphicsRoot32BitConstants( 1, sizeof( PerFrameConstants ) / 4, &constants, 0 );
+  command_list->SetGraphicsRoot32BitConstants( 2, sizeof( Environment::GpuRepr ) / 4, &m_Environment->Repr(), 0 );
   command_list->DispatchMesh( draw_list_info_list.AlphaBlended.DrawCount, 1, 1 );
 }
 
-void Ember::BasicApp::Render()
+void Ember::DeferredApp::Render()
 {
   ZoneScoped;
 
@@ -693,7 +809,7 @@ void Ember::BasicApp::Render()
   // All resources for this frame are guaranteed to be available for CPU modification at this time.
   // Clear Backbuffer
 
-  m_Camera->PrepareFrame( frame_idx );
+  CBVHandle const camera_handle = m_Camera->PrepareFrame( frame_idx );
 
   m_DrawList.Clear();
 
@@ -703,9 +819,14 @@ void Ember::BasicApp::Render()
                         { m_DrawList.PushDraw( wt, mesh, material ); } );
   }
 
-  CD3DX12_RESOURCE_BARRIER top_of_renderpass_barriers[] = {
-    CD3DX12_RESOURCE_BARRIER::Transition( backbuffer, D3D12_RESOURCE_STATE_PRESENT, D3D12_RESOURCE_STATE_COPY_DEST ),
-  };
+  CD3DX12_RESOURCE_BARRIER top_of_renderpass_barriers[kGBufferCount + 1];
+  for ( int i = 0; i < kGBufferCount; i++ )
+  {
+    top_of_renderpass_barriers[i] = CD3DX12_RESOURCE_BARRIER::Transition(
+        m_GBuffer[i].GetTexture(), D3D12_RESOURCE_STATE_PIXEL_SHADER_RESOURCE, D3D12_RESOURCE_STATE_RENDER_TARGET );
+  }
+  top_of_renderpass_barriers[kGBufferCount] =
+      CD3DX12_RESOURCE_BARRIER::Transition( backbuffer, D3D12_RESOURCE_STATE_PRESENT, D3D12_RESOURCE_STATE_COPY_DEST );
 
   DrawList::Batches const draw_list_info = m_DrawList.PrepareFrame( frame_idx );
 
@@ -718,17 +839,6 @@ void Ember::BasicApp::Render()
   m_LightManager->RenderAllShadows( command_list.Get(), draw_list_info, *m_RenderTargetManager, *m_Camera, frame_idx );
 
   RenderScene( command_list.Get(), draw_list_info, frame_idx );
-
-  if ( not g_Debug.HideSkybox )
-  {
-    ZoneScopedN( "Render Skybox" );
-    PIXScopedEvent( command_list.Get(), PIX_COLOR_DEFAULT, "Render Skybox" );
-    command_list->SetGraphicsRootSignature( m_BackgroundRootSignature.Get() );
-    command_list->SetPipelineState( m_BackgroundPipeline.Get() );
-    command_list->SetGraphicsRoot32BitConstant( 0, ( UINT )m_Camera->GetLastUpdatedBuffer(), 0 );
-    command_list->SetGraphicsRoot32BitConstant( 0, ( UINT )m_Environment->Repr().Skybox, 1 );
-    command_list->DispatchMesh( 1, 1, 1 );
-  }
 
   {
     ZoneScopedN( "ImGUI" );
@@ -757,7 +867,7 @@ void Ember::BasicApp::Render()
   m_RenderDevice->Present();
 }
 
-void Ember::BasicApp::UnloadContent()
+void Ember::DeferredApp::UnloadContent()
 {
   m_RenderDevice->WaitIdle();
 
@@ -766,7 +876,7 @@ void Ember::BasicApp::UnloadContent()
   ImGui::DestroyContext();
 }
 
-void Ember::BasicApp::Resize()
+void Ember::DeferredApp::Resize()
 {
   RECT rect;
   ::GetClientRect( m_WindowHandle, &rect );
@@ -792,6 +902,6 @@ void Ember::BasicApp::Resize()
 
   m_Camera->SetAspectRatio( ( float )m_WindowWidth / ( float )m_WindowHeight );
 
-  swprintf_s( m_SprintfBuffer, L"Ember %ux%u", m_WindowWidth, m_WindowHeight );
+  swprintf_s( m_SprintfBuffer, L"Ember (Deferred) %ux%u", m_WindowWidth, m_WindowHeight );
   SetWindowText( m_WindowHandle, m_SprintfBuffer );
 }

@@ -1,5 +1,12 @@
-#include "Triangle.hlsli"
+#include "Bindless.hlsli"
+#include "Camera.hlsli"
 #include "Utility.hlsli"
+
+cbuffer BackgroundCB : register( b0 )
+{
+  ResID g_Camera;
+  ResID g_Skybox;
+}
 
 struct BackgroundOut
 {

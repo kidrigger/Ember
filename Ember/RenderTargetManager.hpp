@@ -29,6 +29,13 @@ public:
 
   void ClearRenderTargetView(
       ID3D12GraphicsCommandList* command_list, Texture const& render_target, float const color[] ) const;
+
+  void ClearRenderTargetViews(
+      ID3D12GraphicsCommandList* command_list,
+      uint32_t                   count,
+      Texture const*             render_target,
+      float const                color[] ) const;
+
   void ClearDepthStencilView(
       ID3D12GraphicsCommandList* command_list,
       Texture const&             depth_stencil,
@@ -38,13 +45,13 @@ public:
 
   void OMSetRenderTargets(
       ID3D12GraphicsCommandList* command_list,
-      uint8_t                    count,
+      uint32_t                   count,
       Texture const*             render_targets,
       Texture const*             depth_stencil ) const;
 
   void OMSetRenderTargets(
       ID3D12GraphicsCommandList*           command_list,
-      uint8_t                              count,
+      uint32_t                             count,
       Texture const*                       render_targets,
       D3D12_RENDER_TARGET_VIEW_DESC const* rtv_desc,
       Texture const*                       depth_stencil,

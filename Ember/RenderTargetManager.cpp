@@ -54,6 +54,25 @@ void Ember::RenderTargetManager::ClearRenderTargetView(
   command_list->ClearRenderTargetView( rtv_handle, color, 0, nullptr );
 }
 
+void Ember::RenderTargetManager::ClearRenderTargetViews(
+    ID3D12GraphicsCommandList* command_list,
+    uint32_t const             count,
+    Texture const*             render_targets,
+    float const                color[] ) const
+{
+  auto const rtv_start  = m_RTVDescriptorHeap->GetCPUDescriptorHandleForHeapStart();
+  auto       rtv_handle = CD3DX12_CPU_DESCRIPTOR_HANDLE{ rtv_start, 0, m_RTVDescriptorSize };
+
+  for ( int i = 0; i < count; i++ )
+  {
+    m_D3D12Device->CreateRenderTargetView(
+        render_targets[i].GetTexture(), render_targets[i].GetRenderTargetView(), rtv_handle );
+    command_list->ClearRenderTargetView( rtv_handle, color, 0, nullptr );
+
+    rtv_handle.Offset( ( INT )m_RTVDescriptorSize );
+  }
+}
+
 void Ember::RenderTargetManager::ClearDepthStencilView(
     ID3D12GraphicsCommandList* command_list,
     Texture const&             depth_stencil,
@@ -70,7 +89,7 @@ void Ember::RenderTargetManager::ClearDepthStencilView(
 
 void Ember::RenderTargetManager::OMSetRenderTargets(
     ID3D12GraphicsCommandList* command_list,
-    uint8_t const              count,
+    uint32_t const             count,
     Texture const*             render_targets,
     Texture const*             depth_stencil ) const
 {
@@ -96,7 +115,7 @@ void Ember::RenderTargetManager::OMSetRenderTargets(
 
 void Ember::RenderTargetManager::OMSetRenderTargets(
     ID3D12GraphicsCommandList*           command_list,
-    uint8_t                              count,
+    uint32_t const                       count,
     Texture const*                       render_targets,
     D3D12_RENDER_TARGET_VIEW_DESC const* rtv_desc,
     Texture const*                       depth_stencil,

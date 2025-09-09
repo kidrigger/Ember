@@ -5,7 +5,9 @@
 #include "RenderDevice.hpp"
 #include "RenderTargetManager.hpp"
 #include "Scene.hpp"
+#include "Util/DataUtil.hpp"
 #include "Util/DirectXHeaders.hpp"
+#include "Util/FlatMap.hpp"
 #include "Util/Runtime.hpp"
 
 namespace Ember
@@ -16,7 +18,7 @@ class PerfCounter;
 class RenderDevice;
 class Camera;
 
-class BasicApp final : public IApp
+class DeferredApp final : public IApp
 {
   using RenderQueryType = flecs::query<WorldTransform const, Mesh const, Geometry const, Material const>;
 
@@ -30,18 +32,44 @@ class BasicApp final : public IApp
   std::unique_ptr<ModelLoader>   m_ModelLoader;
   wchar_t                        m_SprintfBuffer[1024]{};
 
+  enum GBufferIndex
+  {
+    kPosition     = 0,
+    kAlbedo       = 1,
+    kNormal       = 2,
+    kORM          = 3,
+    kEmissive     = 4,
+    kGBufferCount = 5,
+  };
+
+  // TODO: Use more compact formats if possible.
+  // R32G32B32A32_FLOAT is overkill for position, but required for the shadow.
+  // Use quantization?
+  // Normal to Octahedron?
+  DXGI_FORMAT constexpr static kGBufferFormats[kGBufferCount] = {
+    DXGI_FORMAT_R32G32B32A32_FLOAT,  // Position
+    DXGI_FORMAT_R8G8B8A8_UNORM_SRGB, // Albedo
+    DXGI_FORMAT_R8G8B8A8_UNORM,      // Normal
+    DXGI_FORMAT_R8G8B8A8_UNORM,      // ORM
+    DXGI_FORMAT_R8G8B8A8_UNORM_SRGB, // Emissive
+  };
+
   // Specifics
 
   // PBR Pipeline
   ComPtr<ID3D12RootSignature>          m_RootSignature;
-  ComPtr<ID3D12PipelineState>          m_OpaquePBRPipeline;
-  ComPtr<ID3D12PipelineState>          m_AlphaTestedPBRPipeline;
+  ComPtr<ID3D12PipelineState>          m_GBufferPipeline;
+  ComPtr<ID3D12PipelineState>          m_AlphaTestedGBufferPipeline;
+
+  ComPtr<ID3D12RootSignature>          m_MergeRootSignature;
+  ComPtr<ID3D12PipelineState>          m_MergePipeline;
   ComPtr<ID3D12PipelineState>          m_AlphaBlendedPBRPipeline;
 
   ComPtr<ID3D12RootSignature>          m_BackgroundRootSignature;
   ComPtr<ID3D12PipelineState>          m_BackgroundPipeline;
 
   std::unique_ptr<RenderTargetManager> m_RenderTargetManager;
+  Texture                              m_GBuffer[kGBufferCount];
   Texture                              m_RenderTexture;
   Texture                              m_DepthTexture;
   DXGI_FORMAT                          m_SwapchainFormat;
@@ -62,7 +90,7 @@ class BasicApp final : public IApp
   void                                 SetupRenderPipeline();
 
 public:
-  BasicApp(
+  DeferredApp(
       HWND                                 window_handle,
       std::unique_ptr<RenderDevice>        render_device,
       std::unique_ptr<PerfCounter>         perf_counter,
@@ -77,13 +105,13 @@ public:
 
   void        Resize() override;
 
-  static void Create( BasicApp* app, HINSTANCE instance_handle );
+  static void Create( DeferredApp* app, HINSTANCE instance_handle );
 
-  BasicApp( BasicApp const& other )                = delete;
-  BasicApp& operator=( BasicApp const& other )     = delete;
-  BasicApp( BasicApp&& other ) noexcept            = delete;
-  BasicApp& operator=( BasicApp&& other ) noexcept = delete;
-  ~BasicApp() override;
+  DeferredApp( DeferredApp const& other )                = delete;
+  DeferredApp& operator=( DeferredApp const& other )     = delete;
+  DeferredApp( DeferredApp&& other ) noexcept            = delete;
+  DeferredApp& operator=( DeferredApp&& other ) noexcept = delete;
+  ~DeferredApp() override;
 };
 
 } // namespace Ember
