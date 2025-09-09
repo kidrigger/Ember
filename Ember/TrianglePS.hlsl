@@ -38,14 +38,20 @@ float4 TrianglePS( PSIn IN ) : SV_TARGET0
 
   float3 view_dir      = normalize( camera.Position.xyz - IN.Position.xyz );
 
-  float3 point_contrib = CalcPointLightContrib( IN.Position, view_dir, brdf );
-  float3 dir_contrib   = CalcDirLightContrib( IN.Position, view_dir, brdf );
+  float3 point_contrib = CalcPointLightContrib( brdf, IN.Position, view_dir );
+  float3 dir_contrib   = CalcDirLightContrib( brdf, IN.Position, view_dir );
 
 #ifdef STRIP_DEBUG_CONFIG
-  float3 ambient_contrib = GetAmbientInfluence( brdf, view_dir );
+  float3 ambient_contrib = GetAmbientInfluence( g_Env, brdf, view_dir, g_DefaultSampler, g_ClampedSampler );
 #else
-  float3 ambient_contrib =
-      GetAmbientInfluence( brdf, view_dir, !config.RemoveDiffuseContrib, !config.RemoveSpecularContrib );
+  float3 ambient_contrib = GetAmbientInfluence(
+      g_Env,
+      brdf,
+      view_dir,
+      g_DefaultSampler,
+      g_ClampedSampler,
+      !config.RemoveDiffuseContrib,
+      !config.RemoveSpecularContrib );
 #endif
 
   float3 total_contrib = emissive + point_contrib + dir_contrib + ambient_contrib;

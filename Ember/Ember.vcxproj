@@ -571,7 +571,9 @@
     <None Include="DebugConfig.hlsli" />
     <None Include="DirShadow.hlsli" />
     <None Include="Geometry.hlsli" />
+    <None Include="Environment.hlsli" />
     <None Include="LightData.hlsli" />
+    <None Include="Material.hlsli" />
     <None Include="Math.hlsli" />
     <None Include="OmniShadow.hlsli" />
     <None Include="Quantization.hlsli" />

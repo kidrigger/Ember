@@ -14,6 +14,11 @@ struct PointLight
   float         Intensity;   // 24
   float         Attenuation; // 28
   ResID         ShadowIdx;   // 32
+
+  float3        GetRadiance()
+  {
+    return Intensity * UnpackColor32( Color ).rgb;
+  }
 };
 
 struct DirLight
@@ -26,6 +31,11 @@ struct DirLight
   uint          Pad0;                        // 412
   uint          Pad1;                        // 416
   float4        CascadesSph[NUM_CASCADES];   // 512
+
+  float3        GetRadiance()
+  {
+    return Intensity * UnpackColor32( Color ).rgb;
+  }
 };
 
 #endif
