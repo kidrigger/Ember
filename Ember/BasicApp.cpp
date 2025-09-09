@@ -7,6 +7,7 @@
 #include "Camera.hpp"
 #include "Environment.hpp"
 #include "GeometryManager.hpp"
+#include "Input.hpp"
 #include "LightManager.hpp"
 #include "Material.hpp"
 #include "MaterialManager.hpp"
@@ -22,73 +23,9 @@
 #include "imgui_impl_dx12.h"
 #include "imgui_impl_win32.h"
 
-std::unordered_map<SIZE_T, Ember::RawDescriptorHandle> g_ImguiHandleMap;
-
-void ParseArguments( bool* use_warp, uint32_t* client_width, uint32_t* client_height )
-{
-  // Parse Args
-  {
-    int       argc;
-    wchar_t** argv = ::CommandLineToArgvW( ::GetCommandLineW(), &argc );
-
-    for ( size_t i = 0; i < argc; ++i )
-    {
-      if ( ::wcscmp( argv[i], L"-w" ) == 0 or ::wcscmp( argv[i], L"--width" ) == 0 )
-      {
-        *client_width = ::wcstol( argv[++i], nullptr, 10 );
-      }
-      if ( ::wcscmp( argv[i], L"-h" ) == 0 or ::wcscmp( argv[i], L"--height" ) == 0 )
-      {
-        *client_height = ::wcstol( argv[++i], nullptr, 10 );
-      }
-      if ( ::wcscmp( argv[i], L"-warp" ) == 0 or ::wcscmp( argv[i], L"--warp" ) == 0 )
-      {
-        *use_warp = true;
-      }
-    }
-
-    // Free memory allocated by CommandLineToArgvW
-    ::LocalFree( argv );
-  }
-}
-
 namespace
 {
-struct Input
-{
-  uint32_t MousePosX;
-  uint32_t MousePosY;
-  bool     IsRightMouseDown;
-
-  uint32_t constexpr static kPressedBit     = 0x1;
-  uint32_t constexpr static kPrevPressedBit = 0x2;
-  std::unordered_map<char, uint8_t> KeyPress;
-
-  bool                              IsPressed( char c )
-  {
-    return KeyPress[c] & kPressedBit;
-  }
-
-  bool IsJustPressed( char c )
-  {
-    uint8_t val = KeyPress[c];
-    return val & kPressedBit and not( val & kPrevPressedBit );
-  }
-
-  bool IsJustReleased( char c )
-  {
-    uint8_t val = KeyPress[c];
-    return val & kPrevPressedBit and not( val & kPressedBit );
-  }
-
-  void Update()
-  {
-    for ( auto& v : KeyPress | std::views::values )
-    {
-      v = ( v << 1 ) | v;
-    }
-  }
-} g_Input;
+std::unordered_map<SIZE_T, Ember::RawDescriptorHandle> g_ImguiHandleMap;
 
 struct DebugConfig
 {
@@ -105,143 +42,6 @@ struct DebugConfig
 } g_Debug;
 
 } // namespace
-
-// Forward declare message handler from imgui_impl_win32.cpp
-// ReSharper disable once CppInconsistentNaming
-extern IMGUI_IMPL_API LRESULT ImGui_ImplWin32_WndProcHandler( HWND, UINT, WPARAM, LPARAM );
-
-// Window callback function.
-LRESULT CALLBACK WndProc( HWND const window_handle, UINT const message, WPARAM const w_param, LPARAM const l_param )
-{
-  if ( ImGui_ImplWin32_WndProcHandler( window_handle, message, w_param, l_param ) ) return true;
-
-  switch ( message )
-  {
-    case WM_PAINT:
-      PAINTSTRUCT ps;
-      ( void )BeginPaint( window_handle, &ps );
-      EndPaint( window_handle, &ps );
-      break;
-    case WM_SYSKEYDOWN:
-    case WM_KEYDOWN:
-    {
-      // bool alt = (::GetAsyncKeyState(VK_MENU) & 0x8000) != 0;
-
-      if ( w_param == VK_ESCAPE )
-      {
-        ::PostQuitMessage( 0 );
-      }
-      else if ( w_param >= 'A' and w_param <= 'Z' )
-      {
-        g_Input.KeyPress[( char )w_param] |= Input::kPressedBit;
-      }
-    }
-    break;
-    case WM_KEYUP:
-    {
-      // bool alt = (::GetAsyncKeyState(VK_MENU) & 0x8000) != 0;
-      if ( w_param >= 'A' and w_param <= 'Z' )
-      {
-        g_Input.KeyPress[( char )w_param] &= ~Input::kPressedBit;
-      }
-    }
-    break;
-    case WM_MOUSEMOVE:
-    {
-      g_Input.MousePosX = LOWORD( l_param );
-      g_Input.MousePosY = HIWORD( l_param );
-
-      // Handle mouse movement, potentially updating a drawing
-    }
-    break;
-    case WM_RBUTTONDOWN:
-    {
-      g_Input.IsRightMouseDown = true;
-    }
-    break;
-    case WM_RBUTTONUP:
-    {
-      g_Input.IsRightMouseDown = false;
-    }
-    // The default window procedure will play a system notification sound
-    // when pressing the Alt+Enter keyboard combination if this message is
-    // not handled.
-    case WM_SYSCHAR:
-      break;
-    case WM_SIZE:
-    {
-      Ember::IApp::Instance().Resize();
-    }
-    break;
-    case WM_DESTROY:
-      ::PostQuitMessage( 0 );
-      break;
-    default:
-      return ::DefWindowProcW( window_handle, message, w_param, l_param );
-  }
-
-  return 0;
-}
-
-void RegisterWindowClass( HINSTANCE const instance_handle, const wchar_t* window_class_name )
-{
-  // Register a window class for creating our render window with.
-  WNDCLASSEXW window_class;
-  window_class.cbSize        = sizeof( WNDCLASSEX );
-  window_class.style         = CS_HREDRAW | CS_VREDRAW;
-  window_class.lpfnWndProc   = &WndProc;
-  window_class.cbClsExtra    = 0;
-  window_class.cbWndExtra    = 0;
-  window_class.hInstance     = instance_handle;
-  window_class.hIcon         = ::LoadIcon( instance_handle, nullptr );
-  window_class.hCursor       = ::LoadCursor( nullptr, IDC_ARROW );
-  window_class.hbrBackground = ( HBRUSH )( COLOR_WINDOW + 1 );
-  window_class.lpszMenuName  = nullptr;
-  window_class.lpszClassName = window_class_name;
-  window_class.hIconSm       = ::LoadIcon( instance_handle, nullptr );
-
-  static ATOM atom           = ::RegisterClassExW( &window_class );
-  ASSERT( atom > 0 );
-}
-
-HWND CreateWindow(
-    wchar_t const*  window_class_name,
-    HINSTANCE const instance_handle,
-    wchar_t const*  window_title,
-    uint32_t const  width,
-    uint32_t const  height )
-{
-  int const screen_width  = ::GetSystemMetrics( SM_CXSCREEN );
-  int const screen_height = ::GetSystemMetrics( SM_CYSCREEN );
-
-  RECT      window_rect   = { 0, 0, ( LONG )width, ( LONG )height };
-  ::AdjustWindowRect( &window_rect, WS_OVERLAPPEDWINDOW, FALSE );
-
-  int const window_width  = window_rect.right - window_rect.left;
-  int const window_height = window_rect.bottom - window_rect.top;
-
-  // Center the window within the screen. Clamp to 0, 0 for the top-left corner.
-  int const  window_x = std::max<int>( 0, ( screen_width - window_width ) / 2 );
-  int const  window_y = std::max<int>( 0, ( screen_height - window_height ) / 2 );
-
-  HWND const h_window = ::CreateWindowExW(
-      NULL,
-      window_class_name,
-      window_title,
-      WS_OVERLAPPEDWINDOW,
-      window_x,
-      window_y,
-      window_width,
-      window_height,
-      nullptr,
-      nullptr,
-      instance_handle,
-      nullptr );
-
-  ASSERT_M( h_window, "Failed to create window" );
-
-  return h_window;
-}
 
 struct RotatingModel
 {
@@ -620,8 +420,7 @@ void Ember::BasicApp::LoadContent()
        .MipLevels = MipLevels::kBase,
   } );
 
-  m_PrevMouseX    = g_Input.MousePosX;
-  m_PrevMouseY    = g_Input.MousePosY;
+  m_PrevMouse     = Input::Instance().GetMousePosition();
 
   m_RenderQuery   = m_World.GetECS().query<WorldTransform const, Mesh const, Geometry const, Material const>();
 }
@@ -744,7 +543,7 @@ void Ember::BasicApp::Update()
         m_Camera->SetPosition( gi_cam_pos[0], gi_cam_pos[1], gi_cam_pos[2] );
       }
 
-      ImGui::Text( "Mouse Position: %u %u", g_Input.MousePosX, g_Input.MousePosY );
+      ImGui::Text( "Mouse Position: %u %u", m_PrevMouse.x, m_PrevMouse.y );
 
       ImGui::End();
     }
@@ -759,28 +558,28 @@ void Ember::BasicApp::Update()
 
   m_TextureLoader->Update();
 
-  float const mouse_dx = ( ( float )g_Input.MousePosX - ( float )m_PrevMouseX ) / ( float )m_WindowWidth;
-  float const mouse_dy = ( ( float )g_Input.MousePosY - ( float )m_PrevMouseY ) / ( float )m_WindowHeight;
-  m_PrevMouseX         = g_Input.MousePosX;
-  m_PrevMouseY         = g_Input.MousePosY;
+  DirectX::XMUINT2 const mouse_pos = Input::Instance().GetMousePosition();
+  float const            mouse_dx  = ( ( float )mouse_pos.x - ( float )m_PrevMouse.x ) / ( float )m_WindowWidth;
+  float const            mouse_dy  = ( ( float )mouse_pos.y - ( float )m_PrevMouse.y ) / ( float )m_WindowHeight;
+  m_PrevMouse                      = mouse_pos;
 
-  if ( g_Input.IsRightMouseDown )
+  if ( Input::Instance().IsRightMouseDown() )
     m_Camera->SetYawPitch(
         m_Camera->GetYaw() - DirectX::XM_PI * mouse_dx, m_Camera->GetPitch() - DirectX::XM_PIDIV2 * mouse_dy );
 
-  if ( g_Input.IsPressed( 'R' ) )
+  if ( Input::Instance().IsPressed( 'R' ) )
   {
     m_Camera->LocalTranslate( -5 * delta_seconds, 0, 0 );
   }
-  if ( g_Input.IsPressed( 'F' ) )
+  if ( Input::Instance().IsPressed( 'F' ) )
   {
     m_Camera->LocalTranslate( 0, 0, -5 * delta_seconds );
   }
-  if ( g_Input.IsPressed( 'S' ) )
+  if ( Input::Instance().IsPressed( 'S' ) )
   {
     m_Camera->LocalTranslate( 0, 0, 5 * delta_seconds );
   }
-  if ( g_Input.IsPressed( 'T' ) )
+  if ( Input::Instance().IsPressed( 'T' ) )
   {
     m_Camera->LocalTranslate( 5 * delta_seconds, 0, 0 );
   }
@@ -797,7 +596,7 @@ void Ember::BasicApp::Update()
 
   m_World.Update( delta_seconds );
 
-  g_Input.Update();
+  Input::Instance().Update();
 }
 
 void Ember::BasicApp::RenderScene(

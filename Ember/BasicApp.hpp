@@ -45,8 +45,7 @@ class BasicApp final : public IApp
   DXGI_FORMAT                          m_SwapchainFormat;
 
   std::unique_ptr<Camera>              m_Camera;
-  uint32_t                             m_PrevMouseX{ 0 };
-  uint32_t                             m_PrevMouseY{ 0 };
+  DirectX::XMUINT2                     m_PrevMouse;
   Buffer                               m_ConfigurationBuffer;
 
   std::unique_ptr<LightManager>        m_LightManager;

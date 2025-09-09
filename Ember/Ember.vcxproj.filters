@@ -156,6 +156,12 @@
     <ClCompile Include="GeometryManager.cpp">
       <Filter>Source Files\Graphics</Filter>
     </ClCompile>
+    <ClCompile Include="Input.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="Util\HelperUtils.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="Util\PerfCounter.hpp">
@@ -262,6 +268,9 @@
     </ClInclude>
     <ClInclude Include="Float16.hpp">
       <Filter>Header Files\Util</Filter>
+    </ClInclude>
+    <ClInclude Include="Input.hpp">
+      <Filter>Header Files</Filter>
     </ClInclude>
   </ItemGroup>
   <ItemGroup>

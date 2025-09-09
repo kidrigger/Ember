@@ -1,5 +1,9 @@
 #pragma once
+
 #include <cstddef>
+#include <string>
+
+#include "Util/Runtime.hpp"
 
 namespace Ember
 {
@@ -26,3 +30,13 @@ public:
 };
 
 } // namespace Ember
+
+
+void RegisterWindowClass( HINSTANCE instance_handle, const wchar_t* window_class_name );
+
+HWND CreateWindow(
+    wchar_t const* window_class_name,
+    HINSTANCE      instance_handle,
+    wchar_t const* window_title,
+    uint32_t       width,
+    uint32_t       height );

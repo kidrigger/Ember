@@ -87,3 +87,5 @@
 
 #define UNIMPLEMENTED std::terminate()
 #define UNIMPLEMENTED_M( MSG ) std::terminate()
+
+void ParseArguments( bool* use_warp, uint32_t* client_width, uint32_t* client_height );

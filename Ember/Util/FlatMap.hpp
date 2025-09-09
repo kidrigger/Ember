@@ -2,6 +2,7 @@
 
 #include <algorithm>
 #include <vector>
+#include "Util/HelperUtils.hpp"
 
 namespace Ember
 {
@@ -266,6 +267,11 @@ public:
   std::vector<TKey> const& Keys() const
   {
     return m_Keys;
+  }
+
+  std::vector<TValue>& Values()
+  {
+    return m_Values;
   }
 
   std::vector<TValue> const& Values() const
