@@ -14,7 +14,7 @@ struct MSOut
 
 OUTPUT_TOPOLOGY( "triangle" )
 NUM_THREADS( 1, 1, 1 )
-void GBufferLightingMS( uint3 dt_id : SV_DispatchThreadID, out vertices MSOut verts[3], out indices uint3 tris[1] )
+void LightingMS( uint3 dt_id : SV_DispatchThreadID, out vertices MSOut verts[3], out indices uint3 tris[1] )
 {
   SetMeshOutputCounts( 3, 1 );
 

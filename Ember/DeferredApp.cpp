@@ -194,14 +194,14 @@ void Ember::DeferredApp::SetupRenderPipeline()
   ComPtr<ID3DBlob> mesh_shader_blob;
   ERR_ABORT( D3DReadFileToBlob( L"TriangleMS.cso", &mesh_shader_blob ) );
   ComPtr<ID3DBlob> gbuffer_shader_blob;
-  ERR_ABORT( D3DReadFileToBlob( L"TriangleGBufferPS.cso", &gbuffer_shader_blob ) );
+  ERR_ABORT( D3DReadFileToBlob( L"GBufferPS.cso", &gbuffer_shader_blob ) );
   ComPtr<ID3DBlob> gbuffer_alpha_tested_shader_blob;
-  ERR_ABORT( D3DReadFileToBlob( L"TriangleAlphaTestGBufferPS.cso", &gbuffer_alpha_tested_shader_blob ) );
+  ERR_ABORT( D3DReadFileToBlob( L"GBufferAlphaTestPS.cso", &gbuffer_alpha_tested_shader_blob ) );
 
   ComPtr<ID3DBlob> merge_mesh_shader_blob;
-  ERR_ABORT( D3DReadFileToBlob( L"GBufferLightingMS.cso", &merge_mesh_shader_blob ) );
+  ERR_ABORT( D3DReadFileToBlob( L"LightingMS.cso", &merge_mesh_shader_blob ) );
   ComPtr<ID3DBlob> merge_pixel_shader_blob;
-  ERR_ABORT( D3DReadFileToBlob( L"GBufferLightingPS.cso", &merge_pixel_shader_blob ) );
+  ERR_ABORT( D3DReadFileToBlob( L"LightingPS.cso", &merge_pixel_shader_blob ) );
 
   ComPtr<ID3DBlob> alpha_blended_pixel_shader_blob;
   ERR_ABORT( D3DReadFileToBlob( L"TriangleAlphaBlendPS.cso", &alpha_blended_pixel_shader_blob ) );

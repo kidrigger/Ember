@@ -70,6 +70,12 @@
     <Filter Include="Shaders\DebugVis">
       <UniqueIdentifier>{69c153bc-6ff2-42f9-aeb9-c912b0617738}</UniqueIdentifier>
     </Filter>
+    <Filter Include="Shaders\Meshes\Forward">
+      <UniqueIdentifier>{3c704815-4fdd-45a7-9c2c-b6334a96518c}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="Shaders\Meshes\Deferred">
+      <UniqueIdentifier>{6aa6fc91-b2cc-472e-a463-77c6f342fcd3}</UniqueIdentifier>
+    </Filter>
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="Main.cpp">
@@ -334,14 +340,14 @@
     <None Include="DebugConfig.hlsli">
       <Filter>Shaders\Utils</Filter>
     </None>
-    <None Include="TrianglePSCommon.hlsli">
-      <Filter>Shaders\Meshes</Filter>
-    </None>
     <None Include="Environment.hlsli">
       <Filter>Shaders\Utils</Filter>
     </None>
     <None Include="Material.hlsli">
       <Filter>Shaders\Utils</Filter>
+    </None>
+    <None Include="TrianglePSCommon.hlsli">
+      <Filter>Shaders\Meshes\Forward</Filter>
     </None>
   </ItemGroup>
   <ItemGroup>
@@ -381,9 +387,6 @@
     <FxCompile Include="TriangleMS.hlsl">
       <Filter>Shaders\Meshes</Filter>
     </FxCompile>
-    <FxCompile Include="TrianglePS.hlsl">
-      <Filter>Shaders\Meshes</Filter>
-    </FxCompile>
     <FxCompile Include="MipMapCube.hlsl">
       <Filter>Shaders\Utils</Filter>
     </FxCompile>
@@ -408,23 +411,26 @@
     <FxCompile Include="BackgroundMS.hlsl">
       <Filter>Shaders</Filter>
     </FxCompile>
-    <FxCompile Include="TriangleAlphaTestPS.hlsl">
-      <Filter>Shaders\Meshes</Filter>
-    </FxCompile>
     <FxCompile Include="TriangleAlphaBlendPS.hlsl">
-      <Filter>Shaders\Meshes</Filter>
+      <Filter>Shaders\Meshes\Forward</Filter>
     </FxCompile>
-    <FxCompile Include="TriangleGBufferPS.hlsl">
-      <Filter>Shaders\Meshes</Filter>
+    <FxCompile Include="TriangleAlphaTestPS.hlsl">
+      <Filter>Shaders\Meshes\Forward</Filter>
     </FxCompile>
-    <FxCompile Include="TriangleAlphaTestGBufferPS.hlsl">
-      <Filter>Shaders\Meshes</Filter>
+    <FxCompile Include="TrianglePS.hlsl">
+      <Filter>Shaders\Meshes\Forward</Filter>
     </FxCompile>
-    <FxCompile Include="GBufferLightingMS.hlsl">
-      <Filter>Shaders\Meshes</Filter>
+    <FxCompile Include="GBufferAlphaTestPS.hlsl">
+      <Filter>Shaders\Meshes\Deferred</Filter>
     </FxCompile>
-    <FxCompile Include="GBufferLightingPS.hlsl">
-      <Filter>Shaders\Meshes</Filter>
+    <FxCompile Include="GBufferPS.hlsl">
+      <Filter>Shaders\Meshes\Deferred</Filter>
+    </FxCompile>
+    <FxCompile Include="LightingPS.hlsl">
+      <Filter>Shaders\Meshes\Deferred</Filter>
+    </FxCompile>
+    <FxCompile Include="LightingMS.hlsl">
+      <Filter>Shaders\Meshes\Deferred</Filter>
     </FxCompile>
   </ItemGroup>
   <ItemGroup>

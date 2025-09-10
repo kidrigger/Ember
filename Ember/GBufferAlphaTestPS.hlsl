@@ -11,7 +11,7 @@ struct PSOutput
   float4 Emissive : SV_TARGET4;
 };
 
-PSOutput TriangleAlphaTestGBufferPS( PSIn IN )
+PSOutput GBufferAlphaTestPS( PSIn IN )
 {
   ConstantBuffer<Camera>     camera    = ResourceDescriptorHeap[g_Camera];
   StructuredBuffer<Material> materials = ResourceDescriptorHeap[g_Materials];

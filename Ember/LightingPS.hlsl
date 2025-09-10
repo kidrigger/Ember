@@ -74,7 +74,7 @@ float3 CalcPointLightContrib( in BRDFCookTorranceGGX brdf, float4 ws_position, f
   return point_contrib;
 }
 
-float4 GBufferLightingPS( float2 tex_coord : TEXCOORD ) : SV_TARGET
+float4 LightingPS( float2 tex_coord : TEXCOORD ) : SV_TARGET
 {
   Texture2D<float4>      position_tex = ResourceDescriptorHeap[g_Position];
   Texture2D<float4>      albedo_tex   = ResourceDescriptorHeap[g_Albedo];
