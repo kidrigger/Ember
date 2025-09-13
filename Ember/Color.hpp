@@ -55,6 +55,16 @@ struct Color32
     A = ( uint8_t )( a * 255.99f );
   }
 
+  constexpr DirectX::XMFLOAT4 UnpackRgba() const
+  {
+    return { ( float )R / 255.0f, ( float )G / 255.0f, ( float )B / 255.0f, ( float )A / 255.0f };
+  }
+
+  constexpr DirectX::XMFLOAT3 UnpackRgb() const
+  {
+    return { ( float )R / 255.0f, ( float )G / 255.0f, ( float )B / 255.0f };
+  }
+
   constexpr static Color32 Black()
   {
     return {};

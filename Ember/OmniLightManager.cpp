@@ -158,13 +158,8 @@ void Ember::Internal::OmniLightManager::SetDirty()
 }
 
 Ember::OmniLightHandle Ember::Internal::OmniLightManager::AddOmniLight(
-    DirectX::XMFLOAT3 const position,
-    float const             range,
-    Color32 const           color,
-    float const             intensity,
-    float const             attenuation )
+    DirectX::XMFLOAT3 const position, float range, Color32 const color, float const intensity, float const attenuation )
 {
-
   ASSERT_M( m_TotalLightCount < kMaxOmniLights, "All free locs exhausted" );
 
   uint16_t const true_index = m_TotalLightCount;
@@ -175,13 +170,21 @@ Ember::OmniLightHandle Ember::Internal::OmniLightManager::AddOmniLight(
 
   uint16_t const generation = m_HandleGeneration[index];
 
-  m_LightData[true_index]   = {
-      .Position    = position,
-      .Range       = range,
-      .Color       = color,
-      .Intensity   = intensity,
-      .Attenuation = attenuation,
-      .ShadowMap   = {},
+  if ( range <= 0 )
+  {
+    // Auto-calculate the range.
+    DirectX::XMFLOAT3 const color_f  = color.UnpackRgb();
+    float const             max_comp = std::max( std::max( color_f.x, color_f.y ), color_f.z );
+    range                            = sqrt( ( max_comp * intensity ) ) * 10.0f;
+  }
+
+  m_LightData[true_index] = {
+    .Position    = position,
+    .Range       = range,
+    .Color       = color,
+    .Intensity   = intensity,
+    .Attenuation = attenuation,
+    .ShadowMap   = {},
   };
 
   m_TotalLightCount++;
@@ -192,11 +195,7 @@ Ember::OmniLightHandle Ember::Internal::OmniLightManager::AddOmniLight(
 }
 
 Ember::OmniLightHandle Ember::Internal::OmniLightManager::AddShadowingOmniLight(
-    DirectX::XMFLOAT3 const position,
-    float const             range,
-    Color32 const           color,
-    float const             intensity,
-    float const             attenuation )
+    DirectX::XMFLOAT3 const position, float range, Color32 const color, float const intensity, float const attenuation )
 {
 
   ASSERT_M( m_TotalLightCount < kMaxOmniLights, "All free locs exhausted" );
@@ -204,10 +203,18 @@ Ember::OmniLightHandle Ember::Internal::OmniLightManager::AddShadowingOmniLight(
   // Relocate the location to allocate at.
   SwapTrueLocations( m_ShadowingLightCount, m_TotalLightCount );
 
-  uint16_t const        true_index = m_ShadowingLightCount;
-  uint16_t const        index      = m_IndirectionFreeHead;
+  uint16_t const true_index = m_ShadowingLightCount;
+  uint16_t const index      = m_IndirectionFreeHead;
 
-  uint16_t const        generation = m_HandleGeneration[index];
+  uint16_t const generation = m_HandleGeneration[index];
+
+  if ( range <= 0 )
+  {
+    // Auto-calculate the range.
+    DirectX::XMFLOAT3 const color_f  = color.UnpackRgb();
+    float const             max_comp = std::max( std::max( color_f.x, color_f.y ), color_f.z );
+    range                            = sqrt( ( max_comp * intensity ) ) * 10.0f;
+  }
 
   OmniLightHandle const handle{ index, generation };
 

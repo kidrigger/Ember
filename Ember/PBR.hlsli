@@ -1,4 +1,4 @@
-#ifndef PBR_HLSLI_
+﻿#ifndef PBR_HLSLI_
 #define PBR_HLSLI_
 
 #include "Environment.hlsli"
@@ -223,12 +223,14 @@ float3 CalcShadowingLightContrib(
 
   // Shadow test
   TextureCube<float> shadow_map = ResourceDescriptorHeap[point_light.ShadowIdx];
-  float  shadowing    = shadow_map.SampleCmpLevelZero( shadow_sampler, -light_dir, light_dist / point_light.Range );
+  float shadowing = shadow_map.SampleCmpLevelZero( shadow_sampler, -light_dir, light_dist / point_light.Range );
 
-  float  attenuation  = 1.0f / ( light_dist * light_dist ); // TODO: Controlled Attenuation
-  float3 radiance     = attenuation * point_light.GetRadiance();
+  // Smooth attenuation from [karis13]
+  float attenuation =
+      pow( saturate( 1 - pow( light_dist / point_light.Range, 4.0f ) ), 2.0f ) / ( light_dist * light_dist + 1.0f );
+  float3 radiance  = attenuation * point_light.GetRadiance();
 
-  light_dir          /= light_dist;                         // Normalization
+  light_dir       /= light_dist; // Normalization
   return shadowing * brdf.Evaluate( radiance, view_dir, light_dir );
 }
 
@@ -240,10 +242,12 @@ float3 CalcLightContrib( in PointLight point_light, in TBrdf brdf, float4 ws_pos
 
   if ( light_dist > point_light.Range ) return 0.0f;
 
-  float  attenuation  = 1.0f / ( light_dist * light_dist ); // TODO: Controlled Attenuation
-  float3 radiance     = attenuation * point_light.GetRadiance();
+  // Smooth attenuation from [karis13]
+  float attenuation =
+      pow( saturate( 1 - pow( light_dist / point_light.Range, 4.0f ) ), 2.0f ) / ( light_dist * light_dist + 1.0f );
+  float3 radiance  = attenuation * point_light.GetRadiance();
 
-  light_dir          /= light_dist;                         // Normalization
+  light_dir       /= light_dist; // Normalization
   return brdf.Evaluate( radiance, view_dir, light_dir );
 }
 

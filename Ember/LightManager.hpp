@@ -22,7 +22,9 @@ class LightManager
   std::unique_ptr<Internal::DirectionLightManager> m_DirLightManager;
 
 public:
-  LightManager() = default;
+  float constexpr static kRangeAuto = -1.0f;
+
+  LightManager()                    = default;
   LightManager(
       std::unique_ptr<Internal::OmniLightManager>      omni_light_manager,
       std::unique_ptr<Internal::DirectionLightManager> dir_light_manager );
@@ -32,10 +34,10 @@ public:
       DirectX::XMFLOAT3 position, float range, Color32 color, float intensity, float attenuation = 1.0f );
   OmniLightHandle AddShadowingOmniLight(
       DirectX::XMFLOAT3 position, float range, Color32 color, float intensity, float attenuation = 1.0f );
-  DirLightHandle        AddDirLight( DirectX::XMFLOAT3 direction, Color32 color, float intensity );
-  Ember::DirLightHandle AddShadowingDirLight( DirectX::XMFLOAT3 direction, Color32 color, float intensity );
-  void                  Free( OmniLightHandle omni_light_handle );
-  void                  Free( DirLightHandle dir_light_handle );
+  DirLightHandle AddDirLight( DirectX::XMFLOAT3 direction, Color32 color, float intensity );
+  DirLightHandle AddShadowingDirLight( DirectX::XMFLOAT3 direction, Color32 color, float intensity );
+  void           Free( OmniLightHandle omni_light_handle );
+  void           Free( DirLightHandle dir_light_handle );
 
   [[nodiscard]] std::tuple<SRVHandle, SRVHandle> PrepareFrame( uint32_t frame_index ) const;
   [[nodiscard]] uint16_t                         GetOmniLightCount() const;
