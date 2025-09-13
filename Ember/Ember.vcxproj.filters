@@ -169,7 +169,7 @@
       <Filter>Source Files</Filter>
     </ClCompile>
     <ClCompile Include="Util\HelperUtils.cpp">
-      <Filter>Source Files</Filter>
+      <Filter>Source Files\Util</Filter>
     </ClCompile>
   </ItemGroup>
   <ItemGroup>
@@ -349,6 +349,9 @@
     <None Include="TrianglePSCommon.hlsli">
       <Filter>Shaders\Meshes\Forward</Filter>
     </None>
+    <None Include="OmniLightCommon.hlsli">
+      <Filter>Shaders\Meshes\Deferred</Filter>
+    </None>
   </ItemGroup>
   <ItemGroup>
     <FxCompile Include="EqrectToCube.hlsl">
@@ -430,6 +433,15 @@
       <Filter>Shaders\Meshes\Deferred</Filter>
     </FxCompile>
     <FxCompile Include="LightingMS.hlsl">
+      <Filter>Shaders\Meshes\Deferred</Filter>
+    </FxCompile>
+    <FxCompile Include="OmniLightingAS.hlsl">
+      <Filter>Shaders\Meshes\Deferred</Filter>
+    </FxCompile>
+    <FxCompile Include="OmniLightingMS.hlsl">
+      <Filter>Shaders\Meshes\Deferred</Filter>
+    </FxCompile>
+    <FxCompile Include="OmniLightingPS.hlsl">
       <Filter>Shaders\Meshes\Deferred</Filter>
     </FxCompile>
   </ItemGroup>

@@ -63,7 +63,7 @@ void Ember::RenderTargetManager::ClearRenderTargetViews(
   auto const rtv_start  = m_RTVDescriptorHeap->GetCPUDescriptorHandleForHeapStart();
   auto       rtv_handle = CD3DX12_CPU_DESCRIPTOR_HANDLE{ rtv_start, 0, m_RTVDescriptorSize };
 
-  for ( int i = 0; i < count; i++ )
+  for ( uint32_t i = 0; i < count; i++ )
   {
     m_D3D12Device->CreateRenderTargetView(
         render_targets[i].GetTexture(), render_targets[i].GetRenderTargetView(), rtv_handle );
@@ -96,7 +96,7 @@ void Ember::RenderTargetManager::OMSetRenderTargets(
   auto const rtv_start  = m_RTVDescriptorHeap->GetCPUDescriptorHandleForHeapStart();
   auto       rtv_handle = CD3DX12_CPU_DESCRIPTOR_HANDLE{ rtv_start, 0, m_RTVDescriptorSize };
 
-  for ( int i = 0; i < count; i++ )
+  for ( uint32_t i = 0; i < count; i++ )
   {
     m_D3D12Device->CreateRenderTargetView(
         render_targets[i].GetTexture(), render_targets[i].GetRenderTargetView(), rtv_handle );
@@ -124,7 +124,7 @@ void Ember::RenderTargetManager::OMSetRenderTargets(
   auto const rtv_start  = m_RTVDescriptorHeap->GetCPUDescriptorHandleForHeapStart();
   auto       rtv_handle = CD3DX12_CPU_DESCRIPTOR_HANDLE{ rtv_start, 0, m_RTVDescriptorSize };
 
-  for ( int i = 0; i < count; i++ )
+  for ( uint32_t i = 0; i < count; i++ )
   {
     m_D3D12Device->CreateRenderTargetView( render_targets[i].GetTexture(), rtv_desc + i, rtv_handle );
     rtv_handle.Offset( ( INT )m_RTVDescriptorSize );

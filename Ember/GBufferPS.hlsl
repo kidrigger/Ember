@@ -32,7 +32,7 @@ PSOutput GBufferPS( PSIn IN )
   OUT.Emissive = float4( mat.GetRawEmissive( IN.TexCoord[0], g_DefaultSampler ), 0.0f );
 
 #ifndef STRIP_DEBUG_CONFIG
-  if ( config.VisualizeMeshlets )
+  if ( config.VisualizationMode == kMeshlet )
   {
     OUT.Albedo = float4( IN.MeshletColor, 1.0f );
   }

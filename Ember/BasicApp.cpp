@@ -29,17 +29,32 @@ std::unordered_map<SIZE_T, Ember::RawDescriptorHandle> g_ImguiHandleMap;
 
 struct DebugConfig
 {
+  enum VisMode : uint32_t
+  {
+    kRender        = 0,
+    kMeshlet       = 1,
+    kWorldPosition = 2,
+    kAlbedo        = 3,
+    kNormal        = 4,
+    kORM           = 5,
+    kEmissive      = 6,
+    kLightingOnly  = 7,
+  };
+
   uint32_t ShowDebugUI                  = true;
   uint32_t ShowWireframe                = false;
-  uint32_t ShowLightOnly                = false;
+  VisMode  VisualizationMode            = kRender;
 
   uint32_t HideSkybox                   = false;
   uint32_t RemoveDiffuseContrib         = false;
   uint32_t RemoveSpecularContrib        = false;
 
   uint32_t DisableMeshletFrustumCulling = false;
-  uint32_t VisualizeMeshlets            = false;
 } g_Debug;
+
+constexpr char const* kVisualizationModeNames[] = {
+  "Render", "Meshlet", "World Position", "Albedo", "Normal", "ORM", "Emissive", "Lighting Only",
+};
 
 } // namespace
 
@@ -380,9 +395,9 @@ void Ember::BasicApp::LoadContent()
 
   // Setup Lights
   LightManager::Create( m_LightManager.get(), m_RenderDevice.get(), RenderDevice::kNumFrames );
-  m_LightManager->AddShadowingOmniLight( { 15.0f, 2.0f, 12.0f }, 10.0f, Color32::Blue(), 15.0f );
-  m_LightManager->AddShadowingOmniLight( { 0.0f, 2.0f, 5.0f }, 10.0f, Color32::Green(), 15.0f );
-  m_LightManager->AddShadowingOmniLight( { -15.0f, 2.0f, -5.0f }, 10.0f, Color32::Red(), 25.0f );
+  m_LightManager->AddOmniLight( { 15.0f, 2.0f, 12.0f }, 10.0f, Color32::Blue(), 15.0f );
+  m_LightManager->AddOmniLight( { 0.0f, 2.0f, 5.0f }, 10.0f, Color32::Green(), 15.0f );
+  m_LightManager->AddOmniLight( { -15.0f, 2.0f, -5.0f }, 10.0f, Color32::Red(), 25.0f );
   m_LightManager->AddShadowingDirLight( { 1.0f, -1.0f, 0.0f }, Color32::White(), 5.0f );
 
   MaterialManager::Create( m_MaterialManager.get(), m_RenderDevice.get(), 10'000 );
@@ -417,7 +432,7 @@ void Ember::BasicApp::LoadContent()
   constexpr char const* kEnvMapFile = "OvercastSoil.hdr";
   bool const            env_loaded =
       Environment::TryLoadFrom( m_Environment.get(), m_RenderDevice.get(), m_TextureLoader.get(), kEnvMapFile );
-  ASSERT( env_loaded );
+  ENSURE( env_loaded );
 
   SetupRenderPipeline();
 
@@ -517,12 +532,14 @@ void Ember::BasicApp::Update()
         ImGui::Checkbox( "Show Wireframe", &scratch );
         g_Debug.ShowWireframe = ( uint32_t )scratch;
 
-        scratch               = ( bool )g_Debug.ShowLightOnly;
-        ImGui::Checkbox( "Show Light Only", &scratch );
-        g_Debug.ShowLightOnly = ( uint32_t )scratch;
+        ImGui::Combo(
+            "Show Light Only",
+            ( int* )&g_Debug.VisualizationMode,
+            DataOf( kVisualizationModeNames ),
+            CountOf( kVisualizationModeNames ),
+            5 );
 
-
-        scratch               = ( bool )g_Debug.HideSkybox;
+        scratch = ( bool )g_Debug.HideSkybox;
         ImGui::Checkbox( "Hide Skybox", &scratch );
         g_Debug.HideSkybox = ( uint32_t )scratch;
 
@@ -537,10 +554,6 @@ void Ember::BasicApp::Update()
         scratch                       = ( bool )g_Debug.DisableMeshletFrustumCulling;
         ImGui::Checkbox( "Disable Meshlet Frustum Culling", &scratch );
         g_Debug.DisableMeshletFrustumCulling = ( uint32_t )scratch;
-
-        scratch                              = ( bool )g_Debug.VisualizeMeshlets;
-        ImGui::Checkbox( "Visualize Meshlets", &scratch );
-        g_Debug.VisualizeMeshlets = ( uint32_t )scratch;
       }
       ImGui::End();
     }
@@ -651,7 +664,12 @@ void Ember::BasicApp::RenderScene(
   command_list->SetDescriptorHeaps( CountOf( bindless_desc_heaps ), DataOf( bindless_desc_heaps ) );
   command_list->RSSetViewports( 1, &viewport );
   command_list->RSSetScissorRects( 1, &scissor );
-  m_RenderTargetManager->OMSetRenderTargets( command_list, 1, &m_RenderTexture, &m_DepthTexture );
+  D3D12_RENDER_TARGET_VIEW_DESC const rtv_desc{
+    .Format        = DXGI_FORMAT_R8G8B8A8_UNORM_SRGB,
+    .ViewDimension = D3D12_RTV_DIMENSION_TEXTURE2D,
+    .Texture2D     = { .MipSlice = 0 },
+  };
+  m_RenderTargetManager->OMSetRenderTargets( command_list, 1, &m_RenderTexture, &rtv_desc, &m_DepthTexture, nullptr );
 
   PerFrameConstants const constants = {
     .MaterialsBuffer      = materials_srv,
@@ -680,6 +698,18 @@ void Ember::BasicApp::RenderScene(
   command_list->SetPipelineState( m_AlphaBlendedPBRPipeline.Get() );
   command_list->SetGraphicsRoot32BitConstants( 0, sizeof( DrawList::Info ) / 4, &draw_list_info_list.AlphaBlended, 0 );
   command_list->DispatchMesh( draw_list_info_list.AlphaBlended.DrawCount, 1, 1 );
+
+  m_RenderTargetManager->OMSetRenderTargets( command_list, 1, &m_RenderTexture, &m_DepthTexture );
+  if ( not g_Debug.HideSkybox )
+  {
+    ZoneScopedN( "Render Skybox" );
+    PIXScopedEvent( command_list, PIX_COLOR_DEFAULT, "Render Skybox" );
+    command_list->SetGraphicsRootSignature( m_BackgroundRootSignature.Get() );
+    command_list->SetPipelineState( m_BackgroundPipeline.Get() );
+    command_list->SetGraphicsRoot32BitConstant( 0, ( UINT )m_Camera->GetLastUpdatedBuffer(), 0 );
+    command_list->SetGraphicsRoot32BitConstant( 0, ( UINT )m_Environment->Repr().Skybox, 1 );
+    command_list->DispatchMesh( 1, 1, 1 );
+  }
 }
 
 void Ember::BasicApp::Render()
@@ -718,17 +748,6 @@ void Ember::BasicApp::Render()
   m_LightManager->RenderAllShadows( command_list.Get(), draw_list_info, *m_RenderTargetManager, *m_Camera, frame_idx );
 
   RenderScene( command_list.Get(), draw_list_info, frame_idx );
-
-  if ( not g_Debug.HideSkybox )
-  {
-    ZoneScopedN( "Render Skybox" );
-    PIXScopedEvent( command_list.Get(), PIX_COLOR_DEFAULT, "Render Skybox" );
-    command_list->SetGraphicsRootSignature( m_BackgroundRootSignature.Get() );
-    command_list->SetPipelineState( m_BackgroundPipeline.Get() );
-    command_list->SetGraphicsRoot32BitConstant( 0, ( UINT )m_Camera->GetLastUpdatedBuffer(), 0 );
-    command_list->SetGraphicsRoot32BitConstant( 0, ( UINT )m_Environment->Repr().Skybox, 1 );
-    command_list->DispatchMesh( 1, 1, 1 );
-  }
 
   {
     ZoneScopedN( "ImGUI" );

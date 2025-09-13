@@ -6,17 +6,9 @@ float4 TriangleAlphaTestPS( PSIn IN ) : SV_TARGET0
   ConstantBuffer<Camera>     camera    = ResourceDescriptorHeap[g_Camera];
   StructuredBuffer<Material> materials = ResourceDescriptorHeap[g_Materials];
 
-#ifndef STRIP_DEBUG_CONFIG
-  ConstantBuffer<DebugConfig> config = ResourceDescriptorHeap[g_ConfigID];
-  if ( config.VisualizeMeshlets )
-  {
-    return float4( IN.MeshletColor, 1.0f );
-  }
-#endif
+  Material                   mat       = materials[NonUniformResourceIndex( IN.Material )];
 
-  Material mat    = materials[NonUniformResourceIndex( IN.Material )];
-
-  float4   albedo = IN.Color * mat.GetAlbedo( IN.TexCoord[0], g_DefaultSampler );
+  float4                     albedo    = IN.Color * mat.GetAlbedo( IN.TexCoord[0], g_DefaultSampler );
 
   if ( albedo.a < mat.AlphaCutoff ) discard;
 
@@ -25,9 +17,26 @@ float4 TriangleAlphaTestPS( PSIn IN ) : SV_TARGET0
   float3 emissive    = mat.GetEmissive( IN.TexCoord[0], g_DefaultSampler );
 
 #ifndef STRIP_DEBUG_CONFIG
-  if ( config.ShowLightOnly )
+  ConstantBuffer<DebugConfig> config = ResourceDescriptorHeap[g_ConfigID];
+  switch ( config.VisualizationMode )
   {
-    albedo.xyz = 0.5f;
+    case kRender:
+      break;
+    case kMeshlet:
+      return float4( IN.MeshletColor, 1.0f );
+    case kWorldPosition:
+      return float4( IN.Position.xyz, 1.0f );
+    case kAlbedo:
+      return float4( albedo.xyz, 1.0f );
+    case kNormal:
+      return float4( normal, 1.0f );
+    case kORM:
+      return float4( float3( 1.0f, metal_rough.yx ), 1.0f );
+    case kEmissive:
+      return float4( emissive, 1.0f );
+    case kLightingOnly:
+      albedo.xyz = 0.5f;
+      break;
   }
 #endif
 
@@ -59,5 +68,5 @@ float4 TriangleAlphaTestPS( PSIn IN ) : SV_TARGET0
 
   float3 total_contrib = emissive + point_contrib + dir_contrib + ambient_contrib;
 
-  return float4( LinearToSrgb( total_contrib ), 1.0f );
+  return float4( total_contrib, 1.0f );
 }

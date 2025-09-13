@@ -29,17 +29,32 @@ std::unordered_map<SIZE_T, Ember::RawDescriptorHandle> g_ImguiHandleMap;
 
 struct DebugConfig
 {
+  enum VisMode : int
+  {
+    kRender        = 0,
+    kMeshlet       = 1,
+    kWorldPosition = 2,
+    kAlbedo        = 3,
+    kNormal        = 4,
+    kORM           = 5,
+    kEmissive      = 6,
+    kLightingOnly  = 7,
+  };
+
   uint32_t ShowDebugUI                  = true;
   uint32_t ShowWireframe                = false;
-  uint32_t ShowLightOnly                = false;
+  VisMode  VisualizationMode            = kRender;
 
   uint32_t HideSkybox                   = false;
   uint32_t RemoveDiffuseContrib         = false;
   uint32_t RemoveSpecularContrib        = false;
 
   uint32_t DisableMeshletFrustumCulling = false;
-  uint32_t VisualizeMeshlets            = false;
 } g_Debug;
+
+constexpr char const* kVisualizationModeNames[] = {
+  "Render", "Meshlet", "World Position", "Albedo", "Normal", "ORM", "Emissive", "Lighting Only",
+};
 
 } // namespace
 
@@ -203,6 +218,13 @@ void Ember::DeferredApp::SetupRenderPipeline()
   ComPtr<ID3DBlob> merge_pixel_shader_blob;
   ERR_ABORT( D3DReadFileToBlob( L"LightingPS.cso", &merge_pixel_shader_blob ) );
 
+  ComPtr<ID3DBlob> light_volume_amp_shader_blob;
+  ERR_ABORT( D3DReadFileToBlob( L"OmniLightingAS.cso", &light_volume_amp_shader_blob ) );
+  ComPtr<ID3DBlob> light_volume_mesh_shader_blob;
+  ERR_ABORT( D3DReadFileToBlob( L"OmniLightingMS.cso", &light_volume_mesh_shader_blob ) );
+  ComPtr<ID3DBlob> light_volume_pixel_shader_blob;
+  ERR_ABORT( D3DReadFileToBlob( L"OmniLightingPS.cso", &light_volume_pixel_shader_blob ) );
+
   ComPtr<ID3DBlob> alpha_blended_pixel_shader_blob;
   ERR_ABORT( D3DReadFileToBlob( L"TriangleAlphaBlendPS.cso", &alpha_blended_pixel_shader_blob ) );
 
@@ -332,12 +354,26 @@ void Ember::DeferredApp::SetupRenderPipeline()
     CD3DX12_PIPELINE_STATE_STREAM_PRIMITIVE_TOPOLOGY    PrimitiveTopologyType;
     CD3DX12_PIPELINE_STATE_STREAM_MS                    MS;
     CD3DX12_PIPELINE_STATE_STREAM_PS                    PS;
+    CD3DX12_PIPELINE_STATE_STREAM_BLEND_DESC            Blending;
     CD3DX12_PIPELINE_STATE_STREAM_RENDER_TARGET_FORMATS RTVFormats;
   };
 
   D3D12_RT_FORMAT_ARRAY final_rt_formats{
-    .RTFormats        = { DXGI_FORMAT_R8G8B8A8_UNORM },
+    .RTFormats        = { DXGI_FORMAT_R8G8B8A8_UNORM_SRGB },
     .NumRenderTargets = 1,
+  };
+  CD3DX12_BLEND_DESC light_vol_blend_desc{ D3D12_DEFAULT };
+  light_vol_blend_desc.RenderTarget[0] = {
+    .BlendEnable           = TRUE,
+    .LogicOpEnable         = FALSE,
+    .SrcBlend              = D3D12_BLEND_ONE,
+    .DestBlend             = D3D12_BLEND_ONE,
+    .BlendOp               = D3D12_BLEND_OP_ADD,
+    .SrcBlendAlpha         = D3D12_BLEND_ONE,
+    .DestBlendAlpha        = D3D12_BLEND_ONE,
+    .BlendOpAlpha          = D3D12_BLEND_OP_ADD,
+    .LogicOp               = D3D12_LOGIC_OP_NOOP,
+    .RenderTargetWriteMask = D3D12_COLOR_WRITE_ENABLE_ALL,
   };
 
   MergePipelineStream merge_pipeline_stream = {
@@ -345,6 +381,7 @@ void Ember::DeferredApp::SetupRenderPipeline()
     .PrimitiveTopologyType = D3D12_PRIMITIVE_TOPOLOGY_TYPE_TRIANGLE,
     .MS                    = CD3DX12_SHADER_BYTECODE( merge_mesh_shader_blob.Get() ),
     .PS                    = CD3DX12_SHADER_BYTECODE( merge_pixel_shader_blob.Get() ),
+    .Blending              = light_vol_blend_desc,
     .RTVFormats            = final_rt_formats,
   };
 
@@ -354,6 +391,48 @@ void Ember::DeferredApp::SetupRenderPipeline()
   };
 
   ERR_ABORT( device->CreatePipelineState( &merge_pipeline_state_stream_desc, IID_PPV_ARGS( &m_MergePipeline ) ) );
+
+  struct VolumePipelineStream
+  {
+    CD3DX12_PIPELINE_STATE_STREAM_ROOT_SIGNATURE        RootSignature;
+    CD3DX12_PIPELINE_STATE_STREAM_PRIMITIVE_TOPOLOGY    PrimitiveTopologyType;
+    CD3DX12_PIPELINE_STATE_STREAM_AS                    AS;
+    CD3DX12_PIPELINE_STATE_STREAM_MS                    MS;
+    CD3DX12_PIPELINE_STATE_STREAM_PS                    PS;
+    CD3DX12_PIPELINE_STATE_STREAM_RASTERIZER2           Rasterizer;
+    CD3DX12_PIPELINE_STATE_STREAM_BLEND_DESC            Blending;
+    CD3DX12_PIPELINE_STATE_STREAM_RENDER_TARGET_FORMATS RTVFormats;
+    CD3DX12_PIPELINE_STATE_STREAM_DEPTH_STENCIL         DepthStencil;
+    CD3DX12_PIPELINE_STATE_STREAM_DEPTH_STENCIL_FORMAT  DSVFormat;
+  };
+
+  CD3DX12_RASTERIZER_DESC2 light_vol_raster_desc{ D3D12_DEFAULT };
+  light_vol_raster_desc.FrontCounterClockwise = TRUE;
+  light_vol_raster_desc.CullMode              = D3D12_CULL_MODE_FRONT;
+
+  depth_stencil_desc.DepthEnable              = TRUE;
+  depth_stencil_desc.DepthFunc                = D3D12_COMPARISON_FUNC_GREATER_EQUAL;
+  depth_stencil_desc.DepthWriteMask           = D3D12_DEPTH_WRITE_MASK_ZERO;
+
+  VolumePipelineStream volume_pipeline_stream = {
+    .RootSignature         = m_MergeRootSignature.Get(),
+    .PrimitiveTopologyType = D3D12_PRIMITIVE_TOPOLOGY_TYPE_TRIANGLE,
+    .AS                    = CD3DX12_SHADER_BYTECODE( light_volume_amp_shader_blob.Get() ),
+    .MS                    = CD3DX12_SHADER_BYTECODE( light_volume_mesh_shader_blob.Get() ),
+    .PS                    = CD3DX12_SHADER_BYTECODE( light_volume_pixel_shader_blob.Get() ),
+    .Rasterizer            = light_vol_raster_desc,
+    .Blending              = light_vol_blend_desc,
+    .RTVFormats            = final_rt_formats,
+    .DepthStencil          = depth_stencil_desc,
+    .DSVFormat             = DXGI_FORMAT_D32_FLOAT,
+  };
+
+  D3D12_PIPELINE_STATE_STREAM_DESC const volume_pipeline_stream_desc = {
+    .SizeInBytes                   = sizeof volume_pipeline_stream,
+    .pPipelineStateSubobjectStream = &volume_pipeline_stream,
+  };
+
+  ERR_ABORT( device->CreatePipelineState( &volume_pipeline_stream_desc, IID_PPV_ARGS( &m_LightVolumePipeline ) ) );
 
   CD3DX12_BLEND_DESC blend_desc{ D3D12_DEFAULT };
   blend_desc.RenderTarget[0] = {
@@ -452,7 +531,7 @@ void Ember::DeferredApp::LoadContent()
       m_RenderDevice.get(), &m_World, m_TextureLoader.get(), m_MaterialManager.get(), m_GeometryManager.get() );
 
   // Setup Scene Geometry
-  flecs::entity       model = m_ModelLoader->TryLoadModel( "Bistro.glb" ).value().set_name( "Scene" );
+  ( void )m_ModelLoader->TryLoadModel( "Bistro.glb" ).value().set_name( "Scene" );
 
   flecs::entity const rm =
       m_World.GetECS()
@@ -464,7 +543,7 @@ void Ember::DeferredApp::LoadContent()
                 local_tx.Translation = DirectX::XMVectorSet( 0.0f, 1.0f, 5.0f, 1.0f );
               } );
 
-  model                             = m_ModelLoader->TryLoadModel( "DamagedHelmet.glb" )->child_of( rm );
+  flecs::entity   model             = m_ModelLoader->TryLoadModel( "DamagedHelmet.glb" )->child_of( rm );
   LocalTransform* local_tx          = model.get_mut<LocalTransform>();
   local_tx->Scale                   = DirectX::XMVectorSet( 0.3f, 0.3f, 0.3f, 0.0f );
   local_tx->Rotation                = DirectX::XMQuaternionIdentity();
@@ -589,12 +668,14 @@ void Ember::DeferredApp::Update()
         ImGui::Checkbox( "Show Wireframe", &scratch );
         g_Debug.ShowWireframe = ( uint32_t )scratch;
 
-        scratch               = ( bool )g_Debug.ShowLightOnly;
-        ImGui::Checkbox( "Show Light Only", &scratch );
-        g_Debug.ShowLightOnly = ( uint32_t )scratch;
+        ImGui::Combo(
+            "Show Light Only",
+            ( int* )&g_Debug.VisualizationMode,
+            DataOf( kVisualizationModeNames ),
+            CountOf( kVisualizationModeNames ),
+            5 );
 
-
-        scratch               = ( bool )g_Debug.HideSkybox;
+        scratch = ( bool )g_Debug.HideSkybox;
         ImGui::Checkbox( "Hide Skybox", &scratch );
         g_Debug.HideSkybox = ( uint32_t )scratch;
 
@@ -609,10 +690,6 @@ void Ember::DeferredApp::Update()
         scratch                       = ( bool )g_Debug.DisableMeshletFrustumCulling;
         ImGui::Checkbox( "Disable Meshlet Frustum Culling", &scratch );
         g_Debug.DisableMeshletFrustumCulling = ( uint32_t )scratch;
-
-        scratch                              = ( bool )g_Debug.VisualizeMeshlets;
-        ImGui::Checkbox( "Visualize Meshlets", &scratch );
-        g_Debug.VisualizeMeshlets = ( uint32_t )scratch;
       }
       ImGui::End();
     }
@@ -750,7 +827,12 @@ void Ember::DeferredApp::RenderScene(
   command_list->SetGraphicsRoot32BitConstants( 0, sizeof( DrawList::Info ) / 4, &draw_list_info_list.AlphaTested, 0 );
   command_list->DispatchMesh( draw_list_info_list.AlphaTested.DrawCount, 1, 1 );
 
-  m_RenderTargetManager->OMSetRenderTargets( command_list, 1, &m_RenderTexture, nullptr );
+  D3D12_RENDER_TARGET_VIEW_DESC const rtv_desc = {
+    .Format        = DXGI_FORMAT_R8G8B8A8_UNORM_SRGB,
+    .ViewDimension = D3D12_RTV_DIMENSION_TEXTURE2D,
+    .Texture2D     = { .MipSlice = 0 },
+  };
+  m_RenderTargetManager->OMSetRenderTargets( command_list, 1, &m_RenderTexture, &rtv_desc, &m_DepthTexture, nullptr );
 
   CD3DX12_RESOURCE_BARRIER gbuffer_barrier[kGBufferCount];
   for ( int i = 0; i < kGBufferCount; i++ )
@@ -761,7 +843,7 @@ void Ember::DeferredApp::RenderScene(
   command_list->ResourceBarrier( CountOf( gbuffer_barrier ), DataOf( gbuffer_barrier ) );
 
   command_list->SetGraphicsRootSignature( m_MergeRootSignature.Get() );
-  command_list->SetPipelineState( m_MergePipeline.Get() );
+  command_list->SetPipelineState( m_LightVolumePipeline.Get() );
 
   SRVHandle gbuffer_handles[kGBufferCount];
 
@@ -773,13 +855,15 @@ void Ember::DeferredApp::RenderScene(
   command_list->SetGraphicsRoot32BitConstants( 0, CountOf( gbuffer_handles ), DataOf( gbuffer_handles ), 0 );
   command_list->SetGraphicsRoot32BitConstants( 1, sizeof( PerFrameConstants ) / 4, &constants, 0 );
   command_list->SetGraphicsRoot32BitConstants( 2, sizeof( Environment::GpuRepr ) / 4, &m_Environment->Repr(), 0 );
+  command_list->DispatchMesh( ( constants.OmniLightCount + 31 ) / 32, 1, 1 );
+  command_list->SetPipelineState( m_MergePipeline.Get() );
   command_list->DispatchMesh( 1, 1, 1 );
 
+  m_RenderTargetManager->OMSetRenderTargets( command_list, 1, &m_RenderTexture, &m_DepthTexture );
   if ( not g_Debug.HideSkybox )
   {
     ZoneScopedN( "Render Skybox" );
     PIXScopedEvent( command_list, PIX_COLOR_DEFAULT, "Render Skybox" );
-    m_RenderTargetManager->OMSetRenderTargets( command_list, 1, &m_RenderTexture, &m_DepthTexture );
 
     command_list->SetGraphicsRootSignature( m_BackgroundRootSignature.Get() );
     command_list->SetGraphicsRoot32BitConstant( 0, ( UINT )m_Camera->GetLastUpdatedBuffer(), 0 );
@@ -883,6 +967,18 @@ void Ember::DeferredApp::Resize()
 
   m_WindowWidth  = rect.right - rect.left;
   m_WindowHeight = rect.bottom - rect.top;
+
+  for ( int i = 0; i < kGBufferCount; i++ )
+  {
+    m_GBuffer[i] = m_RenderDevice->CreateTexture2D( {
+        .Format    = kGBufferFormats[i],
+        .Width     = m_WindowWidth,
+        .Height    = m_WindowHeight,
+        .Usage     = TextureUsage::kRenderTarget,
+        .MipLevels = MipLevels::kBase,
+        .InitState = D3D12_RESOURCE_STATE_PIXEL_SHADER_RESOURCE,
+    } );
+  }
 
   m_RenderDevice->ResizeSwapchain( m_WindowWidth, m_WindowHeight );
   m_RenderTexture = m_RenderDevice->CreateTexture2D( {

@@ -85,9 +85,24 @@ float4 LightingPS( float2 tex_coord : TEXCOORD ) : SV_TARGET
 
 #ifndef STRIP_DEBUG_CONFIG
   ConstantBuffer<DebugConfig> config = ResourceDescriptorHeap[g_ConfigID];
-  if ( config.VisualizeMeshlets )
+  switch ( config.VisualizationMode )
   {
-    return float4( albedo_tex.Sample( g_DefaultSampler, tex_coord ).rgb, 1.0f );
+    case kRender:
+      break;
+    case kMeshlet:
+      return float4( albedo_tex.Sample( g_DefaultSampler, tex_coord ).rgb, 1.0f );
+    case kWorldPosition:
+      return float4( position_tex.Sample( g_DefaultSampler, tex_coord ).rgb, 1.0f );
+    case kAlbedo:
+      return float4( albedo_tex.Sample( g_DefaultSampler, tex_coord ).rgb, 1.0f );
+    case kNormal:
+      return float4( normal_tex.Sample( g_DefaultSampler, tex_coord ).rgb, 1.0f );
+    case kORM:
+      return float4( orm_tex.Sample( g_DefaultSampler, tex_coord ).rgb, 1.0f );
+    case kEmissive:
+      return float4( emissive_tex.Sample( g_DefaultSampler, tex_coord ).rgb, 1.0f );
+    case kLightingOnly:
+      break;
   }
 #endif
 
@@ -101,24 +116,23 @@ float4 LightingPS( float2 tex_coord : TEXCOORD ) : SV_TARGET
   float3 emissive     = emissive_tex.Sample( g_DefaultSampler, tex_coord ).rgb * pos_emission.w;
 
 #ifndef STRIP_DEBUG_CONFIG
-  if ( config.ShowLightOnly )
+  if ( config.VisualizationMode == kLightingOnly )
   {
     albedo.xyz = 0.5f;
   }
 #endif
 
   BRDFCookTorranceGGX brdf;
-  brdf.Albedo          = albedo;
-  brdf.Normal          = normal;
-  brdf.Metallic        = orm.z;
-  brdf.Roughness       = orm.y;
-  brdf.Occlusion       = orm.x;
-  brdf.F0              = lerp( 0.04f, albedo.rgb, orm.z );
+  brdf.Albedo        = albedo;
+  brdf.Normal        = normal;
+  brdf.Metallic      = orm.z;
+  brdf.Roughness     = orm.y;
+  brdf.Occlusion     = orm.x;
+  brdf.F0            = lerp( 0.04f, albedo.rgb, orm.z );
 
-  float3 view_dir      = normalize( camera.Position.xyz - position.xyz );
+  float3 view_dir    = normalize( camera.Position.xyz - position.xyz );
 
-  float3 point_contrib = CalcPointLightContrib( brdf, position, view_dir );
-  float3 dir_contrib   = CalcDirLightContrib( brdf, position, view_dir );
+  float3 dir_contrib = CalcDirLightContrib( brdf, position, view_dir );
 
 #ifdef STRIP_DEBUG_CONFIG
   float3 ambient_contrib = GetAmbientInfluence( brdf, view_dir, g_DefaultSampler, g_ClampedSampler );
@@ -133,7 +147,7 @@ float4 LightingPS( float2 tex_coord : TEXCOORD ) : SV_TARGET
       !config.RemoveSpecularContrib );
 #endif
 
-  float3 total_contrib = emissive + point_contrib + dir_contrib + ambient_contrib;
+  float3 total_contrib = emissive + dir_contrib + ambient_contrib;
 
-  return float4( LinearToSrgb( total_contrib ), 1.0f );
+  return float4( total_contrib, 1.0f );
 }

@@ -20,5 +20,5 @@ float4 BackgroundPS( BackgroundOut IN ) : SV_TARGET0
   TextureCube<float3> skybox = ResourceDescriptorHeap[g_Skybox];
 
   float3              color  = skybox.SampleLevel( g_DefaultSampler, IN.SkyboxCoord, 0.0f );
-  return float4( LinearToSrgb( color ), 1.0f );
+  return float4( color, 1.0f );
 }
