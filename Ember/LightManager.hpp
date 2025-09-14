@@ -28,7 +28,7 @@ public:
   LightManager(
       std::unique_ptr<Internal::OmniLightManager>      omni_light_manager,
       std::unique_ptr<Internal::DirectionLightManager> dir_light_manager );
-  static void     Create( LightManager* light_manager, RenderDevice* render_device, uint32_t num_frames );
+  static void     Create( LightManager* light_manager, RenderDevice* render_device, World* world, uint32_t num_frames );
 
   OmniLightHandle AddOmniLight(
       DirectX::XMFLOAT3 position, float range, Color32 color, float intensity, float attenuation = 1.0f );

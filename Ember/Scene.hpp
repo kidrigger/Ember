@@ -16,6 +16,9 @@ namespace Ember
 class RenderDevice;
 class MaterialImpl;
 
+struct Static
+{};
+
 struct LocalTransform
 {
   DirectX::XMVECTOR               Translation{ DirectX::XMVectorSet( 0.0f, 0.0f, 0.0f, 1.0f ) };
@@ -30,6 +33,8 @@ struct WorldTransform
 {
   DirectX::XMMATRIX Transform{ DirectX::XMMatrixIdentity() };
   DirectX::XMMATRIX InvTransform{ DirectX::XMMatrixIdentity() };
+
+  DirectX::XMFLOAT3 GetTranslation() const;
 };
 
 struct LocalBoundingBox

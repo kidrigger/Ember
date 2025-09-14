@@ -518,10 +518,42 @@ void Ember::DeferredApp::LoadContent()
   m_Camera->SetPosition( DirectX::XMVectorSet( -23.0f, 2.0f, -10.0f, 1.0f ) );
 
   // Setup Lights
-  LightManager::Create( m_LightManager.get(), m_RenderDevice.get(), RenderDevice::kNumFrames );
-  m_LightManager->AddShadowingOmniLight( { 15.0f, 2.0f, 12.0f }, 10.0f, Color32::Blue(), 15.0f );
-  m_LightManager->AddShadowingOmniLight( { 0.0f, 2.0f, 5.0f }, 10.0f, Color32::Green(), 15.0f );
-  m_LightManager->AddShadowingOmniLight( { -15.0f, 2.0f, -5.0f }, 10.0f, Color32::Red(), 25.0f );
+  LightManager::Create( m_LightManager.get(), m_RenderDevice.get(), &m_World, RenderDevice::kNumFrames );
+
+  std::ignore = m_World.GetECS()
+                    .entity( "Light0" )
+                    .insert(
+                        []( WorldTransform&, LocalTransform& lt, OmniLight& ol )
+                        {
+                          lt.Translation = { 15.0f, 2.0f, 12.0f };
+                          ol.Range       = 10.0f;
+                          ol.Color       = Color32::Blue();
+                          ol.Intensity   = 15.0f;
+                          ol.CastsShadow = true;
+                        } );
+  std::ignore = m_World.GetECS()
+                    .entity( "Light1" )
+                    .insert(
+                        []( WorldTransform&, LocalTransform& lt, OmniLight& ol )
+                        {
+                          lt.Translation = { 0.0f, 2.0f, 5.0f };
+                          ol.Range       = 10.0f;
+                          ol.Color       = Color32::Green();
+                          ol.Intensity   = 15.0f;
+                          ol.CastsShadow = true;
+                        } );
+  std::ignore = m_World.GetECS()
+                    .entity( "Light2" )
+                    .insert(
+                        []( WorldTransform&, LocalTransform& lt, OmniLight& ol )
+                        {
+                          lt.Translation = { -15.0f, 2.0f, -5.0f };
+                          ol.Range       = 10.0f;
+                          ol.Color       = Color32::Red();
+                          ol.Intensity   = 25.0f;
+                          ol.CastsShadow = true;
+                        } );
+
   m_LightManager->AddShadowingDirLight( { 1.0f, -1.0f, 0.0f }, Color32::White(), 5.0f );
 
   MaterialManager::Create( m_MaterialManager.get(), m_RenderDevice.get(), 10'000 );
@@ -855,7 +887,9 @@ void Ember::DeferredApp::RenderScene(
   command_list->SetGraphicsRoot32BitConstants( 0, CountOf( gbuffer_handles ), DataOf( gbuffer_handles ), 0 );
   command_list->SetGraphicsRoot32BitConstants( 1, sizeof( PerFrameConstants ) / 4, &constants, 0 );
   command_list->SetGraphicsRoot32BitConstants( 2, sizeof( Environment::GpuRepr ) / 4, &m_Environment->Repr(), 0 );
-  command_list->DispatchMesh( ( constants.OmniLightCount + 31 ) / 32, 1, 1 );
+
+  if ( constants.OmniLightCount > 0 ) command_list->DispatchMesh( ( constants.OmniLightCount + 31 ) / 32, 1, 1 );
+
   command_list->SetPipelineState( m_MergePipeline.Get() );
   command_list->DispatchMesh( 1, 1, 1 );
 

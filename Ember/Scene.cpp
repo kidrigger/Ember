@@ -16,6 +16,13 @@ void Ember::LocalTransform::SetTransform( DirectX::FXMMATRIX& transform )
   XMMatrixDecompose( &Scale, &Rotation, &Translation, transform );
 }
 
+DirectX::XMFLOAT3 Ember::WorldTransform::GetTranslation() const
+{
+  DirectX::XMFLOAT3 translation;
+  XMStoreFloat3( &translation, Transform.r[3] );
+  return translation;
+}
+
 bool Ember::WorldBoundingBox::IsInit() const
 {
   return AABB.Extents.x != 0.0f or AABB.Extents.y != 0.0f or AABB.Extents.y != 0.0f;

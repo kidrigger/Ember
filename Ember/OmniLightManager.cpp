@@ -21,11 +21,13 @@ static_assert( sizeof( PackedData ) == 36 );
 
 Ember::Internal::OmniLightManager::OmniLightManager(
     RenderDevice*               render_device,
+    World*                      world,
     Buffer                      projection_buffer,
     std::vector<Buffer>         light_buffers,
     ComPtr<ID3D12PipelineState> shadow_pipeline,
     ComPtr<ID3D12RootSignature> shadow_root_signature )
   : m_RenderDevice{ render_device }
+  , m_World{ world }
   , m_ShadowProjectionBuffer{ std::move( projection_buffer ) }
   , m_RootSignature{ std::move( shadow_root_signature ) }
   , m_Pipeline{ std::move( shadow_pipeline ) }
@@ -54,10 +56,20 @@ Ember::Internal::OmniLightManager::OmniLightManager(
   views[5] = DirectX::XMMatrixLookToLH( origin, DirectX::XMVectorNegate( forward ), up );
 
   m_ShadowProjectionBuffer.Write( 0, ByteSizeOf( views ), DataOf( views ) );
+
+  m_World->GetECS().component<OmniLightHandle>().on_remove( [&]( OmniLightHandle const handle ) { Free( handle ); } );
+
+  m_DynamicShadowQuery = m_World->GetECS()
+                             .query_builder<WorldTransform const, OmniLight const, OmniLightHandle const>()
+                             .without<Static>()
+                             .build();
+
+  m_InitShadowQuery =
+      m_World->GetECS().query_builder<WorldTransform const, OmniLight const>().without<OmniLightHandle>().build();
 }
 
 void Ember::Internal::OmniLightManager::Create(
-    OmniLightManager* light_manager, RenderDevice* render_device, uint32_t const num_frames )
+    OmniLightManager* light_manager, RenderDevice* render_device, World* world, uint32_t const num_frames )
 {
 
   Buffer              proj_buffer = render_device->CreateConstantBuffer( 6 * sizeof( DirectX::XMMATRIX ) );
@@ -67,7 +79,7 @@ void Ember::Internal::OmniLightManager::Create(
   for ( uint32_t i = 0; i < num_frames; i++ )
   {
     buffers.push_back(
-        render_device->CreateStorageBuffer( sizeof( OmniLight ) * kMaxOmniLights, sizeof( OmniLight ) ) );
+        render_device->CreateStorageBuffer( sizeof( OmniLightRepr ) * kMaxOmniLights, sizeof( OmniLightRepr ) ) );
   }
 
   ComPtr<ID3DBlob> shadow_amp_shader;
@@ -145,6 +157,7 @@ void Ember::Internal::OmniLightManager::Create(
 
   new ( light_manager ) OmniLightManager{
     render_device,
+    world,
     std::move( proj_buffer ),
     std::move( buffers ),
     std::move( shadow_pipeline ),
@@ -155,6 +168,14 @@ void Ember::Internal::OmniLightManager::Create(
 void Ember::Internal::OmniLightManager::SetDirty()
 {
   m_DirtyFrames = ( uint8_t )m_DataBuffers.size();
+}
+
+
+float Ember::Internal::OmniLightManager::CalculateRange( Color32 const color, float const intensity )
+{
+  auto [x, y, z]       = color.UnpackRgb();
+  float const max_comp = std::max( x, std::max( y, z ) );
+  return sqrt( ( max_comp * intensity ) ) * 10.0f;
 }
 
 Ember::OmniLightHandle Ember::Internal::OmniLightManager::AddOmniLight(
@@ -211,9 +232,7 @@ Ember::OmniLightHandle Ember::Internal::OmniLightManager::AddShadowingOmniLight(
   if ( range <= 0 )
   {
     // Auto-calculate the range.
-    DirectX::XMFLOAT3 const color_f  = color.UnpackRgb();
-    float const             max_comp = std::max( std::max( color_f.x, color_f.y ), color_f.z );
-    range                            = sqrt( ( max_comp * intensity ) ) * 10.0f;
+    range = CalculateRange( color, intensity );
   }
 
   OmniLightHandle const handle{ index, generation };
@@ -301,7 +320,7 @@ void Ember::Internal::OmniLightManager::Free( OmniLightHandle const omni_light_h
   uint16_t const index      = omni_light_handle.GetIndex();
   uint16_t const generation = omni_light_handle.GetGeneration();
 
-  ASSERT( m_HandleGeneration[index] == generation );
+  if ( m_HandleGeneration[index] != generation ) return;
   m_HandleGeneration[index]++;
 
   uint16_t const true_index          = m_IndirectionMap[index];
@@ -338,9 +357,45 @@ void Ember::Internal::OmniLightManager::Free( OmniLightHandle const omni_light_h
 
 Ember::SRVHandle Ember::Internal::OmniLightManager::PrepareFrame( uint32_t const frame_index )
 {
+  m_World->GetECS().defer(
+      [&]
+      {
+        m_InitShadowQuery.each(
+            [&]( flecs::entity e, WorldTransform const& wt, OmniLight const& ol )
+            {
+              DirectX::XMFLOAT3 const position = wt.GetTranslation();
+
+              OmniLightHandle const   olh      = ol.CastsShadow
+                                                     ? AddShadowingOmniLight( position, ol.Range, ol.Color, ol.Intensity )
+                                                     : AddOmniLight( position, ol.Range, ol.Color, ol.Intensity );
+              std::ignore                      = e.set<OmniLightHandle>( olh );
+            } );
+      } );
+
+  m_DynamicShadowQuery.each(
+      [&]( WorldTransform const& wt, OmniLight const& ol, OmniLightHandle const& omni_light_handle )
+      {
+        DirectX::XMFLOAT3 const position   = wt.GetTranslation();
+
+        uint16_t const          index      = omni_light_handle.GetIndex();
+        uint16_t const          generation = omni_light_handle.GetGeneration();
+
+        ASSERT( m_HandleGeneration[index] == generation );
+        if ( m_HandleGeneration[index] != generation ) return;
+
+        uint16_t const true_index         = m_IndirectionMap[index];
+
+        m_LightData[true_index].Position  = position;
+        m_LightData[true_index].Color     = ol.Color;
+        m_LightData[true_index].Intensity = ol.Intensity;
+        m_LightData[true_index].Range     = ol.Range >= 0 ? ol.Range : CalculateRange( ol.Color, ol.Intensity );
+
+        SetDirty();
+      } );
+
   if ( m_DirtyFrames )
   {
-    m_DataBuffers[frame_index].Write( 0, sizeof( OmniLight ) * m_TotalLightCount, DataOf( m_LightData ) );
+    m_DataBuffers[frame_index].Write( 0, sizeof( OmniLightRepr ) * m_TotalLightCount, DataOf( m_LightData ) );
     m_DirtyFrames--;
   }
 
@@ -399,7 +454,7 @@ void Ember::Internal::OmniLightManager::RenderAllShadows(
     ZoneScopedN( "CheckOmniShadow" );
     uint32_t const index = handle.GetIndex();
     ASSERT( handle.GetGeneration() == m_HandleGeneration[index] );
-    OmniLight const& light = m_LightData[index];
+    OmniLightRepr const& light = m_LightData[index];
     ZoneValue( index );
 
     DirectX::BoundingSphere sphere_of_influence{ light.Position, light.Range };
@@ -424,7 +479,7 @@ void Ember::Internal::OmniLightManager::RenderOmniShadow(
     ID3D12GraphicsCommandList6* command_list,
     DrawList::Batches const&    draw_list,
     RenderTargetManager const&  rtm,
-    OmniLight const&            omni_light,
+    OmniLightRepr const&        omni_light,
     Texture const&              texture ) const
 {
   PIXScopedEvent( command_list, PIX_COLOR_DEFAULT, "Render Omni Shadow %u", ( uint32_t )( &omni_light - m_LightData ) );
@@ -443,4 +498,12 @@ void Ember::Internal::OmniLightManager::RenderOmniShadow(
   rtm.OMSetRenderTargets( command_list, 0, nullptr, &texture );
 
   command_list->DispatchMesh( draw_list.Opaque.DrawCount, 1, 1 );
+}
+
+Ember::Internal::OmniLightManager::~OmniLightManager()
+{
+  for ( auto& gen : m_HandleGeneration )
+  {
+    gen = UINT16_MAX;
+  }
 }

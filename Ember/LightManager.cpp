@@ -9,10 +9,11 @@ Ember::LightManager::LightManager(
   : m_OmniLightManager{ std::move( omni_light_manager ) }, m_DirLightManager{ std::move( dir_light_manager ) }
 {}
 
-void Ember::LightManager::Create( LightManager* light_manager, RenderDevice* render_device, uint32_t const num_frames )
+void Ember::LightManager::Create(
+    LightManager* light_manager, RenderDevice* render_device, World* world, uint32_t const num_frames )
 {
   auto omni_light_manager = std::make_unique_for_overwrite<Internal::OmniLightManager>();
-  Internal::OmniLightManager::Create( omni_light_manager.get(), render_device, num_frames );
+  Internal::OmniLightManager::Create( omni_light_manager.get(), render_device, world, num_frames );
 
   auto dir_light_manager = std::make_unique_for_overwrite<Internal::DirectionLightManager>();
   Internal::DirectionLightManager::Create( dir_light_manager.get(), render_device, num_frames );

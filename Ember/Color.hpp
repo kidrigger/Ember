@@ -65,6 +65,11 @@ struct Color32
     return { ( float )R / 255.0f, ( float )G / 255.0f, ( float )B / 255.0f };
   }
 
+  constexpr static Color32 PackRgb( DirectX::XMFLOAT3 const& color )
+  {
+    return { color.x, color.y, color.z, 1.0f };
+  }
+
   constexpr static Color32 Black()
   {
     return {};

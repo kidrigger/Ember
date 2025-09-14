@@ -79,7 +79,6 @@ class DeferredApp final : public IApp
   DirectX::XMUINT2                     m_PrevMouse{};
   Buffer                               m_ConfigurationBuffer;
 
-  std::unique_ptr<LightManager>        m_LightManager;
 
   std::unique_ptr<Environment>         m_Environment;
   std::unique_ptr<MaterialManager>     m_MaterialManager;
@@ -87,8 +86,10 @@ class DeferredApp final : public IApp
   World                                m_World;
   DrawList                             m_DrawList;
   RenderQueryType                      m_RenderQuery;
+  // TODO: Organize init and destroy.
+  std::unique_ptr<LightManager> m_LightManager;
 
-  void                                 SetupRenderPipeline();
+  void                          SetupRenderPipeline();
 
 public:
   DeferredApp(
