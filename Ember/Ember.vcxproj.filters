@@ -358,6 +358,9 @@
     <None Include="OmniLightCommon.hlsli">
       <Filter>Shaders\Meshes\Deferred</Filter>
     </None>
+    <None Include="SpotShadow.hlsli">
+      <Filter>Shaders\Shadows</Filter>
+    </None>
   </ItemGroup>
   <ItemGroup>
     <FxCompile Include="EqrectToCube.hlsl">
@@ -449,6 +452,15 @@
     </FxCompile>
     <FxCompile Include="OmniLightingPS.hlsl">
       <Filter>Shaders\Meshes\Deferred</Filter>
+    </FxCompile>
+    <FxCompile Include="SpotShadowAS.hlsl">
+      <Filter>Shaders\Shadows</Filter>
+    </FxCompile>
+    <FxCompile Include="SpotShadowMS.hlsl">
+      <Filter>Shaders\Shadows</Filter>
+    </FxCompile>
+    <FxCompile Include="SpotShadowPS.hlsl">
+      <Filter>Shaders\Shadows</Filter>
     </FxCompile>
   </ItemGroup>
   <ItemGroup>

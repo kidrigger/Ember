@@ -2,6 +2,7 @@
 #define GEOMETRY_HLSLI_
 
 #include "Colors.hlsli"
+#include "Material.hlsli"
 #include "Quantization.hlsli"
 
 struct Vertex

@@ -1,8 +1,22 @@
 #include "SpotLightManager.hpp"
 
-#include <tracy/Tracy.hpp>
+#include "Camera.hpp"
+#include "RenderTargetManager.hpp"
 
 #include "Util/DataUtil.hpp"
+#include "Util/Profiling.hpp"
+
+namespace
+{
+struct PackedData
+{
+  Ember::DrawList::Info DrawList;
+  Ember::SRVHandle      LightBuffer;
+  uint32_t              LightIndex;
+};
+
+static_assert( sizeof( PackedData ) == 24 );
+} // namespace
 
 Ember::SRVHandle Ember::Internal::SpotLightManager::AllocateSpotShadow()
 {
@@ -70,7 +84,80 @@ void Ember::Internal::SpotLightManager::Create(
     data_buffers[frame_index].SetName( name );
   }
 
-  new ( light_manager ) SpotLightManager{ render_device, world, std::move( data_buffers ), {}, {} };
+  ComPtr<ID3DBlob> shadow_amp_shader;
+  ERR_ABORT( D3DReadFileToBlob( L"SpotShadowAS.cso", &shadow_amp_shader ) );
+
+  ComPtr<ID3DBlob> shadow_mesh_shader;
+  ERR_ABORT( D3DReadFileToBlob( L"SpotShadowMS.cso", &shadow_mesh_shader ) );
+
+  ComPtr<ID3DBlob> shadow_pixel_shader;
+  ERR_ABORT( D3DReadFileToBlob( L"SpotShadowPS.cso", &shadow_pixel_shader ) );
+
+  D3D12_ROOT_SIGNATURE_FLAGS const root_signature_flags = D3D12_ROOT_SIGNATURE_FLAG_ALLOW_INPUT_ASSEMBLER_INPUT_LAYOUT |
+                                                          D3D12_ROOT_SIGNATURE_FLAG_CBV_SRV_UAV_HEAP_DIRECTLY_INDEXED |
+                                                          D3D12_ROOT_SIGNATURE_FLAG_SAMPLER_HEAP_DIRECTLY_INDEXED |
+                                                          D3D12_ROOT_SIGNATURE_FLAG_DENY_GEOMETRY_SHADER_ROOT_ACCESS |
+                                                          D3D12_ROOT_SIGNATURE_FLAG_DENY_VERTEX_SHADER_ROOT_ACCESS |
+                                                          D3D12_ROOT_SIGNATURE_FLAG_DENY_DOMAIN_SHADER_ROOT_ACCESS |
+                                                          D3D12_ROOT_SIGNATURE_FLAG_DENY_HULL_SHADER_ROOT_ACCESS;
+
+  CD3DX12_ROOT_PARAMETER1 root_parameter;
+  root_parameter.InitAsConstants( sizeof( PackedData ) / 4, 0 );
+
+  CD3DX12_VERSIONED_ROOT_SIGNATURE_DESC root_signature_desc;
+  root_signature_desc.Init_1_1( 1, &root_parameter, 0, nullptr, root_signature_flags );
+
+  D3D_ROOT_SIGNATURE_VERSION root_signature_version = render_device->FetchHighestRootSignatureVersion();
+
+  ComPtr<ID3DBlob>           root_signature_blob;
+  ComPtr<ID3DBlob>           error_blob;
+  ERR_ABORT( D3DX12SerializeVersionedRootSignature(
+      &root_signature_desc, root_signature_version, &root_signature_blob, &error_blob ) );
+
+  ComPtr<ID3D12RootSignature> shadow_root_sig;
+  ERR_ABORT( render_device->GetDevice()->CreateRootSignature(
+      0,
+      root_signature_blob->GetBufferPointer(),
+      root_signature_blob->GetBufferSize(),
+      IID_PPV_ARGS( &shadow_root_sig ) ) );
+
+  CD3DX12_RASTERIZER_DESC2 rasterizer_desc{ D3D12_DEFAULT };
+  rasterizer_desc.FrontCounterClockwise = TRUE;
+  rasterizer_desc.CullMode              = D3D12_CULL_MODE_FRONT;
+
+  struct PipelineStream
+  {
+    CD3DX12_PIPELINE_STATE_STREAM_ROOT_SIGNATURE       RootSignature;
+    CD3DX12_PIPELINE_STATE_STREAM_PRIMITIVE_TOPOLOGY   PrimitiveTopologyType;
+    CD3DX12_PIPELINE_STATE_STREAM_AS                   AS;
+    CD3DX12_PIPELINE_STATE_STREAM_MS                   MS;
+    CD3DX12_PIPELINE_STATE_STREAM_PS                   PS;
+    CD3DX12_PIPELINE_STATE_STREAM_RASTERIZER2          Rasterizer;
+    CD3DX12_PIPELINE_STATE_STREAM_DEPTH_STENCIL_FORMAT DSVFormat;
+  };
+
+  PipelineStream pipeline_stream{
+    .RootSignature         = shadow_root_sig.Get(),
+    .PrimitiveTopologyType = D3D12_PRIMITIVE_TOPOLOGY_TYPE_TRIANGLE,
+    .AS                    = CD3DX12_SHADER_BYTECODE( shadow_amp_shader.Get() ),
+    .MS                    = CD3DX12_SHADER_BYTECODE( shadow_mesh_shader.Get() ),
+    .PS                    = CD3DX12_SHADER_BYTECODE( shadow_pixel_shader.Get() ),
+    .Rasterizer            = rasterizer_desc,
+    .DSVFormat             = DXGI_FORMAT_D16_UNORM,
+  };
+
+  D3D12_PIPELINE_STATE_STREAM_DESC desc{
+    .SizeInBytes                   = sizeof( pipeline_stream ),
+    .pPipelineStateSubobjectStream = &pipeline_stream,
+  };
+
+  ComPtr<ID3D12PipelineState> shadow_pipeline;
+  ERR_ABORT( render_device->GetDevice()->CreatePipelineState( &desc, IID_PPV_ARGS( &shadow_pipeline ) ) );
+  ERR_ABORT( shadow_pipeline->SetName( L"Spot Shadow Pipeline" ) );
+
+  new ( light_manager ) SpotLightManager{
+    render_device, world, std::move( data_buffers ), std::move( shadow_pipeline ), std::move( shadow_root_sig ),
+  };
 }
 
 Ember::LightInfo Ember::Internal::SpotLightManager::PrepareFrame( uint32_t const frame_index )
@@ -87,9 +174,18 @@ Ember::LightInfo Ember::Internal::SpotLightManager::PrepareFrame( uint32_t const
         XMStoreFloat3(
             &direction,
             DirectX::XMVector3Rotate(
-                DirectX::XMVectorSet( 0.0f, 0.0f, -1.0f, 0.0f ), XMQuaternionRotationMatrix( transform.Transform ) ) );
+                DirectX::XMVectorSet( 0.0f, 0.0f, 1.0f, 0.0f ), XMQuaternionRotationMatrix( transform.Transform ) ) );
+
+        DirectX::XMMATRIX const view_mat = XMMatrixLookToRH(
+            XMLoadFloat3( &position ), XMLoadFloat3( &direction ), DirectX::XMVECTORF32{ 0.0, 1.0f, 0.0f, 0.0f } );
+        DirectX::XMMATRIX const proj_mat =
+            DirectX::XMMatrixPerspectiveFovRH( light.ConeOuterHalfAngle * 2.0f, 1.0f, 0.01f, range );
+
+        DirectX::XMFLOAT4X4 light_mat;
+        XMStoreFloat4x4( &light_mat, XMMatrixMultiply( view_mat, proj_mat ) );
 
         m_LightData.push_back( {
+            .LightMatrix     = light_mat,
             .Position        = position,
             .Range           = range,
             .Direction       = direction,
@@ -149,4 +245,126 @@ uint32_t Ember::Internal::SpotLightManager::GetSpotLightCount() const
 uint32_t Ember::Internal::SpotLightManager::GetShadowingSpotLightCount() const
 {
   return m_ShadowingLightCount;
+}
+
+void Ember::Internal::SpotLightManager::RenderAllShadows(
+    ID3D12GraphicsCommandList6* command_list,
+    DrawList::Batches const&    draw_list,
+    RenderTargetManager const&  rtm,
+    Camera const&               camera,
+    uint32_t const              frame_idx )
+{
+  ZoneScoped;
+
+  DirectX::BoundingFrustum const& camera_frustum = camera.GetLastUpdatedFrustum();
+
+  command_list->SetGraphicsRootSignature( m_RootSignature.Get() );
+  auto bindless_desc_heaps = m_RenderDevice->GetBindlessDescriptorHeaps();
+  command_list->SetDescriptorHeaps( CountOf( bindless_desc_heaps ), DataOf( bindless_desc_heaps ) );
+  command_list->SetPipelineState( m_Pipeline.Get() );
+  command_list->IASetPrimitiveTopology( D3D_PRIMITIVE_TOPOLOGY_TRIANGLELIST );
+
+  D3D12_RECT const     scissor  = { 0, 0, kSpotShadowResolution, kSpotShadowResolution };
+  D3D12_VIEWPORT const viewport = { 0, 0, kSpotShadowResolution, kSpotShadowResolution, 0.0f, 1.0f };
+
+  command_list->RSSetScissorRects( 1, &scissor );
+  command_list->RSSetViewports( 1, &viewport );
+
+  std::pmr::vector<CD3DX12_RESOURCE_BARRIER> barriers{
+    m_ShadowingLightCount,
+    std::pmr::polymorphic_allocator( &m_BumpAlloc ),
+  };
+
+  std::transform(
+      m_ActiveShadows.begin(),
+      m_ActiveShadows.begin() + m_ShadowingLightCount,
+      barriers.begin(),
+      []( Texture const& tex )
+      {
+        return CD3DX12_RESOURCE_BARRIER::Transition(
+            tex.GetTexture(), D3D12_RESOURCE_STATE_PIXEL_SHADER_RESOURCE, D3D12_RESOURCE_STATE_DEPTH_WRITE );
+      } );
+
+  if ( not barriers.empty() ) command_list->ResourceBarrier( CountOf( barriers ), DataOf( barriers ) );
+
+  for ( uint32_t index = 0; index < m_ShadowingLightCount; index++ )
+  {
+    ZoneScopedN( "CheckSpotShadow" );
+    ZoneValue( index );
+
+    SpotLightRepr const&    light = m_LightData[index];
+
+    DirectX::XMVECTOR const fwd   = XMLoadFloat3( &light.Direction );
+    DirectX::XMVECTOR       up    = DirectX::XMVectorSet( 0.0f, 1.0f, 0.0f, 0.0f );
+    DirectX::XMVECTOR const right = DirectX::XMVector3Normalize( DirectX::XMVector3Cross( fwd, up ) );
+    up                            = DirectX::XMVector3Normalize( DirectX::XMVector3Cross( right, fwd ) );
+
+    DirectX::XMFLOAT3 corners[5];
+    corners[0] = light.Position;
+    XMStoreFloat3(
+        &corners[1],
+        DirectX::XMVectorAdd(
+            XMLoadFloat3( &light.Position ), DirectX::XMVectorAdd( DirectX::XMVectorScale( fwd, light.Range ), up ) ) );
+    XMStoreFloat3(
+        &corners[2],
+        DirectX::XMVectorAdd(
+            XMLoadFloat3( &light.Position ),
+            DirectX::XMVectorSubtract( DirectX::XMVectorScale( fwd, light.Range ), up ) ) );
+    XMStoreFloat3(
+        &corners[3],
+        DirectX::XMVectorAdd(
+            XMLoadFloat3( &light.Position ),
+            DirectX::XMVectorAdd( DirectX::XMVectorScale( fwd, light.Range ), right ) ) );
+    XMStoreFloat3(
+        &corners[4],
+        DirectX::XMVectorAdd(
+            XMLoadFloat3( &light.Position ),
+            DirectX::XMVectorSubtract( DirectX::XMVectorScale( fwd, light.Range ), right ) ) );
+
+    DirectX::BoundingOrientedBox bounding_box;
+    DirectX::BoundingOrientedBox::CreateFromPoints(
+        bounding_box, CountOf( corners ), DataOf( corners ), StrideOf( corners ) );
+
+    if ( camera_frustum.Contains( bounding_box ) == DirectX::DISJOINT ) continue;
+
+    RenderSpotShadow( command_list, draw_list, rtm, index, m_ActiveShadows[index], frame_idx );
+  }
+
+  std::transform(
+      m_ActiveShadows.begin(),
+      m_ActiveShadows.begin() + m_ShadowingLightCount,
+      barriers.begin(),
+      []( Texture const& tex )
+      {
+        return CD3DX12_RESOURCE_BARRIER::Transition(
+            tex.GetTexture(), D3D12_RESOURCE_STATE_DEPTH_WRITE, D3D12_RESOURCE_STATE_PIXEL_SHADER_RESOURCE );
+      } );
+
+  if ( not barriers.empty() ) command_list->ResourceBarrier( CountOf( barriers ), DataOf( barriers ) );
+}
+
+void Ember::Internal::SpotLightManager::RenderSpotShadow(
+    ID3D12GraphicsCommandList6* command_list,
+    DrawList::Batches const&    draw_list,
+    RenderTargetManager const&  rtm,
+    uint32_t const              spot_light_index,
+    Texture const&              texture,
+    uint32_t const              frame_idx ) const
+{
+  PIXScopedEvent( command_list, PIX_COLOR_DEFAULT, "Render Spot Shadow %u", spot_light_index );
+  ZoneScoped;
+
+  rtm.ClearDepthStencilView( command_list, texture, D3D12_CLEAR_FLAG_DEPTH, 1.0f, 0 );
+
+  PackedData const packed_data{
+    .DrawList    = draw_list.Opaque,
+    .LightBuffer = m_DataBuffers[frame_idx].GetSRVHandle(),
+    .LightIndex  = spot_light_index,
+  };
+
+  command_list->SetGraphicsRoot32BitConstants( 0, sizeof( PackedData ) / 4, &packed_data, 0 );
+
+  rtm.OMSetRenderTargets( command_list, 0, nullptr, &texture );
+
+  command_list->DispatchMesh( draw_list.Opaque.DrawCount, 1, 1 );
 }

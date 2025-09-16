@@ -397,6 +397,7 @@ void Ember::BasicApp::LoadContent()
 
   m_World.GetECS()
       .entity( "SpotLight" )
+      .add<LightShadow>()
       .insert(
           [&]( WorldTransform&, LocalTransform& lt, SpotLight& sl, RotatingModel& rm )
           {
@@ -407,6 +408,7 @@ void Ember::BasicApp::LoadContent()
             sl.ConeInnerHalfAngle = DirectX::XMConvertToRadians( 10.0f );
             sl.ConeOuterHalfAngle = DirectX::XMConvertToRadians( 15.0f );
             sl.Intensity          = 50.0f;
+            sl.Range              = 20.0f;
             rm.Speed              = 20.0f;
           } );
 

@@ -49,11 +49,10 @@ float3 CalcSpotLightContrib( in BRDFCookTorranceGGX brdf, float4 ws_position, fl
 
   float3                      spot_contrib = 0.0f;
   int                         light_idx    = 0;
-  // for ( ; light_idx < g_ShadowSpotLightCount; light_idx++ )
-  //{
-  //   spot_contrib += CalcShadowingLightContrib( spot_lights[light_idx], brdf, ws_position, view_dir, g_ShadowSampler
-  //   );
-  // }
+  for ( ; light_idx < g_ShadowSpotLightCount; light_idx++ )
+  {
+    spot_contrib += CalcShadowingLightContrib( spot_lights[light_idx], brdf, ws_position, view_dir, g_ShadowSampler );
+  }
 
   for ( ; light_idx < g_SpotLightCount; light_idx++ )
   {

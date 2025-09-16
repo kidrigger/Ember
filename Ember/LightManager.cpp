@@ -112,4 +112,5 @@ void Ember::LightManager::RenderAllShadows(
   PIXScopedEvent( command_list, PIX_COLOR_DEFAULT, "Render All Shadows" );
   m_OmniLightManager->RenderAllShadows( command_list, draw_list, rtm, camera );
   m_DirLightManager->RenderAllShadows( command_list, draw_list, rtm, camera, frame_idx );
+  m_SpotLightManager->RenderAllShadows( command_list, draw_list, rtm, camera, frame_idx );
 }

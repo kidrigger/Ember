@@ -23,6 +23,7 @@ struct PointLight
 
 struct SpotLight
 {
+  float4x4      LightSpaceMat;   // 112
   float3        Position;        // 12
   float         Range;           // 16
   float3        Direction;       // 28
@@ -30,7 +31,7 @@ struct SpotLight
   float         Intensity;       // 36
   float         ConeInnerCutoff; // 40
   float         ConeOuterCutoff; // 44
-  ResID         ShadowMap;       // 48
+  ResID         ShadowIdx;       // 48
 
   float3        GetRadiance()
   {

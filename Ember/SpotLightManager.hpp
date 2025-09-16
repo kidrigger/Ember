@@ -28,14 +28,15 @@ class SpotLightManager
 
   struct SpotLightRepr
   {
-    DirectX::XMFLOAT3 Position{ 0.0f, 0.0f, 0.0f };   // 12
-    float             Range{ -1.0f };                 // 16
-    DirectX::XMFLOAT3 Direction{ 0.0f, -1.0f, 0.0f }; // 28
-    Color32           Color;                          // 32
-    float             Intensity{ 1.0f };              // 36
-    float             ConeInnerCutoff{ 1.0f };        // 40
-    float             ConeOuterCutoff{ 1.0f };        // 44
-    SRVHandle         ShadowMap;                      // 48
+    DirectX::XMFLOAT4X4 LightMatrix;                    // 112
+    DirectX::XMFLOAT3   Position{ 0.0f, 0.0f, 0.0f };   // 12
+    float               Range;                          // 16
+    DirectX::XMFLOAT3   Direction{ 0.0f, 0.0f, -1.0f }; // 28
+    Color32             Color;                          // 32
+    float               Intensity{ 1.0f };              // 36
+    float               ConeInnerCutoff{ 1.0f };        // 40
+    float               ConeOuterCutoff{ 1.0f };        // 44
+    SRVHandle           ShadowMap;                      // 48
   };
   static_assert( sizeof( SpotLightRepr ) % 16 == 0 );
 
@@ -79,14 +80,16 @@ public:
       ID3D12GraphicsCommandList6* command_list,
       DrawList::Batches const&    draw_list,
       RenderTargetManager const&  rtm,
-      Camera const&               camera );
+      Camera const&               camera,
+      uint32_t                    frame_idx );
 
   void RenderSpotShadow(
       ID3D12GraphicsCommandList6* command_list,
       DrawList::Batches const&    draw_list,
       RenderTargetManager const&  rtm,
-      SpotLightRepr const&        spot_light,
-      Texture const&              texture ) const;
+      uint32_t                    spot_light_index,
+      Texture const&              texture,
+      uint32_t                    frame_idx ) const;
 };
 
 } // namespace Internal
@@ -100,7 +103,6 @@ struct SpotLight
   float   Intensity{ 1.0f };
   float   ConeInnerHalfAngle{ DirectX::XM_PI * 0.166667f }; // 30 degrees.
   float   ConeOuterHalfAngle{ DirectX::XM_PIDIV4 };         // 45 degrees.
-  bool    CastsShadow{ false };
 };
 
 
