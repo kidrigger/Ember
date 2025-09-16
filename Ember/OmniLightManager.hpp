@@ -89,7 +89,7 @@ public:
       DirectX::XMFLOAT3 position, float range, Color32 color, float intensity, float attenuation = 1.0f );
   void                   Free( OmniLightHandle omni_light_handle );
 
-  SRVHandle              PrepareFrame( uint32_t frame_index );
+  LightInfo              PrepareFrame( uint32_t frame_index );
   [[nodiscard]] uint16_t GetOmniLightCount() const;
   [[nodiscard]] uint16_t GetShadowingOmniLightCount() const;
 

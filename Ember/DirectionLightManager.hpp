@@ -85,7 +85,7 @@ public:
   DirLightHandle AddShadowingDirLight( DirectX::XMFLOAT3 direction, Color32 color, float intensity );
   void           Free( DirLightHandle dir_light_handle );
 
-  SRVHandle      PrepareFrame( uint32_t frame_index );
+  LightInfo      PrepareFrame( uint32_t frame_index );
   [[nodiscard]] uint16_t GetDirLightCount() const;
   [[nodiscard]] uint16_t GetShadowingDirLightCount() const;
 

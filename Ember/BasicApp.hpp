@@ -50,16 +50,16 @@ class BasicApp final : public IApp
   DirectX::XMUINT2                     m_PrevMouse{};
   Buffer                               m_ConfigurationBuffer;
 
-  std::unique_ptr<LightManager>        m_LightManager;
-
   std::unique_ptr<Environment>         m_Environment;
   std::unique_ptr<MaterialManager>     m_MaterialManager;
   std::unique_ptr<GeometryManager>     m_GeometryManager;
   World                                m_World;
   DrawList                             m_DrawList;
   RenderQueryType                      m_RenderQuery;
+  // TODO: Organize init and destroy.
+  std::unique_ptr<LightManager> m_LightManager;
 
-  void                                 SetupRenderPipeline();
+  void                          SetupRenderPipeline();
 
 public:
   BasicApp(

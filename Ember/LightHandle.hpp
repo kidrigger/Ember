@@ -2,6 +2,8 @@
 
 #include <compare>
 
+#include "DeviceHandle.hpp"
+
 namespace Ember
 {
 
@@ -34,6 +36,21 @@ class DirLightHandle : public LightHandle
 public:
   DirLightHandle() = default;
   DirLightHandle( uint16_t const inner, uint16_t const generation );
+};
+
+class SpotLightHandle : public LightHandle
+{
+public:
+  SpotLightHandle() = default;
+  SpotLightHandle( uint16_t const inner, uint16_t const generation );
+};
+
+
+struct LightInfo
+{
+  SRVHandle Buffer;
+  uint32_t  ShadowingLightCount;
+  uint32_t  TotalLightCount;
 };
 
 } // namespace Ember

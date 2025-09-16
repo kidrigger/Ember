@@ -355,7 +355,7 @@ void Ember::Internal::OmniLightManager::Free( OmniLightHandle const omni_light_h
   m_IndirectionFreeHead   = index;
 }
 
-Ember::SRVHandle Ember::Internal::OmniLightManager::PrepareFrame( uint32_t const frame_index )
+Ember::LightInfo Ember::Internal::OmniLightManager::PrepareFrame( uint32_t const frame_index )
 {
   m_World->GetECS().defer(
       [&]
@@ -399,7 +399,7 @@ Ember::SRVHandle Ember::Internal::OmniLightManager::PrepareFrame( uint32_t const
     m_DirtyFrames--;
   }
 
-  return m_DataBuffers[frame_index].GetSRVHandle();
+  return { m_DataBuffers[frame_index].GetSRVHandle(), m_ShadowingLightCount, m_TotalLightCount };
 }
 
 uint16_t Ember::Internal::OmniLightManager::GetOmniLightCount() const

@@ -21,3 +21,7 @@ Ember::OmniLightHandle::OmniLightHandle( uint16_t const inner, uint16_t const ge
 Ember::DirLightHandle::DirLightHandle( uint16_t const inner, uint16_t const generation )
   : LightHandle{ inner, generation }
 {}
+
+Ember::SpotLightHandle::SpotLightHandle( uint16_t const inner, uint16_t const generation )
+  : LightHandle{ inner, generation }
+{}

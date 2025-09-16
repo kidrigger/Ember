@@ -18,13 +18,16 @@ cbuffer BindlessIndex : register( b1 )
 {
   ResID g_Materials;
   ResID g_Camera;
-  ResID g_PointLights;
-  uint  g_PointLightCount;
-  uint  g_ShadowPointLightCount;
-  ResID g_DirLights;
-  uint  g_DirLightCount;
-  uint  g_ShadowDirLightCount;
   ResID g_ConfigID;
+  ResID g_PointLights;
+  uint  g_ShadowPointLightCount;
+  uint  g_PointLightCount;
+  ResID g_DirLights;
+  uint  g_ShadowDirLightCount;
+  uint  g_DirLightCount;
+  ResID g_SpotLights;
+  uint  g_ShadowSpotLightCount;
+  uint  g_SpotLightCount;
 }
 
 cbuffer EnvBuf : register( b2 )

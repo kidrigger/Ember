@@ -7,6 +7,7 @@
 #include "DirectionLightManager.hpp"
 #include "LightHandle.hpp"
 #include "OmniLightManager.hpp"
+#include "SpotLightManager.hpp"
 #include "Util/DirectXHeaders.hpp"
 
 namespace Ember
@@ -20,14 +21,25 @@ class LightManager
 {
   std::unique_ptr<Internal::OmniLightManager>      m_OmniLightManager;
   std::unique_ptr<Internal::DirectionLightManager> m_DirLightManager;
+  std::unique_ptr<Internal::SpotLightManager>      m_SpotLightManager;
 
 public:
   float constexpr static kRangeAuto = -1.0f;
 
-  LightManager()                    = default;
+  struct GpuInfo
+  {
+    LightInfo OmniLightInfo;
+    LightInfo DirLightInfo;
+    LightInfo SpotLightInfo;
+  };
+
+  static_assert( sizeof( GpuInfo ) == 36 );
+
+  LightManager() = default;
   LightManager(
       std::unique_ptr<Internal::OmniLightManager>      omni_light_manager,
-      std::unique_ptr<Internal::DirectionLightManager> dir_light_manager );
+      std::unique_ptr<Internal::DirectionLightManager> dir_light_manager,
+      std::unique_ptr<Internal::SpotLightManager>      spot_light_manager );
   static void     Create( LightManager* light_manager, RenderDevice* render_device, World* world, uint32_t num_frames );
 
   OmniLightHandle AddOmniLight(
@@ -39,11 +51,11 @@ public:
   void           Free( OmniLightHandle omni_light_handle );
   void           Free( DirLightHandle dir_light_handle );
 
-  [[nodiscard]] std::tuple<SRVHandle, SRVHandle> PrepareFrame( uint32_t frame_index ) const;
-  [[nodiscard]] uint16_t                         GetOmniLightCount() const;
-  [[nodiscard]] uint16_t                         GetShadowingOmniLightCount() const;
-  [[nodiscard]] uint16_t                         GetDirLightCount() const;
-  [[nodiscard]] uint16_t                         GetShadowingDirLightCount() const;
+  [[nodiscard]] Ember::LightManager::GpuInfo PrepareFrame( uint32_t frame_index ) const;
+  [[nodiscard]] uint16_t                     GetOmniLightCount() const;
+  [[nodiscard]] uint16_t                     GetShadowingOmniLightCount() const;
+  [[nodiscard]] uint16_t                     GetDirLightCount() const;
+  [[nodiscard]] uint16_t                     GetShadowingDirLightCount() const;
 
   //
   void RenderAllShadows(

@@ -48,6 +48,7 @@ float4 TrianglePS( PSIn IN ) : SV_TARGET0
   float3 view_dir      = normalize( camera.Position.xyz - IN.Position.xyz );
 
   float3 point_contrib = CalcPointLightContrib( brdf, IN.Position, view_dir );
+  float3 spot_contrib  = CalcSpotLightContrib( brdf, IN.Position, view_dir );
   float3 dir_contrib   = CalcDirLightContrib( brdf, IN.Position, view_dir );
 
 #ifdef STRIP_DEBUG_CONFIG
@@ -63,7 +64,7 @@ float4 TrianglePS( PSIn IN ) : SV_TARGET0
       !config.RemoveSpecularContrib );
 #endif
 
-  float3 total_contrib = emissive + point_contrib + dir_contrib + ambient_contrib;
+  float3 total_contrib = emissive + point_contrib + dir_contrib + spot_contrib + ambient_contrib;
 
   return float4( total_contrib, 1.0f );
 }

@@ -5,8 +5,11 @@
 
 Ember::LightManager::LightManager(
     std::unique_ptr<Internal::OmniLightManager>      omni_light_manager,
-    std::unique_ptr<Internal::DirectionLightManager> dir_light_manager )
-  : m_OmniLightManager{ std::move( omni_light_manager ) }, m_DirLightManager{ std::move( dir_light_manager ) }
+    std::unique_ptr<Internal::DirectionLightManager> dir_light_manager,
+    std::unique_ptr<Internal::SpotLightManager>      spot_light_manager )
+  : m_OmniLightManager{ std::move( omni_light_manager ) }
+  , m_DirLightManager{ std::move( dir_light_manager ) }
+  , m_SpotLightManager{ std::move( spot_light_manager ) }
 {}
 
 void Ember::LightManager::Create(
@@ -18,7 +21,14 @@ void Ember::LightManager::Create(
   auto dir_light_manager = std::make_unique_for_overwrite<Internal::DirectionLightManager>();
   Internal::DirectionLightManager::Create( dir_light_manager.get(), render_device, num_frames );
 
-  new ( light_manager ) LightManager{ std::move( omni_light_manager ), std::move( dir_light_manager ) };
+  auto spot_light_manager = std::make_unique_for_overwrite<Internal::SpotLightManager>();
+  Internal::SpotLightManager::Create( spot_light_manager.get(), render_device, world, num_frames );
+
+  new ( light_manager ) LightManager{
+    std::move( omni_light_manager ),
+    std::move( dir_light_manager ),
+    std::move( spot_light_manager ),
+  };
 }
 
 Ember::OmniLightHandle Ember::LightManager::AddOmniLight(
@@ -63,9 +73,13 @@ void Ember::LightManager::Free( DirLightHandle const dir_light_handle )
   m_DirLightManager->Free( dir_light_handle );
 }
 
-std::tuple<Ember::SRVHandle, Ember::SRVHandle> Ember::LightManager::PrepareFrame( uint32_t const frame_index ) const
+Ember::LightManager::GpuInfo Ember::LightManager::PrepareFrame( uint32_t const frame_index ) const
 {
-  return { m_OmniLightManager->PrepareFrame( frame_index ), m_DirLightManager->PrepareFrame( frame_index ) };
+  return {
+    .OmniLightInfo = m_OmniLightManager->PrepareFrame( frame_index ),
+    .DirLightInfo  = m_DirLightManager->PrepareFrame( frame_index ),
+    .SpotLightInfo = m_SpotLightManager->PrepareFrame( frame_index ),
+  };
 }
 
 uint16_t Ember::LightManager::GetOmniLightCount() const

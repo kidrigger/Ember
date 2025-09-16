@@ -251,4 +251,26 @@ float3 CalcLightContrib( in PointLight point_light, in TBrdf brdf, float4 ws_pos
   return brdf.Evaluate( radiance, view_dir, light_dir );
 }
 
+template <typename TBrdf>
+float3 CalcLightContrib( in SpotLight spot_light, in TBrdf brdf, float4 ws_position, float3 view_dir )
+{
+  float3 light_dir   = float3( spot_light.Position ) - ws_position.xyz;
+  float3 spot_fwd    = -normalize( spot_light.Direction );
+  float  light_dist  = length( light_dir );
+
+  light_dir         /= light_dist; // Normalization
+
+  float angle_dot    = dot( spot_fwd, light_dir );
+  if ( angle_dot < spot_light.ConeOuterCutoff ) return 0.0f;
+  if ( light_dist > spot_light.Range ) return 0.0f;
+
+  // Smooth attenuation from [karis13]
+  float angle_propo = smoothstep( spot_light.ConeOuterCutoff, spot_light.ConeInnerCutoff, angle_dot );
+  float attenuation = angle_propo * pow( saturate( 1 - pow( light_dist / spot_light.Range, 4.0f ) ), 2.0f ) /
+                      ( light_dist * light_dist + 1.0f );
+  float3 radiance = attenuation * spot_light.GetRadiance();
+
+  return brdf.Evaluate( radiance, view_dir, light_dir );
+}
+
 #endif

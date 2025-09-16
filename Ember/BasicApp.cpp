@@ -65,15 +65,10 @@ struct RotatingModel
 
 struct PerFrameConstants
 {
-  Ember::SRVHandle MaterialsBuffer;
-  Ember::CBVHandle Camera;
-  Ember::SRVHandle OmniLightBuffer;
-  uint32_t         OmniLightCount;
-  uint32_t         OmniLightShadowCount;
-  Ember::SRVHandle DirLightBuffer;
-  uint32_t         DirLightCount;
-  uint32_t         DirLightShadowCount;
-  Ember::CBVHandle ConfigBuffer;
+  Ember::SRVHandle             MaterialsBuffer;
+  Ember::CBVHandle             Camera;
+  Ember::CBVHandle             ConfigBuffer;
+  Ember::LightManager::GpuInfo LightInfo;
 };
 
 struct PerMeshConstants
@@ -100,11 +95,11 @@ Ember::BasicApp::BasicApp(
   , m_RenderTargetManager{ std::move( render_target_manager ) }
   , m_SwapchainFormat{ m_RenderDevice->FetchSwapchainFormat() }
   , m_Camera{ std::make_unique<Camera>() }
-  , m_LightManager{ std::make_unique_for_overwrite<LightManager>() }
   , m_Environment{ std::make_unique<Environment>() }
   , m_MaterialManager{ std::make_unique_for_overwrite<MaterialManager>() }
   , m_GeometryManager{ std::make_unique_for_overwrite<GeometryManager>() }
   , m_DrawList{ m_RenderDevice.get(), m_GeometryManager.get(), RenderDevice::kNumFrames }
+  , m_LightManager{ std::make_unique_for_overwrite<LightManager>() }
 {
   m_TextureLoader = std::make_unique_for_overwrite<TextureLoader>();
   TextureLoader::Create( m_TextureLoader.get(), m_RenderDevice.get(), 3 );
@@ -395,10 +390,25 @@ void Ember::BasicApp::LoadContent()
 
   // Setup Lights
   LightManager::Create( m_LightManager.get(), m_RenderDevice.get(), &m_World, RenderDevice::kNumFrames );
-  m_LightManager->AddOmniLight( { 15.0f, 2.0f, 12.0f }, 10.0f, Color32::Blue(), 15.0f );
-  m_LightManager->AddOmniLight( { 0.0f, 2.0f, 5.0f }, 10.0f, Color32::Green(), 15.0f );
-  m_LightManager->AddOmniLight( { -15.0f, 2.0f, -5.0f }, 10.0f, Color32::Red(), 25.0f );
+  m_LightManager->AddShadowingOmniLight( { 15.0f, 2.0f, 12.0f }, 10.0f, Color32::Blue(), 15.0f );
+  m_LightManager->AddShadowingOmniLight( { 0.0f, 2.0f, 5.0f }, 10.0f, Color32::Green(), 15.0f );
+  m_LightManager->AddShadowingOmniLight( { -15.0f, 2.0f, -5.0f }, 10.0f, Color32::Red(), 25.0f );
   m_LightManager->AddShadowingDirLight( { 1.0f, -1.0f, 0.0f }, Color32::White(), 5.0f );
+
+  m_World.GetECS()
+      .entity( "SpotLight" )
+      .insert(
+          [&]( WorldTransform&, LocalTransform& lt, SpotLight& sl, RotatingModel& rm )
+          {
+            lt.Translation = { -15.0f, 1.0f, -5.0f };
+            lt.Rotation    = DirectX::XMQuaternionRotationRollPitchYaw(
+                DirectX::XMConvertToRadians( -10.0f ), DirectX::XMConvertToRadians( 0.0f ), 0.0f );
+            sl.Color              = Color32::White();
+            sl.ConeInnerHalfAngle = DirectX::XMConvertToRadians( 10.0f );
+            sl.ConeOuterHalfAngle = DirectX::XMConvertToRadians( 15.0f );
+            sl.Intensity          = 50.0f;
+            rm.Speed              = 20.0f;
+          } );
 
   MaterialManager::Create( m_MaterialManager.get(), m_RenderDevice.get(), 10'000 );
   GeometryManager::Create( m_GeometryManager.get(), m_RenderDevice.get(), 256_MiB );
@@ -638,9 +648,9 @@ void Ember::BasicApp::RenderScene(
   m_RenderTargetManager->ClearRenderTargetView( command_list, m_RenderTexture, kBlack );
   m_RenderTargetManager->ClearDepthStencilView( command_list, m_DepthTexture, D3D12_CLEAR_FLAG_DEPTH, 1.0f, 0 );
 
-  CBVHandle const camera_cbv                 = m_Camera->GetLastUpdatedBuffer();
-  auto const [omni_light_srv, dir_light_srv] = m_LightManager->PrepareFrame( frame_idx );
-  SRVHandle const materials_srv              = m_MaterialManager->PrepareFrame();
+  CBVHandle const       camera_cbv    = m_Camera->GetLastUpdatedBuffer();
+  LightManager::GpuInfo light_info    = m_LightManager->PrepareFrame( frame_idx );
+  SRVHandle const       materials_srv = m_MaterialManager->PrepareFrame();
 
   // Viewport and scissor
   D3D12_VIEWPORT const viewport = {
@@ -672,15 +682,10 @@ void Ember::BasicApp::RenderScene(
   m_RenderTargetManager->OMSetRenderTargets( command_list, 1, &m_RenderTexture, &rtv_desc, &m_DepthTexture, nullptr );
 
   PerFrameConstants const constants = {
-    .MaterialsBuffer      = materials_srv,
-    .Camera               = camera_cbv,
-    .OmniLightBuffer      = omni_light_srv,
-    .OmniLightCount       = m_LightManager->GetOmniLightCount(),
-    .OmniLightShadowCount = m_LightManager->GetShadowingOmniLightCount(),
-    .DirLightBuffer       = dir_light_srv,
-    .DirLightCount        = m_LightManager->GetDirLightCount(),
-    .DirLightShadowCount  = m_LightManager->GetShadowingDirLightCount(),
-    .ConfigBuffer         = m_ConfigurationBuffer.GetCBVHandle(),
+    .MaterialsBuffer = materials_srv,
+    .Camera          = camera_cbv,
+    .ConfigBuffer    = m_ConfigurationBuffer.GetCBVHandle(),
+    .LightInfo       = light_info,
   };
 
   command_list->SetGraphicsRoot32BitConstants( 1, sizeof( PerFrameConstants ) / 4, &constants, 0 );

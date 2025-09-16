@@ -171,6 +171,9 @@
     <ClCompile Include="Util\HelperUtils.cpp">
       <Filter>Source Files\Util</Filter>
     </ClCompile>
+    <ClCompile Include="SpotLightManager.cpp">
+      <Filter>Source Files\Scene</Filter>
+    </ClCompile>
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="Util\PerfCounter.hpp">
@@ -283,6 +286,9 @@
     </ClInclude>
     <ClInclude Include="Input.hpp">
       <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="SpotLightManager.hpp">
+      <Filter>Header Files\Scene</Filter>
     </ClInclude>
   </ItemGroup>
   <ItemGroup>

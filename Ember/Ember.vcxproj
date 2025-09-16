@@ -318,6 +318,7 @@
     <ClCompile Include="RenderTargetManager.cpp" />
     <ClCompile Include="ResourceTracker.cpp" />
     <ClCompile Include="Scene.cpp" />
+    <ClCompile Include="SpotLightManager.cpp" />
     <ClCompile Include="Texture.cpp" />
     <ClCompile Include="TextureLoader.cpp" />
     <ClCompile Include="Context.cpp" />
@@ -352,6 +353,7 @@
     <ClInclude Include="RenderTargetManager.hpp" />
     <ClInclude Include="ResourceTracker.hpp" />
     <ClInclude Include="Scene.hpp" />
+    <ClInclude Include="SpotLightManager.hpp" />
     <ClInclude Include="Texture.hpp" />
     <ClInclude Include="TextureLoader.hpp" />
     <ClInclude Include="Context.hpp" />

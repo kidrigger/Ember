@@ -72,6 +72,8 @@ Ember::Buffer::Buffer(
 
 void Ember::Buffer::Write( uint32_t const offset, uint32_t const size, void const* data ) const
 {
+  if ( size == 0 ) return;
+
   uint32_t const    absolute_offset  = GetOffset() + offset;
   D3D12_RANGE const empty_read_range = { 0, 0 };
   D3D12_RANGE const write_range      = { absolute_offset, absolute_offset + size };

@@ -259,7 +259,7 @@ Ember::DirLightHandle Ember::Internal::DirectionLightManager::AddShadowingDirLig
   return handle;
 }
 
-void Ember::Internal::DirectionLightManager::Free( DirLightHandle dir_light_handle )
+void Ember::Internal::DirectionLightManager::Free( DirLightHandle const dir_light_handle )
 {
   uint16_t const index      = dir_light_handle.GetIndex();
   uint16_t const generation = dir_light_handle.GetGeneration();
@@ -299,7 +299,7 @@ void Ember::Internal::DirectionLightManager::Free( DirLightHandle dir_light_hand
   m_IndirectionFreeHead   = index;
 }
 
-Ember::SRVHandle Ember::Internal::DirectionLightManager::PrepareFrame( uint32_t const frame_index )
+Ember::LightInfo Ember::Internal::DirectionLightManager::PrepareFrame( uint32_t const frame_index )
 {
   if ( m_DirtyFrames )
   {
@@ -307,7 +307,7 @@ Ember::SRVHandle Ember::Internal::DirectionLightManager::PrepareFrame( uint32_t 
     m_DirtyFrames--;
   }
 
-  return m_DataBuffers[frame_index].GetSRVHandle();
+  return { m_DataBuffers[frame_index].GetSRVHandle(), m_ShadowingLightCount, m_TotalLightCount };
 }
 
 uint16_t Ember::Internal::DirectionLightManager::GetDirLightCount() const

@@ -21,6 +21,23 @@ struct PointLight
   }
 };
 
+struct SpotLight
+{
+  float3        Position;        // 12
+  float         Range;           // 16
+  float3        Direction;       // 28
+  PackedColor32 Color;           // 32
+  float         Intensity;       // 36
+  float         ConeInnerCutoff; // 40
+  float         ConeOuterCutoff; // 44
+  ResID         ShadowMap;       // 48
+
+  float3        GetRadiance()
+  {
+    return Intensity * UnpackColor32( Color ).rgb;
+  }
+};
+
 struct DirLight
 {
   float4x4      LightSpaceMat[NUM_CASCADES]; // 384

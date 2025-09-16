@@ -65,15 +65,10 @@ struct RotatingModel
 
 struct PerFrameConstants
 {
-  Ember::SRVHandle MaterialsBuffer;
-  Ember::CBVHandle Camera;
-  Ember::SRVHandle OmniLightBuffer;
-  uint32_t         OmniLightCount;
-  uint32_t         OmniLightShadowCount;
-  Ember::SRVHandle DirLightBuffer;
-  uint32_t         DirLightCount;
-  uint32_t         DirLightShadowCount;
-  Ember::CBVHandle ConfigBuffer;
+  Ember::SRVHandle             MaterialsBuffer;
+  Ember::CBVHandle             Camera;
+  Ember::CBVHandle             ConfigBuffer;
+  Ember::LightManager::GpuInfo LightInfo;
 };
 
 struct PerMeshConstants
@@ -588,7 +583,7 @@ void Ember::DeferredApp::LoadContent()
   constexpr char const* kEnvMapFile = "OvercastSoil.hdr";
   bool const            env_loaded =
       Environment::TryLoadFrom( m_Environment.get(), m_RenderDevice.get(), m_TextureLoader.get(), kEnvMapFile );
-  ASSERT( env_loaded );
+  ENSURE( env_loaded );
 
   SetupRenderPipeline();
 
@@ -808,9 +803,9 @@ void Ember::DeferredApp::RenderScene(
   m_RenderTargetManager->ClearRenderTargetView( command_list, m_RenderTexture, kBlack );
   m_RenderTargetManager->ClearDepthStencilView( command_list, m_DepthTexture, D3D12_CLEAR_FLAG_DEPTH, 1.0f, 0 );
 
-  CBVHandle const camera_cbv                 = m_Camera->GetLastUpdatedBuffer();
-  auto const [omni_light_srv, dir_light_srv] = m_LightManager->PrepareFrame( frame_idx );
-  SRVHandle const materials_srv              = m_MaterialManager->PrepareFrame();
+  CBVHandle const       camera_cbv    = m_Camera->GetLastUpdatedBuffer();
+  LightManager::GpuInfo light_info    = m_LightManager->PrepareFrame( frame_idx );
+  SRVHandle const       materials_srv = m_MaterialManager->PrepareFrame();
 
   // Viewport and scissor
   D3D12_VIEWPORT const viewport = {
@@ -837,15 +832,10 @@ void Ember::DeferredApp::RenderScene(
   m_RenderTargetManager->OMSetRenderTargets( command_list, CountOf( m_GBuffer ), DataOf( m_GBuffer ), &m_DepthTexture );
 
   PerFrameConstants const constants = {
-    .MaterialsBuffer      = materials_srv,
-    .Camera               = camera_cbv,
-    .OmniLightBuffer      = omni_light_srv,
-    .OmniLightCount       = m_LightManager->GetOmniLightCount(),
-    .OmniLightShadowCount = m_LightManager->GetShadowingOmniLightCount(),
-    .DirLightBuffer       = dir_light_srv,
-    .DirLightCount        = m_LightManager->GetDirLightCount(),
-    .DirLightShadowCount  = m_LightManager->GetShadowingDirLightCount(),
-    .ConfigBuffer         = m_ConfigurationBuffer.GetCBVHandle(),
+    .MaterialsBuffer = materials_srv,
+    .Camera          = camera_cbv,
+    .ConfigBuffer    = m_ConfigurationBuffer.GetCBVHandle(),
+    .LightInfo       = light_info,
   };
 
   command_list->SetGraphicsRoot32BitConstants( 1, sizeof( PerFrameConstants ) / 4, &constants, 0 );
@@ -888,7 +878,8 @@ void Ember::DeferredApp::RenderScene(
   command_list->SetGraphicsRoot32BitConstants( 1, sizeof( PerFrameConstants ) / 4, &constants, 0 );
   command_list->SetGraphicsRoot32BitConstants( 2, sizeof( Environment::GpuRepr ) / 4, &m_Environment->Repr(), 0 );
 
-  if ( constants.OmniLightCount > 0 ) command_list->DispatchMesh( ( constants.OmniLightCount + 31 ) / 32, 1, 1 );
+  if ( constants.LightInfo.OmniLightInfo.TotalLightCount > 0 )
+    command_list->DispatchMesh( ( constants.LightInfo.OmniLightInfo.TotalLightCount + 31 ) / 32, 1, 1 );
 
   command_list->SetPipelineState( m_MergePipeline.Get() );
   command_list->DispatchMesh( 1, 1, 1 );
