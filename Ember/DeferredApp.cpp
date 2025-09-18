@@ -84,7 +84,7 @@ struct PerMeshConstants
 };
 
 Ember::DeferredApp::DeferredApp(
-    HWND                                 window_handle,
+    HWND const                           window_handle,
     std::unique_ptr<RenderDevice>        render_device,
     std::unique_ptr<PerfCounter>         perf_counter,
     std::unique_ptr<RenderTargetManager> render_target_manager )
@@ -95,11 +95,11 @@ Ember::DeferredApp::DeferredApp(
   , m_RenderTargetManager{ std::move( render_target_manager ) }
   , m_SwapchainFormat{ m_RenderDevice->FetchSwapchainFormat() }
   , m_Camera{ std::make_unique<Camera>() }
-  , m_LightManager{ std::make_unique_for_overwrite<LightManager>() }
   , m_Environment{ std::make_unique<Environment>() }
   , m_MaterialManager{ std::make_unique_for_overwrite<MaterialManager>() }
   , m_GeometryManager{ std::make_unique_for_overwrite<GeometryManager>() }
   , m_DrawList{ m_RenderDevice.get(), m_GeometryManager.get(), RenderDevice::kNumFrames }
+  , m_LightManager{ std::make_unique_for_overwrite<LightManager>() }
 {
   m_TextureLoader = std::make_unique_for_overwrite<TextureLoader>();
   TextureLoader::Create( m_TextureLoader.get(), m_RenderDevice.get(), 3 );
@@ -213,12 +213,19 @@ void Ember::DeferredApp::SetupRenderPipeline()
   ComPtr<ID3DBlob> merge_pixel_shader_blob;
   ERR_ABORT( D3DReadFileToBlob( L"LightingPS.cso", &merge_pixel_shader_blob ) );
 
-  ComPtr<ID3DBlob> light_volume_amp_shader_blob;
-  ERR_ABORT( D3DReadFileToBlob( L"OmniLightingAS.cso", &light_volume_amp_shader_blob ) );
-  ComPtr<ID3DBlob> light_volume_mesh_shader_blob;
-  ERR_ABORT( D3DReadFileToBlob( L"OmniLightingMS.cso", &light_volume_mesh_shader_blob ) );
-  ComPtr<ID3DBlob> light_volume_pixel_shader_blob;
-  ERR_ABORT( D3DReadFileToBlob( L"OmniLightingPS.cso", &light_volume_pixel_shader_blob ) );
+  ComPtr<ID3DBlob> omni_volume_amp_shader_blob;
+  ERR_ABORT( D3DReadFileToBlob( L"OmniLightingAS.cso", &omni_volume_amp_shader_blob ) );
+  ComPtr<ID3DBlob> omni_volume_mesh_shader_blob;
+  ERR_ABORT( D3DReadFileToBlob( L"OmniLightingMS.cso", &omni_volume_mesh_shader_blob ) );
+  ComPtr<ID3DBlob> omni_volume_pixel_shader_blob;
+  ERR_ABORT( D3DReadFileToBlob( L"OmniLightingPS.cso", &omni_volume_pixel_shader_blob ) );
+
+  ComPtr<ID3DBlob> spot_volume_amp_shader_blob;
+  ERR_ABORT( D3DReadFileToBlob( L"SpotLightingAS.cso", &spot_volume_amp_shader_blob ) );
+  ComPtr<ID3DBlob> spot_volume_mesh_shader_blob;
+  ERR_ABORT( D3DReadFileToBlob( L"SpotLightingMS.cso", &spot_volume_mesh_shader_blob ) );
+  ComPtr<ID3DBlob> spot_volume_pixel_shader_blob;
+  ERR_ABORT( D3DReadFileToBlob( L"SpotLightingPS.cso", &spot_volume_pixel_shader_blob ) );
 
   ComPtr<ID3DBlob> alpha_blended_pixel_shader_blob;
   ERR_ABORT( D3DReadFileToBlob( L"TriangleAlphaBlendPS.cso", &alpha_blended_pixel_shader_blob ) );
@@ -412,9 +419,9 @@ void Ember::DeferredApp::SetupRenderPipeline()
   VolumePipelineStream volume_pipeline_stream = {
     .RootSignature         = m_MergeRootSignature.Get(),
     .PrimitiveTopologyType = D3D12_PRIMITIVE_TOPOLOGY_TYPE_TRIANGLE,
-    .AS                    = CD3DX12_SHADER_BYTECODE( light_volume_amp_shader_blob.Get() ),
-    .MS                    = CD3DX12_SHADER_BYTECODE( light_volume_mesh_shader_blob.Get() ),
-    .PS                    = CD3DX12_SHADER_BYTECODE( light_volume_pixel_shader_blob.Get() ),
+    .AS                    = CD3DX12_SHADER_BYTECODE( omni_volume_amp_shader_blob.Get() ),
+    .MS                    = CD3DX12_SHADER_BYTECODE( omni_volume_mesh_shader_blob.Get() ),
+    .PS                    = CD3DX12_SHADER_BYTECODE( omni_volume_pixel_shader_blob.Get() ),
     .Rasterizer            = light_vol_raster_desc,
     .Blending              = light_vol_blend_desc,
     .RTVFormats            = final_rt_formats,
@@ -427,7 +434,12 @@ void Ember::DeferredApp::SetupRenderPipeline()
     .pPipelineStateSubobjectStream = &volume_pipeline_stream,
   };
 
-  ERR_ABORT( device->CreatePipelineState( &volume_pipeline_stream_desc, IID_PPV_ARGS( &m_LightVolumePipeline ) ) );
+  ERR_ABORT( device->CreatePipelineState( &volume_pipeline_stream_desc, IID_PPV_ARGS( &m_OmniLightVolumePipeline ) ) );
+
+  volume_pipeline_stream.AS = CD3DX12_SHADER_BYTECODE( spot_volume_amp_shader_blob.Get() );
+  volume_pipeline_stream.MS = CD3DX12_SHADER_BYTECODE( spot_volume_mesh_shader_blob.Get() );
+  volume_pipeline_stream.PS = CD3DX12_SHADER_BYTECODE( spot_volume_pixel_shader_blob.Get() );
+  ERR_ABORT( device->CreatePipelineState( &volume_pipeline_stream_desc, IID_PPV_ARGS( &m_SpotLightVolumePipeline ) ) );
 
   CD3DX12_BLEND_DESC blend_desc{ D3D12_DEFAULT };
   blend_desc.RenderTarget[0] = {
@@ -550,6 +562,23 @@ void Ember::DeferredApp::LoadContent()
                         } );
 
   m_LightManager->AddShadowingDirLight( { 1.0f, -1.0f, 0.0f }, Color32::White(), 5.0f );
+
+  m_World.GetECS()
+      .entity( "SpotLight" )
+      .add<LightShadow>()
+      .insert(
+          [&]( WorldTransform&, LocalTransform& lt, SpotLight& sl, RotatingModel& rm )
+          {
+            lt.Translation = { -15.0f, 1.0f, -5.0f };
+            lt.Rotation    = DirectX::XMQuaternionRotationRollPitchYaw(
+                DirectX::XMConvertToRadians( -10.0f ), DirectX::XMConvertToRadians( 0.0f ), 0.0f );
+            sl.Color              = Color32::White();
+            sl.ConeInnerHalfAngle = DirectX::XMConvertToRadians( 10.0f );
+            sl.ConeOuterHalfAngle = DirectX::XMConvertToRadians( 15.0f );
+            sl.Intensity          = 50.0f;
+            sl.Range              = 20.0f;
+            rm.Speed              = 20.0f;
+          } );
 
   MaterialManager::Create( m_MaterialManager.get(), m_RenderDevice.get(), 10'000 );
   GeometryManager::Create( m_GeometryManager.get(), m_RenderDevice.get(), 256_MiB );
@@ -864,8 +893,8 @@ void Ember::DeferredApp::RenderScene(
   }
   command_list->ResourceBarrier( CountOf( gbuffer_barrier ), DataOf( gbuffer_barrier ) );
 
+  // Lighting Pass
   command_list->SetGraphicsRootSignature( m_MergeRootSignature.Get() );
-  command_list->SetPipelineState( m_LightVolumePipeline.Get() );
 
   SRVHandle gbuffer_handles[kGBufferCount];
 
@@ -879,7 +908,16 @@ void Ember::DeferredApp::RenderScene(
   command_list->SetGraphicsRoot32BitConstants( 2, sizeof( Environment::GpuRepr ) / 4, &m_Environment->Repr(), 0 );
 
   if ( constants.LightInfo.OmniLightInfo.TotalLightCount > 0 )
+  {
+    command_list->SetPipelineState( m_OmniLightVolumePipeline.Get() );
     command_list->DispatchMesh( ( constants.LightInfo.OmniLightInfo.TotalLightCount + 31 ) / 32, 1, 1 );
+  }
+
+  if ( constants.LightInfo.SpotLightInfo.TotalLightCount > 0 )
+  {
+    command_list->SetPipelineState( m_SpotLightVolumePipeline.Get() );
+    command_list->DispatchMesh( ( constants.LightInfo.SpotLightInfo.TotalLightCount + 31 ) / 32, 1, 1 );
+  }
 
   command_list->SetPipelineState( m_MergePipeline.Get() );
   command_list->DispatchMesh( 1, 1, 1 );

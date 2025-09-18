@@ -361,6 +361,9 @@
     <None Include="SpotShadow.hlsli">
       <Filter>Shaders\Shadows</Filter>
     </None>
+    <None Include="SpotLightCommon.hlsli">
+      <Filter>Shaders\Meshes\Deferred</Filter>
+    </None>
   </ItemGroup>
   <ItemGroup>
     <FxCompile Include="EqrectToCube.hlsl">
@@ -461,6 +464,15 @@
     </FxCompile>
     <FxCompile Include="SpotShadowPS.hlsl">
       <Filter>Shaders\Shadows</Filter>
+    </FxCompile>
+    <FxCompile Include="SpotLightingAS.hlsl">
+      <Filter>Shaders\Meshes\Deferred</Filter>
+    </FxCompile>
+    <FxCompile Include="SpotLightingMS.hlsl">
+      <Filter>Shaders\Meshes\Deferred</Filter>
+    </FxCompile>
+    <FxCompile Include="SpotLightingPS.hlsl">
+      <Filter>Shaders\Meshes\Deferred</Filter>
     </FxCompile>
   </ItemGroup>
   <ItemGroup>

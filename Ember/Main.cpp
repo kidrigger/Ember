@@ -9,7 +9,7 @@
 
 #pragma comment( lib, "dxguid.lib" )
 
-using AppType = Ember::BasicApp;
+using AppType = Ember::DeferredApp;
 
 int CALLBACK wWinMain(
     HINSTANCE const                  instance_handle,

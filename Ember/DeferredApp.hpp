@@ -63,7 +63,8 @@ class DeferredApp final : public IApp
 
   ComPtr<ID3D12RootSignature>          m_MergeRootSignature;
   ComPtr<ID3D12PipelineState>          m_MergePipeline;
-  ComPtr<ID3D12PipelineState>          m_LightVolumePipeline;
+  ComPtr<ID3D12PipelineState>          m_OmniLightVolumePipeline;
+  ComPtr<ID3D12PipelineState>          m_SpotLightVolumePipeline;
   ComPtr<ID3D12PipelineState>          m_AlphaBlendedPBRPipeline;
 
   ComPtr<ID3D12RootSignature>          m_BackgroundRootSignature;

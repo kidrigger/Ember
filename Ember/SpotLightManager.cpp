@@ -174,7 +174,7 @@ Ember::LightInfo Ember::Internal::SpotLightManager::PrepareFrame( uint32_t const
         XMStoreFloat3(
             &direction,
             DirectX::XMVector3Rotate(
-                DirectX::XMVectorSet( 0.0f, 0.0f, 1.0f, 0.0f ), XMQuaternionRotationMatrix( transform.Transform ) ) );
+                DirectX::XMVectorSet( 0.0f, 0.0f, -1.0f, 0.0f ), XMQuaternionRotationMatrix( transform.Transform ) ) );
 
         DirectX::XMMATRIX const view_mat = XMMatrixLookToRH(
             XMLoadFloat3( &position ), XMLoadFloat3( &direction ), DirectX::XMVECTORF32{ 0.0, 1.0f, 0.0f, 0.0f } );
