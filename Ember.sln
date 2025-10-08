@@ -4,6 +4,11 @@ Microsoft Visual Studio Solution File, Format Version 12.00
 VisualStudioVersion = 17.13.36105.23
 MinimumVisualStudioVersion = 10.0.40219.1
 Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "Ember", "Ember\Ember.vcxproj", "{11EAEADB-E456-42D6-A022-7D2093C6AF72}"
+	ProjectSection(ProjectDependencies) = postProject
+		{0F9F57CF-4A55-427F-B46E-0B3BC8CA8CC9} = {0F9F57CF-4A55-427F-B46E-0B3BC8CA8CC9}
+	EndProjectSection
+EndProject
+Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "FrameGraph", "FrameGraph\FrameGraph.vcxproj", "{0F9F57CF-4A55-427F-B46E-0B3BC8CA8CC9}"
 EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
@@ -33,6 +38,22 @@ Global
 		{11EAEADB-E456-42D6-A022-7D2093C6AF72}.RenderDoc_Compat|x64.Build.0 = RenderDoc_Compat|x64
 		{11EAEADB-E456-42D6-A022-7D2093C6AF72}.RenderDoc_Compat|x86.ActiveCfg = RenderDoc_Compat|Win32
 		{11EAEADB-E456-42D6-A022-7D2093C6AF72}.RenderDoc_Compat|x86.Build.0 = RenderDoc_Compat|Win32
+		{0F9F57CF-4A55-427F-B46E-0B3BC8CA8CC9}.Debug|x64.ActiveCfg = Debug|x64
+		{0F9F57CF-4A55-427F-B46E-0B3BC8CA8CC9}.Debug|x64.Build.0 = Debug|x64
+		{0F9F57CF-4A55-427F-B46E-0B3BC8CA8CC9}.Debug|x86.ActiveCfg = Debug|Win32
+		{0F9F57CF-4A55-427F-B46E-0B3BC8CA8CC9}.Debug|x86.Build.0 = Debug|Win32
+		{0F9F57CF-4A55-427F-B46E-0B3BC8CA8CC9}.Release|x64.ActiveCfg = Release|x64
+		{0F9F57CF-4A55-427F-B46E-0B3BC8CA8CC9}.Release|x64.Build.0 = Release|x64
+		{0F9F57CF-4A55-427F-B46E-0B3BC8CA8CC9}.Release|x86.ActiveCfg = Release|Win32
+		{0F9F57CF-4A55-427F-B46E-0B3BC8CA8CC9}.Release|x86.Build.0 = Release|Win32
+		{0F9F57CF-4A55-427F-B46E-0B3BC8CA8CC9}.ReleaseWithDebug|x64.ActiveCfg = ReleaseWithDebug|x64
+		{0F9F57CF-4A55-427F-B46E-0B3BC8CA8CC9}.ReleaseWithDebug|x64.Build.0 = ReleaseWithDebug|x64
+		{0F9F57CF-4A55-427F-B46E-0B3BC8CA8CC9}.ReleaseWithDebug|x86.ActiveCfg = Release|Win32
+		{0F9F57CF-4A55-427F-B46E-0B3BC8CA8CC9}.ReleaseWithDebug|x86.Build.0 = Release|Win32
+		{0F9F57CF-4A55-427F-B46E-0B3BC8CA8CC9}.RenderDoc_Compat|x64.ActiveCfg = Debug|x64
+		{0F9F57CF-4A55-427F-B46E-0B3BC8CA8CC9}.RenderDoc_Compat|x64.Build.0 = Debug|x64
+		{0F9F57CF-4A55-427F-B46E-0B3BC8CA8CC9}.RenderDoc_Compat|x86.ActiveCfg = Debug|Win32
+		{0F9F57CF-4A55-427F-B46E-0B3BC8CA8CC9}.RenderDoc_Compat|x86.Build.0 = Debug|Win32
 	EndGlobalSection
 	GlobalSection(SolutionProperties) = preSolution
 		HideSolutionNode = FALSE

@@ -27,6 +27,11 @@ public:
       ComPtr<ID3D12DescriptorHeap> dsv_descriptor_heap,
       uint32_t                     dsv_descriptor_size );
 
+  void RSSetScissorViewport( ID3D12GraphicsCommandList* command_list, uint32_t width, uint32_t height ) const;
+
+  void ClearRenderTargetView(
+      ID3D12GraphicsCommandList* command_list, ID3D12Resource* render_target, float const color[] ) const;
+
   void ClearRenderTargetView(
       ID3D12GraphicsCommandList* command_list, Texture const& render_target, float const color[] ) const;
 
@@ -38,10 +43,25 @@ public:
 
   void ClearDepthStencilView(
       ID3D12GraphicsCommandList* command_list,
+      ID3D12Resource*            depth_stencil,
+      D3D12_CLEAR_FLAGS          flags,
+      float                      depth,
+      uint8_t                    stencil ) const;
+
+  void ClearDepthStencilView(
+      ID3D12GraphicsCommandList* command_list,
       Texture const&             depth_stencil,
       D3D12_CLEAR_FLAGS          flags,
       float                      depth,
       uint8_t                    stencil ) const;
+
+  void OMSetRenderTargets(
+      ID3D12GraphicsCommandList*           command_list,
+      uint32_t                             count,
+      ID3D12Resource**                     render_targets,
+      D3D12_RENDER_TARGET_VIEW_DESC const* rtv_desc,
+      ID3D12Resource*                      depth_stencil,
+      D3D12_DEPTH_STENCIL_VIEW_DESC const* dsv_desc ) const;
 
   void OMSetRenderTargets(
       ID3D12GraphicsCommandList* command_list,

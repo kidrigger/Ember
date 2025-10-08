@@ -1,11 +1,13 @@
 #include "BasicApp.hpp"
 
 #include <cstdint>
+#include <fstream>
 #include <unordered_set>
 #include <utility>
 
 #include "Camera.hpp"
 #include "Environment.hpp"
+#include "FrameGraphHelper.hpp"
 #include "GeometryManager.hpp"
 #include "Input.hpp"
 #include "LightManager.hpp"
@@ -52,6 +54,8 @@ struct DebugConfig
   uint32_t DisableMeshletFrustumCulling = false;
 } g_Debug;
 
+bool                  g_OutputFrameGraph        = false;
+
 constexpr char const* kVisualizationModeNames[] = {
   "Render", "Meshlet", "World Position", "Albedo", "Normal", "ORM", "Emissive", "Lighting Only",
 };
@@ -61,14 +65,6 @@ constexpr char const* kVisualizationModeNames[] = {
 struct RotatingModel
 {
   float Speed;
-};
-
-struct PerFrameConstants
-{
-  Ember::SRVHandle             MaterialsBuffer;
-  Ember::CBVHandle             Camera;
-  Ember::CBVHandle             ConfigBuffer;
-  Ember::LightManager::GpuInfo LightInfo;
 };
 
 struct PerMeshConstants
@@ -127,7 +123,7 @@ Ember::BasicApp::BasicApp(
   ImGui_ImplWin32_Init( window_handle );
 
   ImGui_ImplDX12_InitInfo init_info = {};
-  init_info.Device                  = m_RenderDevice->GetDevice().Get();
+  init_info.Device                  = m_RenderDevice->GetDevice();
   init_info.CommandQueue            = m_RenderDevice->GetDirectQueue();
   init_info.NumFramesInFlight       = RenderDevice::kNumFrames;
   init_info.RTVFormat               = DXGI_FORMAT_R8G8B8A8_UNORM;
@@ -179,7 +175,7 @@ void Ember::BasicApp::Create( BasicApp* app, HINSTANCE const instance_handle )
   RenderDevice::Create( render_device.get(), window_handle, use_warp );
 
   auto perf_counter = std::make_unique_for_overwrite<PerfCounter>();
-  PerfCounter::Create( perf_counter.get(), render_device->GetDevice().Get(), RenderDevice::kNumFrames );
+  PerfCounter::Create( perf_counter.get(), render_device->GetDevice(), RenderDevice::kNumFrames );
 
   auto render_target_manager = std::make_unique_for_overwrite<RenderTargetManager>();
   RenderTargetManager::Create( render_target_manager.get(), render_device.get() );
@@ -199,178 +195,8 @@ Ember::BasicApp::~BasicApp() // NOLINT(modernize-use-equals-default)
 
 void Ember::BasicApp::SetupRenderPipeline()
 {
-  ComPtr<ID3DBlob> amp_shader_blob;
-  ERR_ABORT( D3DReadFileToBlob( L"TriangleAS.cso", &amp_shader_blob ) );
-  ComPtr<ID3DBlob> mesh_shader_blob;
-  ERR_ABORT( D3DReadFileToBlob( L"TriangleMS.cso", &mesh_shader_blob ) );
-  ComPtr<ID3DBlob> pixel_shader_blob;
-  ERR_ABORT( D3DReadFileToBlob( L"TrianglePS.cso", &pixel_shader_blob ) );
-  ComPtr<ID3DBlob> alpha_tested_pixel_shader_blob;
-  ERR_ABORT( D3DReadFileToBlob( L"TriangleAlphaTestPS.cso", &alpha_tested_pixel_shader_blob ) );
-  ComPtr<ID3DBlob> alpha_blended_pixel_shader_blob;
-  ERR_ABORT( D3DReadFileToBlob( L"TriangleAlphaBlendPS.cso", &alpha_blended_pixel_shader_blob ) );
-
-  ComPtr<ID3DBlob> bg_mesh_shader_blob;
-  ERR_ABORT( D3DReadFileToBlob( L"BackgroundMS.cso", &bg_mesh_shader_blob ) );
-  ComPtr<ID3DBlob> bg_pixel_shader_blob;
-  ERR_ABORT( D3DReadFileToBlob( L"BackgroundPS.cso", &bg_pixel_shader_blob ) );
-
-  ComPtr<ID3D12Device2>       device                 = m_RenderDevice->GetDevice();
-
-  D3D_ROOT_SIGNATURE_VERSION  root_signature_version = m_RenderDevice->FetchHighestRootSignatureVersion();
-
-  CD3DX12_STATIC_SAMPLER_DESC static_sampler_desc[]  = {
-    CD3DX12_STATIC_SAMPLER_DESC{ 0 },
-    CD3DX12_STATIC_SAMPLER_DESC{ 1,
-                                D3D12_FILTER_ANISOTROPIC, D3D12_TEXTURE_ADDRESS_MODE_CLAMP,
-                                D3D12_TEXTURE_ADDRESS_MODE_CLAMP, D3D12_TEXTURE_ADDRESS_MODE_CLAMP },
-    CD3DX12_STATIC_SAMPLER_DESC{ 2,
-                                D3D12_FILTER_COMPARISON_MIN_MAG_LINEAR_MIP_POINT, D3D12_TEXTURE_ADDRESS_MODE_BORDER,
-                                D3D12_TEXTURE_ADDRESS_MODE_BORDER, D3D12_TEXTURE_ADDRESS_MODE_BORDER,
-                                0, 16,
-                                D3D12_COMPARISON_FUNC_LESS_EQUAL, D3D12_STATIC_BORDER_COLOR_OPAQUE_WHITE },
-  };
-
-  D3D12_ROOT_SIGNATURE_FLAGS const root_signature_flags = D3D12_ROOT_SIGNATURE_FLAG_CBV_SRV_UAV_HEAP_DIRECTLY_INDEXED |
-                                                          D3D12_ROOT_SIGNATURE_FLAG_SAMPLER_HEAP_DIRECTLY_INDEXED |
-                                                          D3D12_ROOT_SIGNATURE_FLAG_DENY_VERTEX_SHADER_ROOT_ACCESS |
-                                                          D3D12_ROOT_SIGNATURE_FLAG_DENY_GEOMETRY_SHADER_ROOT_ACCESS |
-                                                          D3D12_ROOT_SIGNATURE_FLAG_DENY_DOMAIN_SHADER_ROOT_ACCESS |
-                                                          D3D12_ROOT_SIGNATURE_FLAG_DENY_HULL_SHADER_ROOT_ACCESS;
-
-  CD3DX12_ROOT_PARAMETER1 root_parameters[3];
-  root_parameters[0].InitAsConstants( sizeof( DrawList::Info ) / 4, 0 );
-  root_parameters[1].InitAsConstants( sizeof( PerFrameConstants ) / 4, 1 );
-  root_parameters[2].InitAsConstants( sizeof( Environment::GpuRepr ) / 4, 2 );
-
-  CD3DX12_VERSIONED_ROOT_SIGNATURE_DESC root_signature_desc;
-  root_signature_desc.Init_1_1(
-      CountOf( root_parameters ),
-      DataOf( root_parameters ),
-      CountOf( static_sampler_desc ),
-      DataOf( static_sampler_desc ),
-      root_signature_flags );
-
-  ComPtr<ID3DBlob> root_signature_blob;
-  ComPtr<ID3DBlob> error_blob;
-  ERR_ABORT( D3DX12SerializeVersionedRootSignature(
-      &root_signature_desc, root_signature_version, &root_signature_blob, &error_blob ) );
-
-  ERR_ABORT( device->CreateRootSignature(
-      0,
-      root_signature_blob->GetBufferPointer(),
-      root_signature_blob->GetBufferSize(),
-      IID_PPV_ARGS( &m_RootSignature ) ) );
-
-  D3D12_RT_FORMAT_ARRAY rtv_formats{
-    .RTFormats        = { DXGI_FORMAT_R8G8B8A8_UNORM },
-    .NumRenderTargets = 1,
-  };
-
-  CD3DX12_RASTERIZER_DESC2 rasterizer_desc{ D3D12_DEFAULT };
-  rasterizer_desc.FrontCounterClockwise = TRUE;
-  rasterizer_desc.CullMode              = D3D12_CULL_MODE_BACK;
-
-  CD3DX12_DEPTH_STENCIL_DESC depth_stencil_desc{ D3D12_DEFAULT };
-
-  struct MainPipelineStream
-  {
-    CD3DX12_PIPELINE_STATE_STREAM_ROOT_SIGNATURE        RootSignature;
-    CD3DX12_PIPELINE_STATE_STREAM_PRIMITIVE_TOPOLOGY    PrimitiveTopologyType;
-    CD3DX12_PIPELINE_STATE_STREAM_AS                    AS;
-    CD3DX12_PIPELINE_STATE_STREAM_MS                    MS;
-    CD3DX12_PIPELINE_STATE_STREAM_PS                    PS;
-    CD3DX12_PIPELINE_STATE_STREAM_BLEND_DESC            Blending;
-    CD3DX12_PIPELINE_STATE_STREAM_RASTERIZER2           Rasterizer;
-    CD3DX12_PIPELINE_STATE_STREAM_RENDER_TARGET_FORMATS RTVFormats;
-    CD3DX12_PIPELINE_STATE_STREAM_DEPTH_STENCIL_FORMAT  DSVFormat;
-  };
-
-  MainPipelineStream pipeline_stream = {
-    .RootSignature         = m_RootSignature.Get(),
-    .PrimitiveTopologyType = D3D12_PRIMITIVE_TOPOLOGY_TYPE_TRIANGLE,
-    .AS                    = CD3DX12_SHADER_BYTECODE( amp_shader_blob.Get() ),
-    .MS                    = CD3DX12_SHADER_BYTECODE( mesh_shader_blob.Get() ),
-    .PS                    = CD3DX12_SHADER_BYTECODE( pixel_shader_blob.Get() ),
-    .Blending              = CD3DX12_BLEND_DESC{ D3D12_DEFAULT },
-    .Rasterizer            = rasterizer_desc,
-    .RTVFormats            = rtv_formats,
-    .DSVFormat             = DXGI_FORMAT_D32_FLOAT,
-  };
-
-  D3D12_PIPELINE_STATE_STREAM_DESC const pipeline_state_stream_desc = {
-    .SizeInBytes                   = sizeof pipeline_stream,
-    .pPipelineStateSubobjectStream = &pipeline_stream,
-  };
-
-  ERR_ABORT( device->CreatePipelineState( &pipeline_state_stream_desc, IID_PPV_ARGS( &m_OpaquePBRPipeline ) ) );
-
-  pipeline_stream.PS = CD3DX12_SHADER_BYTECODE( alpha_tested_pixel_shader_blob.Get() );
-  ERR_ABORT( device->CreatePipelineState( &pipeline_state_stream_desc, IID_PPV_ARGS( &m_AlphaTestedPBRPipeline ) ) );
-
-  CD3DX12_BLEND_DESC blend_desc{ D3D12_DEFAULT };
-  blend_desc.RenderTarget[0] = {
-    .BlendEnable           = TRUE,
-    .LogicOpEnable         = FALSE,
-    .SrcBlend              = D3D12_BLEND_SRC_ALPHA,
-    .DestBlend             = D3D12_BLEND_INV_SRC_ALPHA,
-    .BlendOp               = D3D12_BLEND_OP_ADD,
-    .SrcBlendAlpha         = D3D12_BLEND_ONE,
-    .DestBlendAlpha        = D3D12_BLEND_ZERO,
-    .BlendOpAlpha          = D3D12_BLEND_OP_ADD,
-    .LogicOp               = D3D12_LOGIC_OP_NOOP,
-    .RenderTargetWriteMask = D3D12_COLOR_WRITE_ENABLE_ALL,
-  };
-
-  pipeline_stream.PS       = CD3DX12_SHADER_BYTECODE( alpha_blended_pixel_shader_blob.Get() );
-  pipeline_stream.Blending = blend_desc;
-  ERR_ABORT( device->CreatePipelineState( &pipeline_state_stream_desc, IID_PPV_ARGS( &m_AlphaBlendedPBRPipeline ) ) );
-
-  CD3DX12_ROOT_PARAMETER1 bg_root_parameters[1];
-  bg_root_parameters[0].InitAsConstants( 2, 0 );
-
-  CD3DX12_VERSIONED_ROOT_SIGNATURE_DESC bg_root_signature_desc;
-  bg_root_signature_desc.Init_1_1(
-      CountOf( bg_root_parameters ), DataOf( bg_root_parameters ), 1, &static_sampler_desc[0], root_signature_flags );
-
-  ERR_ABORT( D3DX12SerializeVersionedRootSignature(
-      &bg_root_signature_desc, root_signature_version, root_signature_blob.ReleaseAndGetAddressOf(), &error_blob ) );
-
-  ERR_ABORT( device->CreateRootSignature(
-      0,
-      root_signature_blob->GetBufferPointer(),
-      root_signature_blob->GetBufferSize(),
-      IID_PPV_ARGS( &m_BackgroundRootSignature ) ) );
-
-  struct BackgroundPipelineStream
-  {
-    CD3DX12_PIPELINE_STATE_STREAM_ROOT_SIGNATURE        RootSignature;
-    CD3DX12_PIPELINE_STATE_STREAM_PRIMITIVE_TOPOLOGY    PrimitiveTopologyType;
-    CD3DX12_PIPELINE_STATE_STREAM_MS                    MS;
-    CD3DX12_PIPELINE_STATE_STREAM_PS                    PS;
-    CD3DX12_PIPELINE_STATE_STREAM_RASTERIZER2           Rasterizer;
-    CD3DX12_PIPELINE_STATE_STREAM_DEPTH_STENCIL         DepthStencil;
-    CD3DX12_PIPELINE_STATE_STREAM_RENDER_TARGET_FORMATS RTVFormats;
-    CD3DX12_PIPELINE_STATE_STREAM_DEPTH_STENCIL_FORMAT  DSVFormat;
-  };
-
-  depth_stencil_desc.DepthFunc                = D3D12_COMPARISON_FUNC_LESS_EQUAL;
-  BackgroundPipelineStream bg_pipeline_stream = {
-    .RootSignature         = m_BackgroundRootSignature.Get(),
-    .PrimitiveTopologyType = D3D12_PRIMITIVE_TOPOLOGY_TYPE_TRIANGLE,
-    .MS                    = CD3DX12_SHADER_BYTECODE( bg_mesh_shader_blob.Get() ),
-    .PS                    = CD3DX12_SHADER_BYTECODE( bg_pixel_shader_blob.Get() ),
-    .Rasterizer            = rasterizer_desc,
-    .DepthStencil          = depth_stencil_desc,
-    .RTVFormats            = rtv_formats,
-    .DSVFormat             = DXGI_FORMAT_D32_FLOAT,
-  };
-
-  D3D12_PIPELINE_STATE_STREAM_DESC const bg_pipeline_state_stream_desc = {
-    .SizeInBytes                   = sizeof bg_pipeline_stream,
-    .pPipelineStateSubobjectStream = &bg_pipeline_stream,
-  };
-  ERR_ABORT( device->CreatePipelineState( &bg_pipeline_state_stream_desc, IID_PPV_ARGS( &m_BackgroundPipeline ) ) );
+  ENSURE( RenderPass::Forward::Create( &m_ForwardPass, m_RenderDevice.get() ) );
+  ENSURE( RenderPass::Background::Create( &m_BackgroundPass, m_RenderDevice.get() ) );
 }
 
 void Ember::BasicApp::LoadContent()
@@ -447,25 +273,11 @@ void Ember::BasicApp::LoadContent()
   ENSURE( env_loaded );
 
   SetupRenderPipeline();
+  FG::Context::Create( &m_FGContext, m_RenderDevice.get() );
 
-  m_RenderTexture = m_RenderDevice->CreateTexture2D( {
-      .Format    = m_SwapchainFormat,
-      .Width     = m_WindowWidth,
-      .Height    = m_WindowHeight,
-      .Usage     = TextureUsage::kRenderTarget,
-      .MipLevels = MipLevels::kBase,
-  } );
-  m_DepthTexture  = m_RenderDevice->CreateTexture2D( {
-       .Format    = DXGI_FORMAT_D32_FLOAT,
-       .Width     = m_WindowWidth,
-       .Height    = m_WindowHeight,
-       .Usage     = TextureUsage::kDepthSample,
-       .MipLevels = MipLevels::kBase,
-  } );
+  m_PrevMouse   = Input::Instance().GetMousePosition();
 
-  m_PrevMouse     = Input::Instance().GetMousePosition();
-
-  m_RenderQuery   = m_World.GetECS().query<WorldTransform const, Mesh const, Geometry const, Material const>();
+  m_RenderQuery = m_World.GetECS().query<WorldTransform const, Mesh const, Geometry const, Material const>();
 }
 
 void Ember::BasicApp::Update()
@@ -566,6 +378,8 @@ void Ember::BasicApp::Update()
         scratch                       = ( bool )g_Debug.DisableMeshletFrustumCulling;
         ImGui::Checkbox( "Disable Meshlet Frustum Culling", &scratch );
         g_Debug.DisableMeshletFrustumCulling = ( uint32_t )scratch;
+
+        g_OutputFrameGraph                   = ImGui::Button( "Output FrameGraph" );
       }
       ImGui::End();
     }
@@ -640,83 +454,161 @@ void Ember::BasicApp::Update()
   Input::Instance().Update();
 }
 
-void Ember::BasicApp::RenderScene(
-    ID3D12GraphicsCommandList6* command_list, DrawList::Batches const& draw_list_info_list, uint32_t frame_idx )
+Ember::RTVData Ember::BasicApp::RenderScene(
+    ID3D12GraphicsCommandList6* command_list,
+    DrawList::Batches const&    draw_list_info_list,
+    FrameGraph*                 frame_graph,
+    uint32_t                    frame_idx )
 {
   PIXScopedEvent( command_list, PIX_COLOR_DEFAULT, "Render Scene" );
   ZoneScoped;
 
-  FLOAT constexpr kBlack[4] = {};
-  m_RenderTargetManager->ClearRenderTargetView( command_list, m_RenderTexture, kBlack );
-  m_RenderTargetManager->ClearDepthStencilView( command_list, m_DepthTexture, D3D12_CLEAR_FLAG_DEPTH, 1.0f, 0 );
+  RTVData clear_rtv = frame_graph->addCallbackPass<RTVData>(
+      "Clear RTV",
+      [&]( FrameGraph::Builder& builder, RTVData& data )
+      {
+        data.RenderTarget = builder.create<FG::Texture>(
+            "Main Render Target",
+            FG::Texture::Desc{
+                .Format    = m_SwapchainFormat,
+                .Width     = m_WindowWidth,
+                .Height    = m_WindowHeight,
+                .MipLevels = MipLevels::kBase,
+                .InitState = D3D12_RESOURCE_STATE_RENDER_TARGET,
+                .Flags     = D3D12_RESOURCE_FLAG_ALLOW_RENDER_TARGET,
+            } );
 
-  CBVHandle const       camera_cbv    = m_Camera->GetLastUpdatedBuffer();
-  LightManager::GpuInfo light_info    = m_LightManager->PrepareFrame( frame_idx );
-  SRVHandle const       materials_srv = m_MaterialManager->PrepareFrame();
+        data.DepthStencil = builder.create<FG::Texture>(
+            "Main Depth Target",
+            FG::Texture::Desc{
+                .Format    = DXGI_FORMAT_D32_FLOAT,
+                .Width     = m_WindowWidth,
+                .Height    = m_WindowHeight,
+                .MipLevels = MipLevels::kBase,
+                .InitState = D3D12_RESOURCE_STATE_DEPTH_WRITE,
+                .Flags     = D3D12_RESOURCE_FLAG_ALLOW_DEPTH_STENCIL,
+            } );
 
-  // Viewport and scissor
-  D3D12_VIEWPORT const viewport = {
-    .TopLeftX = 0,
-    .TopLeftY = 0,
-    .Width    = ( FLOAT )m_WindowWidth,
-    .Height   = ( FLOAT )m_WindowHeight,
-    .MinDepth = 0,
-    .MaxDepth = 1,
-  };
-  D3D12_RECT const scissor = {
-    .left   = 0,
-    .top    = 0,
-    .right  = ( LONG )m_WindowWidth,
-    .bottom = ( LONG )m_WindowHeight,
-  };
+        data.RenderTarget = builder.write( data.RenderTarget, FG::Attachment{ .Index = 0 } );
+        data.DepthStencil = builder.write( data.DepthStencil, FG::DepthStencil{} );
+      },
+      []( RTVData const& data, FrameGraphPassResources& resources, void* ctx )
+      {
+        FG::Context* context = ( FG::Context* )ctx;
+        context->FlushBarriers();
 
-  command_list->SetGraphicsRootSignature( m_RootSignature.Get() );
+        FG::Context::FrameData const& frame_data    = context->GetFrameData();
+        RenderTargetManager const*    rtm           = context->GetRenderTargetManager();
 
-  auto bindless_desc_heaps = m_RenderDevice->GetBindlessDescriptorHeaps();
-  command_list->SetDescriptorHeaps( CountOf( bindless_desc_heaps ), DataOf( bindless_desc_heaps ) );
-  command_list->RSSetViewports( 1, &viewport );
-  command_list->RSSetScissorRects( 1, &scissor );
-  D3D12_RENDER_TARGET_VIEW_DESC const rtv_desc{
-    .Format        = DXGI_FORMAT_R8G8B8A8_UNORM_SRGB,
-    .ViewDimension = D3D12_RTV_DIMENSION_TEXTURE2D,
-    .Texture2D     = { .MipSlice = 0 },
-  };
-  m_RenderTargetManager->OMSetRenderTargets( command_list, 1, &m_RenderTexture, &rtv_desc, &m_DepthTexture, nullptr );
+        FG::Texture const&            render_target = resources.get<FG::Texture>( data.RenderTarget );
+        FG::Texture const&            depth_target  = resources.get<FG::Texture>( data.DepthStencil );
 
-  PerFrameConstants const constants = {
-    .MaterialsBuffer = materials_srv,
-    .Camera          = camera_cbv,
+        FLOAT constexpr kBlack[4]                   = {};
+        rtm->ClearRenderTargetView( frame_data.CommandList, render_target.Resource.Get(), kBlack );
+        rtm->ClearDepthStencilView(
+            frame_data.CommandList, depth_target.Resource.Get(), D3D12_CLEAR_FLAG_DEPTH, 1.0f, 0 );
+      } );
+
+  RenderPass::Forward::PerFrameConstants const constants = {
+    .MaterialsBuffer = m_MaterialManager->PrepareFrame(),
+    .Camera          = m_Camera->GetLastUpdatedBuffer(),
     .ConfigBuffer    = m_ConfigurationBuffer.GetCBVHandle(),
-    .LightInfo       = light_info,
+    .LightInfo       = m_LightManager->PrepareFrame( frame_idx ),
   };
 
-  command_list->SetGraphicsRoot32BitConstants( 1, sizeof( PerFrameConstants ) / 4, &constants, 0 );
-  command_list->SetGraphicsRoot32BitConstants( 2, sizeof( Environment::GpuRepr ) / 4, &m_Environment->Repr(), 0 );
+  RTVData main_pass = frame_graph->addCallbackPass<RTVData>(
+      "Main Pass",
+      [&]( FrameGraph::Builder& builder, RTVData& data )
+      {
+        data.RenderTarget = builder.write( clear_rtv.RenderTarget, FG::Attachment{ .Index = 0 } );
+        data.DepthStencil = builder.write( clear_rtv.DepthStencil, FG::DepthStencil{} );
+      },
+      [mp = m_ForwardPass, constants, env = m_Environment->Repr(), draw_list_info_list = draw_list_info_list](
+          RTVData const& data, FrameGraphPassResources& resources, void* ctx )
+      {
+        ZoneScopedN( "Main Pass" );
 
-  command_list->SetPipelineState( m_OpaquePBRPipeline.Get() );
-  command_list->SetGraphicsRoot32BitConstants( 0, sizeof( DrawList::Info ) / 4, &draw_list_info_list.Opaque, 0 );
-  command_list->DispatchMesh( draw_list_info_list.Opaque.DrawCount, 1, 1 );
+        FG::Context* context = ( FG::Context* )ctx;
+        context->FlushBarriers();
 
-  command_list->SetPipelineState( m_AlphaTestedPBRPipeline.Get() );
-  command_list->SetGraphicsRoot32BitConstants( 0, sizeof( DrawList::Info ) / 4, &draw_list_info_list.AlphaTested, 0 );
-  command_list->DispatchMesh( draw_list_info_list.AlphaTested.DrawCount, 1, 1 );
+        FG::Context::FrameData const& frame_data = context->GetFrameData();
+        RenderTargetManager const*    rtm        = context->GetRenderTargetManager();
+        ID3D12GraphicsCommandList6*   cmd        = frame_data.CommandList;
+        PIXScopedEvent( cmd, PIX_COLOR_DEFAULT, "Main Pass" );
 
-  // TODO: Sort transparent objects back to front
-  command_list->SetPipelineState( m_AlphaBlendedPBRPipeline.Get() );
-  command_list->SetGraphicsRoot32BitConstants( 0, sizeof( DrawList::Info ) / 4, &draw_list_info_list.AlphaBlended, 0 );
-  command_list->DispatchMesh( draw_list_info_list.AlphaBlended.DrawCount, 1, 1 );
+        FG::Texture const& render_target = resources.get<FG::Texture>( data.RenderTarget );
+        FG::Texture const& depth_target  = resources.get<FG::Texture>( data.DepthStencil );
 
-  m_RenderTargetManager->OMSetRenderTargets( command_list, 1, &m_RenderTexture, &m_DepthTexture );
-  if ( not g_Debug.HideSkybox )
+        rtm->RSSetScissorViewport( cmd, frame_data.Width, frame_data.Height );
+
+        D3D12_RENDER_TARGET_VIEW_DESC const rtv_desc{
+          .Format        = DXGI_FORMAT_R8G8B8A8_UNORM_SRGB,
+          .ViewDimension = D3D12_RTV_DIMENSION_TEXTURE2D,
+          .Texture2D     = { .MipSlice = 0 },
+        };
+        ID3D12Resource* rtv = render_target.Resource.Get();
+        rtm->OMSetRenderTargets( cmd, 1, &rtv, &rtv_desc, depth_target.Resource.Get(), nullptr );
+
+        cmd->SetGraphicsRootSignature( mp.RootSignature.Get() );
+        cmd->SetGraphicsRoot32BitConstants( 1, sizeof( RenderPass::Forward::PerFrameConstants ) / 4, &constants, 0 );
+        cmd->SetGraphicsRoot32BitConstants( 2, sizeof( Environment::GpuRepr ) / 4, &env, 0 );
+
+        cmd->SetPipelineState( mp.OpaquePipeline.Get() );
+        cmd->SetGraphicsRoot32BitConstants( 0, sizeof( DrawList::Info ) / 4, &draw_list_info_list.Opaque, 0 );
+        cmd->DispatchMesh( draw_list_info_list.Opaque.DrawCount, 1, 1 );
+
+        cmd->SetPipelineState( mp.AlphaTestedPipeline.Get() );
+        cmd->SetGraphicsRoot32BitConstants( 0, sizeof( DrawList::Info ) / 4, &draw_list_info_list.AlphaTested, 0 );
+        cmd->DispatchMesh( draw_list_info_list.AlphaTested.DrawCount, 1, 1 );
+
+        // TODO: Sort transparent objects back to front
+        cmd->SetPipelineState( mp.AlphaBlendedPipeline.Get() );
+        cmd->SetGraphicsRoot32BitConstants( 0, sizeof( DrawList::Info ) / 4, &draw_list_info_list.AlphaBlended, 0 );
+        cmd->DispatchMesh( draw_list_info_list.AlphaBlended.DrawCount, 1, 1 );
+      } );
+
+  RTVData skybox_pass = frame_graph->addCallbackPass<RTVData>(
+      "Render Skybox",
+      [&]( FrameGraph::Builder& builder, RTVData& data )
+      {
+        builder.read( main_pass.RenderTarget );
+        builder.read( main_pass.DepthStencil );
+        data.RenderTarget = builder.write( main_pass.RenderTarget, FG::Attachment{ .Index = 0 } );
+        data.DepthStencil = builder.write( main_pass.DepthStencil, FG::DepthStencil{} );
+      },
+      [mbp = m_BackgroundPass, camera_cbv = constants.Camera, skybox = m_Environment->Repr().Skybox](
+          RTVData const& data, FrameGraphPassResources& resources, void* ctx )
+      {
+        ZoneScopedN( "Render Skybox" );
+
+        FG::Context* context = ( FG::Context* )ctx;
+        context->FlushBarriers();
+        FG::Context::FrameData const& frame_data = context->GetFrameData();
+        RenderTargetManager const*    rtm        = context->GetRenderTargetManager();
+        ID3D12GraphicsCommandList6*   cmd        = frame_data.CommandList;
+
+        PIXScopedEvent( cmd, PIX_COLOR_DEFAULT, "Render Skybox" );
+
+        FG::Texture const& render_target = resources.get<FG::Texture>( data.RenderTarget );
+        FG::Texture const& depth_target  = resources.get<FG::Texture>( data.DepthStencil );
+
+        rtm->RSSetScissorViewport( cmd, frame_data.Width, frame_data.Height );
+
+        ID3D12Resource* rtv = render_target.Resource.Get();
+        rtm->OMSetRenderTargets( cmd, 1, &rtv, nullptr, depth_target.Resource.Get(), nullptr );
+
+        cmd->SetGraphicsRootSignature( mbp.RootSignature.Get() );
+        cmd->SetPipelineState( mbp.Pipeline.Get() );
+        cmd->SetGraphicsRoot32BitConstant( 0, ( UINT )camera_cbv, 0 );
+        cmd->SetGraphicsRoot32BitConstant( 0, ( UINT )skybox, 1 );
+        cmd->DispatchMesh( 1, 1, 1 );
+      } );
+
+  if ( g_Debug.HideSkybox )
   {
-    ZoneScopedN( "Render Skybox" );
-    PIXScopedEvent( command_list, PIX_COLOR_DEFAULT, "Render Skybox" );
-    command_list->SetGraphicsRootSignature( m_BackgroundRootSignature.Get() );
-    command_list->SetPipelineState( m_BackgroundPipeline.Get() );
-    command_list->SetGraphicsRoot32BitConstant( 0, ( UINT )m_Camera->GetLastUpdatedBuffer(), 0 );
-    command_list->SetGraphicsRoot32BitConstant( 0, ( UINT )m_Environment->Repr().Skybox, 1 );
-    command_list->DispatchMesh( 1, 1, 1 );
+    return main_pass;
   }
+  return skybox_pass;
 }
 
 void Ember::BasicApp::Render()
@@ -730,6 +622,13 @@ void Ember::BasicApp::Render()
   // All resources for this frame are guaranteed to be available for CPU modification at this time.
   // Clear Backbuffer
 
+  m_FGContext.SetFrameData( {
+      .Width       = m_WindowWidth,
+      .Height      = m_WindowHeight,
+      .CommandList = command_list.Get(),
+  } );
+  FrameGraph frame_graph;
+
   m_Camera->PrepareFrame( frame_idx );
 
   m_DrawList.Clear();
@@ -740,40 +639,101 @@ void Ember::BasicApp::Render()
                         { m_DrawList.PushDraw( wt, mesh, material ); } );
   }
 
-  CD3DX12_RESOURCE_BARRIER top_of_renderpass_barriers[] = {
-    CD3DX12_RESOURCE_BARRIER::Transition( backbuffer, D3D12_RESOURCE_STATE_PRESENT, D3D12_RESOURCE_STATE_COPY_DEST ),
-  };
+  FrameGraphResource bb_res = frame_graph.import(
+      "Backbuffer",
+      FG::Texture::Desc{
+          .Format    = DXGI_FORMAT_R8G8B8A8_UNORM,
+          .Width     = m_WindowWidth,
+          .Height    = m_WindowHeight,
+          .MipLevels = MipLevels::kBase,
+          .ArraySize = 1,
+          .InitState = D3D12_RESOURCE_STATE_PRESENT,
+      },
+      FG::Texture{
+          .Resource     = backbuffer,
+          .CurrentState = D3D12_RESOURCE_STATE_PRESENT,
+      } );
 
   DrawList::Batches const draw_list_info = m_DrawList.PrepareFrame( frame_idx );
 
   m_PerfCounter->UpdatePipelineStats( frame_idx );
   m_PerfCounter->BeginQuery( command_list.Get(), frame_idx );
 
-  command_list->ResourceBarrier( CountOf( top_of_renderpass_barriers ), DataOf( top_of_renderpass_barriers ) );
   m_TextureLoader->FlushBarriers( command_list.Get() );
+
+  auto bindless_desc_heaps = m_RenderDevice->GetBindlessDescriptorHeaps();
+  command_list->SetDescriptorHeaps( CountOf( bindless_desc_heaps ), DataOf( bindless_desc_heaps ) );
 
   m_LightManager->RenderAllShadows( command_list.Get(), draw_list_info, *m_RenderTargetManager, *m_Camera, frame_idx );
 
-  RenderScene( command_list.Get(), draw_list_info, frame_idx );
+  RTVData scene_data = RenderScene( command_list.Get(), draw_list_info, &frame_graph, frame_idx );
 
+  RTVData rtv_data   = frame_graph.addCallbackPass<RTVData>(
+      "ImGUI",
+      [&]( FrameGraph::Builder& builder, RTVData& data )
+      {
+        builder.read( scene_data.RenderTarget );
+        data.RenderTarget = builder.write( scene_data.RenderTarget, FG::Attachment{ .Index = 0 } );
+        data.DepthStencil = scene_data.DepthStencil;
+      },
+      []( RTVData const& data, FrameGraphPassResources& resources, void* ctx )
+      {
+        ZoneScopedN( "ImGUI" );
+
+        FG::Context* context = ( FG::Context* )ctx;
+        context->FlushBarriers();
+
+        FG::Context::FrameData const& frame_data = context->GetFrameData();
+        RenderTargetManager const*    rtm        = context->GetRenderTargetManager();
+        ID3D12GraphicsCommandList6*   cmd        = frame_data.CommandList;
+
+        PIXScopedEvent( cmd, PIX_COLOR_DEFAULT, "ImGUI" );
+        FG::Texture const& render_target = resources.get<FG::Texture>( data.RenderTarget );
+
+        ID3D12Resource*    rtv           = render_target.Resource.Get();
+        rtm->OMSetRenderTargets( cmd, 1, &rtv, nullptr, nullptr, nullptr );
+
+        ImGui_ImplDX12_RenderDrawData( ImGui::GetDrawData(), cmd );
+      } );
+
+  struct FinalPassData
   {
-    ZoneScopedN( "ImGUI" );
-    PIXScopedEvent( command_list.Get(), PIX_COLOR_DEFAULT, "ImGUI" );
-    ImGui_ImplDX12_RenderDrawData( ImGui::GetDrawData(), command_list.Get() );
-  }
-
-  CD3DX12_RESOURCE_BARRIER post_render_barriers[] = {
-    CD3DX12_RESOURCE_BARRIER::Transition(
-        m_RenderTexture.GetTexture(), D3D12_RESOURCE_STATE_RENDER_TARGET, D3D12_RESOURCE_STATE_COPY_SOURCE ),
+    FrameGraphResource RenderTarget;
+    FrameGraphResource BackBuffer;
   };
-  command_list->ResourceBarrier( CountOf( post_render_barriers ), DataOf( post_render_barriers ) );
 
-  command_list->CopyResource( backbuffer, m_RenderTexture.GetTexture() );
+  frame_graph.addCallbackPass<FinalPassData>(
+      "Copy to Backbuffer",
+      [&]( FrameGraph::Builder& builder, FinalPassData& data )
+      {
+        data.RenderTarget = builder.read( rtv_data.RenderTarget, FG::CopySrc{} );
+        data.BackBuffer   = builder.write( bb_res, FG::CopyDst{} );
+      },
+      []( FinalPassData const& data, FrameGraphPassResources& resources, void* ctx )
+      {
+        ZoneScopedN( "Copy to Backbuffer" );
+
+        FG::Context* context = ( FG::Context* )ctx;
+        context->FlushBarriers();
+
+        FG::Context::FrameData const& frame_data = context->GetFrameData();
+        ID3D12GraphicsCommandList6*   cmd        = frame_data.CommandList;
+
+        PIXScopedEvent( cmd, PIX_COLOR_DEFAULT, "Copy to Backbuffer" );
+        FG::Texture const& render_target = resources.get<FG::Texture>( data.RenderTarget );
+        FG::Texture const& backbuffer    = resources.get<FG::Texture>( data.BackBuffer );
+        cmd->CopyResource( backbuffer.Resource.Get(), render_target.Resource.Get() );
+      } );
+
+  frame_graph.compile();
+  if ( g_OutputFrameGraph )
+  {
+    std::ofstream{ "fg.dot" } << frame_graph;
+  }
+  frame_graph.execute( &m_FGContext, &m_FGContext );
 
   CD3DX12_RESOURCE_BARRIER bottom_of_renderpass_barriers[] = {
     CD3DX12_RESOURCE_BARRIER::Transition( backbuffer, D3D12_RESOURCE_STATE_COPY_DEST, D3D12_RESOURCE_STATE_PRESENT ),
-    CD3DX12_RESOURCE_BARRIER::Transition(
-        m_RenderTexture.GetTexture(), D3D12_RESOURCE_STATE_COPY_SOURCE, D3D12_RESOURCE_STATE_RENDER_TARGET ),
   };
   command_list->ResourceBarrier( CountOf( bottom_of_renderpass_barriers ), DataOf( bottom_of_renderpass_barriers ) );
 
@@ -801,20 +761,6 @@ void Ember::BasicApp::Resize()
   m_WindowHeight = rect.bottom - rect.top;
 
   m_RenderDevice->ResizeSwapchain( m_WindowWidth, m_WindowHeight );
-  m_RenderTexture = m_RenderDevice->CreateTexture2D( {
-      .Format    = m_SwapchainFormat,
-      .Width     = m_WindowWidth,
-      .Height    = m_WindowHeight,
-      .Usage     = TextureUsage::kRenderTarget,
-      .MipLevels = MipLevels::kBase,
-  } );
-  m_DepthTexture  = m_RenderDevice->CreateTexture2D( {
-       .Format    = DXGI_FORMAT_D32_FLOAT,
-       .Width     = m_WindowWidth,
-       .Height    = m_WindowHeight,
-       .Usage     = TextureUsage::kDepthSample,
-       .MipLevels = MipLevels::kBase,
-  } );
 
   m_Camera->SetAspectRatio( ( float )m_WindowWidth / ( float )m_WindowHeight );
 

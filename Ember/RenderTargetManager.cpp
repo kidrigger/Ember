@@ -45,6 +45,38 @@ Ember::RenderTargetManager::RenderTargetManager(
   , m_DSVDescriptorSize{ dsv_descriptor_size }
 {}
 
+void Ember::RenderTargetManager::RSSetScissorViewport(
+    ID3D12GraphicsCommandList* command_list, uint32_t const width, uint32_t const height ) const
+{
+  D3D12_VIEWPORT const viewport{
+    .TopLeftX = 0.0f,
+    .TopLeftY = 0.0f,
+    .Width    = ( FLOAT )width,
+    .Height   = ( FLOAT )height,
+    .MinDepth = 0.0f,
+    .MaxDepth = 1.0f,
+  };
+
+  D3D12_RECT const scissor{
+    .left   = 0,
+    .top    = 0,
+    .right  = ( LONG )width,
+    .bottom = ( LONG )height,
+  };
+
+  command_list->RSSetViewports( 1, &viewport );
+  command_list->RSSetScissorRects( 1, &scissor );
+}
+
+void Ember::RenderTargetManager::ClearRenderTargetView(
+    ID3D12GraphicsCommandList* command_list, ID3D12Resource* render_target, float const color[] ) const
+{
+  D3D12_CPU_DESCRIPTOR_HANDLE const rtv_handle = m_RTVDescriptorHeap->GetCPUDescriptorHandleForHeapStart();
+  m_D3D12Device->CreateRenderTargetView( render_target, nullptr, rtv_handle );
+
+  command_list->ClearRenderTargetView( rtv_handle, color, 0, nullptr );
+}
+
 void Ember::RenderTargetManager::ClearRenderTargetView(
     ID3D12GraphicsCommandList* command_list, Texture const& render_target, float const color[] ) const
 {
@@ -75,6 +107,19 @@ void Ember::RenderTargetManager::ClearRenderTargetViews(
 
 void Ember::RenderTargetManager::ClearDepthStencilView(
     ID3D12GraphicsCommandList* command_list,
+    ID3D12Resource*            depth_stencil,
+    D3D12_CLEAR_FLAGS const    flags,
+    float const                depth,
+    uint8_t const              stencil ) const
+{
+  D3D12_CPU_DESCRIPTOR_HANDLE const dsv_descriptor = m_DSVDescriptorHeap->GetCPUDescriptorHandleForHeapStart();
+  m_D3D12Device->CreateDepthStencilView( depth_stencil, nullptr, dsv_descriptor );
+
+  command_list->ClearDepthStencilView( dsv_descriptor, flags, depth, stencil, 0, nullptr );
+}
+
+void Ember::RenderTargetManager::ClearDepthStencilView(
+    ID3D12GraphicsCommandList* command_list,
     Texture const&             depth_stencil,
     D3D12_CLEAR_FLAGS const    flags,
     float const                depth,
@@ -85,6 +130,32 @@ void Ember::RenderTargetManager::ClearDepthStencilView(
       depth_stencil.GetTexture(), depth_stencil.GetDepthStencilView(), dsv_descriptor );
 
   command_list->ClearDepthStencilView( dsv_descriptor, flags, depth, stencil, 0, nullptr );
+}
+
+void Ember::RenderTargetManager::OMSetRenderTargets(
+    ID3D12GraphicsCommandList*           command_list,
+    uint32_t const                       count,
+    ID3D12Resource**                     render_targets,
+    D3D12_RENDER_TARGET_VIEW_DESC const* rtv_desc,
+    ID3D12Resource*                      depth_stencil,
+    D3D12_DEPTH_STENCIL_VIEW_DESC const* dsv_desc ) const
+{
+  auto const rtv_start  = m_RTVDescriptorHeap->GetCPUDescriptorHandleForHeapStart();
+  auto       rtv_handle = CD3DX12_CPU_DESCRIPTOR_HANDLE{ rtv_start, 0, m_RTVDescriptorSize };
+
+  for ( uint32_t i = 0; i < count; i++ )
+  {
+    m_D3D12Device->CreateRenderTargetView( render_targets[i], &rtv_desc[i], rtv_handle );
+    rtv_handle.Offset( ( INT )m_RTVDescriptorSize );
+  }
+
+  D3D12_CPU_DESCRIPTOR_HANDLE const dsv_descriptor = m_DSVDescriptorHeap->GetCPUDescriptorHandleForHeapStart();
+  if ( depth_stencil )
+  {
+    m_D3D12Device->CreateDepthStencilView( depth_stencil, dsv_desc, dsv_descriptor );
+  }
+
+  command_list->OMSetRenderTargets( count, &rtv_start, TRUE, depth_stencil ? &dsv_descriptor : nullptr );
 }
 
 void Ember::RenderTargetManager::OMSetRenderTargets(

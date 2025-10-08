@@ -57,17 +57,17 @@ Ember::RenderDevice::RenderDevice(
   }
 }
 
-ComPtr<ID3D12Device2> Ember::RenderDevice::GetDevice() noexcept
+ID3D12Device2* Ember::RenderDevice::GetDevice() const noexcept
 {
-  return m_Device;
+  return m_Device.Get();
 }
 
-ComPtr<D3D12MA::Allocator> Ember::RenderDevice::GetAllocator() noexcept
+D3D12MA::Allocator* Ember::RenderDevice::GetAllocator() const noexcept
 {
-  return m_Allocator;
+  return m_Allocator.Get();
 }
 
-ID3D12CommandQueue* Ember::RenderDevice::GetDirectQueue() const
+ID3D12CommandQueue* Ember::RenderDevice::GetDirectQueue() const noexcept
 {
   return m_DirectContext.GetCommandQueue();
 }

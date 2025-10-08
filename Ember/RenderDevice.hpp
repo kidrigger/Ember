@@ -65,11 +65,11 @@ public:
       Context                             direct_context,
       bool                                is_tearing_supported );
 
-  ComPtr<ID3D12Device2>                    GetDevice() noexcept;
-  ComPtr<D3D12MA::Allocator>               GetAllocator() noexcept;
-  ID3D12CommandQueue*                      GetDirectQueue() const;
+  [[nodiscard]] ID3D12Device2*             GetDevice() const noexcept;
+  [[nodiscard]] D3D12MA::Allocator*        GetAllocator() const noexcept;
+  [[nodiscard]] ID3D12CommandQueue*        GetDirectQueue() const noexcept;
 
-  DXGI_FORMAT                              FetchSwapchainFormat() const;
+  [[nodiscard]] DXGI_FORMAT                FetchSwapchainFormat() const;
   [[nodiscard]] D3D_ROOT_SIGNATURE_VERSION FetchHighestRootSignatureVersion() const;
 
   static void                              Create( RenderDevice* render_device, HWND window_handle, bool use_warp );

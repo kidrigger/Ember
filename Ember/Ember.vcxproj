@@ -199,10 +199,14 @@
       <EnableVectorLength>VectorLength512</EnableVectorLength>
       <ExternalWarningLevel>TurnOffAllWarnings</ExternalWarningLevel>
       <FloatingPointModel>Fast</FloatingPointModel>
+      <MultiProcessorCompilation>true</MultiProcessorCompilation>
+      <AdditionalIncludeDirectories>$(SolutionDir)FrameGraph;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
     </ClCompile>
     <Link>
       <SubSystem>Windows</SubSystem>
       <GenerateDebugInformation>true</GenerateDebugInformation>
+      <AdditionalDependencies>FrameGraph.lib;%(AdditionalDependencies)</AdditionalDependencies>
+      <AdditionalLibraryDirectories>$(TargetDir);%(AdditionalLibraryDirectories)</AdditionalLibraryDirectories>
     </Link>
     <FxCompile>
       <ShaderModel>6.6</ShaderModel>
@@ -223,10 +227,14 @@
       <EnableVectorLength>VectorLength512</EnableVectorLength>
       <ExternalWarningLevel>TurnOffAllWarnings</ExternalWarningLevel>
       <FloatingPointModel>Fast</FloatingPointModel>
+      <MultiProcessorCompilation>true</MultiProcessorCompilation>
+      <AdditionalIncludeDirectories>$(SolutionDir)FrameGraph;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
     </ClCompile>
     <Link>
       <SubSystem>Windows</SubSystem>
       <GenerateDebugInformation>true</GenerateDebugInformation>
+      <AdditionalDependencies>FrameGraph.lib;%(AdditionalDependencies)</AdditionalDependencies>
+      <AdditionalLibraryDirectories>$(TargetDir);%(AdditionalLibraryDirectories)</AdditionalLibraryDirectories>
     </Link>
     <FxCompile>
       <ShaderModel>6.6</ShaderModel>
@@ -249,12 +257,16 @@
       <EnableVectorLength>VectorLength512</EnableVectorLength>
       <ExternalWarningLevel>TurnOffAllWarnings</ExternalWarningLevel>
       <FloatingPointModel>Fast</FloatingPointModel>
+      <MultiProcessorCompilation>true</MultiProcessorCompilation>
+      <AdditionalIncludeDirectories>$(SolutionDir)FrameGraph;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
     </ClCompile>
     <Link>
       <SubSystem>Windows</SubSystem>
       <EnableCOMDATFolding>true</EnableCOMDATFolding>
       <OptimizeReferences>true</OptimizeReferences>
       <GenerateDebugInformation>true</GenerateDebugInformation>
+      <AdditionalDependencies>FrameGraph.lib;%(AdditionalDependencies)</AdditionalDependencies>
+      <AdditionalLibraryDirectories>$(TargetDir);%(AdditionalLibraryDirectories)</AdditionalLibraryDirectories>
     </Link>
     <FxCompile>
       <ShaderModel>6.6</ShaderModel>
@@ -278,12 +290,16 @@
       <EnableVectorLength>VectorLength512</EnableVectorLength>
       <ExternalWarningLevel>TurnOffAllWarnings</ExternalWarningLevel>
       <FloatingPointModel>Fast</FloatingPointModel>
+      <MultiProcessorCompilation>true</MultiProcessorCompilation>
+      <AdditionalIncludeDirectories>$(SolutionDir)FrameGraph;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
     </ClCompile>
     <Link>
       <SubSystem>Windows</SubSystem>
       <EnableCOMDATFolding>true</EnableCOMDATFolding>
       <OptimizeReferences>true</OptimizeReferences>
       <GenerateDebugInformation>true</GenerateDebugInformation>
+      <AdditionalDependencies>FrameGraph.lib;%(AdditionalDependencies)</AdditionalDependencies>
+      <AdditionalLibraryDirectories>$(TargetDir);%(AdditionalLibraryDirectories)</AdditionalLibraryDirectories>
     </Link>
     <FxCompile>
       <ShaderModel>6.6</ShaderModel>
@@ -295,6 +311,7 @@
     </FxCompile>
   </ItemDefinitionGroup>
   <ItemGroup>
+    <ClCompile Include="BackgroundPass.cpp" />
     <ClCompile Include="BasicApp.cpp" />
     <ClCompile Include="BindlessManager.cpp" />
     <ClCompile Include="Buffer.cpp" />
@@ -303,6 +320,8 @@
     <ClCompile Include="DeferredApp.cpp" />
     <ClCompile Include="DirectionLightManager.cpp" />
     <ClCompile Include="Environment.cpp" />
+    <ClCompile Include="ForwardPass.cpp" />
+    <ClCompile Include="FrameGraphHelper.cpp" />
     <ClCompile Include="GeometryManager.cpp" />
     <ClCompile Include="IApp.cpp" />
     <ClCompile Include="Input.cpp" />
@@ -329,6 +348,7 @@
     <ClCompile Include="Util\ScopedHandle.cpp" />
   </ItemGroup>
   <ItemGroup>
+    <ClInclude Include="BackgroundPass.hpp" />
     <ClInclude Include="BasicApp.hpp" />
     <ClInclude Include="DeferredApp.hpp" />
     <ClInclude Include="DeviceHandle.hpp" />
@@ -339,6 +359,8 @@
     <ClInclude Include="DirectionLightManager.hpp" />
     <ClInclude Include="Environment.hpp" />
     <ClInclude Include="Float16.hpp" />
+    <ClInclude Include="ForwardPass.hpp" />
+    <ClInclude Include="FrameGraphHelper.hpp" />
     <ClInclude Include="GeometryManager.hpp" />
     <ClInclude Include="IApp.hpp" />
     <ClInclude Include="Input.hpp" />

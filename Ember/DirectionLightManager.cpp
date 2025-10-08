@@ -329,8 +329,6 @@ void Ember::Internal::DirectionLightManager::RenderAllShadows(
 {
   ZoneScoped;
   command_list->SetGraphicsRootSignature( m_RootSignature.Get() );
-  auto bindless_desc_heaps = m_RenderDevice->GetBindlessDescriptorHeaps();
-  command_list->SetDescriptorHeaps( CountOf( bindless_desc_heaps ), DataOf( bindless_desc_heaps ) );
   command_list->SetPipelineState( m_Pipeline.Get() );
   command_list->IASetPrimitiveTopology( D3D_PRIMITIVE_TOPOLOGY_TRIANGLELIST );
 

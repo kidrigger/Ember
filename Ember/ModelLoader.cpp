@@ -25,8 +25,6 @@ struct LoadingData
 
 using Payload = std::span<LoadingData>;
 
-namespace Internal
-{
 void SetTangent(
     SMikkTSpaceContext const* ctx, float const out_tan[], float const sign, int const face_idx, int const vert_idx )
 {
@@ -67,8 +65,6 @@ void GetTexCoord( SMikkTSpaceContext const* ctx, float out_tex[], int const face
   size_t const   vertex_idx = 3 * face_idx + vert_idx;
   memcpy( out_tex, &payload[vertex_idx].TexCoord0, sizeof( float ) * 2 );
 }
-
-} // namespace Internal
 
 Ember::VertexData QuantizeData( LoadingData const& in_data )
 {
@@ -374,12 +370,12 @@ void Ember::ModelLoader::ProcessPrimitive(
 
       SMikkTSpaceInterface mikk_t_space_interface;
       ZeroMemory( &mikk_t_space_interface, sizeof mikk_t_space_interface );
-      mikk_t_space_interface.m_getNumFaces          = &Internal::GetFaceCount;
-      mikk_t_space_interface.m_getNumVerticesOfFace = &Internal::GetNumFaceVertices;
-      mikk_t_space_interface.m_getPosition          = &Internal::GetPosition;
-      mikk_t_space_interface.m_getNormal            = &Internal::GetNormal;
-      mikk_t_space_interface.m_getTexCoord          = &Internal::GetTexCoord;
-      mikk_t_space_interface.m_setTSpaceBasic       = &Internal::SetTangent;
+      mikk_t_space_interface.m_getNumFaces          = &GetFaceCount;
+      mikk_t_space_interface.m_getNumVerticesOfFace = &GetNumFaceVertices;
+      mikk_t_space_interface.m_getPosition          = &GetPosition;
+      mikk_t_space_interface.m_getNormal            = &GetNormal;
+      mikk_t_space_interface.m_getTexCoord          = &GetTexCoord;
+      mikk_t_space_interface.m_setTSpaceBasic       = &SetTangent;
 
       SMikkTSpaceContext mikk_t_space_context{
         .m_pInterface = &mikk_t_space_interface,

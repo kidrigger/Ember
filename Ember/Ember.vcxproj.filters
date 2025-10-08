@@ -58,9 +58,6 @@
     <Filter Include="Shaders\Shadows">
       <UniqueIdentifier>{19b95aa5-3537-429c-84f2-4fd0eea82243}</UniqueIdentifier>
     </Filter>
-    <Filter Include="Header Files\Debug">
-      <UniqueIdentifier>{33be62f3-5eec-43bf-8b2e-8720ea67d57b}</UniqueIdentifier>
-    </Filter>
     <Filter Include="Shaders\Utils">
       <UniqueIdentifier>{e5054b06-327b-4e25-86de-082460938480}</UniqueIdentifier>
     </Filter>
@@ -75,6 +72,12 @@
     </Filter>
     <Filter Include="Shaders\Meshes\Deferred">
       <UniqueIdentifier>{6aa6fc91-b2cc-472e-a463-77c6f342fcd3}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="Header Files\Passes">
+      <UniqueIdentifier>{ef966d89-19fe-4754-85bb-4d79dcb8d79e}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="Source Files\Passes">
+      <UniqueIdentifier>{9cb2a318-b3ee-466f-808f-379c472bf996}</UniqueIdentifier>
     </Filter>
   </ItemGroup>
   <ItemGroup>
@@ -173,6 +176,15 @@
     </ClCompile>
     <ClCompile Include="SpotLightManager.cpp">
       <Filter>Source Files\Scene</Filter>
+    </ClCompile>
+    <ClCompile Include="FrameGraphHelper.cpp">
+      <Filter>Source Files\Graphics</Filter>
+    </ClCompile>
+    <ClCompile Include="BackgroundPass.cpp">
+      <Filter>Source Files\Passes</Filter>
+    </ClCompile>
+    <ClCompile Include="ForwardPass.cpp">
+      <Filter>Source Files\Passes</Filter>
     </ClCompile>
   </ItemGroup>
   <ItemGroup>
@@ -289,6 +301,15 @@
     </ClInclude>
     <ClInclude Include="SpotLightManager.hpp">
       <Filter>Header Files\Scene</Filter>
+    </ClInclude>
+    <ClInclude Include="FrameGraphHelper.hpp">
+      <Filter>Header Files\Graphics</Filter>
+    </ClInclude>
+    <ClInclude Include="BackgroundPass.hpp">
+      <Filter>Header Files\Passes</Filter>
+    </ClInclude>
+    <ClInclude Include="ForwardPass.hpp">
+      <Filter>Header Files\Passes</Filter>
     </ClInclude>
   </ItemGroup>
   <ItemGroup>

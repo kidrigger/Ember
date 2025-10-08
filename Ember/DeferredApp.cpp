@@ -127,7 +127,7 @@ Ember::DeferredApp::DeferredApp(
   ImGui_ImplWin32_Init( window_handle );
 
   ImGui_ImplDX12_InitInfo init_info = {};
-  init_info.Device                  = m_RenderDevice->GetDevice().Get();
+  init_info.Device                  = m_RenderDevice->GetDevice();
   init_info.CommandQueue            = m_RenderDevice->GetDirectQueue();
   init_info.NumFramesInFlight       = RenderDevice::kNumFrames;
   init_info.RTVFormat               = DXGI_FORMAT_R8G8B8A8_UNORM;
@@ -179,7 +179,7 @@ void Ember::DeferredApp::Create( DeferredApp* app, HINSTANCE const instance_hand
   RenderDevice::Create( render_device.get(), window_handle, use_warp );
 
   auto perf_counter = std::make_unique_for_overwrite<PerfCounter>();
-  PerfCounter::Create( perf_counter.get(), render_device->GetDevice().Get(), RenderDevice::kNumFrames );
+  PerfCounter::Create( perf_counter.get(), render_device->GetDevice(), RenderDevice::kNumFrames );
 
   auto render_target_manager = std::make_unique_for_overwrite<RenderTargetManager>();
   RenderTargetManager::Create( render_target_manager.get(), render_device.get() );
@@ -854,8 +854,6 @@ void Ember::DeferredApp::RenderScene(
 
   command_list->SetGraphicsRootSignature( m_RootSignature.Get() );
 
-  auto bindless_desc_heaps = m_RenderDevice->GetBindlessDescriptorHeaps();
-  command_list->SetDescriptorHeaps( CountOf( bindless_desc_heaps ), DataOf( bindless_desc_heaps ) );
   command_list->RSSetViewports( 1, &viewport );
   command_list->RSSetScissorRects( 1, &scissor );
   m_RenderTargetManager->OMSetRenderTargets( command_list, CountOf( m_GBuffer ), DataOf( m_GBuffer ), &m_DepthTexture );
@@ -956,7 +954,10 @@ void Ember::DeferredApp::Render()
   // All resources for this frame are guaranteed to be available for CPU modification at this time.
   // Clear Backbuffer
 
-  CBVHandle const camera_handle = m_Camera->PrepareFrame( frame_idx );
+  CBVHandle const camera_handle       = m_Camera->PrepareFrame( frame_idx );
+
+  auto            bindless_desc_heaps = m_RenderDevice->GetBindlessDescriptorHeaps();
+  command_list->SetDescriptorHeaps( CountOf( bindless_desc_heaps ), DataOf( bindless_desc_heaps ) );
 
   m_DrawList.Clear();
 

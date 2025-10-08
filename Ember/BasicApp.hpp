@@ -1,12 +1,16 @@
 #pragma once
 
+#include "BackgroundPass.hpp"
 #include "Environment.hpp"
+#include "ForwardPass.hpp"
+#include "FrameGraphHelper.hpp"
 #include "IApp.hpp"
 #include "RenderDevice.hpp"
 #include "RenderTargetManager.hpp"
 #include "Scene.hpp"
 #include "Util/DirectXHeaders.hpp"
 #include "Util/Runtime.hpp"
+#include "fg/FrameGraph.hpp"
 
 namespace Ember
 {
@@ -15,6 +19,12 @@ class ModelLoader;
 class PerfCounter;
 class RenderDevice;
 class Camera;
+
+struct RTVData
+{
+  FrameGraphResource RenderTarget;
+  FrameGraphResource DepthStencil;
+};
 
 class BasicApp final : public IApp
 {
@@ -31,19 +41,13 @@ class BasicApp final : public IApp
   wchar_t                        m_SprintfBuffer[1024]{};
 
   // Specifics
+  FG::Context m_FGContext;
 
   // PBR Pipeline
-  ComPtr<ID3D12RootSignature>          m_RootSignature;
-  ComPtr<ID3D12PipelineState>          m_OpaquePBRPipeline;
-  ComPtr<ID3D12PipelineState>          m_AlphaTestedPBRPipeline;
-  ComPtr<ID3D12PipelineState>          m_AlphaBlendedPBRPipeline;
-
-  ComPtr<ID3D12RootSignature>          m_BackgroundRootSignature;
-  ComPtr<ID3D12PipelineState>          m_BackgroundPipeline;
+  RenderPass::Forward                  m_ForwardPass;
+  RenderPass::Background               m_BackgroundPass;
 
   std::unique_ptr<RenderTargetManager> m_RenderTargetManager;
-  Texture                              m_RenderTexture;
-  Texture                              m_DepthTexture;
   DXGI_FORMAT                          m_SwapchainFormat;
 
   std::unique_ptr<Camera>              m_Camera;
@@ -68,10 +72,13 @@ public:
       std::unique_ptr<PerfCounter>         perf_counter,
       std::unique_ptr<RenderTargetManager> render_target_manager );
 
-  void LoadContent() override;
-  void Update() override;
-  void RenderScene(
-      ID3D12GraphicsCommandList6* command_list, DrawList::Batches const& draw_list_info, uint32_t frame_idx );
+  void    LoadContent() override;
+  void    Update() override;
+  RTVData RenderScene(
+      ID3D12GraphicsCommandList6* command_list,
+      DrawList::Batches const&    draw_list_info_list,
+      FrameGraph*                 frame_graph,
+      uint32_t                    frame_idx );
   void        Render() override;
   void        UnloadContent() override;
 

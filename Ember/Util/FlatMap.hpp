@@ -159,7 +159,7 @@ public:
   Iterator Find( TKey const& key )
   {
     auto key_it = std::ranges::lower_bound( m_Keys, key );
-    if ( key_it == m_Keys.end() ) return end();
+    if ( key_it == m_Keys.end() or *key_it != key ) return end();
 
     ptrdiff_t offset = key_it - m_Keys.begin();
     return { key_it, m_Values.begin() + offset };
