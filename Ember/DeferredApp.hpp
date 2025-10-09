@@ -1,14 +1,18 @@
 #pragma once
 
+#include "BackgroundPass.hpp"
 #include "Environment.hpp"
+#include "FrameGraphHelper.hpp"
+#include "GBufferPass.hpp"
 #include "IApp.hpp"
+#include "LightingPass.hpp"
 #include "RenderDevice.hpp"
 #include "RenderTargetManager.hpp"
 #include "Scene.hpp"
-#include "Util/DataUtil.hpp"
+#include "TransparencyPass.hpp"
 #include "Util/DirectXHeaders.hpp"
-#include "Util/FlatMap.hpp"
-#include "Util/Runtime.hpp"
+#include "fg/FrameGraph.hpp"
+#include "fg/FrameGraphResource.hpp"
 
 namespace Ember
 {
@@ -22,58 +26,25 @@ class DeferredApp final : public IApp
 {
   using RenderQueryType = flecs::query<WorldTransform const, Mesh const, Geometry const, Material const>;
 
-  HWND                           m_WindowHandle{ nullptr };
-  uint32_t                       m_WindowWidth{ 1280 };
-  uint32_t                       m_WindowHeight{ 720 };
+  HWND                                 m_WindowHandle{ nullptr };
+  uint32_t                             m_WindowWidth{ 1280 };
+  uint32_t                             m_WindowHeight{ 720 };
 
-  std::unique_ptr<RenderDevice>  m_RenderDevice;
-  std::unique_ptr<PerfCounter>   m_PerfCounter;
-  std::unique_ptr<TextureLoader> m_TextureLoader;
-  std::unique_ptr<ModelLoader>   m_ModelLoader;
-  wchar_t                        m_SprintfBuffer[1024]{};
+  std::unique_ptr<RenderDevice>        m_RenderDevice;
+  std::unique_ptr<PerfCounter>         m_PerfCounter;
+  std::unique_ptr<TextureLoader>       m_TextureLoader;
+  std::unique_ptr<ModelLoader>         m_ModelLoader;
+  wchar_t                              m_SprintfBuffer[1024]{};
 
-  enum GBufferIndex
-  {
-    kPosition     = 0,
-    kAlbedo       = 1,
-    kNormal       = 2,
-    kORM          = 3,
-    kEmissive     = 4,
-    kGBufferCount = 5,
-  };
-
-  // TODO: Use more compact formats if possible.
-  // R32G32B32A32_FLOAT is overkill for position, but required for the shadow.
-  // Use quantization?
-  // Normal to Octahedron?
-  DXGI_FORMAT constexpr static kGBufferFormats[kGBufferCount] = {
-    DXGI_FORMAT_R32G32B32A32_FLOAT,  // Position
-    DXGI_FORMAT_R8G8B8A8_UNORM_SRGB, // Albedo
-    DXGI_FORMAT_R8G8B8A8_UNORM,      // Normal
-    DXGI_FORMAT_R8G8B8A8_UNORM,      // ORM
-    DXGI_FORMAT_R8G8B8A8_UNORM_SRGB, // Emissive
-  };
-
-  // Specifics
-
-  // PBR Pipeline
-  ComPtr<ID3D12RootSignature>          m_RootSignature;
-  ComPtr<ID3D12PipelineState>          m_GBufferPipeline;
-  ComPtr<ID3D12PipelineState>          m_AlphaTestedGBufferPipeline;
-
-  ComPtr<ID3D12RootSignature>          m_MergeRootSignature;
-  ComPtr<ID3D12PipelineState>          m_MergePipeline;
-  ComPtr<ID3D12PipelineState>          m_OmniLightVolumePipeline;
-  ComPtr<ID3D12PipelineState>          m_SpotLightVolumePipeline;
-  ComPtr<ID3D12PipelineState>          m_AlphaBlendedPBRPipeline;
-
-  ComPtr<ID3D12RootSignature>          m_BackgroundRootSignature;
-  ComPtr<ID3D12PipelineState>          m_BackgroundPipeline;
+  RenderPass::GBuffer                  m_GBufferPass;
+  RenderPass::TransparencyForward      m_TransparencyPass;
+  RenderPass::OmniLightDeferred        m_OmniLightPass;
+  RenderPass::SpotLightDeferred        m_SpotLightPass;
+  RenderPass::ScreenSpaceLightDeferred m_ScreenSpaceLightPass;
+  RenderPass::Background               m_BackgroundPass;
+  FG::Context                          m_FGContext;
 
   std::unique_ptr<RenderTargetManager> m_RenderTargetManager;
-  Texture                              m_GBuffer[kGBufferCount];
-  Texture                              m_RenderTexture;
-  Texture                              m_DepthTexture;
   DXGI_FORMAT                          m_SwapchainFormat;
 
   std::unique_ptr<Camera>              m_Camera;
@@ -98,10 +69,13 @@ public:
       std::unique_ptr<PerfCounter>         perf_counter,
       std::unique_ptr<RenderTargetManager> render_target_manager );
 
-  void LoadContent() override;
-  void Update() override;
-  void RenderScene(
-      ID3D12GraphicsCommandList6* command_list, DrawList::Batches const& draw_list_info, uint32_t frame_idx );
+  void                LoadContent() override;
+  void                Update() override;
+  RenderPass::RTVData RenderScene(
+      ID3D12GraphicsCommandList6* command_list,
+      DrawList::Batches const&    draw_list_info_list,
+      FrameGraph*                 frame_graph,
+      uint32_t                    frame_idx );
   void        Render() override;
   void        UnloadContent() override;
 

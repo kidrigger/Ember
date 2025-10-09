@@ -15,6 +15,7 @@
 #include "MaterialManager.hpp"
 #include "ModelLoader.hpp"
 #include "RenderDevice.hpp"
+#include "RenderPassCommon.hpp"
 #include "TextureLoader.hpp"
 #include "Util/DataUtil.hpp"
 #include "Util/HelperUtils.hpp"
@@ -195,8 +196,9 @@ Ember::BasicApp::~BasicApp() // NOLINT(modernize-use-equals-default)
 
 void Ember::BasicApp::SetupRenderPipeline()
 {
-  ENSURE( RenderPass::Forward::Create( &m_ForwardPass, m_RenderDevice.get() ) );
-  ENSURE( RenderPass::Background::Create( &m_BackgroundPass, m_RenderDevice.get() ) );
+  ENSURE( RenderPass::OpaqueForward::Create( &m_OpaquePass, m_RenderDevice.get(), m_SwapchainFormat ) );
+  ENSURE( RenderPass::TransparencyForward::Create( &m_TransparencyPass, m_RenderDevice.get(), m_SwapchainFormat ) );
+  ENSURE( RenderPass::Background::Create( &m_BackgroundPass, m_RenderDevice.get(), m_SwapchainFormat ) );
 }
 
 void Ember::BasicApp::LoadContent()
@@ -454,7 +456,7 @@ void Ember::BasicApp::Update()
   Input::Instance().Update();
 }
 
-Ember::RTVData Ember::BasicApp::RenderScene(
+Ember::RenderPass::RTVData Ember::BasicApp::RenderScene(
     ID3D12GraphicsCommandList6* command_list,
     DrawList::Batches const&    draw_list_info_list,
     FrameGraph*                 frame_graph,
@@ -463,9 +465,9 @@ Ember::RTVData Ember::BasicApp::RenderScene(
   PIXScopedEvent( command_list, PIX_COLOR_DEFAULT, "Render Scene" );
   ZoneScoped;
 
-  RTVData clear_rtv = frame_graph->addCallbackPass<RTVData>(
+  RenderPass::RTVData clear_rtv = frame_graph->addCallbackPass<RenderPass::RTVData>(
       "Clear RTV",
-      [&]( FrameGraph::Builder& builder, RTVData& data )
+      [&]( FrameGraph::Builder& builder, RenderPass::RTVData& data )
       {
         data.RenderTarget = builder.create<FG::Texture>(
             "Main Render Target",
@@ -492,7 +494,7 @@ Ember::RTVData Ember::BasicApp::RenderScene(
         data.RenderTarget = builder.write( data.RenderTarget, FG::Attachment{ .Index = 0 } );
         data.DepthStencil = builder.write( data.DepthStencil, FG::DepthStencil{} );
       },
-      []( RTVData const& data, FrameGraphPassResources& resources, void* ctx )
+      []( RenderPass::RTVData const& data, FrameGraphPassResources& resources, void* ctx )
       {
         FG::Context* context = ( FG::Context* )ctx;
         context->FlushBarriers();
@@ -509,22 +511,22 @@ Ember::RTVData Ember::BasicApp::RenderScene(
             frame_data.CommandList, depth_target.Resource.Get(), D3D12_CLEAR_FLAG_DEPTH, 1.0f, 0 );
       } );
 
-  RenderPass::Forward::PerFrameConstants const constants = {
+  PerFrameConstants const constants = {
     .MaterialsBuffer = m_MaterialManager->PrepareFrame(),
     .Camera          = m_Camera->GetLastUpdatedBuffer(),
     .ConfigBuffer    = m_ConfigurationBuffer.GetCBVHandle(),
     .LightInfo       = m_LightManager->PrepareFrame( frame_idx ),
   };
 
-  RTVData main_pass = frame_graph->addCallbackPass<RTVData>(
+  RenderPass::RTVData opaque_pass = frame_graph->addCallbackPass<RenderPass::RTVData>(
       "Main Pass",
-      [&]( FrameGraph::Builder& builder, RTVData& data )
+      [&]( FrameGraph::Builder& builder, RenderPass::RTVData& data )
       {
         data.RenderTarget = builder.write( clear_rtv.RenderTarget, FG::Attachment{ .Index = 0 } );
         data.DepthStencil = builder.write( clear_rtv.DepthStencil, FG::DepthStencil{} );
       },
-      [mp = m_ForwardPass, constants, env = m_Environment->Repr(), draw_list_info_list = draw_list_info_list](
-          RTVData const& data, FrameGraphPassResources& resources, void* ctx )
+      [mp = m_OpaquePass, constants, env = m_Environment->Repr(), draw_list_info_list = draw_list_info_list](
+          RenderPass::RTVData const& data, FrameGraphPassResources& resources, void* ctx )
       {
         ZoneScopedN( "Main Pass" );
 
@@ -550,7 +552,7 @@ Ember::RTVData Ember::BasicApp::RenderScene(
         rtm->OMSetRenderTargets( cmd, 1, &rtv, &rtv_desc, depth_target.Resource.Get(), nullptr );
 
         cmd->SetGraphicsRootSignature( mp.RootSignature.Get() );
-        cmd->SetGraphicsRoot32BitConstants( 1, sizeof( RenderPass::Forward::PerFrameConstants ) / 4, &constants, 0 );
+        cmd->SetGraphicsRoot32BitConstants( 1, sizeof( PerFrameConstants ) / 4, &constants, 0 );
         cmd->SetGraphicsRoot32BitConstants( 2, sizeof( Environment::GpuRepr ) / 4, &env, 0 );
 
         cmd->SetPipelineState( mp.OpaquePipeline.Get() );
@@ -560,24 +562,59 @@ Ember::RTVData Ember::BasicApp::RenderScene(
         cmd->SetPipelineState( mp.AlphaTestedPipeline.Get() );
         cmd->SetGraphicsRoot32BitConstants( 0, sizeof( DrawList::Info ) / 4, &draw_list_info_list.AlphaTested, 0 );
         cmd->DispatchMesh( draw_list_info_list.AlphaTested.DrawCount, 1, 1 );
+      } );
 
+  RenderPass::RTVData transparency_pass = frame_graph->addCallbackPass<RenderPass::RTVData>(
+      "Transparency Pass",
+      [&]( FrameGraph::Builder& builder, RenderPass::RTVData& data )
+      {
+        data.RenderTarget = builder.write( opaque_pass.RenderTarget, FG::Attachment{ .Index = 0 } );
+        data.DepthStencil = builder.write( opaque_pass.DepthStencil, FG::DepthStencil{} );
+      },
+      [mp = m_TransparencyPass, constants, env = m_Environment->Repr(), draw_list_info_list = draw_list_info_list](
+          RenderPass::RTVData const& data, FrameGraphPassResources& resources, void* ctx )
+      {
+        ZoneScopedN( "Transparency Pass" );
+
+        FG::Context* context = ( FG::Context* )ctx;
+        context->FlushBarriers();
+
+        FG::Context::FrameData const& frame_data = context->GetFrameData();
+        RenderTargetManager const*    rtm        = context->GetRenderTargetManager();
+        ID3D12GraphicsCommandList6*   cmd        = frame_data.CommandList;
+        PIXScopedEvent( cmd, PIX_COLOR_DEFAULT, "Transparency Pass" );
+
+        FG::Texture const& render_target = resources.get<FG::Texture>( data.RenderTarget );
+        FG::Texture const& depth_target  = resources.get<FG::Texture>( data.DepthStencil );
+
+        rtm->RSSetScissorViewport( cmd, frame_data.Width, frame_data.Height );
+
+        D3D12_RENDER_TARGET_VIEW_DESC const rtv_desc{
+          .Format        = DXGI_FORMAT_R8G8B8A8_UNORM_SRGB,
+          .ViewDimension = D3D12_RTV_DIMENSION_TEXTURE2D,
+          .Texture2D     = { .MipSlice = 0 },
+        };
+        ID3D12Resource* rtv = render_target.Resource.Get();
+        rtm->OMSetRenderTargets( cmd, 1, &rtv, &rtv_desc, depth_target.Resource.Get(), nullptr );
+
+        cmd->SetGraphicsRootSignature( mp.RootSignature.Get() );
         // TODO: Sort transparent objects back to front
-        cmd->SetPipelineState( mp.AlphaBlendedPipeline.Get() );
+        cmd->SetPipelineState( mp.Pipeline.Get() );
         cmd->SetGraphicsRoot32BitConstants( 0, sizeof( DrawList::Info ) / 4, &draw_list_info_list.AlphaBlended, 0 );
+        cmd->SetGraphicsRoot32BitConstants( 1, sizeof( PerFrameConstants ) / 4, &constants, 0 );
+        cmd->SetGraphicsRoot32BitConstants( 2, sizeof( Environment::GpuRepr ) / 4, &env, 0 );
         cmd->DispatchMesh( draw_list_info_list.AlphaBlended.DrawCount, 1, 1 );
       } );
 
-  RTVData skybox_pass = frame_graph->addCallbackPass<RTVData>(
+  RenderPass::RTVData skybox_pass = frame_graph->addCallbackPass<RenderPass::RTVData>(
       "Render Skybox",
-      [&]( FrameGraph::Builder& builder, RTVData& data )
+      [&]( FrameGraph::Builder& builder, RenderPass::RTVData& data )
       {
-        builder.read( main_pass.RenderTarget );
-        builder.read( main_pass.DepthStencil );
-        data.RenderTarget = builder.write( main_pass.RenderTarget, FG::Attachment{ .Index = 0 } );
-        data.DepthStencil = builder.write( main_pass.DepthStencil, FG::DepthStencil{} );
+        data.RenderTarget = builder.write( transparency_pass.RenderTarget, FG::Attachment{ .Index = 0 } );
+        data.DepthStencil = builder.write( transparency_pass.DepthStencil, FG::DepthStencil{} );
       },
       [mbp = m_BackgroundPass, camera_cbv = constants.Camera, skybox = m_Environment->Repr().Skybox](
-          RTVData const& data, FrameGraphPassResources& resources, void* ctx )
+          RenderPass::RTVData const& data, FrameGraphPassResources& resources, void* ctx )
       {
         ZoneScopedN( "Render Skybox" );
 
@@ -594,8 +631,13 @@ Ember::RTVData Ember::BasicApp::RenderScene(
 
         rtm->RSSetScissorViewport( cmd, frame_data.Width, frame_data.Height );
 
+        D3D12_RENDER_TARGET_VIEW_DESC const rtv_desc{
+          .Format        = DXGI_FORMAT_R8G8B8A8_UNORM_SRGB,
+          .ViewDimension = D3D12_RTV_DIMENSION_TEXTURE2D,
+          .Texture2D     = { .MipSlice = 0 },
+        };
         ID3D12Resource* rtv = render_target.Resource.Get();
-        rtm->OMSetRenderTargets( cmd, 1, &rtv, nullptr, depth_target.Resource.Get(), nullptr );
+        rtm->OMSetRenderTargets( cmd, 1, &rtv, &rtv_desc, depth_target.Resource.Get(), nullptr );
 
         cmd->SetGraphicsRootSignature( mbp.RootSignature.Get() );
         cmd->SetPipelineState( mbp.Pipeline.Get() );
@@ -606,7 +648,7 @@ Ember::RTVData Ember::BasicApp::RenderScene(
 
   if ( g_Debug.HideSkybox )
   {
-    return main_pass;
+    return transparency_pass;
   }
   return skybox_pass;
 }
@@ -642,7 +684,7 @@ void Ember::BasicApp::Render()
   FrameGraphResource bb_res = frame_graph.import(
       "Backbuffer",
       FG::Texture::Desc{
-          .Format    = DXGI_FORMAT_R8G8B8A8_UNORM,
+          .Format    = m_SwapchainFormat,
           .Width     = m_WindowWidth,
           .Height    = m_WindowHeight,
           .MipLevels = MipLevels::kBase,
@@ -666,17 +708,16 @@ void Ember::BasicApp::Render()
 
   m_LightManager->RenderAllShadows( command_list.Get(), draw_list_info, *m_RenderTargetManager, *m_Camera, frame_idx );
 
-  RTVData scene_data = RenderScene( command_list.Get(), draw_list_info, &frame_graph, frame_idx );
+  RenderPass::RTVData scene_data = RenderScene( command_list.Get(), draw_list_info, &frame_graph, frame_idx );
 
-  RTVData rtv_data   = frame_graph.addCallbackPass<RTVData>(
+  RenderPass::RTVData rtv_data   = frame_graph.addCallbackPass<RenderPass::RTVData>(
       "ImGUI",
-      [&]( FrameGraph::Builder& builder, RTVData& data )
+      [&]( FrameGraph::Builder& builder, RenderPass::RTVData& data )
       {
-        builder.read( scene_data.RenderTarget );
         data.RenderTarget = builder.write( scene_data.RenderTarget, FG::Attachment{ .Index = 0 } );
         data.DepthStencil = scene_data.DepthStencil;
       },
-      []( RTVData const& data, FrameGraphPassResources& resources, void* ctx )
+      []( RenderPass::RTVData const& data, FrameGraphPassResources& resources, void* ctx )
       {
         ZoneScopedN( "ImGUI" );
 

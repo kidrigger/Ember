@@ -3,6 +3,7 @@
 #include <queue>
 #include <variant>
 
+#include "DeviceHandle.hpp"
 #include "Util/DirectXHeaders.hpp"
 #include "Util/FlatMap.hpp"
 #include "Util/Runtime.hpp"
@@ -28,6 +29,16 @@ enum class WriteType
   kRTV,
   kDSV,
   kCopy,
+};
+
+struct ShaderResource
+{
+  ReadType Type           = ReadType::kSRV; // 2 bits
+  bool     PixelShaderUse = true;           // 1 bit
+  bool     OnlyTopMip     = true;           // 1 bit
+
+  operator uint32_t() const;
+  static ShaderResource Decode( uint32_t flag );
 };
 
 struct CopySrc
@@ -63,7 +74,7 @@ struct CopyDst
   static CopyDst Decode( uint32_t flag );
 };
 
-using Read = std::variant<std::monostate, std::monostate, std::monostate, CopySrc>;
+using Read = std::variant<std::monostate, ShaderResource, std::monostate, CopySrc>;
 Read DecodeReadFlags( uint32_t v );
 
 using Write = std::variant<Attachment, DepthStencil, CopyDst>;
@@ -71,9 +82,11 @@ Write DecodeWriteFlags( uint32_t v );
 
 struct Texture
 {
-  ComPtr<ID3D12Resource>      Resource;
-  ComPtr<D3D12MA::Allocation> Allocation;
-  D3D12_RESOURCE_STATES       CurrentState;
+  ComPtr<ID3D12Resource>       Resource;
+  ComPtr<D3D12MA::Allocation>  Allocation;
+  D3D12_RESOURCE_STATES        CurrentState;
+  FlatMap<uint64_t, SRVHandle> SRVHandleCache;
+  SRVHandle                    AsSRV;
 
   struct Desc
   {

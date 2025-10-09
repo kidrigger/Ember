@@ -137,7 +137,28 @@ void Ember::FG::Context::DestroyTexture( Texture::Desc const& desc, Texture tex 
   auto           it   = m_Textures.Find( hash );
   if ( it == m_Textures.end() ) return;
 
+  for ( SRVHandle const& handle : tex.SRVHandleCache.Values() )
+  {
+    m_RenderDevice->FreeHandle( handle );
+  }
+  tex.SRVHandleCache.Clear();
+  tex.AsSRV = {};
+
   it->second.emplace( std::move( tex ) );
+}
+
+Ember::FG::ShaderResource::operator uint32_t() const
+{
+  return ( ( uint32_t )Type & 0x3 ) | ( PixelShaderUse << 2 ) | OnlyTopMip << 3;
+}
+
+Ember::FG::ShaderResource Ember::FG::ShaderResource::Decode( uint32_t const flag )
+{
+  return ShaderResource{
+    .Type           = ( ReadType )( flag & 0x3 ),
+    .PixelShaderUse = ( bool )( ( flag >> 2 ) & 0x1 ),
+    .OnlyTopMip     = ( bool )( ( flag >> 3 ) & 0x1 ),
+  };
 }
 
 Ember::FG::CopySrc::operator uint32_t() const
@@ -187,7 +208,7 @@ Ember::FG::Read Ember::FG::DecodeReadFlags( uint32_t const v )
     case ReadType::kDSV:
       UNREACHABLE; // Not supported
     case ReadType::kSRV:
-      UNREACHABLE; // Not supported
+      return ShaderResource::Decode( v );
     case ReadType::kCBV:
       UNREACHABLE; // Not supported
     case ReadType::kCopy:
@@ -230,12 +251,38 @@ void Ember::FG::Texture::destroy( Desc const& desc, void* alloc )
 void Ember::FG::Texture::preRead( Desc const& desc, uint32_t flags, void* context )
 {
   ASSERT( context );
-  Context* ctx     = ( Context* )context;
+  Context*   ctx     = ( Context* )context;
 
-  auto     decoded = DecodeReadFlags( flags );
+  auto const decoded = DecodeReadFlags( flags );
 
   switch ( decoded.index() )
   {
+    case 1:
+    {
+      ShaderResource const              srv            = std::get<ShaderResource>( decoded );
+      D3D12_RESOURCE_STATES const       required_state = srv.PixelShaderUse ? D3D12_RESOURCE_STATE_PIXEL_SHADER_RESOURCE
+                                                                            : D3D12_RESOURCE_STATE_NON_PIXEL_SHADER_RESOURCE;
+
+      CD3DX12_SHADER_RESOURCE_VIEW_DESC srv_desc =
+          CD3DX12_SHADER_RESOURCE_VIEW_DESC::Tex2D( desc.Format, srv.OnlyTopMip ? 1 : -1 );
+      uint64_t const hash = HashFnv1A( srv_desc );
+      if ( auto it = SRVHandleCache.Find( hash ); it != SRVHandleCache.end() )
+      {
+        AsSRV = it->second;
+      }
+      else
+      {
+        SRVHandle const handle = ctx->GetRenderDevice()->CreateBindlessHandle( Resource.Get(), srv_desc );
+        AsSRV                  = SRVHandleCache.Put( hash, handle );
+      }
+
+      if ( CurrentState != required_state )
+      {
+        ctx->PushBarrier( CD3DX12_RESOURCE_BARRIER::Transition( Resource.Get(), CurrentState, required_state ) );
+        CurrentState = required_state;
+      }
+    }
+    break;
     case 3:
     {
       if ( CurrentState != D3D12_RESOURCE_STATE_COPY_SOURCE )
@@ -246,11 +293,13 @@ void Ember::FG::Texture::preRead( Desc const& desc, uint32_t flags, void* contex
       }
     }
     break;
+    default:
+      UNREACHABLE;
   }
 }
 
 // ReSharper disable once CppInconsistentNaming
-void Ember::FG::Texture::preWrite( Desc const& desc, uint32_t const flags, void* context )
+void Ember::FG::Texture::preWrite( [[maybe_unused]] Desc const& desc, uint32_t const flags, void* context )
 {
   ASSERT( context );
   Context* ctx     = ( Context* )context;

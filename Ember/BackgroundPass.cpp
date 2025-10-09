@@ -4,8 +4,10 @@
 #include "Util/DataUtil.hpp"
 #include "Util/HelperUtils.hpp"
 
-bool Ember::RenderPass::Background::Create( Background* out, RenderDevice* render_device )
+bool Ember::RenderPass::Background::Create( Background* out, RenderDevice* render_device, DXGI_FORMAT const rt_format )
 {
+  out->RenderTargetFormat = rt_format;
+
   ComPtr<ID3DBlob> bg_mesh_shader_blob;
   ERR_FAIL_RET_F( D3DReadFileToBlob( L"BackgroundMS.cso", &bg_mesh_shader_blob ) );
   ComPtr<ID3DBlob> bg_pixel_shader_blob;
@@ -50,11 +52,11 @@ bool Ember::RenderPass::Background::Create( Background* out, RenderDevice* rende
   rasterizer_desc.CullMode              = D3D12_CULL_MODE_BACK;
 
   D3D12_RT_FORMAT_ARRAY rtv_formats{
-    .RTFormats        = { DXGI_FORMAT_R8G8B8A8_UNORM },
+    .RTFormats        = { rt_format },
     .NumRenderTargets = 1,
   };
 
-  struct BackgroundPipelineStream
+  struct PipelineStream
   {
     CD3DX12_PIPELINE_STATE_STREAM_ROOT_SIGNATURE        RootSignature;
     CD3DX12_PIPELINE_STATE_STREAM_PRIMITIVE_TOPOLOGY    PrimitiveTopologyType;
@@ -66,7 +68,7 @@ bool Ember::RenderPass::Background::Create( Background* out, RenderDevice* rende
     CD3DX12_PIPELINE_STATE_STREAM_DEPTH_STENCIL_FORMAT  DSVFormat;
   };
 
-  BackgroundPipelineStream bg_pipeline_stream = {
+  PipelineStream bg_pipeline_stream = {
     .RootSignature         = out->RootSignature.Get(),
     .PrimitiveTopologyType = D3D12_PRIMITIVE_TOPOLOGY_TYPE_TRIANGLE,
     .MS                    = CD3DX12_SHADER_BYTECODE( bg_mesh_shader_blob.Get() ),

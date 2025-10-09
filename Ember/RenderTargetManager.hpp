@@ -38,6 +38,12 @@ public:
   void ClearRenderTargetViews(
       ID3D12GraphicsCommandList* command_list,
       uint32_t                   count,
+      ID3D12Resource**           render_target,
+      float const                color[] ) const;
+
+  void ClearRenderTargetViews(
+      ID3D12GraphicsCommandList* command_list,
+      uint32_t                   count,
       Texture const*             render_target,
       float const                color[] ) const;
 

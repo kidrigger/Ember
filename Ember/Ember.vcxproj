@@ -311,6 +311,7 @@
     </FxCompile>
   </ItemDefinitionGroup>
   <ItemGroup>
+    <ClCompile Include="TransparencyPass.cpp" />
     <ClCompile Include="BackgroundPass.cpp" />
     <ClCompile Include="BasicApp.cpp" />
     <ClCompile Include="BindlessManager.cpp" />
@@ -322,9 +323,11 @@
     <ClCompile Include="Environment.cpp" />
     <ClCompile Include="ForwardPass.cpp" />
     <ClCompile Include="FrameGraphHelper.cpp" />
+    <ClCompile Include="GBufferPass.cpp" />
     <ClCompile Include="GeometryManager.cpp" />
     <ClCompile Include="IApp.cpp" />
     <ClCompile Include="Input.cpp" />
+    <ClCompile Include="LightingPass.cpp" />
     <ClCompile Include="LightManager.cpp" />
     <ClCompile Include="LightHandle.cpp" />
     <ClCompile Include="Material.cpp" />
@@ -348,6 +351,7 @@
     <ClCompile Include="Util\ScopedHandle.cpp" />
   </ItemGroup>
   <ItemGroup>
+    <ClInclude Include="TransparencyPass.hpp" />
     <ClInclude Include="BackgroundPass.hpp" />
     <ClInclude Include="BasicApp.hpp" />
     <ClInclude Include="DeferredApp.hpp" />
@@ -361,9 +365,11 @@
     <ClInclude Include="Float16.hpp" />
     <ClInclude Include="ForwardPass.hpp" />
     <ClInclude Include="FrameGraphHelper.hpp" />
+    <ClInclude Include="GBufferPass.hpp" />
     <ClInclude Include="GeometryManager.hpp" />
     <ClInclude Include="IApp.hpp" />
     <ClInclude Include="Input.hpp" />
+    <ClInclude Include="LightingPass.hpp" />
     <ClInclude Include="LightManager.hpp" />
     <ClInclude Include="LightHandle.hpp" />
     <ClInclude Include="Material.hpp" />
@@ -372,6 +378,7 @@
     <ClInclude Include="ModelLoader.hpp" />
     <ClInclude Include="ObjectPool.hpp" />
     <ClInclude Include="RenderDevice.hpp" />
+    <ClInclude Include="RenderPassCommon.hpp" />
     <ClInclude Include="RenderTargetManager.hpp" />
     <ClInclude Include="ResourceTracker.hpp" />
     <ClInclude Include="Scene.hpp" />

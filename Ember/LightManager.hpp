@@ -46,16 +46,16 @@ public:
       DirectX::XMFLOAT3 position, float range, Color32 color, float intensity, float attenuation = 1.0f );
   OmniLightHandle AddShadowingOmniLight(
       DirectX::XMFLOAT3 position, float range, Color32 color, float intensity, float attenuation = 1.0f );
-  DirLightHandle AddDirLight( DirectX::XMFLOAT3 direction, Color32 color, float intensity );
-  DirLightHandle AddShadowingDirLight( DirectX::XMFLOAT3 direction, Color32 color, float intensity );
-  void           Free( OmniLightHandle omni_light_handle );
-  void           Free( DirLightHandle dir_light_handle );
+  DirLightHandle         AddDirLight( DirectX::XMFLOAT3 direction, Color32 color, float intensity );
+  DirLightHandle         AddShadowingDirLight( DirectX::XMFLOAT3 direction, Color32 color, float intensity );
+  void                   Free( OmniLightHandle omni_light_handle );
+  void                   Free( DirLightHandle dir_light_handle );
 
-  [[nodiscard]] Ember::LightManager::GpuInfo PrepareFrame( uint32_t frame_index ) const;
-  [[nodiscard]] uint16_t                     GetOmniLightCount() const;
-  [[nodiscard]] uint16_t                     GetShadowingOmniLightCount() const;
-  [[nodiscard]] uint16_t                     GetDirLightCount() const;
-  [[nodiscard]] uint16_t                     GetShadowingDirLightCount() const;
+  [[nodiscard]] GpuInfo  PrepareFrame( uint32_t frame_index ) const;
+  [[nodiscard]] uint16_t GetOmniLightCount() const;
+  [[nodiscard]] uint16_t GetShadowingOmniLightCount() const;
+  [[nodiscard]] uint16_t GetDirLightCount() const;
+  [[nodiscard]] uint16_t GetShadowingDirLightCount() const;
 
   //
   void RenderAllShadows(

@@ -1,9 +1,7 @@
 
 #include "BasicApp.hpp"
 #include "DeferredApp.hpp"
-#include "RenderDevice.hpp"
 #include "Util/DirectXHeaders.hpp"
-#include "Util/HelperUtils.hpp"
 #include "Util/Profiling.hpp"
 #include "Util/Runtime.hpp"
 

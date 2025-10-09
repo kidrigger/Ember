@@ -8,6 +8,7 @@
 #include "RenderDevice.hpp"
 #include "RenderTargetManager.hpp"
 #include "Scene.hpp"
+#include "TransparencyPass.hpp"
 #include "Util/DirectXHeaders.hpp"
 #include "Util/Runtime.hpp"
 #include "fg/FrameGraph.hpp"
@@ -19,12 +20,6 @@ class ModelLoader;
 class PerfCounter;
 class RenderDevice;
 class Camera;
-
-struct RTVData
-{
-  FrameGraphResource RenderTarget;
-  FrameGraphResource DepthStencil;
-};
 
 class BasicApp final : public IApp
 {
@@ -44,7 +39,8 @@ class BasicApp final : public IApp
   FG::Context m_FGContext;
 
   // PBR Pipeline
-  RenderPass::Forward                  m_ForwardPass;
+  RenderPass::OpaqueForward            m_OpaquePass;
+  RenderPass::TransparencyForward      m_TransparencyPass;
   RenderPass::Background               m_BackgroundPass;
 
   std::unique_ptr<RenderTargetManager> m_RenderTargetManager;
@@ -72,9 +68,9 @@ public:
       std::unique_ptr<PerfCounter>         perf_counter,
       std::unique_ptr<RenderTargetManager> render_target_manager );
 
-  void    LoadContent() override;
-  void    Update() override;
-  RTVData RenderScene(
+  void                LoadContent() override;
+  void                Update() override;
+  RenderPass::RTVData RenderScene(
       ID3D12GraphicsCommandList6* command_list,
       DrawList::Batches const&    draw_list_info_list,
       FrameGraph*                 frame_graph,

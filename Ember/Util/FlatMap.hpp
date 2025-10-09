@@ -278,6 +278,12 @@ public:
   {
     return m_Values;
   }
+
+  void Clear()
+  {
+    m_Keys.clear();
+    m_Values.clear();
+  }
 };
 
 } // namespace Ember

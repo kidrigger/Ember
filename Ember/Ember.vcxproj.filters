@@ -64,9 +64,6 @@
     <Filter Include="Shaders\Meshes">
       <UniqueIdentifier>{adc7aab0-8972-4e53-b006-c56043c1d5ec}</UniqueIdentifier>
     </Filter>
-    <Filter Include="Shaders\DebugVis">
-      <UniqueIdentifier>{69c153bc-6ff2-42f9-aeb9-c912b0617738}</UniqueIdentifier>
-    </Filter>
     <Filter Include="Shaders\Meshes\Forward">
       <UniqueIdentifier>{3c704815-4fdd-45a7-9c2c-b6334a96518c}</UniqueIdentifier>
     </Filter>
@@ -184,6 +181,15 @@
       <Filter>Source Files\Passes</Filter>
     </ClCompile>
     <ClCompile Include="ForwardPass.cpp">
+      <Filter>Source Files\Passes</Filter>
+    </ClCompile>
+    <ClCompile Include="TransparencyPass.cpp">
+      <Filter>Source Files\Passes</Filter>
+    </ClCompile>
+    <ClCompile Include="GBufferPass.cpp">
+      <Filter>Source Files\Passes</Filter>
+    </ClCompile>
+    <ClCompile Include="LightingPass.cpp">
       <Filter>Source Files\Passes</Filter>
     </ClCompile>
   </ItemGroup>
@@ -309,6 +315,18 @@
       <Filter>Header Files\Passes</Filter>
     </ClInclude>
     <ClInclude Include="ForwardPass.hpp">
+      <Filter>Header Files\Passes</Filter>
+    </ClInclude>
+    <ClInclude Include="TransparencyPass.hpp">
+      <Filter>Header Files\Passes</Filter>
+    </ClInclude>
+    <ClInclude Include="RenderPassCommon.hpp">
+      <Filter>Header Files\Passes</Filter>
+    </ClInclude>
+    <ClInclude Include="GBufferPass.hpp">
+      <Filter>Header Files\Passes</Filter>
+    </ClInclude>
+    <ClInclude Include="LightingPass.hpp">
       <Filter>Header Files\Passes</Filter>
     </ClInclude>
   </ItemGroup>

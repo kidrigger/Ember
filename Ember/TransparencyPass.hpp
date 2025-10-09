@@ -1,5 +1,6 @@
 #pragma once
 
+#include "ForwardPass.hpp"
 #include "Util/DirectXHeaders.hpp"
 #include "Util/Runtime.hpp"
 
@@ -11,13 +12,12 @@ class RenderDevice;
 namespace Ember::RenderPass
 {
 
-struct Background
+struct TransparencyForward
 {
   ComPtr<ID3D12RootSignature> RootSignature;
   ComPtr<ID3D12PipelineState> Pipeline;
-  DXGI_FORMAT                 RenderTargetFormat;
 
-  static bool                 Create( Background* out, RenderDevice* render_device, DXGI_FORMAT rt_format );
+  static bool                 Create( TransparencyForward* out, RenderDevice* render_device, DXGI_FORMAT rt_format );
 };
 
 } // namespace Ember::RenderPass

@@ -1,4 +1,4 @@
-#include "ForwardPass.hpp"
+#include "TransparencyPass.hpp"
 
 #include "Environment.hpp"
 #include "RenderDevice.hpp"
@@ -7,19 +7,13 @@
 #include "Util/DataUtil.hpp"
 #include "Util/HelperUtils.hpp"
 
-bool Ember::RenderPass::OpaqueForward::Create(
-    OpaqueForward* out, RenderDevice* render_device, DXGI_FORMAT const rt_format )
+bool Ember::RenderPass::TransparencyForward::Create(
+    TransparencyForward* out, RenderDevice* render_device, DXGI_FORMAT const rt_format )
 {
-  out->RenderTargetFormat = rt_format;
-
   ComPtr<ID3DBlob> amp_shader_blob;
   ERR_FAIL_RET_F( D3DReadFileToBlob( L"TriangleAS.cso", &amp_shader_blob ) );
   ComPtr<ID3DBlob> mesh_shader_blob;
   ERR_FAIL_RET_F( D3DReadFileToBlob( L"TriangleMS.cso", &mesh_shader_blob ) );
-  ComPtr<ID3DBlob> pixel_shader_blob;
-  ERR_FAIL_RET_F( D3DReadFileToBlob( L"TrianglePS.cso", &pixel_shader_blob ) );
-  ComPtr<ID3DBlob> alpha_tested_pixel_shader_blob;
-  ERR_FAIL_RET_F( D3DReadFileToBlob( L"TriangleAlphaTestPS.cso", &alpha_tested_pixel_shader_blob ) );
   ComPtr<ID3DBlob> alpha_blended_pixel_shader_blob;
   ERR_FAIL_RET_F( D3DReadFileToBlob( L"TriangleAlphaBlendPS.cso", &alpha_blended_pixel_shader_blob ) );
 
@@ -70,7 +64,7 @@ bool Ember::RenderPass::OpaqueForward::Create(
       root_signature_blob->GetBufferSize(),
       IID_PPV_ARGS( out->RootSignature.ReleaseAndGetAddressOf() ) ) );
 
-  D3D12_RT_FORMAT_ARRAY rtv_formats{
+  D3D12_RT_FORMAT_ARRAY rt_formats{
     .RTFormats        = { rt_format },
     .NumRenderTargets = 1,
   };
@@ -79,26 +73,42 @@ bool Ember::RenderPass::OpaqueForward::Create(
   rasterizer_desc.FrontCounterClockwise = TRUE;
   rasterizer_desc.CullMode              = D3D12_CULL_MODE_BACK;
 
-  struct PipelineStream
+  CD3DX12_BLEND_DESC blend_desc{ D3D12_DEFAULT };
+  blend_desc.RenderTarget[0] = {
+    .BlendEnable           = TRUE,
+    .LogicOpEnable         = FALSE,
+    .SrcBlend              = D3D12_BLEND_SRC_ALPHA,
+    .DestBlend             = D3D12_BLEND_INV_SRC_ALPHA,
+    .BlendOp               = D3D12_BLEND_OP_ADD,
+    .SrcBlendAlpha         = D3D12_BLEND_ONE,
+    .DestBlendAlpha        = D3D12_BLEND_ZERO,
+    .BlendOpAlpha          = D3D12_BLEND_OP_ADD,
+    .LogicOp               = D3D12_LOGIC_OP_NOOP,
+    .RenderTargetWriteMask = D3D12_COLOR_WRITE_ENABLE_ALL,
+  };
+
+  struct MainPipelineStream
   {
     CD3DX12_PIPELINE_STATE_STREAM_ROOT_SIGNATURE        RootSignature;
     CD3DX12_PIPELINE_STATE_STREAM_PRIMITIVE_TOPOLOGY    PrimitiveTopologyType;
     CD3DX12_PIPELINE_STATE_STREAM_AS                    AS;
     CD3DX12_PIPELINE_STATE_STREAM_MS                    MS;
     CD3DX12_PIPELINE_STATE_STREAM_PS                    PS;
+    CD3DX12_PIPELINE_STATE_STREAM_BLEND_DESC            Blending;
     CD3DX12_PIPELINE_STATE_STREAM_RASTERIZER2           Rasterizer;
     CD3DX12_PIPELINE_STATE_STREAM_RENDER_TARGET_FORMATS RTVFormats;
     CD3DX12_PIPELINE_STATE_STREAM_DEPTH_STENCIL_FORMAT  DSVFormat;
   };
 
-  PipelineStream pipeline_stream = {
+  MainPipelineStream pipeline_stream = {
     .RootSignature         = out->RootSignature.Get(),
     .PrimitiveTopologyType = D3D12_PRIMITIVE_TOPOLOGY_TYPE_TRIANGLE,
     .AS                    = CD3DX12_SHADER_BYTECODE( amp_shader_blob.Get() ),
     .MS                    = CD3DX12_SHADER_BYTECODE( mesh_shader_blob.Get() ),
-    .PS                    = CD3DX12_SHADER_BYTECODE( pixel_shader_blob.Get() ),
+    .PS                    = CD3DX12_SHADER_BYTECODE( alpha_blended_pixel_shader_blob.Get() ),
+    .Blending              = blend_desc,
     .Rasterizer            = rasterizer_desc,
-    .RTVFormats            = rtv_formats,
+    .RTVFormats            = rt_formats,
     .DSVFormat             = DXGI_FORMAT_D32_FLOAT,
   };
 
@@ -108,11 +118,7 @@ bool Ember::RenderPass::OpaqueForward::Create(
   };
 
   ERR_FAIL_RET_F( device->CreatePipelineState(
-      &pipeline_state_stream_desc, IID_PPV_ARGS( out->OpaquePipeline.ReleaseAndGetAddressOf() ) ) );
-
-  pipeline_stream.PS = CD3DX12_SHADER_BYTECODE( alpha_tested_pixel_shader_blob.Get() );
-  ERR_FAIL_RET_F( device->CreatePipelineState(
-      &pipeline_state_stream_desc, IID_PPV_ARGS( out->AlphaTestedPipeline.ReleaseAndGetAddressOf() ) ) );
+      &pipeline_state_stream_desc, IID_PPV_ARGS( out->Pipeline.ReleaseAndGetAddressOf() ) ) );
 
   return true;
 }
