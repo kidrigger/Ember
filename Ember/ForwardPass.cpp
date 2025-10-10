@@ -79,6 +79,9 @@ bool Ember::RenderPass::OpaqueForward::Create(
   rasterizer_desc.FrontCounterClockwise = TRUE;
   rasterizer_desc.CullMode              = D3D12_CULL_MODE_BACK;
 
+  CD3DX12_DEPTH_STENCIL_DESC depth_stencil_desc{ D3D12_DEFAULT };
+  depth_stencil_desc.DepthFunc = D3D12_COMPARISON_FUNC_LESS_EQUAL;
+
   struct PipelineStream
   {
     CD3DX12_PIPELINE_STATE_STREAM_ROOT_SIGNATURE        RootSignature;
@@ -87,6 +90,7 @@ bool Ember::RenderPass::OpaqueForward::Create(
     CD3DX12_PIPELINE_STATE_STREAM_MS                    MS;
     CD3DX12_PIPELINE_STATE_STREAM_PS                    PS;
     CD3DX12_PIPELINE_STATE_STREAM_RASTERIZER2           Rasterizer;
+    CD3DX12_PIPELINE_STATE_STREAM_DEPTH_STENCIL         DepthStencil;
     CD3DX12_PIPELINE_STATE_STREAM_RENDER_TARGET_FORMATS RTVFormats;
     CD3DX12_PIPELINE_STATE_STREAM_DEPTH_STENCIL_FORMAT  DSVFormat;
   };
@@ -98,6 +102,7 @@ bool Ember::RenderPass::OpaqueForward::Create(
     .MS                    = CD3DX12_SHADER_BYTECODE( mesh_shader_blob.Get() ),
     .PS                    = CD3DX12_SHADER_BYTECODE( pixel_shader_blob.Get() ),
     .Rasterizer            = rasterizer_desc,
+    .DepthStencil          = depth_stencil_desc,
     .RTVFormats            = rtv_formats,
     .DSVFormat             = DXGI_FORMAT_D32_FLOAT,
   };

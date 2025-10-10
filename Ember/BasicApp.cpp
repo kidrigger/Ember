@@ -22,6 +22,7 @@
 #include "Util/PerfCounter.hpp"
 #include "Util/Profiling.hpp"
 
+#include <fg/JsonWriter.hpp>
 #include "imgui.h"
 #include "imgui_impl_dx12.h"
 #include "imgui_impl_win32.h"
@@ -56,6 +57,7 @@ struct DebugConfig
 } g_Debug;
 
 bool                  g_OutputFrameGraph        = false;
+bool                  g_UseDeferredRendering    = false;
 
 constexpr char const* kVisualizationModeNames[] = {
   "Render", "Meshlet", "World Position", "Albedo", "Normal", "ORM", "Emissive", "Lighting Only",
@@ -196,9 +198,21 @@ Ember::BasicApp::~BasicApp() // NOLINT(modernize-use-equals-default)
 
 void Ember::BasicApp::SetupRenderPipeline()
 {
-  ENSURE( RenderPass::OpaqueForward::Create( &m_OpaquePass, m_RenderDevice.get(), m_SwapchainFormat ) );
-  ENSURE( RenderPass::TransparencyForward::Create( &m_TransparencyPass, m_RenderDevice.get(), m_SwapchainFormat ) );
-  ENSURE( RenderPass::Background::Create( &m_BackgroundPass, m_RenderDevice.get(), m_SwapchainFormat ) );
+  ENSURE( RenderPass::OpaqueForward::Create(
+      &m_OpaquePass, m_RenderDevice.get(), DirectX::MakeSRGB( m_SwapchainFormat ) ) );
+
+  ENSURE( RenderPass::GBuffer::Create( &m_GBufferPass, m_RenderDevice.get() ) );
+  ENSURE( RenderPass::OmniLightDeferred::Create(
+      &m_OmniLightPass, m_RenderDevice.get(), DirectX::MakeSRGB( m_SwapchainFormat ) ) );
+  ENSURE( RenderPass::SpotLightDeferred::Create(
+      &m_SpotLightPass, m_RenderDevice.get(), DirectX::MakeSRGB( m_SwapchainFormat ) ) );
+  ENSURE( RenderPass::ScreenSpaceLightDeferred::Create(
+      &m_ScreenSpaceLightPass, m_RenderDevice.get(), DirectX::MakeSRGB( m_SwapchainFormat ) ) );
+
+  ENSURE( RenderPass::TransparencyForward::Create(
+      &m_TransparencyPass, m_RenderDevice.get(), DirectX::MakeSRGB( m_SwapchainFormat ) ) );
+  ENSURE( RenderPass::Background::Create(
+      &m_BackgroundPass, m_RenderDevice.get(), DirectX::MakeSRGB( m_SwapchainFormat ) ) );
 }
 
 void Ember::BasicApp::LoadContent()
@@ -381,7 +395,8 @@ void Ember::BasicApp::Update()
         ImGui::Checkbox( "Disable Meshlet Frustum Culling", &scratch );
         g_Debug.DisableMeshletFrustumCulling = ( uint32_t )scratch;
 
-        g_OutputFrameGraph                   = ImGui::Button( "Output FrameGraph" );
+        ImGui::Checkbox( "Use Deferred Rendering", &g_UseDeferredRendering );
+        g_OutputFrameGraph = ImGui::Button( "Output FrameGraph" );
       }
       ImGui::End();
     }
@@ -456,16 +471,9 @@ void Ember::BasicApp::Update()
   Input::Instance().Update();
 }
 
-Ember::RenderPass::RTVData Ember::BasicApp::RenderScene(
-    ID3D12GraphicsCommandList6* command_list,
-    DrawList::Batches const&    draw_list_info_list,
-    FrameGraph*                 frame_graph,
-    uint32_t                    frame_idx )
+Ember::RenderPass::RTVData Ember::BasicApp::ClearRenderTargets( FrameGraph* frame_graph ) const
 {
-  PIXScopedEvent( command_list, PIX_COLOR_DEFAULT, "Render Scene" );
-  ZoneScoped;
-
-  RenderPass::RTVData clear_rtv = frame_graph->addCallbackPass<RenderPass::RTVData>(
+  return frame_graph->addCallbackPass<RenderPass::RTVData>(
       "Clear RTV",
       [&]( FrameGraph::Builder& builder, RenderPass::RTVData& data )
       {
@@ -510,61 +518,15 @@ Ember::RenderPass::RTVData Ember::BasicApp::RenderScene(
         rtm->ClearDepthStencilView(
             frame_data.CommandList, depth_target.Resource.Get(), D3D12_CLEAR_FLAG_DEPTH, 1.0f, 0 );
       } );
+}
 
-  PerFrameConstants const constants = {
-    .MaterialsBuffer = m_MaterialManager->PrepareFrame(),
-    .Camera          = m_Camera->GetLastUpdatedBuffer(),
-    .ConfigBuffer    = m_ConfigurationBuffer.GetCBVHandle(),
-    .LightInfo       = m_LightManager->PrepareFrame( frame_idx ),
-  };
-
-  RenderPass::RTVData opaque_pass = frame_graph->addCallbackPass<RenderPass::RTVData>(
-      "Main Pass",
-      [&]( FrameGraph::Builder& builder, RenderPass::RTVData& data )
-      {
-        data.RenderTarget = builder.write( clear_rtv.RenderTarget, FG::Attachment{ .Index = 0 } );
-        data.DepthStencil = builder.write( clear_rtv.DepthStencil, FG::DepthStencil{} );
-      },
-      [mp = m_OpaquePass, constants, env = m_Environment->Repr(), draw_list_info_list = draw_list_info_list](
-          RenderPass::RTVData const& data, FrameGraphPassResources& resources, void* ctx )
-      {
-        ZoneScopedN( "Main Pass" );
-
-        FG::Context* context = ( FG::Context* )ctx;
-        context->FlushBarriers();
-
-        FG::Context::FrameData const& frame_data = context->GetFrameData();
-        RenderTargetManager const*    rtm        = context->GetRenderTargetManager();
-        ID3D12GraphicsCommandList6*   cmd        = frame_data.CommandList;
-        PIXScopedEvent( cmd, PIX_COLOR_DEFAULT, "Main Pass" );
-
-        FG::Texture const& render_target = resources.get<FG::Texture>( data.RenderTarget );
-        FG::Texture const& depth_target  = resources.get<FG::Texture>( data.DepthStencil );
-
-        rtm->RSSetScissorViewport( cmd, frame_data.Width, frame_data.Height );
-
-        D3D12_RENDER_TARGET_VIEW_DESC const rtv_desc{
-          .Format        = DXGI_FORMAT_R8G8B8A8_UNORM_SRGB,
-          .ViewDimension = D3D12_RTV_DIMENSION_TEXTURE2D,
-          .Texture2D     = { .MipSlice = 0 },
-        };
-        ID3D12Resource* rtv = render_target.Resource.Get();
-        rtm->OMSetRenderTargets( cmd, 1, &rtv, &rtv_desc, depth_target.Resource.Get(), nullptr );
-
-        cmd->SetGraphicsRootSignature( mp.RootSignature.Get() );
-        cmd->SetGraphicsRoot32BitConstants( 1, sizeof( PerFrameConstants ) / 4, &constants, 0 );
-        cmd->SetGraphicsRoot32BitConstants( 2, sizeof( Environment::GpuRepr ) / 4, &env, 0 );
-
-        cmd->SetPipelineState( mp.OpaquePipeline.Get() );
-        cmd->SetGraphicsRoot32BitConstants( 0, sizeof( DrawList::Info ) / 4, &draw_list_info_list.Opaque, 0 );
-        cmd->DispatchMesh( draw_list_info_list.Opaque.DrawCount, 1, 1 );
-
-        cmd->SetPipelineState( mp.AlphaTestedPipeline.Get() );
-        cmd->SetGraphicsRoot32BitConstants( 0, sizeof( DrawList::Info ) / 4, &draw_list_info_list.AlphaTested, 0 );
-        cmd->DispatchMesh( draw_list_info_list.AlphaTested.DrawCount, 1, 1 );
-      } );
-
-  RenderPass::RTVData transparency_pass = frame_graph->addCallbackPass<RenderPass::RTVData>(
+Ember::RenderPass::RTVData Ember::BasicApp::RenderTransparency(
+    FrameGraph*                frame_graph,
+    DrawList::Batches const&   draw_list_info_list,
+    PerFrameConstants const&   constants,
+    RenderPass::RTVData const& opaque_pass )
+{
+  return frame_graph->addCallbackPass<RenderPass::RTVData>(
       "Transparency Pass",
       [&]( FrameGraph::Builder& builder, RenderPass::RTVData& data )
       {
@@ -605,8 +567,65 @@ Ember::RenderPass::RTVData Ember::BasicApp::RenderScene(
         cmd->SetGraphicsRoot32BitConstants( 2, sizeof( Environment::GpuRepr ) / 4, &env, 0 );
         cmd->DispatchMesh( draw_list_info_list.AlphaBlended.DrawCount, 1, 1 );
       } );
+}
 
-  RenderPass::RTVData skybox_pass = frame_graph->addCallbackPass<RenderPass::RTVData>(
+Ember::RenderPass::RTVData Ember::BasicApp::RenderOpaqueFwd(
+    FrameGraph*                frame_graph,
+    DrawList::Batches const&   draw_list_info_list,
+    PerFrameConstants const&   constants,
+    RenderPass::RTVData const& clear_rtv )
+{
+  return frame_graph->addCallbackPass<RenderPass::RTVData>(
+      "Opaque Forward",
+      [&]( FrameGraph::Builder& builder, RenderPass::RTVData& data )
+      {
+        data.RenderTarget = builder.write( clear_rtv.RenderTarget, FG::Attachment{ .Index = 0 } );
+        data.DepthStencil = builder.write( clear_rtv.DepthStencil, FG::DepthStencil{} );
+      },
+      [mp = m_OpaquePass, constants, env = m_Environment->Repr(), draw_list_info_list = draw_list_info_list](
+          RenderPass::RTVData const& data, FrameGraphPassResources& resources, void* ctx )
+      {
+        ZoneScopedN( "Opaque Forward" );
+
+        FG::Context* context = ( FG::Context* )ctx;
+        context->FlushBarriers();
+
+        FG::Context::FrameData const& frame_data = context->GetFrameData();
+        RenderTargetManager const*    rtm        = context->GetRenderTargetManager();
+        ID3D12GraphicsCommandList6*   cmd        = frame_data.CommandList;
+        PIXScopedEvent( cmd, PIX_COLOR_DEFAULT, "Opaque Forward" );
+
+        FG::Texture const& render_target = resources.get<FG::Texture>( data.RenderTarget );
+        FG::Texture const& depth_target  = resources.get<FG::Texture>( data.DepthStencil );
+
+        rtm->RSSetScissorViewport( cmd, frame_data.Width, frame_data.Height );
+
+        D3D12_RENDER_TARGET_VIEW_DESC const rtv_desc{
+          .Format        = DXGI_FORMAT_R8G8B8A8_UNORM_SRGB,
+          .ViewDimension = D3D12_RTV_DIMENSION_TEXTURE2D,
+          .Texture2D     = { .MipSlice = 0 },
+        };
+        ID3D12Resource* rtv = render_target.Resource.Get();
+        rtm->OMSetRenderTargets( cmd, 1, &rtv, &rtv_desc, depth_target.Resource.Get(), nullptr );
+
+        cmd->SetGraphicsRootSignature( mp.RootSignature.Get() );
+        cmd->SetGraphicsRoot32BitConstants( 1, sizeof( PerFrameConstants ) / 4, &constants, 0 );
+        cmd->SetGraphicsRoot32BitConstants( 2, sizeof( Environment::GpuRepr ) / 4, &env, 0 );
+
+        cmd->SetPipelineState( mp.OpaquePipeline.Get() );
+        cmd->SetGraphicsRoot32BitConstants( 0, sizeof( DrawList::Info ) / 4, &draw_list_info_list.Opaque, 0 );
+        cmd->DispatchMesh( draw_list_info_list.Opaque.DrawCount, 1, 1 );
+
+        cmd->SetPipelineState( mp.AlphaTestedPipeline.Get() );
+        cmd->SetGraphicsRoot32BitConstants( 0, sizeof( DrawList::Info ) / 4, &draw_list_info_list.AlphaTested, 0 );
+        cmd->DispatchMesh( draw_list_info_list.AlphaTested.DrawCount, 1, 1 );
+      } );
+}
+
+Ember::RenderPass::RTVData Ember::BasicApp::RenderSkybox(
+    FrameGraph* frame_graph, PerFrameConstants const& constants, RenderPass::RTVData const& transparency_pass )
+{
+  return frame_graph->addCallbackPass<RenderPass::RTVData>(
       "Render Skybox",
       [&]( FrameGraph::Builder& builder, RenderPass::RTVData& data )
       {
@@ -645,12 +664,299 @@ Ember::RenderPass::RTVData Ember::BasicApp::RenderScene(
         cmd->SetGraphicsRoot32BitConstant( 0, ( UINT )skybox, 1 );
         cmd->DispatchMesh( 1, 1, 1 );
       } );
+}
 
-  if ( g_Debug.HideSkybox )
-  {
-    return transparency_pass;
-  }
-  return skybox_pass;
+Ember::RenderPass::RTVData Ember::BasicApp::RenderOpaqueDfr(
+    FrameGraph*                frame_graph,
+    DrawList::Batches const&   draw_list_info_list,
+    PerFrameConstants const&   constants,
+    RenderPass::RTVData const& clear_rtv )
+{
+  RenderPass::GBufferData clear_gbuffer = frame_graph->addCallbackPass<RenderPass::GBufferData>(
+      "Clear GBuffer",
+      [&]( FrameGraph::Builder& builder, RenderPass::GBufferData& data )
+      {
+        data.GBuffer[RenderPass::GBuffer::kPosition] = builder.create<FG::Texture>(
+            "GBuffer Position",
+            FG::Texture::Desc{
+                .Format    = RenderPass::GBuffer::kGBufferFormats[RenderPass::GBuffer::kPosition],
+                .Width     = m_WindowWidth,
+                .Height    = m_WindowHeight,
+                .MipLevels = MipLevels::kBase,
+                .InitState = D3D12_RESOURCE_STATE_RENDER_TARGET,
+                .Flags     = D3D12_RESOURCE_FLAG_ALLOW_RENDER_TARGET,
+            } );
+        data.GBuffer[RenderPass::GBuffer::kAlbedo] = builder.create<FG::Texture>(
+            "GBuffer Albedo",
+            FG::Texture::Desc{
+                .Format    = RenderPass::GBuffer::kGBufferFormats[RenderPass::GBuffer::kAlbedo],
+                .Width     = m_WindowWidth,
+                .Height    = m_WindowHeight,
+                .MipLevels = MipLevels::kBase,
+                .InitState = D3D12_RESOURCE_STATE_RENDER_TARGET,
+                .Flags     = D3D12_RESOURCE_FLAG_ALLOW_RENDER_TARGET,
+            } );
+
+        data.GBuffer[RenderPass::GBuffer::kNormal] = builder.create<FG::Texture>(
+            "GBuffer Normal",
+            FG::Texture::Desc{
+                .Format    = RenderPass::GBuffer::kGBufferFormats[RenderPass::GBuffer::kNormal],
+                .Width     = m_WindowWidth,
+                .Height    = m_WindowHeight,
+                .MipLevels = MipLevels::kBase,
+                .InitState = D3D12_RESOURCE_STATE_RENDER_TARGET,
+                .Flags     = D3D12_RESOURCE_FLAG_ALLOW_RENDER_TARGET,
+            } );
+
+        data.GBuffer[RenderPass::GBuffer::kORM] = builder.create<FG::Texture>(
+            "GBuffer ORM",
+            FG::Texture::Desc{
+                .Format    = RenderPass::GBuffer::kGBufferFormats[RenderPass::GBuffer::kORM],
+                .Width     = m_WindowWidth,
+                .Height    = m_WindowHeight,
+                .MipLevels = MipLevels::kBase,
+                .InitState = D3D12_RESOURCE_STATE_RENDER_TARGET,
+                .Flags     = D3D12_RESOURCE_FLAG_ALLOW_RENDER_TARGET,
+            } );
+
+        data.GBuffer[RenderPass::GBuffer::kEmissive] = builder.create<FG::Texture>(
+            "GBuffer Emissive",
+            FG::Texture::Desc{
+                .Format    = RenderPass::GBuffer::kGBufferFormats[RenderPass::GBuffer::kEmissive],
+                .Width     = m_WindowWidth,
+                .Height    = m_WindowHeight,
+                .MipLevels = MipLevels::kBase,
+                .InitState = D3D12_RESOURCE_STATE_RENDER_TARGET,
+                .Flags     = D3D12_RESOURCE_FLAG_ALLOW_RENDER_TARGET,
+            } );
+
+        for ( uint32_t i = 0; i < RenderPass::GBuffer::kGBufferCount; i++ )
+        {
+          data.GBuffer[i] = builder.write( data.GBuffer[i], FG::Attachment{ .Index = ( uint8_t )i } );
+        }
+      },
+      []( RenderPass::GBufferData const& data, FrameGraphPassResources& resources, void* ctx )
+      {
+        FG::Context* context = ( FG::Context* )ctx;
+        context->FlushBarriers();
+
+        FG::Context::FrameData const& frame_data = context->GetFrameData();
+        RenderTargetManager const*    rtm        = context->GetRenderTargetManager();
+
+        ID3D12Resource*               gbuffer[RenderPass::GBuffer::kGBufferCount];
+
+        for ( int i = 0; i < RenderPass::GBuffer::kGBufferCount; i++ )
+        {
+          gbuffer[i] = resources.get<FG::Texture>( data.GBuffer[i] ).Resource.Get();
+        }
+
+        FLOAT constexpr kBlack[4] = {};
+        rtm->ClearRenderTargetViews( frame_data.CommandList, CountOf( gbuffer ), DataOf( gbuffer ), kBlack );
+      } );
+
+  RenderPass::GBufferData gbuffer = frame_graph->addCallbackPass<RenderPass::GBufferData>(
+      "GBuffer Pass",
+      [&]( FrameGraph::Builder& builder, RenderPass::GBufferData& data )
+      {
+        for ( uint32_t i = 0; i < RenderPass::GBuffer::kGBufferCount; i++ )
+        {
+          data.GBuffer[i] = builder.write( clear_gbuffer.GBuffer[i], FG::Attachment{ .Index = ( uint8_t )i } );
+        }
+        data.DepthStencil = builder.write( clear_rtv.DepthStencil, FG::DepthStencil{} );
+      },
+      [mp = m_GBufferPass, constants, env = m_Environment->Repr(), draw_list_info_list = draw_list_info_list](
+          RenderPass::GBufferData const& data, FrameGraphPassResources& resources, void* ctx )
+      {
+        ZoneScopedN( "GBuffer Pass" );
+
+        FG::Context* context = ( FG::Context* )ctx;
+        context->FlushBarriers();
+
+        FG::Context::FrameData const& frame_data = context->GetFrameData();
+        RenderTargetManager const*    rtm        = context->GetRenderTargetManager();
+        ID3D12GraphicsCommandList6*   cmd        = frame_data.CommandList;
+        PIXScopedEvent( cmd, PIX_COLOR_DEFAULT, "GBuffer Pass" );
+
+        ID3D12Resource* gbuffer[RenderPass::GBuffer::kGBufferCount];
+        for ( int i = 0; i < RenderPass::GBuffer::kGBufferCount; i++ )
+        {
+          gbuffer[i] = resources.get<FG::Texture>( data.GBuffer[i] ).Resource.Get();
+        }
+        FG::Texture const& depth_target = resources.get<FG::Texture>( data.DepthStencil );
+
+        rtm->RSSetScissorViewport( cmd, frame_data.Width, frame_data.Height );
+
+        rtm->OMSetRenderTargets(
+            cmd, CountOf( gbuffer ), DataOf( gbuffer ), nullptr, depth_target.Resource.Get(), nullptr );
+
+        cmd->SetGraphicsRootSignature( mp.RootSignature.Get() );
+        cmd->SetGraphicsRoot32BitConstants( 1, sizeof( PerFrameConstants ) / 4, &constants, 0 );
+        cmd->SetGraphicsRoot32BitConstants( 2, sizeof( Environment::GpuRepr ) / 4, &env, 0 );
+
+        cmd->SetPipelineState( mp.GBufferPipeline.Get() );
+        cmd->SetGraphicsRoot32BitConstants( 0, sizeof( DrawList::Info ) / 4, &draw_list_info_list.Opaque, 0 );
+        cmd->DispatchMesh( draw_list_info_list.Opaque.DrawCount, 1, 1 );
+
+        cmd->SetPipelineState( mp.AlphaTestedGBufferPipeline.Get() );
+        cmd->SetGraphicsRoot32BitConstants( 0, sizeof( DrawList::Info ) / 4, &draw_list_info_list.AlphaTested, 0 );
+        cmd->DispatchMesh( draw_list_info_list.AlphaTested.DrawCount, 1, 1 );
+      } );
+
+  RenderPass::MergeData omni_pass = frame_graph->addCallbackPass<RenderPass::MergeData>(
+      "OmniLight Pass",
+      [&]( FrameGraph::Builder& builder, RenderPass::MergeData& data )
+      {
+        for ( uint32_t i = 0; i < RenderPass::GBuffer::kGBufferCount; i++ )
+        {
+          data.GBuffer[i] = builder.read( gbuffer.GBuffer[i], FG::ShaderResource{ .PixelShaderUse = true } );
+        }
+        data.RenderTarget = builder.write( clear_rtv.RenderTarget, FG::Attachment{ .Index = 0 } );
+        data.DepthStencil = builder.write( gbuffer.DepthStencil, FG::DepthStencil{} );
+      },
+      [mp = m_OmniLightPass, constants, env = m_Environment->Repr()](
+          RenderPass::MergeData const& data, FrameGraphPassResources& resources, void* ctx )
+      {
+        ZoneScopedN( "OmniLight Pass" );
+
+        FG::Context* context = ( FG::Context* )ctx;
+        context->FlushBarriers();
+
+        FG::Context::FrameData const& frame_data = context->GetFrameData();
+        RenderTargetManager const*    rtm        = context->GetRenderTargetManager();
+        ID3D12GraphicsCommandList6*   cmd        = frame_data.CommandList;
+        PIXScopedEvent( cmd, PIX_COLOR_DEFAULT, "OmniLight Pass" );
+
+        FG::Texture const& render_target = resources.get<FG::Texture>( data.RenderTarget );
+        FG::Texture const& depth_target  = resources.get<FG::Texture>( data.DepthStencil );
+
+        SRVHandle          gbuffer_handles[RenderPass::GBuffer::kGBufferCount];
+        for ( uint32_t i = 0; i < RenderPass::GBuffer::kGBufferCount; i++ )
+        {
+          gbuffer_handles[i] = resources.get<FG::Texture>( data.GBuffer[i] ).AsSRV;
+        }
+
+        rtm->RSSetScissorViewport( cmd, frame_data.Width, frame_data.Height );
+
+        D3D12_RENDER_TARGET_VIEW_DESC const rtv_desc{
+          .Format        = DXGI_FORMAT_R8G8B8A8_UNORM_SRGB,
+          .ViewDimension = D3D12_RTV_DIMENSION_TEXTURE2D,
+          .Texture2D     = { .MipSlice = 0 },
+        };
+        ID3D12Resource* rtv = render_target.Resource.Get();
+        rtm->OMSetRenderTargets( cmd, 1, &rtv, &rtv_desc, depth_target.Resource.Get(), nullptr );
+
+        cmd->SetGraphicsRootSignature( mp.RootSignature.Get() );
+        cmd->SetPipelineState( mp.Pipeline.Get() );
+        cmd->SetGraphicsRoot32BitConstants( 0, CountOf( gbuffer_handles ), DataOf( gbuffer_handles ), 0 );
+        cmd->SetGraphicsRoot32BitConstants( 1, sizeof( PerFrameConstants ) / 4, &constants, 0 );
+        cmd->SetGraphicsRoot32BitConstants( 2, sizeof( Environment::GpuRepr ) / 4, &env, 0 );
+        cmd->DispatchMesh( ( constants.LightInfo.OmniLightInfo.TotalLightCount + 31 ) / 32, 1, 1 );
+      } );
+
+  RenderPass::MergeData const spot_pass = frame_graph->addCallbackPass<RenderPass::MergeData>(
+      "SpotLight Pass",
+      [&]( FrameGraph::Builder& builder, RenderPass::MergeData& data )
+      {
+        for ( uint32_t i = 0; i < RenderPass::GBuffer::kGBufferCount; i++ )
+        {
+          data.GBuffer[i] = builder.read( gbuffer.GBuffer[i], FG::ShaderResource{ .PixelShaderUse = true } );
+        }
+        data.RenderTarget = builder.write( omni_pass.RenderTarget, FG::Attachment{ .Index = 0 } );
+        data.DepthStencil = builder.write( omni_pass.DepthStencil, FG::DepthStencil{} );
+      },
+      [mp = m_SpotLightPass, constants, env = m_Environment->Repr()](
+          RenderPass::MergeData const& data, FrameGraphPassResources& resources, void* ctx )
+      {
+        ZoneScopedN( "SpotLight Pass" );
+
+        FG::Context* context = ( FG::Context* )ctx;
+        context->FlushBarriers();
+
+        FG::Context::FrameData const& frame_data = context->GetFrameData();
+        RenderTargetManager const*    rtm        = context->GetRenderTargetManager();
+        ID3D12GraphicsCommandList6*   cmd        = frame_data.CommandList;
+        PIXScopedEvent( cmd, PIX_COLOR_DEFAULT, "SpotLight Pass" );
+
+        FG::Texture const& render_target = resources.get<FG::Texture>( data.RenderTarget );
+        FG::Texture const& depth_target  = resources.get<FG::Texture>( data.DepthStencil );
+
+        SRVHandle          gbuffer_handles[RenderPass::GBuffer::kGBufferCount];
+        for ( uint32_t i = 0; i < RenderPass::GBuffer::kGBufferCount; i++ )
+        {
+          gbuffer_handles[i] = resources.get<FG::Texture>( data.GBuffer[i] ).AsSRV;
+        }
+
+        rtm->RSSetScissorViewport( cmd, frame_data.Width, frame_data.Height );
+
+        D3D12_RENDER_TARGET_VIEW_DESC const rtv_desc{
+          .Format        = DXGI_FORMAT_R8G8B8A8_UNORM_SRGB,
+          .ViewDimension = D3D12_RTV_DIMENSION_TEXTURE2D,
+          .Texture2D     = { .MipSlice = 0 },
+        };
+        ID3D12Resource* rtv = render_target.Resource.Get();
+        rtm->OMSetRenderTargets( cmd, 1, &rtv, &rtv_desc, depth_target.Resource.Get(), nullptr );
+
+        cmd->SetGraphicsRootSignature( mp.RootSignature.Get() );
+        cmd->SetPipelineState( mp.Pipeline.Get() );
+        cmd->SetGraphicsRoot32BitConstants( 0, CountOf( gbuffer_handles ), DataOf( gbuffer_handles ), 0 );
+        cmd->SetGraphicsRoot32BitConstants( 1, sizeof( PerFrameConstants ) / 4, &constants, 0 );
+        cmd->SetGraphicsRoot32BitConstants( 2, sizeof( Environment::GpuRepr ) / 4, &env, 0 );
+        cmd->DispatchMesh( ( constants.LightInfo.SpotLightInfo.TotalLightCount + 31 ) / 32, 1, 1 );
+      } );
+
+
+  RenderPass::MergeData const screen_pass = frame_graph->addCallbackPass<RenderPass::MergeData>(
+      "Screen Space Light Pass",
+      [&]( FrameGraph::Builder& builder, RenderPass::MergeData& data )
+      {
+        for ( uint32_t i = 0; i < RenderPass::GBuffer::kGBufferCount; i++ )
+        {
+          data.GBuffer[i] = builder.read( gbuffer.GBuffer[i], FG::ShaderResource{ .PixelShaderUse = true } );
+        }
+        data.RenderTarget = builder.write( spot_pass.RenderTarget, FG::Attachment{ .Index = 0 } );
+        data.DepthStencil = builder.write( spot_pass.DepthStencil, FG::DepthStencil{} );
+      },
+      [mp = m_ScreenSpaceLightPass, constants, env = m_Environment->Repr()](
+          RenderPass::MergeData const& data, FrameGraphPassResources& resources, void* ctx )
+      {
+        ZoneScopedN( "Screen Space Light Pass" );
+
+        FG::Context* context = ( FG::Context* )ctx;
+        context->FlushBarriers();
+
+        FG::Context::FrameData const& frame_data = context->GetFrameData();
+        RenderTargetManager const*    rtm        = context->GetRenderTargetManager();
+        ID3D12GraphicsCommandList6*   cmd        = frame_data.CommandList;
+        PIXScopedEvent( cmd, PIX_COLOR_DEFAULT, "Screen Space Light Pass" );
+
+        FG::Texture const& render_target = resources.get<FG::Texture>( data.RenderTarget );
+        FG::Texture const& depth_target  = resources.get<FG::Texture>( data.DepthStencil );
+
+        SRVHandle          gbuffer_handles[RenderPass::GBuffer::kGBufferCount];
+        for ( uint32_t i = 0; i < RenderPass::GBuffer::kGBufferCount; i++ )
+        {
+          gbuffer_handles[i] = resources.get<FG::Texture>( data.GBuffer[i] ).AsSRV;
+        }
+
+        rtm->RSSetScissorViewport( cmd, frame_data.Width, frame_data.Height );
+
+        D3D12_RENDER_TARGET_VIEW_DESC const rtv_desc{
+          .Format        = DXGI_FORMAT_R8G8B8A8_UNORM_SRGB,
+          .ViewDimension = D3D12_RTV_DIMENSION_TEXTURE2D,
+          .Texture2D     = { .MipSlice = 0 },
+        };
+        ID3D12Resource* rtv = render_target.Resource.Get();
+        rtm->OMSetRenderTargets( cmd, 1, &rtv, &rtv_desc, depth_target.Resource.Get(), nullptr );
+
+        cmd->SetGraphicsRootSignature( mp.RootSignature.Get() );
+        cmd->SetPipelineState( mp.Pipeline.Get() );
+        cmd->SetGraphicsRoot32BitConstants( 0, CountOf( gbuffer_handles ), DataOf( gbuffer_handles ), 0 );
+        cmd->SetGraphicsRoot32BitConstants( 1, sizeof( PerFrameConstants ) / 4, &constants, 0 );
+        cmd->SetGraphicsRoot32BitConstants( 2, sizeof( Environment::GpuRepr ) / 4, &env, 0 );
+        cmd->DispatchMesh( 1, 1, 1 );
+      } );
+
+  return { screen_pass.RenderTarget, screen_pass.DepthStencil };
 }
 
 void Ember::BasicApp::Render()
@@ -662,16 +968,15 @@ void Ember::BasicApp::Render()
   uint32_t const       frame_idx    = m_RenderDevice->GetCurrentFrameIndex();
 
   // All resources for this frame are guaranteed to be available for CPU modification at this time.
-  // Clear Backbuffer
 
   m_FGContext.SetFrameData( {
+      .CommandList = command_list.Get(),
       .Width       = m_WindowWidth,
       .Height      = m_WindowHeight,
-      .CommandList = command_list.Get(),
   } );
-  FrameGraph frame_graph;
+  FrameGraph      frame_graph;
 
-  m_Camera->PrepareFrame( frame_idx );
+  CBVHandle const camera_cbv = m_Camera->PrepareFrame( frame_idx );
 
   m_DrawList.Clear();
 
@@ -708,9 +1013,29 @@ void Ember::BasicApp::Render()
 
   m_LightManager->RenderAllShadows( command_list.Get(), draw_list_info, *m_RenderTargetManager, *m_Camera, frame_idx );
 
-  RenderPass::RTVData scene_data = RenderScene( command_list.Get(), draw_list_info, &frame_graph, frame_idx );
+  LightManager::GpuInfo   light_info    = m_LightManager->PrepareFrame( frame_idx );
+  SRVHandle const         materials_srv = m_MaterialManager->PrepareFrame();
 
-  RenderPass::RTVData rtv_data   = frame_graph.addCallbackPass<RenderPass::RTVData>(
+  PerFrameConstants const constants     = {
+        .MaterialsBuffer = materials_srv,
+        .Camera          = camera_cbv,
+        .ConfigBuffer    = m_ConfigurationBuffer.GetCBVHandle(),
+        .LightInfo       = light_info,
+  };
+
+  RenderPass::RTVData clear_rtv         = ClearRenderTargets( &frame_graph );
+  RenderPass::RTVData opaque_pass_fwd   = RenderOpaqueFwd( &frame_graph, draw_list_info, constants, clear_rtv );
+
+  RenderPass::RTVData opaque_pass_dfr   = RenderOpaqueDfr( &frame_graph, draw_list_info, constants, clear_rtv );
+
+  RenderPass::RTVData opaque_pass       = g_UseDeferredRendering ? opaque_pass_dfr : opaque_pass_fwd;
+
+  RenderPass::RTVData transparency_pass = RenderTransparency( &frame_graph, draw_list_info, constants, opaque_pass );
+  RenderPass::RTVData skybox_pass       = RenderSkybox( &frame_graph, constants, transparency_pass );
+
+  RenderPass::RTVData scene_data        = g_Debug.HideSkybox ? transparency_pass : skybox_pass;
+
+  RenderPass::RTVData rtv_data          = frame_graph.addCallbackPass<RenderPass::RTVData>(
       "ImGUI",
       [&]( FrameGraph::Builder& builder, RenderPass::RTVData& data )
       {
@@ -770,6 +1095,8 @@ void Ember::BasicApp::Render()
   if ( g_OutputFrameGraph )
   {
     std::ofstream{ "fg.dot" } << frame_graph;
+    std::ofstream f{ "fg.json" };
+    frame_graph.debugOutput( f, JsonWriter{} );
   }
   frame_graph.execute( &m_FGContext, &m_FGContext );
 

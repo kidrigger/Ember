@@ -4,9 +4,9 @@
 #include <variant>
 
 #include "DeviceHandle.hpp"
+#include "RenderPassCommon.hpp"
 #include "Util/DirectXHeaders.hpp"
 #include "Util/FlatMap.hpp"
-#include "Util/Runtime.hpp"
 
 namespace Ember
 {
@@ -115,9 +115,9 @@ class Context
 public:
   struct FrameData
   {
+    ID3D12GraphicsCommandList6* CommandList;
     uint32_t                    Width;
     uint32_t                    Height;
-    ID3D12GraphicsCommandList6* CommandList;
   };
 
 private:

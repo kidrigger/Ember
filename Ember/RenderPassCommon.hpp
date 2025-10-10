@@ -5,7 +5,6 @@
 namespace Ember
 {
 
-
 struct PerFrameConstants
 {
   SRVHandle             MaterialsBuffer;

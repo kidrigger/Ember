@@ -59,6 +59,9 @@
     <ClInclude Include="fg\TypeTraits.hpp">
       <Filter>Header Files</Filter>
     </ClInclude>
+    <ClInclude Include="fg\JsonWriter.hpp">
+      <Filter>Header Files</Filter>
+    </ClInclude>
   </ItemGroup>
   <ItemGroup>
     <None Include="fg\Blackboard.inl">

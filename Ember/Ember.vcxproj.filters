@@ -162,9 +162,6 @@
     <ClCompile Include="GeometryManager.cpp">
       <Filter>Source Files\Graphics</Filter>
     </ClCompile>
-    <ClCompile Include="DeferredApp.cpp">
-      <Filter>Source Files</Filter>
-    </ClCompile>
     <ClCompile Include="Input.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
@@ -298,9 +295,6 @@
     </ClInclude>
     <ClInclude Include="Float16.hpp">
       <Filter>Header Files\Util</Filter>
-    </ClInclude>
-    <ClInclude Include="DeferredApp.hpp">
-      <Filter>Header Files</Filter>
     </ClInclude>
     <ClInclude Include="Input.hpp">
       <Filter>Header Files</Filter>

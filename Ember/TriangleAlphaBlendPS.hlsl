@@ -27,7 +27,7 @@ float4 TriangleAlphaBlendPS( PSIn IN ) : SV_TARGET0
     case kAlbedo:
       return float4( albedo.xyz, 1.0f );
     case kNormal:
-      return float4( normal, 1.0f );
+      return 0.5f * float4( normal, 1.0f ) + 0.5f;
     case kORM:
       return float4( float3( 1.0f, metal_rough.yx ), 1.0f );
     case kEmissive:

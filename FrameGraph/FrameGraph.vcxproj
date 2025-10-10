@@ -38,6 +38,7 @@
     <ClInclude Include="fg\Fwd.hpp" />
     <ClInclude Include="fg\GraphNode.hpp" />
     <ClInclude Include="fg\GraphvizWriter.hpp" />
+    <ClInclude Include="fg\JsonWriter.hpp" />
     <ClInclude Include="fg\PassEntry.hpp" />
     <ClInclude Include="fg\PassNode.hpp" />
     <ClInclude Include="fg\ResourceEntry.hpp" />

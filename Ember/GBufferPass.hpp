@@ -1,9 +1,15 @@
 #pragma once
 
-#include "LightManager.hpp"
+#include <array>
+
 #include "Util/DirectXHeaders.hpp"
 #include "Util/Runtime.hpp"
 #include "fg/FrameGraphResource.hpp"
+
+namespace Ember
+{
+class RenderDevice;
+}
 
 namespace Ember::RenderPass
 {
@@ -54,6 +60,5 @@ struct GBufferData
   std::array<FrameGraphResource, GBuffer::kGBufferCount> GBuffer;
   FrameGraphResource                                     DepthStencil;
 };
-
 
 } // namespace Ember::RenderPass

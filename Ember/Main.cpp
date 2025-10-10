@@ -1,6 +1,5 @@
 
 #include "BasicApp.hpp"
-#include "DeferredApp.hpp"
 #include "Util/DirectXHeaders.hpp"
 #include "Util/Profiling.hpp"
 #include "Util/Runtime.hpp"

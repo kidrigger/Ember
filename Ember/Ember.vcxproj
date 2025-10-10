@@ -318,7 +318,6 @@
     <ClCompile Include="Buffer.cpp" />
     <ClCompile Include="Camera.cpp" />
     <ClCompile Include="CgltfImpl.cpp" />
-    <ClCompile Include="DeferredApp.cpp" />
     <ClCompile Include="DirectionLightManager.cpp" />
     <ClCompile Include="Environment.cpp" />
     <ClCompile Include="ForwardPass.cpp" />
@@ -354,7 +353,6 @@
     <ClInclude Include="TransparencyPass.hpp" />
     <ClInclude Include="BackgroundPass.hpp" />
     <ClInclude Include="BasicApp.hpp" />
-    <ClInclude Include="DeferredApp.hpp" />
     <ClInclude Include="DeviceHandle.hpp" />
     <ClInclude Include="BindlessManager.hpp" />
     <ClInclude Include="Buffer.hpp" />

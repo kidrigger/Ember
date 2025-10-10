@@ -4,8 +4,11 @@
 #include "Environment.hpp"
 #include "ForwardPass.hpp"
 #include "FrameGraphHelper.hpp"
+#include "GBufferPass.hpp"
 #include "IApp.hpp"
+#include "LightingPass.hpp"
 #include "RenderDevice.hpp"
+#include "RenderPassCommon.hpp"
 #include "RenderTargetManager.hpp"
 #include "Scene.hpp"
 #include "TransparencyPass.hpp"
@@ -39,7 +42,17 @@ class BasicApp final : public IApp
   FG::Context m_FGContext;
 
   // PBR Pipeline
-  RenderPass::OpaqueForward            m_OpaquePass;
+
+  // Forward Only
+  RenderPass::OpaqueForward m_OpaquePass;
+
+  // Deferred Only
+  RenderPass::GBuffer                  m_GBufferPass;
+  RenderPass::OmniLightDeferred        m_OmniLightPass;
+  RenderPass::SpotLightDeferred        m_SpotLightPass;
+  RenderPass::ScreenSpaceLightDeferred m_ScreenSpaceLightPass;
+
+  // Forward + Deferred
   RenderPass::TransparencyForward      m_TransparencyPass;
   RenderPass::Background               m_BackgroundPass;
 
@@ -60,6 +73,24 @@ class BasicApp final : public IApp
   std::unique_ptr<LightManager> m_LightManager;
 
   void                          SetupRenderPipeline();
+  RenderPass::RTVData           ClearRenderTargets( FrameGraph* frame_graph ) const;
+  RenderPass::RTVData           RenderTransparency(
+                FrameGraph*                frame_graph,
+                DrawList::Batches const&   draw_list_info_list,
+                PerFrameConstants const&   constants,
+                RenderPass::RTVData const& opaque_pass );
+  RenderPass::RTVData RenderOpaqueFwd(
+      FrameGraph*                frame_graph,
+      DrawList::Batches const&   draw_list_info_list,
+      PerFrameConstants const&   constants,
+      RenderPass::RTVData const& clear_rtv );
+  RenderPass::RTVData RenderSkybox(
+      FrameGraph* frame_graph, PerFrameConstants const& constants, RenderPass::RTVData const& transparency_pass );
+  RenderPass::RTVData RenderOpaqueDfr(
+      FrameGraph*                frame_graph,
+      DrawList::Batches const&   draw_list_info_list,
+      PerFrameConstants const&   constants,
+      RenderPass::RTVData const& clear_rtv );
 
 public:
   BasicApp(
@@ -68,13 +99,9 @@ public:
       std::unique_ptr<PerfCounter>         perf_counter,
       std::unique_ptr<RenderTargetManager> render_target_manager );
 
-  void                LoadContent() override;
-  void                Update() override;
-  RenderPass::RTVData RenderScene(
-      ID3D12GraphicsCommandList6* command_list,
-      DrawList::Batches const&    draw_list_info_list,
-      FrameGraph*                 frame_graph,
-      uint32_t                    frame_idx );
+  void        LoadContent() override;
+  void        Update() override;
+
   void        Render() override;
   void        UnloadContent() override;
 
