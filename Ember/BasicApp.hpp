@@ -53,6 +53,7 @@ class BasicApp final : public IApp
   RenderPass::ScreenSpaceLightDeferred m_ScreenSpaceLightPass;
 
   // Forward + Deferred
+  RenderPass::AlphaTestedForward       m_AlphaTestedPass;
   RenderPass::TransparencyForward      m_TransparencyPass;
   RenderPass::Background               m_BackgroundPass;
 

@@ -18,10 +18,6 @@ bool Ember::RenderPass::OpaqueForward::Create(
   ERR_FAIL_RET_F( D3DReadFileToBlob( L"TriangleMS.cso", &mesh_shader_blob ) );
   ComPtr<ID3DBlob> pixel_shader_blob;
   ERR_FAIL_RET_F( D3DReadFileToBlob( L"TrianglePS.cso", &pixel_shader_blob ) );
-  ComPtr<ID3DBlob> alpha_tested_pixel_shader_blob;
-  ERR_FAIL_RET_F( D3DReadFileToBlob( L"TriangleAlphaTestPS.cso", &alpha_tested_pixel_shader_blob ) );
-  ComPtr<ID3DBlob> alpha_blended_pixel_shader_blob;
-  ERR_FAIL_RET_F( D3DReadFileToBlob( L"TriangleAlphaBlendPS.cso", &alpha_blended_pixel_shader_blob ) );
 
   ComPtr<ID3D12Device2>       device                 = render_device->GetDevice();
 
@@ -113,11 +109,7 @@ bool Ember::RenderPass::OpaqueForward::Create(
   };
 
   ERR_FAIL_RET_F( device->CreatePipelineState(
-      &pipeline_state_stream_desc, IID_PPV_ARGS( out->OpaquePipeline.ReleaseAndGetAddressOf() ) ) );
-
-  pipeline_stream.PS = CD3DX12_SHADER_BYTECODE( alpha_tested_pixel_shader_blob.Get() );
-  ERR_FAIL_RET_F( device->CreatePipelineState(
-      &pipeline_state_stream_desc, IID_PPV_ARGS( out->AlphaTestedPipeline.ReleaseAndGetAddressOf() ) ) );
+      &pipeline_state_stream_desc, IID_PPV_ARGS( out->Pipeline.ReleaseAndGetAddressOf() ) ) );
 
   return true;
 }

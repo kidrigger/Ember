@@ -6,7 +6,7 @@ struct PSOutput
 {
   float4 Position : SV_TARGET0;
   float4 Albedo : SV_TARGET1;
-  float4 Normal : SV_TARGET2;
+  float2 Normal : SV_TARGET2;
   float4 ORM : SV_TARGET3;
   float4 Emissive : SV_TARGET4;
 };
@@ -26,14 +26,12 @@ PSOutput GBufferAlphaTestPS( PSIn IN )
 
   float4   albedo = mat.GetAlbedo( IN.TexCoord[0], g_DefaultSampler );
 
-  if ( albedo.a < mat.AlphaCutoff )
-  {
-    discard;
-  }
+  if ( albedo.a < mat.AlphaCutoff ) discard;
+
   OUT.Position = float4( IN.Position.xyz, mat.EmissiveStrength );
   OUT.Albedo   = IN.Color * albedo;
-  OUT.Normal   = float4(
-      0.5f + 0.5f * mat.GetNormal( IN.Normal, IN.Tangent, IN.Position.xyz, IN.TexCoord[0], g_DefaultSampler ), 1.0f );
+  OUT.Normal =
+      OctahedralEncode( mat.GetNormal( IN.Normal, IN.Tangent, IN.Position.xyz, IN.TexCoord[0], g_DefaultSampler ) );
   OUT.ORM      = float4( 1.0f, mat.GetMetalRough( IN.TexCoord[0], g_DefaultSampler ).yx, 0.0f );
   OUT.Emissive = float4( mat.GetRawEmissive( IN.TexCoord[0], g_DefaultSampler ), 0.0f );
 

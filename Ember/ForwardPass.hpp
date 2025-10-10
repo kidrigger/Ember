@@ -17,8 +17,7 @@ namespace Ember::RenderPass
 struct OpaqueForward
 {
   ComPtr<ID3D12RootSignature> RootSignature;
-  ComPtr<ID3D12PipelineState> OpaquePipeline;
-  ComPtr<ID3D12PipelineState> AlphaTestedPipeline;
+  ComPtr<ID3D12PipelineState> Pipeline;
   DXGI_FORMAT                 RenderTargetFormat;
 
   OpaqueForward() = default;

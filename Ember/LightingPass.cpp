@@ -6,6 +6,8 @@
 bool Ember::RenderPass::OmniLightDeferred::Create(
     OmniLightDeferred* out, RenderDevice* render_device, DXGI_FORMAT const rt_format )
 {
+  out->RenderTargetFormat = rt_format;
+
   ComPtr<ID3DBlob> omni_volume_amp_shader_blob;
   ERR_FAIL_RET_F( D3DReadFileToBlob( L"OmniLightingAS.cso", &omni_volume_amp_shader_blob ) );
   ComPtr<ID3DBlob> omni_volume_mesh_shader_blob;
@@ -27,6 +29,7 @@ bool Ember::RenderPass::OmniLightDeferred::Create(
                                 D3D12_TEXTURE_ADDRESS_MODE_BORDER, D3D12_TEXTURE_ADDRESS_MODE_BORDER,
                                 0, 16,
                                 D3D12_COMPARISON_FUNC_LESS_EQUAL, D3D12_STATIC_BORDER_COLOR_OPAQUE_WHITE },
+    CD3DX12_STATIC_SAMPLER_DESC{ 3, D3D12_FILTER_MIN_MAG_MIP_POINT },
   };
 
   D3D12_ROOT_SIGNATURE_FLAGS const root_signature_flags = D3D12_ROOT_SIGNATURE_FLAG_CBV_SRV_UAV_HEAP_DIRECTLY_INDEXED |
@@ -129,6 +132,7 @@ bool Ember::RenderPass::OmniLightDeferred::Create(
 bool Ember::RenderPass::SpotLightDeferred::Create(
     SpotLightDeferred* out, RenderDevice* render_device, DXGI_FORMAT rt_format )
 {
+  out->RenderTargetFormat = rt_format;
 
   ComPtr<ID3DBlob> spot_volume_amp_shader_blob;
   ERR_FAIL_RET_F( D3DReadFileToBlob( L"SpotLightingAS.cso", &spot_volume_amp_shader_blob ) );
@@ -151,6 +155,7 @@ bool Ember::RenderPass::SpotLightDeferred::Create(
                                 D3D12_TEXTURE_ADDRESS_MODE_BORDER, D3D12_TEXTURE_ADDRESS_MODE_BORDER,
                                 0, 16,
                                 D3D12_COMPARISON_FUNC_LESS_EQUAL, D3D12_STATIC_BORDER_COLOR_OPAQUE_WHITE },
+    CD3DX12_STATIC_SAMPLER_DESC{ 3, D3D12_FILTER_MIN_MAG_MIP_POINT },
   };
 
   D3D12_ROOT_SIGNATURE_FLAGS const root_signature_flags = D3D12_ROOT_SIGNATURE_FLAG_CBV_SRV_UAV_HEAP_DIRECTLY_INDEXED |
@@ -253,6 +258,8 @@ bool Ember::RenderPass::SpotLightDeferred::Create(
 bool Ember::RenderPass::ScreenSpaceLightDeferred::Create(
     ScreenSpaceLightDeferred* out, RenderDevice* render_device, DXGI_FORMAT rt_format )
 {
+  out->RenderTargetFormat = rt_format;
+
   ComPtr<ID3DBlob> merge_mesh_shader_blob;
   ERR_FAIL_RET_F( D3DReadFileToBlob( L"LightingMS.cso", &merge_mesh_shader_blob ) );
   ComPtr<ID3DBlob> merge_pixel_shader_blob;
@@ -272,6 +279,7 @@ bool Ember::RenderPass::ScreenSpaceLightDeferred::Create(
                                 D3D12_TEXTURE_ADDRESS_MODE_BORDER, D3D12_TEXTURE_ADDRESS_MODE_BORDER,
                                 0, 16,
                                 D3D12_COMPARISON_FUNC_LESS_EQUAL, D3D12_STATIC_BORDER_COLOR_OPAQUE_WHITE },
+    CD3DX12_STATIC_SAMPLER_DESC{ 3, D3D12_FILTER_MIN_MAG_MIP_POINT },
   };
 
   D3D12_ROOT_SIGNATURE_FLAGS const root_signature_flags = D3D12_ROOT_SIGNATURE_FLAG_CBV_SRV_UAV_HEAP_DIRECTLY_INDEXED |

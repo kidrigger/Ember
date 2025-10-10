@@ -16,8 +16,18 @@ struct TransparencyForward
 {
   ComPtr<ID3D12RootSignature> RootSignature;
   ComPtr<ID3D12PipelineState> Pipeline;
+  DXGI_FORMAT                 RenderTargetFormat;
 
   static bool                 Create( TransparencyForward* out, RenderDevice* render_device, DXGI_FORMAT rt_format );
+};
+
+struct AlphaTestedForward
+{
+  ComPtr<ID3D12RootSignature> RootSignature;
+  ComPtr<ID3D12PipelineState> Pipeline;
+  DXGI_FORMAT                 RenderTargetFormat;
+
+  static bool                 Create( AlphaTestedForward* out, RenderDevice* render_device, DXGI_FORMAT rt_format );
 };
 
 } // namespace Ember::RenderPass

@@ -209,6 +209,8 @@ void Ember::BasicApp::SetupRenderPipeline()
   ENSURE( RenderPass::ScreenSpaceLightDeferred::Create(
       &m_ScreenSpaceLightPass, m_RenderDevice.get(), DirectX::MakeSRGB( m_SwapchainFormat ) ) );
 
+  ENSURE( RenderPass::AlphaTestedForward::Create(
+      &m_AlphaTestedPass, m_RenderDevice.get(), DirectX::MakeSRGB( m_SwapchainFormat ) ) );
   ENSURE( RenderPass::TransparencyForward::Create(
       &m_TransparencyPass, m_RenderDevice.get(), DirectX::MakeSRGB( m_SwapchainFormat ) ) );
   ENSURE( RenderPass::Background::Create(
@@ -526,12 +528,54 @@ Ember::RenderPass::RTVData Ember::BasicApp::RenderTransparency(
     PerFrameConstants const&   constants,
     RenderPass::RTVData const& opaque_pass )
 {
-  return frame_graph->addCallbackPass<RenderPass::RTVData>(
-      "Transparency Pass",
+  RenderPass::RTVData alpha_tested_pass = frame_graph->addCallbackPass<RenderPass::RTVData>(
+      "Alpha Tested Pass",
       [&]( FrameGraph::Builder& builder, RenderPass::RTVData& data )
       {
         data.RenderTarget = builder.write( opaque_pass.RenderTarget, FG::Attachment{ .Index = 0 } );
         data.DepthStencil = builder.write( opaque_pass.DepthStencil, FG::DepthStencil{} );
+      },
+      [mp = m_AlphaTestedPass, constants, env = m_Environment->Repr(), draw_list_info_list = draw_list_info_list](
+          RenderPass::RTVData const& data, FrameGraphPassResources& resources, void* ctx )
+      {
+        ZoneScopedN( "Alpha Tested Pass" );
+
+        FG::Context* context = ( FG::Context* )ctx;
+        context->FlushBarriers();
+
+        FG::Context::FrameData const& frame_data = context->GetFrameData();
+        RenderTargetManager const*    rtm        = context->GetRenderTargetManager();
+        ID3D12GraphicsCommandList6*   cmd        = frame_data.CommandList;
+        PIXScopedEvent( cmd, PIX_COLOR_DEFAULT, "Alpha Tested Pass" );
+
+        FG::Texture const& render_target = resources.get<FG::Texture>( data.RenderTarget );
+        FG::Texture const& depth_target  = resources.get<FG::Texture>( data.DepthStencil );
+
+        rtm->RSSetScissorViewport( cmd, frame_data.Width, frame_data.Height );
+
+        D3D12_RENDER_TARGET_VIEW_DESC const rtv_desc{
+          .Format        = mp.RenderTargetFormat,
+          .ViewDimension = D3D12_RTV_DIMENSION_TEXTURE2D,
+          .Texture2D     = { .MipSlice = 0 },
+        };
+        ID3D12Resource* rtv = render_target.Resource.Get();
+        rtm->OMSetRenderTargets( cmd, 1, &rtv, &rtv_desc, depth_target.Resource.Get(), nullptr );
+
+        cmd->SetGraphicsRootSignature( mp.RootSignature.Get() );
+        // TODO: Sort transparent objects back to front
+        cmd->SetPipelineState( mp.Pipeline.Get() );
+        cmd->SetGraphicsRoot32BitConstants( 0, sizeof( DrawList::Info ) / 4, &draw_list_info_list.AlphaTested, 0 );
+        cmd->SetGraphicsRoot32BitConstants( 1, sizeof( PerFrameConstants ) / 4, &constants, 0 );
+        cmd->SetGraphicsRoot32BitConstants( 2, sizeof( Environment::GpuRepr ) / 4, &env, 0 );
+        cmd->DispatchMesh( draw_list_info_list.AlphaTested.DrawCount, 1, 1 );
+      } );
+
+  return frame_graph->addCallbackPass<RenderPass::RTVData>(
+      "Transparency Pass",
+      [&]( FrameGraph::Builder& builder, RenderPass::RTVData& data )
+      {
+        data.RenderTarget = builder.write( alpha_tested_pass.RenderTarget, FG::Attachment{ .Index = 0 } );
+        data.DepthStencil = builder.write( alpha_tested_pass.DepthStencil, FG::DepthStencil{} );
       },
       [mp = m_TransparencyPass, constants, env = m_Environment->Repr(), draw_list_info_list = draw_list_info_list](
           RenderPass::RTVData const& data, FrameGraphPassResources& resources, void* ctx )
@@ -552,7 +596,7 @@ Ember::RenderPass::RTVData Ember::BasicApp::RenderTransparency(
         rtm->RSSetScissorViewport( cmd, frame_data.Width, frame_data.Height );
 
         D3D12_RENDER_TARGET_VIEW_DESC const rtv_desc{
-          .Format        = DXGI_FORMAT_R8G8B8A8_UNORM_SRGB,
+          .Format        = mp.RenderTargetFormat,
           .ViewDimension = D3D12_RTV_DIMENSION_TEXTURE2D,
           .Texture2D     = { .MipSlice = 0 },
         };
@@ -601,7 +645,7 @@ Ember::RenderPass::RTVData Ember::BasicApp::RenderOpaqueFwd(
         rtm->RSSetScissorViewport( cmd, frame_data.Width, frame_data.Height );
 
         D3D12_RENDER_TARGET_VIEW_DESC const rtv_desc{
-          .Format        = DXGI_FORMAT_R8G8B8A8_UNORM_SRGB,
+          .Format        = mp.RenderTargetFormat,
           .ViewDimension = D3D12_RTV_DIMENSION_TEXTURE2D,
           .Texture2D     = { .MipSlice = 0 },
         };
@@ -612,13 +656,9 @@ Ember::RenderPass::RTVData Ember::BasicApp::RenderOpaqueFwd(
         cmd->SetGraphicsRoot32BitConstants( 1, sizeof( PerFrameConstants ) / 4, &constants, 0 );
         cmd->SetGraphicsRoot32BitConstants( 2, sizeof( Environment::GpuRepr ) / 4, &env, 0 );
 
-        cmd->SetPipelineState( mp.OpaquePipeline.Get() );
+        cmd->SetPipelineState( mp.Pipeline.Get() );
         cmd->SetGraphicsRoot32BitConstants( 0, sizeof( DrawList::Info ) / 4, &draw_list_info_list.Opaque, 0 );
         cmd->DispatchMesh( draw_list_info_list.Opaque.DrawCount, 1, 1 );
-
-        cmd->SetPipelineState( mp.AlphaTestedPipeline.Get() );
-        cmd->SetGraphicsRoot32BitConstants( 0, sizeof( DrawList::Info ) / 4, &draw_list_info_list.AlphaTested, 0 );
-        cmd->DispatchMesh( draw_list_info_list.AlphaTested.DrawCount, 1, 1 );
       } );
 }
 
@@ -651,7 +691,7 @@ Ember::RenderPass::RTVData Ember::BasicApp::RenderSkybox(
         rtm->RSSetScissorViewport( cmd, frame_data.Width, frame_data.Height );
 
         D3D12_RENDER_TARGET_VIEW_DESC const rtv_desc{
-          .Format        = DXGI_FORMAT_R8G8B8A8_UNORM_SRGB,
+          .Format        = mbp.RenderTargetFormat,
           .ViewDimension = D3D12_RTV_DIMENSION_TEXTURE2D,
           .Texture2D     = { .MipSlice = 0 },
         };
@@ -793,13 +833,9 @@ Ember::RenderPass::RTVData Ember::BasicApp::RenderOpaqueDfr(
         cmd->SetGraphicsRoot32BitConstants( 1, sizeof( PerFrameConstants ) / 4, &constants, 0 );
         cmd->SetGraphicsRoot32BitConstants( 2, sizeof( Environment::GpuRepr ) / 4, &env, 0 );
 
-        cmd->SetPipelineState( mp.GBufferPipeline.Get() );
+        cmd->SetPipelineState( mp.Pipeline.Get() );
         cmd->SetGraphicsRoot32BitConstants( 0, sizeof( DrawList::Info ) / 4, &draw_list_info_list.Opaque, 0 );
         cmd->DispatchMesh( draw_list_info_list.Opaque.DrawCount, 1, 1 );
-
-        cmd->SetPipelineState( mp.AlphaTestedGBufferPipeline.Get() );
-        cmd->SetGraphicsRoot32BitConstants( 0, sizeof( DrawList::Info ) / 4, &draw_list_info_list.AlphaTested, 0 );
-        cmd->DispatchMesh( draw_list_info_list.AlphaTested.DrawCount, 1, 1 );
       } );
 
   RenderPass::MergeData omni_pass = frame_graph->addCallbackPass<RenderPass::MergeData>(
@@ -838,7 +874,7 @@ Ember::RenderPass::RTVData Ember::BasicApp::RenderOpaqueDfr(
         rtm->RSSetScissorViewport( cmd, frame_data.Width, frame_data.Height );
 
         D3D12_RENDER_TARGET_VIEW_DESC const rtv_desc{
-          .Format        = DXGI_FORMAT_R8G8B8A8_UNORM_SRGB,
+          .Format        = mp.RenderTargetFormat,
           .ViewDimension = D3D12_RTV_DIMENSION_TEXTURE2D,
           .Texture2D     = { .MipSlice = 0 },
         };
@@ -889,7 +925,7 @@ Ember::RenderPass::RTVData Ember::BasicApp::RenderOpaqueDfr(
         rtm->RSSetScissorViewport( cmd, frame_data.Width, frame_data.Height );
 
         D3D12_RENDER_TARGET_VIEW_DESC const rtv_desc{
-          .Format        = DXGI_FORMAT_R8G8B8A8_UNORM_SRGB,
+          .Format        = mp.RenderTargetFormat,
           .ViewDimension = D3D12_RTV_DIMENSION_TEXTURE2D,
           .Texture2D     = { .MipSlice = 0 },
         };
@@ -941,7 +977,7 @@ Ember::RenderPass::RTVData Ember::BasicApp::RenderOpaqueDfr(
         rtm->RSSetScissorViewport( cmd, frame_data.Width, frame_data.Height );
 
         D3D12_RENDER_TARGET_VIEW_DESC const rtv_desc{
-          .Format        = DXGI_FORMAT_R8G8B8A8_UNORM_SRGB,
+          .Format        = mp.RenderTargetFormat,
           .ViewDimension = D3D12_RTV_DIMENSION_TEXTURE2D,
           .Texture2D     = { .MipSlice = 0 },
         };

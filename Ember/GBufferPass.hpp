@@ -28,12 +28,11 @@ struct GBuffer
 
   // TODO: Use more compact formats if possible.
   // R32G32B32A32_FLOAT is overkill for position, but required for the shadow.
-  // Use quantization?
-  // Normal to Octahedron?
+  // More quantization?
   DXGI_FORMAT constexpr static kGBufferFormats[kGBufferCount] = {
     DXGI_FORMAT_R32G32B32A32_FLOAT,  // Position
     DXGI_FORMAT_R8G8B8A8_UNORM_SRGB, // Albedo
-    DXGI_FORMAT_R8G8B8A8_UNORM,      // Normal
+    DXGI_FORMAT_R16G16_UNORM,        // Normal
     DXGI_FORMAT_R8G8B8A8_UNORM,      // ORM
     DXGI_FORMAT_R8G8B8A8_UNORM_SRGB, // Emissive
   };
@@ -42,8 +41,7 @@ struct GBuffer
 
   // PBR Pipeline
   ComPtr<ID3D12RootSignature> RootSignature;
-  ComPtr<ID3D12PipelineState> GBufferPipeline;
-  ComPtr<ID3D12PipelineState> AlphaTestedGBufferPipeline;
+  ComPtr<ID3D12PipelineState> Pipeline;
 
   static bool                 Create( GBuffer* out, RenderDevice* render_device );
 };
