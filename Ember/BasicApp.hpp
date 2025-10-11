@@ -14,6 +14,7 @@
 #include "TransparencyPass.hpp"
 #include "Util/DirectXHeaders.hpp"
 #include "Util/Runtime.hpp"
+#include "fg/Blackboard.hpp"
 #include "fg/FrameGraph.hpp"
 
 namespace Ember
@@ -39,7 +40,8 @@ class BasicApp final : public IApp
   wchar_t                        m_SprintfBuffer[1024]{};
 
   // Specifics
-  FG::Context m_FGContext;
+  FG::Context          m_FGContext;
+  FrameGraphBlackboard m_FGBlackboard;
 
   // PBR Pipeline
 
@@ -73,25 +75,13 @@ class BasicApp final : public IApp
   // TODO: Organize init and destroy.
   std::unique_ptr<LightManager> m_LightManager;
 
-  void                          SetupRenderPipeline();
+  void                          SetupRenderPasses();
+
   RenderPass::RTVData           ClearRenderTargets( FrameGraph* frame_graph ) const;
-  RenderPass::RTVData           RenderTransparency(
-                FrameGraph*                frame_graph,
-                DrawList::Batches const&   draw_list_info_list,
-                PerFrameConstants const&   constants,
-                RenderPass::RTVData const& opaque_pass );
-  RenderPass::RTVData RenderOpaqueFwd(
-      FrameGraph*                frame_graph,
-      DrawList::Batches const&   draw_list_info_list,
-      PerFrameConstants const&   constants,
-      RenderPass::RTVData const& clear_rtv );
-  RenderPass::RTVData RenderSkybox(
-      FrameGraph* frame_graph, PerFrameConstants const& constants, RenderPass::RTVData const& transparency_pass );
-  RenderPass::RTVData RenderOpaqueDfr(
-      FrameGraph*                frame_graph,
-      DrawList::Batches const&   draw_list_info_list,
-      PerFrameConstants const&   constants,
-      RenderPass::RTVData const& clear_rtv );
+  RenderPass::RTVData           RenderTransparency( FrameGraph* frame_graph, RenderPass::RTVData const& opaque_pass );
+  RenderPass::RTVData           RenderOpaqueFwd( FrameGraph* frame_graph, RenderPass::RTVData const& clear_rtv );
+  RenderPass::RTVData           RenderSkybox( FrameGraph* frame_graph, RenderPass::RTVData const& transparency_pass );
+  RenderPass::RTVData           RenderOpaqueDfr( FrameGraph* frame_graph, RenderPass::RTVData const& clear_rtv );
 
 public:
   BasicApp(

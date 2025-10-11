@@ -15,7 +15,7 @@ struct Background
 {
   ComPtr<ID3D12RootSignature> RootSignature;
   ComPtr<ID3D12PipelineState> Pipeline;
-  DXGI_FORMAT                 RenderTargetFormat;
+  DXGI_FORMAT                 RenderTargetFormat{ DXGI_FORMAT_UNKNOWN };
 
   static bool                 Create( Background* out, RenderDevice* render_device, DXGI_FORMAT rt_format );
 };

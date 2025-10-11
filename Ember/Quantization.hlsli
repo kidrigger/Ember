@@ -34,7 +34,7 @@ float4 UnpackR8G8B8A8Unorm( uint input )
 float2 OctahedralEncode( float3 n )
 {
   n    /= ( abs( n.x ) + abs( n.y ) + abs( n.z ) );
-  n.xy  = select( n.z >= 0.0f, n.xy, ( 1.0f - abs( n.yx ) ) * select( n.xy >= 0.0f , 1.0f , -1.0f ) );
+  n.xy  = select( n.z >= 0.0f, n.xy, ( 1.0f - abs( n.yx ) ) * select( n.xy >= 0.0f, 1.0f, -1.0f ) );
   n.xy  = n.xy * 0.5f + 0.5f;
   return n.xy;
 }
