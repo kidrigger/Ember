@@ -49,6 +49,8 @@
     <None Include="fg\Blackboard.inl" />
     <None Include="fg\FrameGraph.inl" />
     <None Include="fg\ResourceEntry.inl" />
+    <None Include="LICENSE" />
+    <None Include="README.md" />
   </ItemGroup>
   <PropertyGroup Label="Globals">
     <VCProjectVersion>17.0</VCProjectVersion>
