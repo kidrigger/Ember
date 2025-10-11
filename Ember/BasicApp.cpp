@@ -713,7 +713,7 @@ Ember::RenderPass::RTVData Ember::BasicApp::RenderSkybox(
         cmd->SetPipelineState( mbp.Pipeline.Get() );
         cmd->SetGraphicsRoot32BitConstant( 0, ( UINT )constants.Camera, 0 );
         cmd->SetGraphicsRoot32BitConstant( 0, ( UINT )env.Skybox, 1 );
-        cmd->DispatchMesh( 1, 1, 1 );
+        cmd->DrawInstanced( 3, 1, 0, 0 );
       } );
 }
 

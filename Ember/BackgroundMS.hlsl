@@ -33,7 +33,7 @@ void BackgroundMS( uint3 dt_id : SV_DispatchThreadID, out vertices BackgroundOut
     float4 screen_pos       = float4( kPosition[i], 1.0f );
 
     float4 clip_space       = mul( camera.InvProj, screen_pos );
-    float3 skybox_coord     = mul( camera.InvView, clip_space / clip_space.w ).xyz;
+    float3 skybox_coord     = mul( camera.InvView, clip_space / clip_space.w ).xyz - camera.Position.xyz;
 
     verts[i].ScreenPosition = screen_pos;
     verts[i].SkyboxCoord    = skybox_coord;
