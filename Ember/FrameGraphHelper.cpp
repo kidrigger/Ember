@@ -69,7 +69,10 @@ Ember::FG::Texture Ember::FG::Context::CreateTextureImpl( Texture::Desc const& d
 }
 
 Ember::FG::Context::Context( RenderDevice* render_device, std::unique_ptr<RenderTargetManager> render_target_manager )
-  : m_RenderDevice{ render_device }, m_RenderTargetManager{ std::move( render_target_manager ) }, m_FrameData{}
+  : m_RenderDevice{ render_device }
+  , m_RenderTargetManager{ std::move( render_target_manager ) }
+  , m_FrameData{}
+  , m_TextureCount{ 0 }
 {}
 
 void Ember::FG::Context::Create( Context* out, RenderDevice* render_device )
@@ -120,13 +123,14 @@ Ember::FG::Texture Ember::FG::Context::CreateTexture( Texture::Desc const& desc 
   auto           it        = m_Textures.Find( hash );
   auto&          res_queue = it == m_Textures.end() ? m_Textures.Put( hash, {} ) : it->second;
 
-  if ( not res_queue.empty() )
+  res_queue.TickStamp      = m_TickCounter;
+
+  if ( not res_queue.Empty() )
   {
-    Texture tex = res_queue.front();
-    res_queue.pop();
-    return tex;
+    return res_queue.Pop();
   }
 
+  m_TextureCount++;
   return CreateTextureImpl( desc );
 }
 
@@ -144,7 +148,25 @@ void Ember::FG::Context::DestroyTexture( Texture::Desc const& desc, Texture tex 
   tex.SRVHandleCache.Clear();
   tex.AsSRV = {};
 
-  it->second.emplace( std::move( tex ) );
+  it->second.Push( std::move( tex ) );
+}
+
+uint32_t Ember::FG::Context::GetTextureCount() const
+{
+  return m_TextureCount;
+}
+
+void Ember::FG::Context::Update()
+{
+  m_TickCounter++;
+
+  m_Textures.EraseIf(
+      [&]( uint64_t const&, TexturePoolEntry const& val )
+      {
+        bool const marked_del = val.Empty() or m_TickCounter - val.TickStamp >= kMaxAge;
+        if ( marked_del ) m_TextureCount -= ( uint32_t )val.Queue.size();
+        return marked_del;
+      } );
 }
 
 Ember::FG::ShaderResource::operator uint32_t() const
@@ -345,4 +367,22 @@ void Ember::FG::Texture::preWrite( [[maybe_unused]] Desc const& desc, uint32_t c
     default:
       UNREACHABLE;
   }
+}
+
+bool Ember::FG::Context::TexturePoolEntry::Empty() const
+{
+  return Queue.empty();
+}
+
+Ember::FG::Texture Ember::FG::Context::TexturePoolEntry::Pop()
+{
+  Texture tex = Queue.front();
+  Queue.pop();
+
+  return tex;
+}
+
+void Ember::FG::Context::TexturePoolEntry::Push( Texture tex )
+{
+  Queue.push( std::move( tex ) );
 }

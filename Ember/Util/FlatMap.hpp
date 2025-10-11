@@ -53,6 +53,11 @@ public:
       return { *m_KeyIter, *m_ValueIter };
     }
 
+    Iterator operator+( ptrdiff_t const offset ) const
+    {
+      return { m_KeyIter + offset, m_ValueIter + offset };
+    }
+
     Iterator& operator++()
     {
       ++m_KeyIter;
@@ -225,6 +230,26 @@ public:
     if ( iter == end() ) return;
     m_Keys.erase( iter.GetKeyIter() );
     m_Values.erase( iter.GetValueIter() );
+  }
+
+  void Erase( TKey const& key )
+  {
+    auto it = Find( key );
+    if ( it != end() ) Erase( it );
+  }
+
+  template <std::predicate<TKey const&, TValue const&> TPredicate>
+  void EraseIf( TPredicate&& predicate )
+  {
+    for ( size_t i = m_Keys.size(); i > 0; --i )
+    {
+      size_t index = i - 1;
+      if ( std::invoke( std::forward<TPredicate>( predicate ), m_Keys[index], m_Values[index] ) )
+      {
+        m_Keys.erase( m_Keys.begin() + index );
+        m_Values.erase( m_Values.begin() + index );
+      }
+    }
   }
 
   TValue& operator[]( TKey const& key )

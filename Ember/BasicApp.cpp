@@ -335,6 +335,8 @@ void Ember::BasicApp::Update()
           0,
           PerfCounter::kMaxDeltaMs );
 
+      ImGui::Text( "Transient Textures: %u", m_FGContext.GetTextureCount() );
+
       if ( ImGui::CollapsingHeader( "MeshDraws" ) )
       {
         ImGui::Text( "Total: %llu", m_DrawList.GetTotalCount() );
@@ -722,62 +724,19 @@ Ember::RenderPass::RTVData Ember::BasicApp::RenderOpaqueDfr(
       "Clear GBuffer",
       [&]( FrameGraph::Builder& builder, RenderPass::GBufferData& data )
       {
-        data.GBuffer[RenderPass::GBuffer::kPosition] = builder.create<FG::Texture>(
-            "GBuffer Position",
-            FG::Texture::Desc{
-                .Format    = RenderPass::GBuffer::kGBufferFormats[RenderPass::GBuffer::kPosition],
-                .Width     = m_WindowWidth,
-                .Height    = m_WindowHeight,
-                .MipLevels = MipLevels::kBase,
-                .InitState = D3D12_RESOURCE_STATE_RENDER_TARGET,
-                .Flags     = D3D12_RESOURCE_FLAG_ALLOW_RENDER_TARGET,
-            } );
-        data.GBuffer[RenderPass::GBuffer::kAlbedo] = builder.create<FG::Texture>(
-            "GBuffer Albedo",
-            FG::Texture::Desc{
-                .Format    = RenderPass::GBuffer::kGBufferFormats[RenderPass::GBuffer::kAlbedo],
-                .Width     = m_WindowWidth,
-                .Height    = m_WindowHeight,
-                .MipLevels = MipLevels::kBase,
-                .InitState = D3D12_RESOURCE_STATE_RENDER_TARGET,
-                .Flags     = D3D12_RESOURCE_FLAG_ALLOW_RENDER_TARGET,
-            } );
+        FG::Texture::Desc desc{
+          .Format    = RenderPass::GBuffer::kGBufferFormats[RenderPass::GBuffer::kPosition],
+          .Width     = m_WindowWidth,
+          .Height    = m_WindowHeight,
+          .MipLevels = MipLevels::kBase,
+          .InitState = D3D12_RESOURCE_STATE_RENDER_TARGET,
+          .Flags     = D3D12_RESOURCE_FLAG_ALLOW_RENDER_TARGET,
+        };
 
-        data.GBuffer[RenderPass::GBuffer::kNormal] = builder.create<FG::Texture>(
-            "GBuffer Normal",
-            FG::Texture::Desc{
-                .Format    = RenderPass::GBuffer::kGBufferFormats[RenderPass::GBuffer::kNormal],
-                .Width     = m_WindowWidth,
-                .Height    = m_WindowHeight,
-                .MipLevels = MipLevels::kBase,
-                .InitState = D3D12_RESOURCE_STATE_RENDER_TARGET,
-                .Flags     = D3D12_RESOURCE_FLAG_ALLOW_RENDER_TARGET,
-            } );
-
-        data.GBuffer[RenderPass::GBuffer::kORM] = builder.create<FG::Texture>(
-            "GBuffer ORM",
-            FG::Texture::Desc{
-                .Format    = RenderPass::GBuffer::kGBufferFormats[RenderPass::GBuffer::kORM],
-                .Width     = m_WindowWidth,
-                .Height    = m_WindowHeight,
-                .MipLevels = MipLevels::kBase,
-                .InitState = D3D12_RESOURCE_STATE_RENDER_TARGET,
-                .Flags     = D3D12_RESOURCE_FLAG_ALLOW_RENDER_TARGET,
-            } );
-
-        data.GBuffer[RenderPass::GBuffer::kEmissive] = builder.create<FG::Texture>(
-            "GBuffer Emissive",
-            FG::Texture::Desc{
-                .Format    = RenderPass::GBuffer::kGBufferFormats[RenderPass::GBuffer::kEmissive],
-                .Width     = m_WindowWidth,
-                .Height    = m_WindowHeight,
-                .MipLevels = MipLevels::kBase,
-                .InitState = D3D12_RESOURCE_STATE_RENDER_TARGET,
-                .Flags     = D3D12_RESOURCE_FLAG_ALLOW_RENDER_TARGET,
-            } );
-
-        for ( uint32_t i = 0; i < RenderPass::GBuffer::kGBufferCount; i++ )
+        for ( int i = 0; i < RenderPass::GBuffer::kGBufferCount; i++ )
         {
+          desc.Format     = RenderPass::GBuffer::kGBufferFormats[i];
+          data.GBuffer[i] = builder.create<FG::Texture>( RenderPass::GBuffer::kGBufferNames[i], desc );
           data.GBuffer[i] = builder.write( data.GBuffer[i], FG::Attachment{ .Index = ( uint8_t )i } );
         }
       },
@@ -840,11 +799,10 @@ Ember::RenderPass::RTVData Ember::BasicApp::RenderOpaqueDfr(
             cmd, CountOf( gbuffer ), DataOf( gbuffer ), nullptr, depth_target.Resource.Get(), nullptr );
 
         cmd->SetGraphicsRootSignature( mp.RootSignature.Get() );
-        cmd->SetGraphicsRoot32BitConstants( 1, sizeof( PerFrameConstants ) / 4, &constants, 0 );
-        cmd->SetGraphicsRoot32BitConstants( 2, sizeof( Environment::GpuRepr ) / 4, &env, 0 );
-
         cmd->SetPipelineState( mp.Pipeline.Get() );
         cmd->SetGraphicsRoot32BitConstants( 0, sizeof( DrawList::Info ) / 4, &draw_list_info_list.Opaque, 0 );
+        cmd->SetGraphicsRoot32BitConstants( 1, sizeof( PerFrameConstants ) / 4, &constants, 0 );
+        cmd->SetGraphicsRoot32BitConstants( 2, sizeof( Environment::GpuRepr ) / 4, &env, 0 );
         cmd->DispatchMesh( draw_list_info_list.Opaque.DrawCount, 1, 1 );
       } );
 
@@ -1016,6 +974,8 @@ Ember::RenderPass::RTVData Ember::BasicApp::RenderOpaqueDfr(
 void Ember::BasicApp::Render()
 {
   ZoneScoped;
+
+  m_FGContext.Update();
 
   ID3D12Resource*      backbuffer   = m_RenderDevice->GetCurrentBackbuffer();
   Context::CommandList command_list = m_RenderDevice->GetGraphicsCommandList();

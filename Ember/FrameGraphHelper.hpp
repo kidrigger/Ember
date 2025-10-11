@@ -113,6 +113,9 @@ struct Texture
 class Context
 {
 public:
+  // Approx 1 second at 120 FPS
+  uint64_t constexpr static kMaxAge = 120;
+
   struct FrameData
   {
     ID3D12GraphicsCommandList6* CommandList;
@@ -121,13 +124,25 @@ public:
   };
 
 private:
-  RenderDevice*                          m_RenderDevice;
-  std::unique_ptr<RenderTargetManager>   m_RenderTargetManager;
-  FrameData                              m_FrameData;
-  FlatMap<uint64_t, std::queue<Texture>> m_Textures;
-  std::vector<CD3DX12_RESOURCE_BARRIER>  m_Barriers;
+  struct TexturePoolEntry
+  {
+    std::queue<Texture> Queue;
+    uint64_t            TickStamp;
 
-  [[nodiscard]] Texture                  CreateTextureImpl( Texture::Desc const& desc ) const;
+    bool                Empty() const;
+    Texture             Pop();
+    void                Push( Texture tex );
+  };
+
+  RenderDevice*                         m_RenderDevice;
+  std::unique_ptr<RenderTargetManager>  m_RenderTargetManager;
+  FrameData                             m_FrameData;
+  FlatMap<uint64_t, TexturePoolEntry>   m_Textures;
+  std::vector<CD3DX12_RESOURCE_BARRIER> m_Barriers;
+  uint64_t                              m_TickCounter;
+  uint32_t                              m_TextureCount;
+
+  [[nodiscard]] Texture                 CreateTextureImpl( Texture::Desc const& desc ) const;
 
 public:
   Context() = default;
@@ -145,6 +160,9 @@ public:
 
   [[nodiscard]] Texture              CreateTexture( Texture::Desc const& desc );
   void                               DestroyTexture( Texture::Desc const& desc, Texture tex );
+
+  [[nodiscard]] uint32_t             GetTextureCount() const;
+  void                               Update();
 };
 
 } // namespace FG

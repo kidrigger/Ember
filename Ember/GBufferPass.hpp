@@ -26,6 +26,10 @@ struct GBuffer
     kGBufferCount = 5,
   };
 
+  constexpr static char const* kGBufferNames[kGBufferCount] = {
+    "GBuffer Position", "GBuffer Albedo", "GBuffer Normal", "GBuffer ORM", "GBuffer Emissive",
+  };
+
   // TODO: Use more compact formats if possible.
   // R32G32B32A32_FLOAT is overkill for position, but required for the shadow.
   // More quantization?
