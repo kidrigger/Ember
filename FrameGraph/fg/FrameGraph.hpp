@@ -81,8 +81,8 @@ public:
   [[nodiscard]] FrameGraphResource import(const std::string_view name,
                                           const typename T::Desc &, T &&);
 
-  /** @return True if the given resource is valid for read/write operation. */
-  [[nodiscard]] bool isValid(FrameGraphResource id) const;
+  /** @return True if the given resource exists. */
+  [[nodiscard]] bool exists(FrameGraphResource id) const;
 
   /** Culls unreferenced resources and passes. */
   void compile();

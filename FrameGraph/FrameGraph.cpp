@@ -12,9 +12,8 @@ void FrameGraph::reserve(uint32_t numPasses, uint32_t numResources) {
   m_resourceRegistry.reserve(numResources);
 }
 
-bool FrameGraph::isValid(FrameGraphResource id) const {
-  const auto &node = _getResourceNode(id);
-  return node.getVersion() == _getResourceEntry(node).getVersion();
+bool FrameGraph::exists(FrameGraphResource id) const {
+  return id < m_resourceNodes.size();
 }
 
 void FrameGraph::compile() {
@@ -51,19 +50,43 @@ void FrameGraph::compile() {
     }
   }
 
-  // -- Calculate resources lifetime:
+  // -- Calculate and validate resources lifetime:
 
+#if !defined(NDEBUG)
+  std::vector<uint32_t> resourceVersions(m_resourceRegistry.size(), ResourceEntry::kInitialVersion);
+#endif
   for (auto &pass : m_passNodes) {
     if (pass.m_refCount == 0) continue;
 
-    for (const auto id : pass.m_creates)
-      _getResourceEntry(id).m_producer = &pass;
-    for (const auto [id, _] : pass.m_writes)
-      _getResourceEntry(id).m_last = &pass;
-    for (const auto [id, _] : pass.m_reads)
-      _getResourceEntry(id).m_last = &pass;
+    for (const auto id : pass.m_creates) {
+      ResourceEntry& entry = _getResourceEntry( id );
+#if !defined(NDEBUG)
+      resourceVersions[entry.getId()]--;
+#endif
+      entry.m_producer = &pass;
+    }
+    for (const auto [id, _] : pass.m_reads) {
+      ResourceEntry& entry = _getResourceEntry( id );
+#if !defined(NDEBUG)      
+      uint32_t& currentVersion = resourceVersions[entry.getId()];
+      uint32_t nodeVersion = _getResourceNode(id).getVersion();
+      assert(nodeVersion == currentVersion);
+#endif
+      entry.m_last = &pass;
+    }
+    for (const auto [id, _] : pass.m_writes) {
+      ResourceEntry& entry = _getResourceEntry( id );
+#if !defined(NDEBUG)
+      uint32_t& currentVersion = resourceVersions[entry.getId()];
+      uint32_t nodeVersion = _getResourceNode( id ).getVersion();
+      assert(nodeVersion > currentVersion);
+      currentVersion = nodeVersion;
+#endif
+      entry.m_last = &pass;
+    }
   }
 }
+
 void FrameGraph::execute(void *context, void *allocator) {
   for (const auto &pass : m_passNodes) {
     if (!pass.canExecute()) continue;
@@ -106,6 +129,7 @@ ResourceNode &FrameGraph::_createResourceNode(const std::string_view name,
   return m_resourceNodes.emplace_back(
     ResourceNode{name, id, resourceId, version});
 }
+
 FrameGraphResource FrameGraph::_clone(FrameGraphResource id) {
   const auto &node = _getResourceNode(id);
   auto &entry = _getResourceEntry(node);
@@ -120,10 +144,12 @@ const ResourceNode &FrameGraph::_getResourceNode(FrameGraphResource id) const {
   assert(id < m_resourceNodes.size());
   return m_resourceNodes[id];
 }
+
 const ResourceEntry &
 FrameGraph::_getResourceEntry(FrameGraphResource id) const {
   return _getResourceEntry(_getResourceNode(id));
 }
+
 const ResourceEntry &
 FrameGraph::_getResourceEntry(const ResourceNode &node) const {
   assert(node.m_resourceId < m_resourceRegistry.size());
@@ -142,12 +168,13 @@ std::ostream &operator<<(std::ostream &os, const FrameGraph &fg) {
 
 FrameGraphResource FrameGraph::Builder::read(FrameGraphResource id,
                                              uint32_t flags) {
-  assert(m_frameGraph.isValid(id));
+  assert(m_frameGraph.exists(id));
   return m_passNode._read(id, flags);
 }
+
 FrameGraphResource FrameGraph::Builder::write(FrameGraphResource id,
                                               uint32_t flags) {
-  assert(m_frameGraph.isValid(id));
+  assert(m_frameGraph.exists(id));
   if (m_frameGraph._getResourceEntry(id).isImported()) setSideEffect();
 
   if (m_passNode.creates(id)) {
