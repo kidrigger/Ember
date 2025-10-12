@@ -62,11 +62,13 @@ Ember::Buffer::Buffer(
     ComPtr<D3D12MA::Allocation> allocation,
     uint32_t const              offset,
     uint32_t const              size,
+    D3D12_GPU_VIRTUAL_ADDRESS   gpu_address,
     Views                       view )
   : m_Buffer{ std::move( buffer ) }
   , m_Allocation{ std::move( allocation ) }
   , m_Offset{ offset }
   , m_Size{ size }
+  , m_GPUAddress{ gpu_address }
   , m_Views{ std::move( view ) }
 {}
 
@@ -156,6 +158,11 @@ void Ember::Buffer::SetName( LPCWSTR const name ) const
   ERR_ABORT( m_Buffer->SetName( name ) );
 }
 
+D3D12_GPU_VIRTUAL_ADDRESS Ember::Buffer::GetGPUVirtualAddress() const
+{
+  return m_GPUAddress;
+}
+
 Ember::BufferManager::BufferManager(
     ComPtr<ID3D12Device2> device, ComPtr<D3D12MA::Allocator> gpu_allocator, BindlessManager* bindless_manager )
   : m_Bindless{ bindless_manager }, m_Device{ std::move( device ) }, m_GpuAllocator{ std::move( gpu_allocator ) }
@@ -207,7 +214,8 @@ Ember::Buffer Ember::BufferManager::CreateVertexBuffer( uint32_t const size, uin
     .StrideInBytes  = stride,
   };
 
-  return Buffer{ std::move( buffer ), std::move( allocation ), 0, size, vertex_buffer_view };
+  return Buffer{ std::move( buffer ), std::move( allocation ), 0, size, vertex_buffer_view.BufferLocation,
+                 vertex_buffer_view };
 }
 
 Ember::Buffer Ember::BufferManager::CreateIndexBuffer( uint32_t const size, DXGI_FORMAT const format )
@@ -222,7 +230,9 @@ Ember::Buffer Ember::BufferManager::CreateIndexBuffer( uint32_t const size, DXGI
     .Format         = format,
   };
 
-  return Buffer{ std::move( buffer ), std::move( allocation ), 0, size, index_buffer_view };
+  return Buffer{
+    std::move( buffer ), std::move( allocation ), 0, size, index_buffer_view.BufferLocation, index_buffer_view,
+  };
 }
 
 Ember::Buffer Ember::BufferManager::CreateStorageBuffer( uint32_t const size, uint32_t const stride )
@@ -241,7 +251,9 @@ Ember::Buffer Ember::BufferManager::CreateStorageBuffer( uint32_t const size, ui
   auto            storage_info = std::allocate_shared<Buffer::StorageBufferInfoImpl>(
       std::pmr::polymorphic_allocator<byte>{ &m_MemoryPool }, m_Bindless, srv_handle, UAVHandle{} );
 
-  return Buffer{ std::move( buffer ), std::move( allocation ), 0, size, std::move( storage_info ) };
+  return Buffer{
+    std::move( buffer ), std::move( allocation ), 0, size, buffer->GetGPUVirtualAddress(), std::move( storage_info ),
+  };
 }
 
 Ember::Buffer Ember::BufferManager::CreateRawStorageBuffer( uint32_t size )
@@ -263,7 +275,9 @@ Ember::Buffer Ember::BufferManager::CreateRawStorageBuffer( uint32_t size )
   auto            storage_info = std::allocate_shared<Buffer::StorageBufferInfoImpl>(
       std::pmr::polymorphic_allocator<byte>{ &m_MemoryPool }, m_Bindless, srv_handle, UAVHandle{} );
 
-  return Buffer{ std::move( buffer ), std::move( allocation ), 0, size, std::move( storage_info ) };
+  return Buffer{
+    std::move( buffer ), std::move( allocation ), 0, size, buffer->GetGPUVirtualAddress(), std::move( storage_info ),
+  };
 }
 
 Ember::Buffer Ember::BufferManager::CreateReadWriteBuffer( uint32_t size, uint32_t stride )
@@ -287,7 +301,9 @@ Ember::Buffer Ember::BufferManager::CreateReadWriteBuffer( uint32_t size, uint32
   auto            storage_info = std::allocate_shared<Buffer::StorageBufferInfoImpl>(
       std::pmr::polymorphic_allocator<byte>{ &m_MemoryPool }, m_Bindless, srv_handle, uav_handle );
 
-  return Buffer{ std::move( buffer ), std::move( allocation ), 0, size, std::move( storage_info ) };
+  return Buffer{
+    std::move( buffer ), std::move( allocation ), 0, size, buffer->GetGPUVirtualAddress(), std::move( storage_info ),
+  };
 }
 
 Ember::Buffer Ember::BufferManager::CreateConstantBuffer( uint32_t const size )
@@ -308,5 +324,8 @@ Ember::Buffer Ember::BufferManager::CreateConstantBuffer( uint32_t const size )
   auto            constant_buffer_info = std::allocate_shared<Buffer::ConstantBufferInfoImpl>(
       std::pmr::polymorphic_allocator<byte>{ &m_MemoryPool }, m_Bindless, cbv_handle );
 
-  return Buffer{ std::move( buffer ), std::move( allocation ), 0, padded_size, std::move( constant_buffer_info ) };
+  return Buffer{
+    std::move( buffer ), std::move( allocation ),        0,
+    padded_size,         buffer->GetGPUVirtualAddress(), std::move( constant_buffer_info ),
+  };
 }

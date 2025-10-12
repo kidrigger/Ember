@@ -72,6 +72,7 @@ Ember::FG::Context::Context( RenderDevice* render_device, std::unique_ptr<Render
   : m_RenderDevice{ render_device }
   , m_RenderTargetManager{ std::move( render_target_manager ) }
   , m_FrameData{}
+  , m_TickCounter{ 0 }
   , m_TextureCount{ 0 }
 {}
 
@@ -120,8 +121,8 @@ Ember::FG::Texture Ember::FG::Context::CreateTexture( Texture::Desc const& desc 
 {
   uint64_t const hash      = HashFnv1A( sizeof( Texture::Desc ), ( byte* )&desc );
 
-  auto           it        = m_Textures.Find( hash );
-  auto&          res_queue = it == m_Textures.end() ? m_Textures.Put( hash, {} ) : it->second;
+  auto           it        = m_TransientTextures.Find( hash );
+  auto&          res_queue = it == m_TransientTextures.end() ? m_TransientTextures.Put( hash, {} ) : it->second;
 
   res_queue.TickStamp      = m_TickCounter;
 
@@ -138,14 +139,16 @@ void Ember::FG::Context::DestroyTexture( Texture::Desc const& desc, Texture tex 
 {
   uint64_t const hash = HashFnv1A( sizeof( Texture::Desc ), ( byte* )&desc );
 
-  auto           it   = m_Textures.Find( hash );
-  if ( it == m_Textures.end() ) return;
+  auto           it   = m_TransientTextures.Find( hash );
+  if ( it == m_TransientTextures.end() ) return;
 
-  for ( SRVHandle const& handle : tex.SRVHandleCache.Values() )
+  auto& srv_cache = m_TextureSRVCache[tex.Resource.Get()];
+  for ( SRVHandle const& handle : srv_cache.Values() )
   {
     m_RenderDevice->FreeHandle( handle );
   }
-  tex.SRVHandleCache.Clear();
+  srv_cache.Clear();
+
   tex.AsSRV = {};
 
   it->second.Push( std::move( tex ) );
@@ -160,13 +163,39 @@ void Ember::FG::Context::Update()
 {
   m_TickCounter++;
 
-  m_Textures.EraseIf(
+  m_TransientTextures.EraseIf(
       [&]( uint64_t const&, TexturePoolEntry const& val )
       {
         bool const marked_del = val.Empty() or m_TickCounter - val.TickStamp >= kMaxAge;
         if ( marked_del ) m_TextureCount -= ( uint32_t )val.Queue.size();
         return marked_del;
       } );
+}
+
+Ember::SRVHandle Ember::FG::Context::GetOrCreateSRVHandle(
+    Texture const& texture, CD3DX12_SHADER_RESOURCE_VIEW_DESC const& srv_desc )
+{
+  auto&          cache = m_TextureSRVCache[texture.Resource.Get()];
+
+  uint64_t const hash  = HashFnv1A( srv_desc );
+  if ( auto it = cache.Find( hash ); it != cache.end() )
+  {
+    return it->second;
+  }
+
+  SRVHandle const handle = m_RenderDevice->CreateBindlessHandle( texture.Resource.Get(), srv_desc );
+  return cache.Put( hash, handle );
+}
+
+Ember::FG::Context::~Context()
+{
+  for ( auto const& cache : m_TextureSRVCache.Values() )
+  {
+    for ( auto const& handle : cache.Values() )
+    {
+      m_RenderDevice->FreeHandle( handle );
+    }
+  }
 }
 
 Ember::FG::ShaderResource::operator uint32_t() const
@@ -270,7 +299,7 @@ void Ember::FG::Texture::destroy( Desc const& desc, void* alloc )
 }
 
 // ReSharper disable once CppInconsistentNaming
-void Ember::FG::Texture::preRead( Desc const& desc, uint32_t flags, void* context )
+void Ember::FG::Texture::preRead( Desc const& desc, uint32_t const flags, void* context )
 {
   ASSERT( context );
   Context*   ctx     = ( Context* )context;
@@ -287,16 +316,8 @@ void Ember::FG::Texture::preRead( Desc const& desc, uint32_t flags, void* contex
 
       CD3DX12_SHADER_RESOURCE_VIEW_DESC srv_desc =
           CD3DX12_SHADER_RESOURCE_VIEW_DESC::Tex2D( desc.Format, srv.OnlyTopMip ? 1 : -1 );
-      uint64_t const hash = HashFnv1A( srv_desc );
-      if ( auto it = SRVHandleCache.Find( hash ); it != SRVHandleCache.end() )
-      {
-        AsSRV = it->second;
-      }
-      else
-      {
-        SRVHandle const handle = ctx->GetRenderDevice()->CreateBindlessHandle( Resource.Get(), srv_desc );
-        AsSRV                  = SRVHandleCache.Put( hash, handle );
-      }
+
+      AsSRV = ctx->GetOrCreateSRVHandle( *this, srv_desc );
 
       if ( CurrentState != required_state )
       {

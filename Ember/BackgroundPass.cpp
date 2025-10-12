@@ -12,6 +12,8 @@ bool Ember::RenderPass::Background::Create( Background* out, RenderDevice* rende
   ERR_FAIL_RET_F( D3DReadFileToBlob( L"BackgroundVS.cso", &bg_vertex_shader_blob ) );
   ComPtr<ID3DBlob> bg_pixel_shader_blob;
   ERR_FAIL_RET_F( D3DReadFileToBlob( L"BackgroundPS.cso", &bg_pixel_shader_blob ) );
+  ComPtr<ID3DBlob> atmos_bg_pixel_shader_blob;
+  ERR_FAIL_RET_F( D3DReadFileToBlob( L"AtmosphereBackgroundPS.cso", &atmos_bg_pixel_shader_blob ) );
 
   ComPtr<ID3D12Device2>      device                 = render_device->GetDevice();
 
@@ -79,7 +81,11 @@ bool Ember::RenderPass::Background::Create( Background* out, RenderDevice* rende
     .pPipelineStateSubobjectStream = &pipeline_stream,
   };
   ERR_FAIL_RET_F( device->CreatePipelineState(
-      &pipeline_state_stream_desc, IID_PPV_ARGS( out->Pipeline.ReleaseAndGetAddressOf() ) ) );
+      &pipeline_state_stream_desc, IID_PPV_ARGS( out->SkyboxPipeline.ReleaseAndGetAddressOf() ) ) );
+
+  pipeline_stream.PS = CD3DX12_SHADER_BYTECODE( atmos_bg_pixel_shader_blob.Get() );
+  ERR_FAIL_RET_F( device->CreatePipelineState(
+      &pipeline_state_stream_desc, IID_PPV_ARGS( out->AtmospherePipeline.ReleaseAndGetAddressOf() ) ) );
 
   return true;
 }

@@ -76,6 +76,9 @@
     <Filter Include="Source Files\Passes">
       <UniqueIdentifier>{9cb2a318-b3ee-466f-808f-379c472bf996}</UniqueIdentifier>
     </Filter>
+    <Filter Include="Shaders\Atmosphere">
+      <UniqueIdentifier>{1a829239-b011-4709-9d4e-8c5ad3903102}</UniqueIdentifier>
+    </Filter>
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="Main.cpp">
@@ -188,6 +191,9 @@
     </ClCompile>
     <ClCompile Include="LightingPass.cpp">
       <Filter>Source Files\Passes</Filter>
+    </ClCompile>
+    <ClCompile Include="AtmosphereContext.cpp">
+      <Filter>Source Files</Filter>
     </ClCompile>
   </ItemGroup>
   <ItemGroup>
@@ -323,6 +329,9 @@
     <ClInclude Include="LightingPass.hpp">
       <Filter>Header Files\Passes</Filter>
     </ClInclude>
+    <ClInclude Include="AtmosphereContext.hpp">
+      <Filter>Header Files</Filter>
+    </ClInclude>
   </ItemGroup>
   <ItemGroup>
     <None Include="..\.clang-format">
@@ -396,6 +405,12 @@
     </None>
     <None Include="SpotLightCommon.hlsli">
       <Filter>Shaders\Meshes\Deferred</Filter>
+    </None>
+    <None Include="AtmosphereCommon.hlsli">
+      <Filter>Shaders\Atmosphere</Filter>
+    </None>
+    <None Include="Constants.hlsli">
+      <Filter>Shaders\Utils</Filter>
     </None>
   </ItemGroup>
   <ItemGroup>
@@ -506,6 +521,18 @@
     </FxCompile>
     <FxCompile Include="SpotLightingPS.hlsl">
       <Filter>Shaders\Meshes\Deferred</Filter>
+    </FxCompile>
+    <FxCompile Include="ScreenSpaceTriangleVS.hlsl">
+      <Filter>Shaders\Utils</Filter>
+    </FxCompile>
+    <FxCompile Include="TransmittanceLUTPS.hlsl">
+      <Filter>Shaders\Atmosphere</Filter>
+    </FxCompile>
+    <FxCompile Include="SkyViewLUTPS.hlsl">
+      <Filter>Shaders\Atmosphere</Filter>
+    </FxCompile>
+    <FxCompile Include="AtmosphereBackgroundPS.hlsl">
+      <Filter>Shaders</Filter>
     </FxCompile>
   </ItemGroup>
   <ItemGroup>

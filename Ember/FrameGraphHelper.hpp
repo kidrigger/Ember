@@ -82,11 +82,10 @@ Write DecodeWriteFlags( uint32_t v );
 
 struct Texture
 {
-  ComPtr<ID3D12Resource>       Resource;
-  ComPtr<D3D12MA::Allocation>  Allocation;
-  D3D12_RESOURCE_STATES        CurrentState;
-  FlatMap<uint64_t, SRVHandle> SRVHandleCache;
-  SRVHandle                    AsSRV;
+  ComPtr<ID3D12Resource>      Resource;
+  ComPtr<D3D12MA::Allocation> Allocation;
+  D3D12_RESOURCE_STATES       CurrentState;
+  SRVHandle                   AsSRV;
 
   struct Desc
   {
@@ -108,6 +107,25 @@ struct Texture
   void preRead( Desc const&, uint32_t flags, void* context );
   // ReSharper disable once CppInconsistentNaming
   void preWrite( Desc const&, uint32_t flags, void* context );
+};
+
+struct Buffer
+{
+  Ember::Buffer InnerBuffer;
+
+  struct Desc
+  {};
+
+  // ReSharper disable once CppInconsistentNaming
+  void create( Desc const&, void* )
+  {
+    UNIMPLEMENTED;
+  }
+  // ReSharper disable once CppInconsistentNaming
+  void destroy( Desc const&, void* )
+  {
+    UNIMPLEMENTED;
+  }
 };
 
 class Context
@@ -134,15 +152,19 @@ private:
     void                Push( Texture tex );
   };
 
-  RenderDevice*                         m_RenderDevice;
-  std::unique_ptr<RenderTargetManager>  m_RenderTargetManager;
-  FrameData                             m_FrameData;
-  FlatMap<uint64_t, TexturePoolEntry>   m_Textures;
-  std::vector<CD3DX12_RESOURCE_BARRIER> m_Barriers;
-  uint64_t                              m_TickCounter;
-  uint32_t                              m_TextureCount;
+  using SRVCacheType = FlatMap<uint64_t, SRVHandle>;
 
-  [[nodiscard]] Texture                 CreateTextureImpl( Texture::Desc const& desc ) const;
+  RenderDevice*                          m_RenderDevice;
+  std::unique_ptr<RenderTargetManager>   m_RenderTargetManager;
+  FrameData                              m_FrameData;
+  FlatMap<uint64_t, TexturePoolEntry>    m_TransientTextures;
+  FlatMap<ID3D12Resource*, SRVCacheType> m_TextureSRVCache;
+
+  std::vector<CD3DX12_RESOURCE_BARRIER>  m_Barriers;
+  uint64_t                               m_TickCounter;
+  uint32_t                               m_TextureCount;
+
+  [[nodiscard]] Texture                  CreateTextureImpl( Texture::Desc const& desc ) const;
 
 public:
   Context() = default;
@@ -163,6 +185,13 @@ public:
 
   [[nodiscard]] uint32_t             GetTextureCount() const;
   void                               Update();
+  SRVHandle GetOrCreateSRVHandle( Texture const& texture, CD3DX12_SHADER_RESOURCE_VIEW_DESC const& srv_desc );
+
+  Context( Context const& other )                = delete;
+  Context( Context&& other ) noexcept            = default;
+  Context& operator=( Context const& other )     = delete;
+  Context& operator=( Context&& other ) noexcept = default;
+  ~Context();
 };
 
 } // namespace FG

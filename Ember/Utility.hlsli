@@ -1,9 +1,7 @@
-#ifndef CONSTANTS_HLSLI_
-#define CONSTANTS_HLSLI_
+#ifndef UTILITY_HLSLI_
+#define UTILITY_HLSLI_
 
-static const float kPi     = 3.14159265f;
-static const float kTau    = 6.28318537f;
-static const float kHalfPi = 1.57079632f;
+#include "Constants.hlsli"
 
 #define OUTPUT_TOPOLOGY( x ) [outputtopology( x )]
 #define NUM_THREADS( x, y, z ) [numthreads( x, y, z )]

@@ -59,6 +59,7 @@ private:
   ComPtr<D3D12MA::Allocation> m_Allocation;
   uint32_t                    m_Offset{ 0 };
   uint32_t                    m_Size{ 0 };
+  D3D12_GPU_VIRTUAL_ADDRESS   m_GPUAddress{ 0 };
   Views                       m_Views;
 
 public:
@@ -69,6 +70,7 @@ public:
       ComPtr<D3D12MA::Allocation> allocation,
       uint32_t                    offset,
       uint32_t                    size,
+      D3D12_GPU_VIRTUAL_ADDRESS   gpu_address,
       Views                       view );
 
   void                                          Write( uint32_t offset, uint32_t size, void const* data ) const;
@@ -83,6 +85,8 @@ public:
   [[nodiscard]] UAVHandle                       GetUAVHandle() const;
   [[nodiscard]] CBVHandle                       GetCBVHandle() const;
   void                                          SetName( LPCWSTR name ) const;
+
+  [[nodiscard]] D3D12_GPU_VIRTUAL_ADDRESS       GetGPUVirtualAddress() const;
 };
 
 class BufferManager

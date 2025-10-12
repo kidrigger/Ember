@@ -1,6 +1,8 @@
 #ifndef MATH_HLSLI_
 #define MATH_HLSLI_
 
+#include "Constants.hlsli"
+
 // Sphere repr (cx, cy, cz, r)
 bool PointInsideSphere( float3 pnt, float4 sphere )
 {
@@ -41,6 +43,45 @@ uint SimpleHash( uint x )
   x *= 0xb278e4ad;
   x ^= x >> 17;
   return x;
+}
+
+// Polar form intersection
+// ray_origin_r: distance from the ray origin to the center of the sphere (r = ||x||)
+// ray_direction_mu: cosine of the angle between the ray direction and the vertical axis dot(norm(x), v)
+bool DistanceToSpherePolar( out float distance, float sphere_radius, float ray_origin_r, float ray_direction_mu )
+{
+  distance   = kInf;
+
+  float b    = ray_origin_r * ray_direction_mu;
+  float c    = ray_origin_r * ray_origin_r - sphere_radius * sphere_radius;
+  float disc = b * b - c;
+
+  if ( disc < 0.0f ) return false;
+
+  float delta        = sqrt( disc );
+  float distance_val = -b - delta;
+
+  distance_val       = distance_val + step( distance_val, 0.0f ) * 2 * delta;
+
+  if ( distance_val < 0.0f ) return false;
+
+  distance = distance_val;
+
+  return true;
+}
+
+// Polar form intersection, assuming the ray origin is inside the sphere
+// Undefined behavior if the ray origin is outside the sphere
+//
+// ray_origin_r: distance from the ray origin to the center of the sphere (r = ||x||)
+// ray_direction_mu: cosine of the angle between the ray direction and the vertical axis dot(norm(x), v)
+void DistanceToSphereFromInsidePolar(
+    out float distance, float sphere_radius, float ray_origin_r, float ray_direction_mu )
+{
+  float b     = ray_origin_r * ray_direction_mu;
+  float c     = ray_origin_r * ray_origin_r - sphere_radius * sphere_radius;
+  float delta = sqrt( b * b - c );
+  distance    = -b + delta;
 }
 
 #endif

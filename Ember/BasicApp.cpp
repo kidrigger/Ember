@@ -23,6 +23,8 @@
 #include "Util/Profiling.hpp"
 
 #include <fg/JsonWriter.hpp>
+
+#include "AtmosphereContext.hpp"
 #include "imgui.h"
 #include "imgui_impl_dx12.h"
 #include "imgui_impl_win32.h"
@@ -45,11 +47,18 @@ struct DebugConfig
     kLightingOnly  = 7,
   };
 
+  enum SkyMode : uint32_t
+  {
+    kNone       = 0,
+    kSkybox     = 1,
+    kAtmosphere = 2,
+  };
+
   uint32_t ShowDebugUI                  = true;
   uint32_t ShowWireframe                = false;
   VisMode  VisualizationMode            = kRender;
 
-  uint32_t HideSkybox                   = false;
+  SkyMode  SkyMode                      = kAtmosphere;
   uint32_t RemoveDiffuseContrib         = false;
   uint32_t RemoveSpecularContrib        = false;
 
@@ -62,6 +71,7 @@ bool                  g_UseDeferredRendering    = false;
 constexpr char const* kVisualizationModeNames[] = {
   "Render", "Meshlet", "World Position", "Albedo", "Normal", "ORM", "Emissive", "Lighting Only",
 };
+constexpr char const* kSkyModeNames[] = { "None", "Skybox", "Atmosphere" };
 
 } // namespace
 
@@ -97,6 +107,7 @@ Ember::BasicApp::BasicApp(
   , m_Environment{ std::make_unique<Environment>() }
   , m_MaterialManager{ std::make_unique_for_overwrite<MaterialManager>() }
   , m_GeometryManager{ std::make_unique_for_overwrite<GeometryManager>() }
+  , m_AtmosphereContext{ std::make_unique_for_overwrite<AtmosphereContext>() }
   , m_DrawList{ m_RenderDevice.get(), m_GeometryManager.get(), RenderDevice::kNumFrames }
   , m_LightManager{ std::make_unique_for_overwrite<LightManager>() }
 {
@@ -151,6 +162,10 @@ Ember::BasicApp::BasicApp(
   };
   init_info.UserData = m_RenderDevice.get();
   ImGui_ImplDX12_Init( &init_info );
+
+  m_FGBlackboard.add<PerFrameConstants>();
+  m_FGBlackboard.add<DrawList::Batches>();
+  m_FGBlackboard.add<Environment::GpuRepr>();
 }
 
 void Ember::BasicApp::Create( BasicApp* app, HINSTANCE const instance_handle )
@@ -263,7 +278,7 @@ void Ember::BasicApp::LoadContent()
       m_RenderDevice.get(), &m_World, m_TextureLoader.get(), m_MaterialManager.get(), m_GeometryManager.get() );
 
   // Setup Scene Geometry
-  flecs::entity       model = m_ModelLoader->TryLoadModel( "Bistro.glb" ).value().set_name( "Scene" );
+  flecs::entity       model = m_ModelLoader->TryLoadModel( "Sponza.glb" ).value().set_name( "Scene" );
 
   flecs::entity const rm =
       m_World.GetECS()
@@ -292,6 +307,8 @@ void Ember::BasicApp::LoadContent()
 
   SetupRenderPasses();
   FG::Context::Create( &m_FGContext, m_RenderDevice.get() );
+
+  ENSURE( AtmosphereContext::Create( m_AtmosphereContext.get(), m_RenderDevice.get() ) );
 
   m_PrevMouse   = Input::Instance().GetMousePosition();
 
@@ -383,11 +400,9 @@ void Ember::BasicApp::Update()
             CountOf( kVisualizationModeNames ),
             5 );
 
-        scratch = ( bool )g_Debug.HideSkybox;
-        ImGui::Checkbox( "Hide Skybox", &scratch );
-        g_Debug.HideSkybox = ( uint32_t )scratch;
+        ImGui::Combo( "Skybox", ( int* )&g_Debug.SkyMode, DataOf( kSkyModeNames ), CountOf( kSkyModeNames ), 5 );
 
-        scratch            = ( bool )g_Debug.RemoveDiffuseContrib;
+        scratch = ( bool )g_Debug.RemoveDiffuseContrib;
         ImGui::Checkbox( "Remove Diffuse Contribution", &scratch );
         g_Debug.RemoveDiffuseContrib = ( uint32_t )scratch;
 
@@ -671,17 +686,45 @@ Ember::RenderPass::RTVData Ember::BasicApp::RenderOpaqueFwd(
 }
 
 Ember::RenderPass::RTVData Ember::BasicApp::RenderSkybox(
-    FrameGraph* frame_graph, RenderPass::RTVData const& transparency_pass )
+    FrameGraph*                       frame_graph,
+    RenderPass::RTVData const&        transparency_pass,
+    AtmosphereContext::OutData const& atmosphere )
 {
-  return frame_graph->addCallbackPass<RenderPass::RTVData>(
+  struct SkyboxData
+  {
+    FrameGraphResource RenderTarget;
+    FrameGraphResource DepthStencil;
+    FrameGraphResource SkyViewLUT;
+    bool               UseProcAtmos{ false };
+  };
+
+  SkyboxData skybox = frame_graph->addCallbackPass<SkyboxData>(
       "Render Skybox",
-      [&]( FrameGraph::Builder& builder, RenderPass::RTVData& data )
+      [&]( FrameGraph::Builder& builder, SkyboxData& data )
       {
+        if ( g_Debug.SkyMode == DebugConfig::kNone )
+        {
+          data.RenderTarget = transparency_pass.RenderTarget;
+          data.DepthStencil = transparency_pass.DepthStencil;
+          return;
+        }
+
         data.RenderTarget = builder.write( transparency_pass.RenderTarget, FG::Attachment{ .Index = 0 } );
         data.DepthStencil = builder.write( transparency_pass.DepthStencil, FG::DepthStencil{} );
+
+        if ( g_Debug.SkyMode == DebugConfig::kAtmosphere )
+        {
+          data.SkyViewLUT = builder.read(
+              atmosphere.SkyViewLUT,
+              FG::ShaderResource{
+                  .PixelShaderUse = true,
+                  .OnlyTopMip     = true,
+              } );
+          data.UseProcAtmos = true;
+        }
       },
       [mbp = m_BackgroundPass,
-       bb  = &m_FGBlackboard]( RenderPass::RTVData const& data, FrameGraphPassResources& resources, void* ctx )
+       bb  = &m_FGBlackboard]( SkyboxData const& data, FrameGraphPassResources& resources, void* ctx )
       {
         ZoneScopedN( "Render Skybox" );
 
@@ -710,11 +753,25 @@ Ember::RenderPass::RTVData Ember::BasicApp::RenderSkybox(
         rtm->OMSetRenderTargets( cmd, 1, &rtv, &rtv_desc, depth_target.Resource.Get(), nullptr );
 
         cmd->SetGraphicsRootSignature( mbp.RootSignature.Get() );
-        cmd->SetPipelineState( mbp.Pipeline.Get() );
         cmd->SetGraphicsRoot32BitConstant( 0, ( UINT )constants.Camera, 0 );
-        cmd->SetGraphicsRoot32BitConstant( 0, ( UINT )env.Skybox, 1 );
+
+        if ( data.UseProcAtmos )
+        {
+          FG::Texture const& sky_view = resources.get<FG::Texture>( data.SkyViewLUT );
+          cmd->SetPipelineState( mbp.AtmospherePipeline.Get() );
+          cmd->SetGraphicsRoot32BitConstant( 0, ( UINT )sky_view.AsSRV, 1 );
+        }
+        else
+        {
+          cmd->SetPipelineState( mbp.SkyboxPipeline.Get() );
+          cmd->SetGraphicsRoot32BitConstant( 0, ( UINT )env.Skybox, 1 );
+        }
+
+
         cmd->DrawInstanced( 3, 1, 0, 0 );
       } );
+
+  return { skybox.RenderTarget, skybox.DepthStencil };
 }
 
 Ember::RenderPass::RTVData Ember::BasicApp::RenderOpaqueDfr(
@@ -767,6 +824,7 @@ Ember::RenderPass::RTVData Ember::BasicApp::RenderOpaqueDfr(
         {
           data.GBuffer[i] = builder.write( clear_gbuffer.GBuffer[i], FG::Attachment{ .Index = ( uint8_t )i } );
         }
+        data.DepthStencil = builder.read( clear_rtv.DepthStencil );
         data.DepthStencil = builder.write( clear_rtv.DepthStencil, FG::DepthStencil{} );
       },
       [mp = m_GBufferPass,
@@ -1030,34 +1088,33 @@ void Ember::BasicApp::Render()
   LightManager::GpuInfo light_info        = m_LightManager->PrepareFrame( frame_idx );
   SRVHandle const       materials_srv     = m_MaterialManager->PrepareFrame();
 
-  m_FGBlackboard.add<PerFrameConstants>() = {
+  m_FGBlackboard.get<PerFrameConstants>() = {
     .MaterialsBuffer = materials_srv,
     .Camera          = camera_cbv,
     .ConfigBuffer    = m_ConfigurationBuffer.GetCBVHandle(),
     .LightInfo       = light_info,
   };
 
-  m_FGBlackboard.add<DrawList::Batches>()    = draw_list_info;
-  m_FGBlackboard.add<Environment::GpuRepr>() = m_Environment->Repr();
+  m_FGBlackboard.get<DrawList::Batches>()      = draw_list_info;
+  m_FGBlackboard.get<Environment::GpuRepr>()   = m_Environment->Repr();
 
-  RenderPass::RTVData clear_rtv              = ClearRenderTargets( &frame_graph );
-  RenderPass::RTVData opaque_pass_fwd        = RenderOpaqueFwd( &frame_graph, clear_rtv );
+  AtmosphereContext::OutData atmosphere        = m_AtmosphereContext->Render( &frame_graph, camera_cbv, frame_idx );
 
-  RenderPass::RTVData opaque_pass_dfr        = RenderOpaqueDfr( &frame_graph, clear_rtv );
+  RenderPass::RTVData        clear_rtv         = ClearRenderTargets( &frame_graph );
+  RenderPass::RTVData        opaque_pass_fwd   = RenderOpaqueFwd( &frame_graph, clear_rtv );
+  RenderPass::RTVData        opaque_pass_dfr   = RenderOpaqueDfr( &frame_graph, clear_rtv );
 
-  RenderPass::RTVData opaque_pass            = g_UseDeferredRendering ? opaque_pass_dfr : opaque_pass_fwd;
+  RenderPass::RTVData        opaque_pass       = g_UseDeferredRendering ? opaque_pass_dfr : opaque_pass_fwd;
 
-  RenderPass::RTVData transparency_pass      = RenderTransparency( &frame_graph, opaque_pass );
-  RenderPass::RTVData skybox_pass            = RenderSkybox( &frame_graph, transparency_pass );
+  RenderPass::RTVData        transparency_pass = RenderTransparency( &frame_graph, opaque_pass );
+  RenderPass::RTVData        skybox_pass       = RenderSkybox( &frame_graph, transparency_pass, atmosphere );
 
-  RenderPass::RTVData scene_data             = g_Debug.HideSkybox ? transparency_pass : skybox_pass;
-
-  RenderPass::RTVData rtv_data               = frame_graph.addCallbackPass<RenderPass::RTVData>(
+  RenderPass::RTVData        rtv_data          = frame_graph.addCallbackPass<RenderPass::RTVData>(
       "ImGUI",
       [&]( FrameGraph::Builder& builder, RenderPass::RTVData& data )
       {
-        data.RenderTarget = builder.write( scene_data.RenderTarget, FG::Attachment{ .Index = 0 } );
-        data.DepthStencil = scene_data.DepthStencil;
+        data.RenderTarget = builder.write( skybox_pass.RenderTarget, FG::Attachment{ .Index = 0 } );
+        data.DepthStencil = skybox_pass.DepthStencil;
       },
       []( RenderPass::RTVData const& data, FrameGraphPassResources& resources, void* ctx )
       {

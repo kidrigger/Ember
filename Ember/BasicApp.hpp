@@ -1,5 +1,6 @@
 #pragma once
 
+#include "AtmosphereContext.hpp"
 #include "BackgroundPass.hpp"
 #include "Environment.hpp"
 #include "ForwardPass.hpp"
@@ -69,6 +70,7 @@ class BasicApp final : public IApp
   std::unique_ptr<Environment>         m_Environment;
   std::unique_ptr<MaterialManager>     m_MaterialManager;
   std::unique_ptr<GeometryManager>     m_GeometryManager;
+  std::unique_ptr<AtmosphereContext>   m_AtmosphereContext;
   World                                m_World;
   DrawList                             m_DrawList;
   RenderQueryType                      m_RenderQuery;
@@ -80,8 +82,11 @@ class BasicApp final : public IApp
   RenderPass::RTVData           ClearRenderTargets( FrameGraph* frame_graph ) const;
   RenderPass::RTVData           RenderTransparency( FrameGraph* frame_graph, RenderPass::RTVData const& opaque_pass );
   RenderPass::RTVData           RenderOpaqueFwd( FrameGraph* frame_graph, RenderPass::RTVData const& clear_rtv );
-  RenderPass::RTVData           RenderSkybox( FrameGraph* frame_graph, RenderPass::RTVData const& transparency_pass );
-  RenderPass::RTVData           RenderOpaqueDfr( FrameGraph* frame_graph, RenderPass::RTVData const& clear_rtv );
+  RenderPass::RTVData           RenderSkybox(
+                FrameGraph*                       frame_graph,
+                RenderPass::RTVData const&        transparency_pass,
+                AtmosphereContext::OutData const& atmosphere );
+  RenderPass::RTVData RenderOpaqueDfr( FrameGraph* frame_graph, RenderPass::RTVData const& clear_rtv );
 
 public:
   BasicApp(
