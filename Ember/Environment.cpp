@@ -46,6 +46,7 @@ bool Ember::Environment::TryLoadFrom(
       .Side      = kEnvCubeSide,
       .Usage     = TextureUsage::kReadWrite,
       .MipLevels = MipLevels::kBase,
+      .InitState = D3D12_RESOURCE_STATE_UNORDERED_ACCESS,
   } );
   skybox.SetName( L"Skybox" );
 
@@ -54,6 +55,7 @@ bool Ember::Environment::TryLoadFrom(
       .Side      = kDiffuseCubeSide,
       .Usage     = TextureUsage::kReadWrite,
       .MipLevels = MipLevels::kBase,
+      .InitState = D3D12_RESOURCE_STATE_UNORDERED_ACCESS,
   } );
   diffuse_irradiance.SetName( L"Diffuse Irradiance Map" );
 
@@ -62,6 +64,7 @@ bool Ember::Environment::TryLoadFrom(
       .Side      = kPrefilterCubeSide,
       .Usage     = TextureUsage::kReadWrite,
       .MipLevels = kPrefilterMaxLoD + 1, // accounting for mip0
+      .InitState = D3D12_RESOURCE_STATE_UNORDERED_ACCESS,
   } );
   prefilter.SetName( L"Prefiltered Cube" );
 
@@ -71,6 +74,7 @@ bool Ember::Environment::TryLoadFrom(
       .Height    = kBrdfLutSize,
       .Usage     = TextureUsage::kReadWrite,
       .MipLevels = MipLevels::kBase,
+      .InitState = D3D12_RESOURCE_STATE_UNORDERED_ACCESS,
   } );
   brdf_lut.SetName( L"BRDF LUT" );
 
@@ -238,8 +242,8 @@ bool Ember::Environment::TryLoadFrom(
 
     auto command_list = context.GetCommandList();
 
-    command_list->SetComputeRootSignature( root_signature.Get() );
     command_list->SetDescriptorHeaps( CountOf( desc_heaps ), DataOf( desc_heaps ) );
+    command_list->SetComputeRootSignature( root_signature.Get() );
 
     command_list->SetPipelineState( eqrect_to_cube_pipeline.Get() );
     command_list->SetComputeRoot32BitConstants( 0, sizeof( EnvRootConstant ) / 4, &env_cube_root_constant, 0 );
@@ -250,7 +254,9 @@ bool Ember::Environment::TryLoadFrom(
       command_list->ResourceBarrier( 1, &barrier );
     }
 
-    if ( not texture_loader->TryGenerateMipMapCube( command_list.Get(), &skybox, &tracker ) ) return false;
+    if ( not texture_loader->TryGenerateMipMapCube(
+             command_list.Get(), &skybox, &tracker, D3D12_RESOURCE_STATE_UNORDERED_ACCESS ) )
+      return false;
 
     {
       auto barrier = CD3DX12_RESOURCE_BARRIER::UAV( skybox.GetTexture() );

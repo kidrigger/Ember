@@ -40,7 +40,8 @@ class TextureLoader
         RenderDevice*                            render_device,
         Context::Receipt                         receipt,
         std::pmr::polymorphic_allocator<> const& pool_allocator );
-    void PushUpload( ComPtr<ID3D12Resource> dest, ComPtr<IUnknown> intermediate );
+    void PushUpload(
+        ComPtr<ID3D12Resource> dest, ComPtr<IUnknown> intermediate, D3D12_RESOURCE_STATES const final_state );
     void PushAllocation( ComPtr<D3D12MA::Allocation> intermediate );
     void PushAlias( ComPtr<ID3D12Resource> alias );
     void PushHandle( SRVHandle handle );
@@ -59,7 +60,7 @@ class TextureLoader
   std::pmr::unsynchronized_pool_resource m_InFlightPool;
   Context                                m_CopyContext;
   std::vector<UploadBatch>               m_UploadBatches;
-  uint32_t                               m_CurrentUploadBatch_{ 0 };
+  uint32_t                               m_CurrentUploadBatch{ 0 };
   Context::CommandList                   m_CurrentCommandList;
   uint32_t                               m_CurrentUploadBatchSize{ 0 };
 
@@ -76,7 +77,8 @@ class TextureLoader
       char const*                  id,
       DirectX::TexMetadata const&  metadata,
       DirectX::ScratchImage const& scratch_image,
-      ColorSpaceOverride           color_space_override );
+      ColorSpaceOverride const     color_space_override,
+      D3D12_RESOURCE_STATES        final_state );
 
 public:
   TextureLoader() = default;
@@ -92,16 +94,25 @@ public:
   static void Create( TextureLoader* loader, RenderDevice* render_device, uint32_t upload_frame_count );
 
   bool        TryLoadTexture(
-             Texture* texture, char const* filename, ColorSpaceOverride color_space_override = ColorSpaceOverride::kNone );
+             Texture*           texture,
+             char const*        filename,
+             ColorSpaceOverride color_space_override = ColorSpaceOverride::kNone,
+             D3D12_RESOURCE_STATES final_state       = D3D12_RESOURCE_STATE_PIXEL_SHADER_RESOURCE );
+
   bool TryLoadTextureFromData(
       Texture*           texture,
       char const*        id,
       size_t             data_size,
       byte const*        data,
-      ColorSpaceOverride color_space_override = ColorSpaceOverride::kNone );
+      ColorSpaceOverride color_space_override = ColorSpaceOverride::kNone,
+      D3D12_RESOURCE_STATES final_state       = D3D12_RESOURCE_STATE_PIXEL_SHADER_RESOURCE );
+
   bool TryGenerateMipMaps( ID3D12GraphicsCommandList* command_list, Texture* texture, ResourceTracker* tracker ) const;
   bool TryGenerateMipMapCube(
-      ID3D12GraphicsCommandList* command_list, Texture* texture, ResourceTracker* tracker ) const;
+      ID3D12GraphicsCommandList* command_list,
+      Texture*                   texture,
+      ResourceTracker*           tracker,
+      D3D12_RESOURCE_STATES      texture_resource_state ) const;
   Context::Receipt EndBatch();
 
   void             Update();

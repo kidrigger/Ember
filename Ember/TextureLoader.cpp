@@ -7,6 +7,7 @@
 
 #include "RenderDevice.hpp"
 #include "Util/DataUtil.hpp"
+#include "Util/Profiling.hpp"
 
 namespace
 {
@@ -27,10 +28,11 @@ Ember::TextureLoader::UploadBatch::UploadBatch(
   : Tracker{ render_device, pool_allocator }, Receipt{ std::move( receipt ) }
 {}
 
-void Ember::TextureLoader::UploadBatch::PushUpload( ComPtr<ID3D12Resource> dest, ComPtr<IUnknown> intermediate )
+void Ember::TextureLoader::UploadBatch::PushUpload(
+    ComPtr<ID3D12Resource> dest, ComPtr<IUnknown> intermediate, D3D12_RESOURCE_STATES const final_state )
 {
-  Tracker.PushBarrier( CD3DX12_RESOURCE_BARRIER::Transition(
-      dest.Get(), D3D12_RESOURCE_STATE_COPY_DEST, D3D12_RESOURCE_STATE_PIXEL_SHADER_RESOURCE ) );
+  Tracker.PushBarrier(
+      CD3DX12_RESOURCE_BARRIER::Transition( dest.Get(), D3D12_RESOURCE_STATE_COPY_DEST, final_state ) );
   Tracker.PushResource( std::move( dest ) );
   Tracker.PushResource( std::move( intermediate ) );
 }
@@ -78,6 +80,7 @@ DXGI_FORMAT MakeUAVCompat( DXGI_FORMAT const format )
     case DXGI_FORMAT_R32G32B32A32_FLOAT:
     case DXGI_FORMAT_R11G11B10_FLOAT:
     case DXGI_FORMAT_R8_UNORM:
+    case DXGI_FORMAT_R16G16B16A16_UNORM:
       return format;
     default:
       UNIMPLEMENTED_M( "Add formats as used/required" );
@@ -198,9 +201,9 @@ bool Ember::TextureLoader::TryGenerateMipMaps(
 
   auto bindless_desc_heaps = m_RenderDevice->GetBindlessDescriptorHeaps();
 
+  command_list->SetDescriptorHeaps( CountOf( bindless_desc_heaps ), DataOf( bindless_desc_heaps ) );
   command_list->SetPipelineState( m_MipmapPipeline.Get() );
   command_list->SetComputeRootSignature( m_MipMapRootSig.Get() );
-  command_list->SetDescriptorHeaps( CountOf( bindless_desc_heaps ), DataOf( bindless_desc_heaps ) );
 
   MipMapRootSigInfo mip_map_info;
   mip_map_info.Src                           = mip_src_handle;
@@ -248,7 +251,10 @@ bool Ember::TextureLoader::TryGenerateMipMaps(
 }
 
 bool Ember::TextureLoader::TryGenerateMipMapCube(
-    ID3D12GraphicsCommandList* command_list, Texture* texture, ResourceTracker* tracker ) const
+    ID3D12GraphicsCommandList* command_list,
+    Texture*                   texture,
+    ResourceTracker*           tracker,
+    D3D12_RESOURCE_STATES      texture_resource_state ) const
 {
   ComPtr<ID3D12Resource> uav_capable;
 
@@ -312,8 +318,8 @@ bool Ember::TextureLoader::TryGenerateMipMapCube(
 
   ERR_FAIL_RET_V( uav_capable->SetName( L"UAV Alias" ), false );
   {
-    CD3DX12_RESOURCE_BARRIER const transition = CD3DX12_RESOURCE_BARRIER::Transition(
-        resource, D3D12_RESOURCE_STATE_COPY_DEST, D3D12_RESOURCE_STATE_COPY_SOURCE );
+    CD3DX12_RESOURCE_BARRIER const transition =
+        CD3DX12_RESOURCE_BARRIER::Transition( resource, texture_resource_state, D3D12_RESOURCE_STATE_COPY_SOURCE );
     command_list->ResourceBarrier( 1, &transition );
   }
 
@@ -405,6 +411,10 @@ bool Ember::TextureLoader::TryGenerateMipMapCube(
     command_list->ResourceBarrier( 1, &reverse_aliasing );
   }
 #endif
+
+  CD3DX12_RESOURCE_BARRIER barrier =
+      CD3DX12_RESOURCE_BARRIER::Transition( resource, D3D12_RESOURCE_STATE_COPY_DEST, texture_resource_state );
+  command_list->ResourceBarrier( 1, &barrier );
 
   return true;
 }
@@ -521,8 +531,11 @@ bool Ember::TextureLoader::TryLoadImpl(
     char const*                  id,
     DirectX::TexMetadata const&  metadata,
     DirectX::ScratchImage const& scratch_image,
-    ColorSpaceOverride const     color_space_override )
+    ColorSpaceOverride const     color_space_override,
+    D3D12_RESOURCE_STATES        final_state )
 {
+  PIXScopedEvent( m_CurrentCommandList.Get(), PIX_COLOR_DEFAULT, "TextureLoader::TryLoadImpl %s", id );
+
   std::span const images{ scratch_image.GetImages(), scratch_image.GetImageCount() };
 
   DXGI_FORMAT     format = metadata.format;
@@ -610,12 +623,12 @@ bool Ember::TextureLoader::TryLoadImpl(
       DataOf( subresources ) );
 
 #if not defined( RENDERDOC_COMPAT )
-  m_UploadBatches[m_CurrentUploadBatch_].PushUpload( texture->GetTexture(), staging_alloc );
+  m_UploadBatches[m_CurrentUploadBatch].PushUpload( texture->GetTexture(), staging_alloc, final_state );
 #else
-  m_UploadBatches[m_CurrentUploadBatch_].PushUpload( texture->GetTexture(), staging_res );
+  m_UploadBatches[m_CurrentUploadBatch].PushUpload( texture->GetTexture(), staging_res, final_state );
 #endif
 
-  if ( not TryGenerateMipMaps( m_CurrentCommandList.Get(), texture, &m_UploadBatches[m_CurrentUploadBatch_].Tracker ) )
+  if ( not TryGenerateMipMaps( m_CurrentCommandList.Get(), texture, &m_UploadBatches[m_CurrentUploadBatch].Tracker ) )
   {
     return false;
   }
@@ -626,7 +639,10 @@ bool Ember::TextureLoader::TryLoadImpl(
 }
 
 bool Ember::TextureLoader::TryLoadTexture(
-    Texture* texture, char const* filename, ColorSpaceOverride const color_space_override )
+    Texture*                    texture,
+    char const*                 filename,
+    ColorSpaceOverride const    color_space_override,
+    D3D12_RESOURCE_STATES const final_state )
 {
   auto const it = m_Cache.find( filename );
   if ( it != m_Cache.end() )
@@ -646,23 +662,25 @@ bool Ember::TextureLoader::TryLoadTexture(
 
   if ( file_path.extension() == ".hdr" )
   {
-    ERR_FAIL_RET_V( DirectX::LoadFromHDRFile( wide_filename, &metadata, scratch_image ), false );
+    ERR_FAIL_RET_F( DirectX::LoadFromHDRFile( wide_filename, &metadata, scratch_image ) );
   }
   else
   {
+    // TODO: This is dicey. Might wanna support "R" format etc.
     DirectX::WIC_FLAGS const flags = DirectX::WIC_FLAGS_DEFAULT_SRGB | DirectX::WIC_FLAGS_FORCE_RGB;
-    ERR_FAIL_RET_V( LoadFromWICFile( wide_filename, flags, &metadata, scratch_image ), false );
+    ERR_FAIL_RET_F( LoadFromWICFile( wide_filename, flags, &metadata, scratch_image ) );
   }
 
-  return TryLoadImpl( texture, filename, metadata, scratch_image, color_space_override );
+  return TryLoadImpl( texture, filename, metadata, scratch_image, color_space_override, final_state );
 }
 
 bool Ember::TextureLoader::TryLoadTextureFromData(
-    Texture*                 texture,
-    char const*              id,
-    size_t const             data_size,
-    byte const*              data,
-    ColorSpaceOverride const color_space_override )
+    Texture*                    texture,
+    char const*                 id,
+    size_t const                data_size,
+    byte const*                 data,
+    ColorSpaceOverride const    color_space_override,
+    D3D12_RESOURCE_STATES const final_state )
 {
   auto const it = m_Cache.find( id );
   if ( it != m_Cache.end() )
@@ -676,23 +694,23 @@ bool Ember::TextureLoader::TryLoadTextureFromData(
   DirectX::WIC_FLAGS const flags = DirectX::WIC_FLAGS_DEFAULT_SRGB | DirectX::WIC_FLAGS_FORCE_RGB;
   ERR_FAIL_RET_V( DirectX::LoadFromWICMemory( data, data_size, flags, &metadata, scratch_image ), false );
 
-  return TryLoadImpl( texture, id, metadata, scratch_image, color_space_override );
+  return TryLoadImpl( texture, id, metadata, scratch_image, color_space_override, final_state );
 }
 
 Ember::Context::Receipt Ember::TextureLoader::EndBatch()
 {
-  m_UploadBatches[m_CurrentUploadBatch_].Receipt = m_CopyContext.Submit( std::move( m_CurrentCommandList ) );
+  m_UploadBatches[m_CurrentUploadBatch].Receipt = m_CopyContext.Submit( std::move( m_CurrentCommandList ) );
 
-  Context::Receipt const batch_receipt           = m_UploadBatches[m_CurrentUploadBatch_].Receipt;
+  Context::Receipt const batch_receipt          = m_UploadBatches[m_CurrentUploadBatch].Receipt;
 
-  m_CurrentUploadBatch_++;
-  m_CurrentUploadBatch_ %= m_UploadBatches.size();
+  m_CurrentUploadBatch++;
+  m_CurrentUploadBatch %= m_UploadBatches.size();
 
-  m_CopyContext.WaitOn( m_UploadBatches[m_CurrentUploadBatch_].Receipt );
+  m_CopyContext.WaitOn( m_UploadBatches[m_CurrentUploadBatch].Receipt );
 
   auto lock_guard = std::lock_guard( m_LoadLock );
 
-  m_UploadBatches[m_CurrentUploadBatch_].ClearResources( &m_PendingBarriers );
+  m_UploadBatches[m_CurrentUploadBatch].ClearResources( &m_PendingBarriers );
 
   m_CurrentCommandList     = m_CopyContext.GetCommandList();
   m_CurrentUploadBatchSize = 0;

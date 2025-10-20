@@ -202,6 +202,7 @@ Ember::AtmosphereContext::OutData Ember::AtmosphereContext::Render(
         FG::Texture const& render_target = resources.get<FG::Texture>( data.TransmittanceLUT );
         FG::Buffer const&  params        = resources.get<FG::Buffer>( data.AtmosphereParams );
 
+        cmd->DiscardResource( render_target.Resource.Get(), nullptr );
         rtm->RSSetScissorViewport( cmd, kTransmittanceLUTSize.x, kTransmittanceLUTSize.y );
 
         ID3D12Resource* rtv = render_target.Resource.Get();
@@ -248,14 +249,15 @@ Ember::AtmosphereContext::OutData Ember::AtmosphereContext::Render(
         ID3D12GraphicsCommandList6*   cmd        = frame_data.CommandList;
         PIXScopedEvent( cmd, PIX_COLOR_DEFAULT, "Update Sky View LUT" );
 
-        FG::Texture const& render_target     = resources.get<FG::Texture>( data.SkyViewLUT );
+        ID3D12Resource*    sky_view_lut_res  = resources.get<FG::Texture>( data.SkyViewLUT ).Resource.Get();
         FG::Texture const& transmittance_lut = resources.get<FG::Texture>( data.TransmittanceLUT );
         FG::Buffer const&  params            = resources.get<FG::Buffer>( data.AtmosphereParams );
 
+        cmd->DiscardResource( sky_view_lut_res, nullptr );
+
         rtm->RSSetScissorViewport( cmd, kSkyViewLUTSize.x, kSkyViewLUTSize.y );
 
-        ID3D12Resource* rtv = render_target.Resource.Get();
-        rtm->OMSetRenderTargets( cmd, 1, &rtv, nullptr, nullptr, nullptr );
+        rtm->OMSetRenderTargets( cmd, 1, &sky_view_lut_res, nullptr, nullptr, nullptr );
 
         cmd->SetGraphicsRootSignature( mp->m_RootSignature.Get() );
         cmd->SetPipelineState( mp->m_SkyViewLUTPipeline.Get() );

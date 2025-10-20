@@ -99,7 +99,9 @@ void Ember::RenderDevice::Create( RenderDevice* render_device, HWND window_handl
     ERR_ABORT( D3D12GetDebugInterface( IID_PPV_ARGS( &debug_interface ) ) );
     ERR_ABORT( debug_interface.As( &debug_interface1 ) );
     debug_interface->EnableDebugLayer();
+#if not defined( RENDERDOC_COMPAT )
     debug_interface1->SetEnableGPUBasedValidation( true );
+#endif
   }
 #endif
 

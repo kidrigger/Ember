@@ -19,7 +19,7 @@ bool Ember::RenderPass::OpaqueForward::Create(
   ComPtr<ID3DBlob> pixel_shader_blob;
   ERR_FAIL_RET_F( D3DReadFileToBlob( L"TrianglePS.cso", &pixel_shader_blob ) );
 
-  ComPtr<ID3D12Device2>       device                 = render_device->GetDevice();
+  ID3D12Device2*              device                 = render_device->GetDevice();
 
   D3D_ROOT_SIGNATURE_VERSION  root_signature_version = render_device->FetchHighestRootSignatureVersion();
 

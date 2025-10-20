@@ -193,7 +193,7 @@
       <Filter>Source Files\Passes</Filter>
     </ClCompile>
     <ClCompile Include="AtmosphereContext.cpp">
-      <Filter>Source Files</Filter>
+      <Filter>Source Files\Passes</Filter>
     </ClCompile>
   </ItemGroup>
   <ItemGroup>
@@ -330,7 +330,7 @@
       <Filter>Header Files\Passes</Filter>
     </ClInclude>
     <ClInclude Include="AtmosphereContext.hpp">
-      <Filter>Header Files</Filter>
+      <Filter>Header Files\Passes</Filter>
     </ClInclude>
   </ItemGroup>
   <ItemGroup>
