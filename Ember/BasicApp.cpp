@@ -5,6 +5,7 @@
 #include <unordered_set>
 #include <utility>
 
+#include "AtmosphereContext.hpp"
 #include "Camera.hpp"
 #include "Environment.hpp"
 #include "FrameGraphHelper.hpp"
@@ -21,10 +22,9 @@
 #include "Util/HelperUtils.hpp"
 #include "Util/PerfCounter.hpp"
 #include "Util/Profiling.hpp"
+#include "fg/FrameGraph.hpp"
+#include "fg/JsonWriter.hpp"
 
-#include <fg/JsonWriter.hpp>
-
-#include "AtmosphereContext.hpp"
 #include "imgui.h"
 #include "imgui_impl_dx12.h"
 #include "imgui_impl_win32.h"
@@ -101,6 +101,7 @@ Ember::BasicApp::BasicApp(
   , m_WindowHandle{ window_handle }
   , m_RenderDevice{ std::move( render_device ) }
   , m_PerfCounter{ std::move( perf_counter ) }
+  , m_FGContext{}
   , m_RenderTargetManager{ std::move( render_target_manager ) }
   , m_SwapchainFormat{ m_RenderDevice->FetchSwapchainFormat() }
   , m_Camera{ std::make_unique<Camera>() }

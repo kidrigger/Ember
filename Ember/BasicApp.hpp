@@ -16,7 +16,6 @@
 #include "Util/DirectXHeaders.hpp"
 #include "Util/Runtime.hpp"
 #include "fg/Blackboard.hpp"
-#include "fg/FrameGraph.hpp"
 
 namespace Ember
 {
