@@ -1095,16 +1095,16 @@ void Ember::BasicApp::Render()
     .LightInfo       = light_info,
   };
 
-  m_FGBlackboard.get<DrawList::Batches>()      = draw_list_info;
-  m_FGBlackboard.get<Environment::GpuRepr>()   = m_Environment->Repr();
+  m_FGBlackboard.get<DrawList::Batches>()    = draw_list_info;
+  m_FGBlackboard.get<Environment::GpuRepr>() = m_Environment->Repr();
 
-  AtmosphereContext::OutData atmosphere        = m_AtmosphereContext->Render( &frame_graph, camera_cbv, frame_idx );
+  AtmosphereContext::OutData atmosphere      = m_AtmosphereContext->Render( &frame_graph, &m_FGBlackboard, frame_idx );
 
-  RenderPass::RTVData        clear_rtv         = ClearRenderTargets( &frame_graph );
-  RenderPass::RTVData        opaque_pass_fwd   = RenderOpaqueFwd( &frame_graph, clear_rtv );
-  RenderPass::RTVData        opaque_pass_dfr   = RenderOpaqueDfr( &frame_graph, clear_rtv );
+  RenderPass::RTVData        clear_rtv       = ClearRenderTargets( &frame_graph );
+  RenderPass::RTVData        opaque_pass_fwd = RenderOpaqueFwd( &frame_graph, clear_rtv );
+  RenderPass::RTVData        opaque_pass_dfr = RenderOpaqueDfr( &frame_graph, clear_rtv );
 
-  RenderPass::RTVData        opaque_pass       = g_UseDeferredRendering ? opaque_pass_dfr : opaque_pass_fwd;
+  RenderPass::RTVData        opaque_pass     = g_UseDeferredRendering ? opaque_pass_dfr : opaque_pass_fwd;
 
   RenderPass::RTVData        transparency_pass = RenderTransparency( &frame_graph, opaque_pass );
   RenderPass::RTVData        skybox_pass       = RenderSkybox( &frame_graph, transparency_pass, atmosphere );

@@ -3,14 +3,14 @@
 cbuffer AtmosphereAndSun : register( b0 )
 {
   Atmosphere g_Atmosphere;
-  SunData    g_Sun;
+  uint       g_SunIndex;
 }
 
 cbuffer Unused : register( b1 )
-{
-  uint g_Unused0;
-  uint g_Unused1;
-}
+{}
+
+cbuffer Unused2 : register( b2 )
+{}
 
 float3 TotalExtinction( in Atmosphere atmosphere, float2 rmu, float len )
 {

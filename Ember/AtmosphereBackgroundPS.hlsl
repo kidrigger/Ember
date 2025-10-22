@@ -24,7 +24,7 @@ float4 AtmosphereBackgroundPS( BackgroundOut IN ) : SV_TARGET0
 
   float2            skyview_uv  = GetSkyViewUVFromDir( view_dir );
 
-  float3            color       = skyview_lut.SampleLevel( g_DefaultSampler, skyview_uv, 0.0f );
+  float3            color       = skyview_lut.SampleLevel( g_DefaultSampler, skyview_uv, 0.0f ).rgb;
   color                         = color / ( 1.0f + color );
 
   return float4( color, 1.0f );

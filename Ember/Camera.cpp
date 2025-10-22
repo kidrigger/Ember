@@ -10,7 +10,7 @@ void Ember::Camera::UpdateRepr()
   {
     DirectX::FXMVECTOR direction =
         XMVector3Rotate( kCameraFwd, DirectX::XMQuaternionRotationRollPitchYaw( m_Pitch, m_Yaw, 0.0f ) );
-    m_Repr.View    = DirectX::XMMatrixLookToRH( m_Repr.Position, direction, kCameraUp );
+    m_Repr.View    = XMMatrixLookToRH( m_Repr.Position, direction, kCameraUp );
     m_Repr.InvView = XMMatrixInverse( nullptr, m_Repr.View );
   }
 

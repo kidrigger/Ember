@@ -5,18 +5,23 @@
 #include "Util/DataUtil.hpp"
 #include "Util/HelperUtils.hpp"
 #include "Util/Profiling.hpp"
+#include "fg/Blackboard.hpp"
 #include "fg/FrameGraph.hpp"
 
 Ember::AtmosphereContext::AtmosphereContext(
     ComPtr<ID3D12RootSignature> root_signature,
     ComPtr<ID3D12PipelineState> transmittance_lut_pipeline,
     ComPtr<ID3D12PipelineState> sky_view_lut_pipeline,
+    ComPtr<ID3D12RootSignature> aerial_perspective_root_signature,
+    ComPtr<ID3D12PipelineState> aerial_perspective_pipeline,
     Texture                     transmittance_lut,
     Texture                     sky_view_lut,
     std::vector<Buffer>         atmosphere_param_buffers )
   : m_RootSignature{ std::move( root_signature ) }
   , m_TransmittanceLUTPipeline{ std::move( transmittance_lut_pipeline ) }
   , m_SkyViewLUTPipeline{ std::move( sky_view_lut_pipeline ) }
+  , m_AerialPerspectiveRootSignature{ std::move( aerial_perspective_root_signature ) }
+  , m_AerialPerspectivePipeline{ std::move( aerial_perspective_pipeline ) }
   , m_TransmittanceLUT{ std::move( transmittance_lut ) }
   , m_SkyViewLUT{ std::move( sky_view_lut ) }
   , m_AtmosphereParamBuffers{ std::move( atmosphere_param_buffers ) }
@@ -51,79 +56,143 @@ bool Ember::AtmosphereContext::Create( AtmosphereContext* out, RenderDevice* ren
   ERR_FAIL_RET_F( D3DReadFileToBlob( L"TransmittanceLUTPS.cso", &transmittance_pixel_shader_blob ) );
   ComPtr<ID3DBlob> sky_view_pixel_shader_blob;
   ERR_FAIL_RET_F( D3DReadFileToBlob( L"SkyViewLUTPS.cso", &sky_view_pixel_shader_blob ) );
+  ComPtr<ID3DBlob> aerial_perspective_comp_shader_blob;
+  ERR_FAIL_RET_F( D3DReadFileToBlob( L"AerialPerspectiveCS.cso", &aerial_perspective_comp_shader_blob ) );
 
-  ComPtr<ID3D12Device2>      device                 = render_device->GetDevice();
+  ComPtr<ID3D12Device2>       device                 = render_device->GetDevice();
 
-  D3D_ROOT_SIGNATURE_VERSION root_signature_version = render_device->FetchHighestRootSignatureVersion();
-
-  CD3DX12_ROOT_PARAMETER1    root_parameters[2];
-  root_parameters[0].InitAsConstantBufferView( 0 );
-  root_parameters[1].InitAsConstants( 2, 1 );
-
-  CD3DX12_STATIC_SAMPLER_DESC      static_sampler_desc = CD3DX12_STATIC_SAMPLER_DESC{ 0 };
-
-  D3D12_ROOT_SIGNATURE_FLAGS const root_signature_flags =
-      D3D12_ROOT_SIGNATURE_FLAG_CBV_SRV_UAV_HEAP_DIRECTLY_INDEXED |
-      D3D12_ROOT_SIGNATURE_FLAG_SAMPLER_HEAP_DIRECTLY_INDEXED |
-      D3D12_ROOT_SIGNATURE_FLAG_DENY_AMPLIFICATION_SHADER_ROOT_ACCESS |
-      D3D12_ROOT_SIGNATURE_FLAG_DENY_MESH_SHADER_ROOT_ACCESS |
-      D3D12_ROOT_SIGNATURE_FLAG_DENY_GEOMETRY_SHADER_ROOT_ACCESS |
-      D3D12_ROOT_SIGNATURE_FLAG_DENY_DOMAIN_SHADER_ROOT_ACCESS | D3D12_ROOT_SIGNATURE_FLAG_DENY_HULL_SHADER_ROOT_ACCESS;
-
-  CD3DX12_VERSIONED_ROOT_SIGNATURE_DESC root_signature_desc;
-  root_signature_desc.Init_1_1(
-      CountOf( root_parameters ), DataOf( root_parameters ), 1, &static_sampler_desc, root_signature_flags );
-
-  ComPtr<ID3DBlob> root_signature_blob;
-  ComPtr<ID3DBlob> error_blob;
-  ERR_FAIL_RET_F( D3DX12SerializeVersionedRootSignature(
-      &root_signature_desc, root_signature_version, root_signature_blob.ReleaseAndGetAddressOf(), &error_blob ) );
+  D3D_ROOT_SIGNATURE_VERSION  root_signature_version = render_device->FetchHighestRootSignatureVersion();
 
   ComPtr<ID3D12RootSignature> root_signature;
-  ERR_FAIL_RET_F( device->CreateRootSignature(
-      0,
-      root_signature_blob->GetBufferPointer(),
-      root_signature_blob->GetBufferSize(),
-      IID_PPV_ARGS( &root_signature ) ) );
-
-  D3D12_RT_FORMAT_ARRAY rtv_formats{
-    .RTFormats        = { kTransmittanceLUTFormat },
-    .NumRenderTargets = 1,
-  };
-
-  struct PipelineStream
-  {
-    CD3DX12_PIPELINE_STATE_STREAM_ROOT_SIGNATURE        RootSignature;
-    CD3DX12_PIPELINE_STATE_STREAM_PRIMITIVE_TOPOLOGY    PrimitiveTopologyType;
-    CD3DX12_PIPELINE_STATE_STREAM_VS                    VS;
-    CD3DX12_PIPELINE_STATE_STREAM_PS                    PS;
-    CD3DX12_PIPELINE_STATE_STREAM_RENDER_TARGET_FORMATS RTVFormats;
-  };
-
-  PipelineStream pipeline_stream = {
-    .RootSignature         = root_signature.Get(),
-    .PrimitiveTopologyType = D3D12_PRIMITIVE_TOPOLOGY_TYPE_TRIANGLE,
-    .VS                    = CD3DX12_SHADER_BYTECODE( vertex_shader_blob.Get() ),
-    .PS                    = CD3DX12_SHADER_BYTECODE( transmittance_pixel_shader_blob.Get() ),
-    .RTVFormats            = rtv_formats,
-  };
-
-  D3D12_PIPELINE_STATE_STREAM_DESC const pipeline_state_stream_desc = {
-    .SizeInBytes                   = sizeof pipeline_stream,
-    .pPipelineStateSubobjectStream = &pipeline_stream,
-  };
-
   ComPtr<ID3D12PipelineState> transmittance_lut_pipeline;
-  ERR_FAIL_RET_F(
-      device->CreatePipelineState( &pipeline_state_stream_desc, IID_PPV_ARGS( &transmittance_lut_pipeline ) ) );
-
-  pipeline_stream.PS         = CD3DX12_SHADER_BYTECODE( sky_view_pixel_shader_blob.Get() );
-
-  rtv_formats.RTFormats[0]   = kSkyViewLUTFormat;
-  pipeline_stream.RTVFormats = rtv_formats;
-
   ComPtr<ID3D12PipelineState> sky_view_lut_pipeline;
-  ERR_FAIL_RET_F( device->CreatePipelineState( &pipeline_state_stream_desc, IID_PPV_ARGS( &sky_view_lut_pipeline ) ) );
+
+  ComPtr<ID3D12RootSignature> aerial_perspective_root_signature;
+  ComPtr<ID3D12PipelineState> aerial_perspective_pipeline;
+
+  {
+    CD3DX12_ROOT_PARAMETER1 root_parameters[3];
+    root_parameters[0].InitAsConstantBufferView( 0 );
+    root_parameters[1].InitAsConstants( sizeof( PerFrameConstants ) / 4, 1 );
+    root_parameters[2].InitAsConstants( 1, 2 );
+
+    CD3DX12_STATIC_SAMPLER_DESC      static_sampler_desc = CD3DX12_STATIC_SAMPLER_DESC{ 0 };
+
+    D3D12_ROOT_SIGNATURE_FLAGS const root_signature_flags =
+        D3D12_ROOT_SIGNATURE_FLAG_CBV_SRV_UAV_HEAP_DIRECTLY_INDEXED |
+        D3D12_ROOT_SIGNATURE_FLAG_SAMPLER_HEAP_DIRECTLY_INDEXED |
+        D3D12_ROOT_SIGNATURE_FLAG_DENY_AMPLIFICATION_SHADER_ROOT_ACCESS |
+        D3D12_ROOT_SIGNATURE_FLAG_DENY_MESH_SHADER_ROOT_ACCESS |
+        D3D12_ROOT_SIGNATURE_FLAG_DENY_GEOMETRY_SHADER_ROOT_ACCESS |
+        D3D12_ROOT_SIGNATURE_FLAG_DENY_DOMAIN_SHADER_ROOT_ACCESS |
+        D3D12_ROOT_SIGNATURE_FLAG_DENY_HULL_SHADER_ROOT_ACCESS;
+
+    CD3DX12_VERSIONED_ROOT_SIGNATURE_DESC root_signature_desc;
+    root_signature_desc.Init_1_1(
+        CountOf( root_parameters ), DataOf( root_parameters ), 1, &static_sampler_desc, root_signature_flags );
+
+    ComPtr<ID3DBlob> root_signature_blob;
+    ComPtr<ID3DBlob> error_blob;
+    ERR_FAIL_RET_F( D3DX12SerializeVersionedRootSignature(
+        &root_signature_desc, root_signature_version, root_signature_blob.ReleaseAndGetAddressOf(), &error_blob ) );
+
+    ERR_FAIL_RET_F( device->CreateRootSignature(
+        0,
+        root_signature_blob->GetBufferPointer(),
+        root_signature_blob->GetBufferSize(),
+        IID_PPV_ARGS( &root_signature ) ) );
+
+    D3D12_RT_FORMAT_ARRAY rtv_formats{
+      .RTFormats        = { kTransmittanceLUTFormat },
+      .NumRenderTargets = 1,
+    };
+
+    struct PipelineStream
+    {
+      CD3DX12_PIPELINE_STATE_STREAM_ROOT_SIGNATURE        RootSignature;
+      CD3DX12_PIPELINE_STATE_STREAM_PRIMITIVE_TOPOLOGY    PrimitiveTopologyType;
+      CD3DX12_PIPELINE_STATE_STREAM_VS                    VS;
+      CD3DX12_PIPELINE_STATE_STREAM_PS                    PS;
+      CD3DX12_PIPELINE_STATE_STREAM_RENDER_TARGET_FORMATS RTVFormats;
+    };
+
+    PipelineStream pipeline_stream = {
+      .RootSignature         = root_signature.Get(),
+      .PrimitiveTopologyType = D3D12_PRIMITIVE_TOPOLOGY_TYPE_TRIANGLE,
+      .VS                    = CD3DX12_SHADER_BYTECODE( vertex_shader_blob.Get() ),
+      .PS                    = CD3DX12_SHADER_BYTECODE( transmittance_pixel_shader_blob.Get() ),
+      .RTVFormats            = rtv_formats,
+    };
+
+    D3D12_PIPELINE_STATE_STREAM_DESC const pipeline_state_stream_desc = {
+      .SizeInBytes                   = sizeof pipeline_stream,
+      .pPipelineStateSubobjectStream = &pipeline_stream,
+    };
+
+    ERR_FAIL_RET_F(
+        device->CreatePipelineState( &pipeline_state_stream_desc, IID_PPV_ARGS( &transmittance_lut_pipeline ) ) );
+
+    pipeline_stream.PS         = CD3DX12_SHADER_BYTECODE( sky_view_pixel_shader_blob.Get() );
+
+    rtv_formats.RTFormats[0]   = kSkyViewLUTFormat;
+    pipeline_stream.RTVFormats = rtv_formats;
+
+    ERR_FAIL_RET_F(
+        device->CreatePipelineState( &pipeline_state_stream_desc, IID_PPV_ARGS( &sky_view_lut_pipeline ) ) );
+  }
+
+  // Aerial Perspective Pipeline
+  {
+    CD3DX12_ROOT_PARAMETER1 root_parameters[3];
+    root_parameters[0].InitAsConstantBufferView( 0 );
+    root_parameters[1].InitAsConstants( sizeof( PerFrameConstants ) / 4, 1 );
+    root_parameters[2].InitAsConstants( 1, 2 );
+
+    CD3DX12_STATIC_SAMPLER_DESC      static_sampler_desc = CD3DX12_STATIC_SAMPLER_DESC{ 0 };
+
+    D3D12_ROOT_SIGNATURE_FLAGS const root_signature_flags =
+        D3D12_ROOT_SIGNATURE_FLAG_CBV_SRV_UAV_HEAP_DIRECTLY_INDEXED |
+        D3D12_ROOT_SIGNATURE_FLAG_SAMPLER_HEAP_DIRECTLY_INDEXED |
+        D3D12_ROOT_SIGNATURE_FLAG_DENY_AMPLIFICATION_SHADER_ROOT_ACCESS |
+        D3D12_ROOT_SIGNATURE_FLAG_DENY_MESH_SHADER_ROOT_ACCESS |
+        D3D12_ROOT_SIGNATURE_FLAG_DENY_GEOMETRY_SHADER_ROOT_ACCESS |
+        D3D12_ROOT_SIGNATURE_FLAG_DENY_DOMAIN_SHADER_ROOT_ACCESS |
+        D3D12_ROOT_SIGNATURE_FLAG_DENY_HULL_SHADER_ROOT_ACCESS;
+
+    CD3DX12_VERSIONED_ROOT_SIGNATURE_DESC root_signature_desc;
+    root_signature_desc.Init_1_1(
+        CountOf( root_parameters ), DataOf( root_parameters ), 1, &static_sampler_desc, root_signature_flags );
+
+    ComPtr<ID3DBlob> root_signature_blob;
+    ComPtr<ID3DBlob> error_blob;
+    ERR_FAIL_RET_F( D3DX12SerializeVersionedRootSignature(
+        &root_signature_desc, root_signature_version, root_signature_blob.ReleaseAndGetAddressOf(), &error_blob ) );
+
+    ERR_FAIL_RET_F( device->CreateRootSignature(
+        0,
+        root_signature_blob->GetBufferPointer(),
+        root_signature_blob->GetBufferSize(),
+        IID_PPV_ARGS( &root_signature ) ) );
+
+    struct PipelineStream
+    {
+      CD3DX12_PIPELINE_STATE_STREAM_ROOT_SIGNATURE RootSignature;
+      CD3DX12_PIPELINE_STATE_STREAM_CS             CS;
+    };
+
+    PipelineStream pipeline_stream = {
+      .RootSignature = root_signature.Get(),
+      .CS            = CD3DX12_SHADER_BYTECODE( aerial_perspective_comp_shader_blob.Get() ),
+    };
+
+    D3D12_PIPELINE_STATE_STREAM_DESC const pipeline_state_stream_desc = {
+      .SizeInBytes                   = sizeof pipeline_stream,
+      .pPipelineStateSubobjectStream = &pipeline_stream,
+    };
+
+    ERR_FAIL_RET_F(
+        device->CreatePipelineState( &pipeline_state_stream_desc, IID_PPV_ARGS( &aerial_perspective_pipeline ) ) );
+  }
 
   std::vector<Buffer> atmosphere_param_buffers;
   wchar_t             buf[64];
@@ -136,19 +205,25 @@ bool Ember::AtmosphereContext::Create( AtmosphereContext* out, RenderDevice* ren
   }
 
   new ( out ) AtmosphereContext{
-    std::move( root_signature ),        std::move( transmittance_lut_pipeline ),
-    std::move( sky_view_lut_pipeline ), std::move( transmittance_lut ),
-    std::move( sky_view_lut ),          std::move( atmosphere_param_buffers ),
+    std::move( root_signature ),
+    std::move( transmittance_lut_pipeline ),
+    std::move( sky_view_lut_pipeline ),
+    std::move( aerial_perspective_root_signature ),
+    std::move( aerial_perspective_pipeline ),
+    std::move( transmittance_lut ),
+    std::move( sky_view_lut ),
+    std::move( atmosphere_param_buffers ),
   };
 
   return true;
 }
 
 Ember::AtmosphereContext::OutData Ember::AtmosphereContext::Render(
-    FrameGraph* frame_graph, CBVHandle camera, uint32_t const frame_idx )
+    FrameGraph* frame_graph, FrameGraphBlackboard* blackboard, uint32_t const frame_idx )
 {
   if ( m_LUTUpdatePendingFrames ) m_AtmosphereParamBuffers[frame_idx].Write( 0, sizeof( Params ), &m_AtmosphereParams );
-  m_AtmosphereParamBuffers[frame_idx].Write( sizeof( Params ), sizeof( SunData ), &m_Sun );
+  uint32_t zero = 0;
+  m_AtmosphereParamBuffers[frame_idx].Write( sizeof( Params ), sizeof( SunData ), &zero );
 
   // TODO: Resource layout breaks when sky_view is not rendered, but transmittance is updated.
   // Need to fix by supporting persistent resources in frame graph allocator.
@@ -173,7 +248,7 @@ Ember::AtmosphereContext::OutData Ember::AtmosphereContext::Render(
   bool const transmittance_lut_needs_update = m_LUTUpdatePendingFrames;
   if ( m_LUTUpdatePendingFrames ) --m_LUTUpdatePendingFrames;
 
-  OutData transmittance = frame_graph->addCallbackPass<OutData>(
+  OutData const transmittance = frame_graph->addCallbackPass<OutData>(
       "Update Transmittance LUT",
       [&]( FrameGraph::Builder& builder, OutData& data )
       {
@@ -214,11 +289,11 @@ Ember::AtmosphereContext::OutData Ember::AtmosphereContext::Render(
         cmd->DrawInstanced( 3, 1, 0, 0 );
       } );
 
-  OutData sky = frame_graph->addCallbackPass<OutData>(
+  OutData const sky = frame_graph->addCallbackPass<OutData>(
       "Update Sky View LUT",
       [&]( FrameGraph::Builder& builder, OutData& data )
       {
-        FrameGraphResource sky_view_lut = builder.create<FG::Texture>(
+        FrameGraphResource const sky_view_lut = builder.create<FG::Texture>(
             "Sky View LUT",
             FG::Texture::Desc{
                 .Format    = kSkyViewLUTFormat,
@@ -237,7 +312,7 @@ Ember::AtmosphereContext::OutData Ember::AtmosphereContext::Render(
         data.AtmosphereParams = builder.read( param_buffer );
         data.SkyViewLUT       = builder.write( sky_view_lut, FG::Attachment{ .Index = 0 } );
       },
-      [mp = this, camera_cbv = camera]( OutData const& data, FrameGraphPassResources& resources, void* ctx )
+      [mp = this, blackboard]( OutData const& data, FrameGraphPassResources& resources, void* ctx )
       {
         ZoneScopedN( "Update Sky View LUT" );
 
@@ -249,9 +324,11 @@ Ember::AtmosphereContext::OutData Ember::AtmosphereContext::Render(
         ID3D12GraphicsCommandList6*   cmd        = frame_data.CommandList;
         PIXScopedEvent( cmd, PIX_COLOR_DEFAULT, "Update Sky View LUT" );
 
-        ID3D12Resource*    sky_view_lut_res  = resources.get<FG::Texture>( data.SkyViewLUT ).Resource.Get();
-        FG::Texture const& transmittance_lut = resources.get<FG::Texture>( data.TransmittanceLUT );
-        FG::Buffer const&  params            = resources.get<FG::Buffer>( data.AtmosphereParams );
+        ID3D12Resource*          sky_view_lut_res  = resources.get<FG::Texture>( data.SkyViewLUT ).Resource.Get();
+        FG::Texture const&       transmittance_lut = resources.get<FG::Texture>( data.TransmittanceLUT );
+        FG::Buffer const&        params            = resources.get<FG::Buffer>( data.AtmosphereParams );
+
+        PerFrameConstants const& constants         = blackboard->get<PerFrameConstants>();
 
         cmd->DiscardResource( sky_view_lut_res, nullptr );
 
@@ -262,28 +339,23 @@ Ember::AtmosphereContext::OutData Ember::AtmosphereContext::Render(
         cmd->SetGraphicsRootSignature( mp->m_RootSignature.Get() );
         cmd->SetPipelineState( mp->m_SkyViewLUTPipeline.Get() );
         cmd->SetGraphicsRootConstantBufferView( 0, params.InnerBuffer.GetGPUVirtualAddress() );
-        cmd->SetGraphicsRoot32BitConstant( 1, ( UINT )transmittance_lut.AsSRV, 0 );
-        cmd->SetGraphicsRoot32BitConstant( 1, ( UINT )camera_cbv, 1 );
+        cmd->SetGraphicsRoot32BitConstants( 1, sizeof( PerFrameConstants ) / 4, &constants, 0 );
+        cmd->SetGraphicsRoot32BitConstant( 2, ( UINT )transmittance_lut.AsSRV, 0 );
         cmd->DrawInstanced( 3, 1, 0, 0 );
       } );
 
   return sky;
 }
 
-void Ember::AtmosphereContext::SetSun( SunData const& sun )
+void Ember::AtmosphereContext::SetSun( uint32_t const sun_index )
 {
-  m_Sun = std::move( sun );
+  m_Sun = sun_index;
 }
 
 void Ember::AtmosphereContext::SetAtmosphereParams( Params const& atmosphere_params )
 {
   m_AtmosphereParams       = atmosphere_params;
   m_LUTUpdatePendingFrames = true;
-}
-
-Ember::AtmosphereContext::SunData const& Ember::AtmosphereContext::GetSun() const
-{
-  return m_Sun;
 }
 
 Ember::AtmosphereContext::Params const& Ember::AtmosphereContext::GetAtmosphereParams() const

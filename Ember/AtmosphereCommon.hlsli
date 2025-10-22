@@ -2,6 +2,7 @@
 #define _FUNCTIONS_HLSLI
 
 #include "Colors.hlsli"
+#include "LightData.hlsli"
 #include "Math.hlsli"
 #include "Utility.hlsli"
 
@@ -212,7 +213,7 @@ float2 GetSkyViewLongLatFromDir( float3 dir )
   float2 longlat;
   longlat.y             = asin( dir.y );
   const float2 norm_dir = normalize( dir.xz );
-  longlat.x             = ( norm_dir.y < 0 ? 2 * kPi - acos( norm_dir.x ) : acos( norm_dir.x ) );
+  longlat.x             = ( norm_dir.x < 0 ? 2 * kPi - acos( norm_dir.y ) : acos( norm_dir.y ) );
 
   return longlat;
 }
@@ -233,6 +234,57 @@ float2 GetSkyViewUVFromLongLat( float2 longlat )
 float2 GetSkyViewUVFromDir( float3 dir )
 {
   return GetSkyViewUVFromLongLat( GetSkyViewLongLatFromDir( dir ) );
+}
+
+// Transmittance
+float3 TransmittancePointAtoB( float3 a, float3 b, in Texture2D transmittance_lut, in SamplerState lut_sampler )
+{
+  float len = distance( a, b );
+  if ( len == 0.0f ) return 1.0f;
+  float3 v     = ( b - a ) / len;
+  float2 rmu_x = GetRMu( a, v );
+  float2 rmu_y = GetRMu( b, v );
+  float2 xuv   = GetTransmittanceUVFromRMu( rmu_x );
+  float2 yuv   = GetTransmittanceUVFromRMu( rmu_y );
+  return saturate(
+      transmittance_lut.SampleLevel( lut_sampler, xuv, 0 ).rgb /
+      transmittance_lut.SampleLevel( lut_sampler, yuv, 0 ).rgb );
+}
+
+// Direct visibility (no ground)
+float Vis( float2 rmu )
+{
+  float dg;
+  return DistanceToSpherePolar( dg, kRg, rmu.x, rmu.y ) ? 0.0f : 1.0f;
+}
+
+float3 ShadowTerm( float3 x, float3 v, in Texture2D transmittance_lut, in SamplerState lut_sampler )
+{
+  float2 rmu   = GetRMu( x, v );
+  float  t_atm = DistanceToAtmosphere( rmu );
+  return Vis( rmu ) * TransmittancePointAtoB( x, x + t_atm * v, transmittance_lut, lut_sampler );
+}
+
+// In-scattering from the sun
+// c: camera position
+// x: point in the atmosphere
+// v: view direction
+float3 InScattering(
+    float3          c,
+    float3          x,
+    float3          v,
+    in DirLight     sun,
+    in Atmosphere   atmosphere,
+    in Texture2D    transmittance_lut,
+    in SamplerState lut_sampler )
+{
+  float3 li              = -normalize( sun.Direction );
+  float  r               = GetR( x );
+  float  nu              = dot( v, li );
+  float3 rayleigh_factor = Pr( nu ) * atmosphere.ScatterCoeffRayleigh * atmosphere.DensityRayleigh( r );
+  float  mei_factor      = atmosphere.Pm( nu ) * atmosphere.ScatterCoeffMei * atmosphere.DensityMei( r );
+  return TransmittancePointAtoB( c, x, transmittance_lut, lut_sampler ) *
+         ShadowTerm( x, li, transmittance_lut, lut_sampler ) * ( rayleigh_factor + mei_factor ) * sun.GetRadiance();
 }
 
 #endif // _FUNCTIONS_HLSLI
