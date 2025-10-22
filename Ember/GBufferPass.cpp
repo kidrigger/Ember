@@ -2,6 +2,7 @@
 
 #include "Environment.hpp"
 #include "RenderPassCommon.hpp"
+#include "Util/DataUtil.hpp"
 
 bool Ember::RenderPass::GBuffer::Create( GBuffer* out, RenderDevice* render_device )
 {

@@ -2,6 +2,7 @@
 
 #include "Environment.hpp"
 #include "RenderPassCommon.hpp"
+#include "Util/DataUtil.hpp"
 
 bool Ember::RenderPass::OmniLightDeferred::Create(
     OmniLightDeferred* out, RenderDevice* render_device, DXGI_FORMAT const rt_format )

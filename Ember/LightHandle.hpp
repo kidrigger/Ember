@@ -45,6 +45,8 @@ public:
   SpotLightHandle( uint16_t const inner, uint16_t const generation );
 };
 
+struct ShadowCaster
+{};
 
 struct LightInfo
 {

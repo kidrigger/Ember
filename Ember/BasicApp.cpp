@@ -249,14 +249,47 @@ void Ember::BasicApp::LoadContent()
 
   // Setup Lights
   LightManager::Create( m_LightManager.get(), m_RenderDevice.get(), &m_World, RenderDevice::kNumFrames );
-  m_LightManager->AddShadowingOmniLight( { 15.0f, 2.0f, 12.0f }, 10.0f, Color32::Blue(), 15.0f );
-  m_LightManager->AddShadowingOmniLight( { 0.0f, 2.0f, 5.0f }, 10.0f, Color32::Green(), 15.0f );
-  m_LightManager->AddShadowingOmniLight( { -15.0f, 2.0f, -5.0f }, 10.0f, Color32::Red(), 25.0f );
   m_LightManager->AddShadowingDirLight( { 1.0f, -1.0f, 0.0f }, Color32::White(), 5.0f );
 
   m_World.GetECS()
+      .entity( "OmniLight 0" )
+      .add<ShadowCaster>()
+      .insert(
+          [&]( WorldTransform&, LocalTransform& lt, OmniLight& ol )
+          {
+            lt.Translation = { 15.0f, 2.0f, 12.0f };
+            ol.Color       = Color32::Blue();
+            ol.Intensity   = 15.0f;
+            ol.Range       = 10.0f;
+          } );
+
+  m_World.GetECS()
+      .entity( "OmniLight 1" )
+      .add<ShadowCaster>()
+      .insert(
+          [&]( WorldTransform&, LocalTransform& lt, OmniLight& ol )
+          {
+            lt.Translation = { 0.0f, 2.0f, 5.0f };
+            ol.Color       = Color32::Green();
+            ol.Intensity   = 15.0f;
+            ol.Range       = 10.0f;
+          } );
+
+  m_World.GetECS()
+      .entity( "OmniLight 2" )
+      .add<ShadowCaster>()
+      .insert(
+          [&]( WorldTransform&, LocalTransform& lt, OmniLight& ol )
+          {
+            lt.Translation = { -15.0f, 2.0f, -5.0f };
+            ol.Color       = Color32::Red();
+            ol.Intensity   = 25.0f;
+            ol.Range       = 10.0f;
+          } );
+
+  m_World.GetECS()
       .entity( "SpotLight" )
-      .add<LightShadow>()
+      .add<ShadowCaster>()
       .insert(
           [&]( WorldTransform&, LocalTransform& lt, SpotLight& sl, RotatingModel& rm )
           {

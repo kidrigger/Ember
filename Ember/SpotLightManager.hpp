@@ -13,9 +13,6 @@ class RenderTargetManager;
 class Camera;
 class RenderDevice;
 
-struct LightShadow
-{};
-
 namespace Internal
 {
 
@@ -88,7 +85,6 @@ public:
       DrawList::Batches const&    draw_list,
       RenderTargetManager const&  rtm,
       uint32_t                    spot_light_index,
-      Texture const&              texture,
       uint32_t                    frame_idx ) const;
 };
 
@@ -104,6 +100,5 @@ struct SpotLight
   float   ConeInnerHalfAngle{ DirectX::XM_PI * 0.166667f }; // 30 degrees.
   float   ConeOuterHalfAngle{ DirectX::XM_PIDIV4 };         // 45 degrees.
 };
-
 
 } // namespace Ember

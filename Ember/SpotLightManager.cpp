@@ -65,9 +65,9 @@ Ember::Internal::SpotLightManager::SpotLightManager(
   , m_AllocatedShadows{ 0 }
 {
   m_ShadowLightQuery =
-      m_World->GetECS().query_builder<WorldTransform const, SpotLight const>().with<LightShadow const>().build();
+      m_World->GetECS().query_builder<WorldTransform const, SpotLight const>().with<ShadowCaster const>().build();
   m_LightQuery =
-      m_World->GetECS().query_builder<WorldTransform const, SpotLight const>().without<LightShadow const>().build();
+      m_World->GetECS().query_builder<WorldTransform const, SpotLight const>().without<ShadowCaster const>().build();
 }
 
 void Ember::Internal::SpotLightManager::Create(
@@ -325,7 +325,7 @@ void Ember::Internal::SpotLightManager::RenderAllShadows(
 
     if ( camera_frustum.Contains( bounding_box ) == DirectX::DISJOINT ) continue;
 
-    RenderSpotShadow( command_list, draw_list, rtm, index, m_ActiveShadows[index], frame_idx );
+    RenderSpotShadow( command_list, draw_list, rtm, index, frame_idx );
   }
 
   std::transform(
@@ -346,12 +346,12 @@ void Ember::Internal::SpotLightManager::RenderSpotShadow(
     DrawList::Batches const&    draw_list,
     RenderTargetManager const&  rtm,
     uint32_t const              spot_light_index,
-    Texture const&              texture,
     uint32_t const              frame_idx ) const
 {
   PIXScopedEvent( command_list, PIX_COLOR_DEFAULT, "Render Spot Shadow %u", spot_light_index );
   ZoneScoped;
 
+  auto& texture = m_ActiveShadows[spot_light_index];
   rtm.ClearDepthStencilView( command_list, texture, D3D12_CLEAR_FLAG_DEPTH, 1.0f, 0 );
 
   PackedData const packed_data{

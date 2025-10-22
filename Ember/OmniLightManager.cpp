@@ -32,14 +32,7 @@ Ember::Internal::OmniLightManager::OmniLightManager(
   , m_RootSignature{ std::move( shadow_root_signature ) }
   , m_Pipeline{ std::move( shadow_pipeline ) }
   , m_DataBuffers{ std::move( light_buffers ) }
-  , m_DirtyFrames{ ( uint8_t )light_buffers.size() }
 {
-  for ( uint16_t i = 0; i < kMaxOmniLights; ++i )
-  {
-    m_IndirectionMap[i] = i + 1;
-  }
-  m_IndirectionFreeHead = 0;
-
   // We use left handed just this once.
 
   DirectX::XMVECTOR const origin  = DirectX::XMVectorSet( 0.0f, 0.0f, 0.0f, 1.0f );
@@ -57,15 +50,11 @@ Ember::Internal::OmniLightManager::OmniLightManager(
 
   m_ShadowProjectionBuffer.Write( 0, ByteSizeOf( views ), DataOf( views ) );
 
-  m_World->GetECS().component<OmniLightHandle>().on_remove( [&]( OmniLightHandle const handle ) { Free( handle ); } );
+  m_LightQuery =
+      m_World->GetECS().query_builder<WorldTransform const, OmniLight const>().without<ShadowCaster>().build();
 
-  m_DynamicShadowQuery = m_World->GetECS()
-                             .query_builder<WorldTransform const, OmniLight const, OmniLightHandle const>()
-                             .without<Static>()
-                             .build();
-
-  m_InitShadowQuery =
-      m_World->GetECS().query_builder<WorldTransform const, OmniLight const>().without<OmniLightHandle>().build();
+  m_ShadowLightQuery =
+      m_World->GetECS().query_builder<WorldTransform const, OmniLight const>().with<ShadowCaster>().build();
 }
 
 void Ember::Internal::OmniLightManager::Create(
@@ -78,8 +67,7 @@ void Ember::Internal::OmniLightManager::Create(
   buffers.reserve( num_frames );
   for ( uint32_t i = 0; i < num_frames; i++ )
   {
-    buffers.push_back(
-        render_device->CreateStorageBuffer( sizeof( OmniLightRepr ) * kMaxOmniLights, sizeof( OmniLightRepr ) ) );
+    buffers.push_back( render_device->CreateStorageBuffer( 8 * sizeof( OmniLightRepr ), sizeof( OmniLightRepr ) ) );
   }
 
   ComPtr<ID3DBlob> shadow_amp_shader;
@@ -165,12 +153,6 @@ void Ember::Internal::OmniLightManager::Create(
   };
 }
 
-void Ember::Internal::OmniLightManager::SetDirty()
-{
-  m_DirtyFrames = ( uint8_t )m_DataBuffers.size();
-}
-
-
 float Ember::Internal::OmniLightManager::CalculateRange( Color32 const color, float const intensity )
 {
   auto [x, y, z]       = color.UnpackRgb();
@@ -178,236 +160,90 @@ float Ember::Internal::OmniLightManager::CalculateRange( Color32 const color, fl
   return sqrt( ( max_comp * intensity ) ) * 10.0f;
 }
 
-Ember::OmniLightHandle Ember::Internal::OmniLightManager::AddOmniLight(
-    DirectX::XMFLOAT3 const position, float range, Color32 const color, float const intensity, float const attenuation )
+Ember::SRVHandle Ember::Internal::OmniLightManager::AllocateOmniShadow()
 {
-  ASSERT_M( m_TotalLightCount < kMaxOmniLights, "All free locs exhausted" );
-
-  uint16_t const true_index = m_TotalLightCount;
-  uint16_t const index      = m_IndirectionFreeHead;
-
-  m_IndirectionFreeHead     = m_IndirectionMap[index];
-  m_IndirectionMap[index]   = true_index;
-
-  uint16_t const generation = m_HandleGeneration[index];
-
-  if ( range <= 0 )
+  if ( m_AllocatedShadows == m_ActiveShadows.size() )
   {
-    // Auto-calculate the range.
-    DirectX::XMFLOAT3 const color_f  = color.UnpackRgb();
-    float const             max_comp = std::max( std::max( color_f.x, color_f.y ), color_f.z );
-    range                            = sqrt( ( max_comp * intensity ) ) * 10.0f;
-  }
-
-  m_LightData[true_index] = {
-    .Position    = position,
-    .Range       = range,
-    .Color       = color,
-    .Intensity   = intensity,
-    .Attenuation = attenuation,
-    .ShadowMap   = {},
-  };
-
-  m_TotalLightCount++;
-
-  SetDirty();
-
-  return OmniLightHandle{ index, generation };
-}
-
-Ember::OmniLightHandle Ember::Internal::OmniLightManager::AddShadowingOmniLight(
-    DirectX::XMFLOAT3 const position, float range, Color32 const color, float const intensity, float const attenuation )
-{
-
-  ASSERT_M( m_TotalLightCount < kMaxOmniLights, "All free locs exhausted" );
-
-  // Relocate the location to allocate at.
-  SwapTrueLocations( m_ShadowingLightCount, m_TotalLightCount );
-
-  uint16_t const true_index = m_ShadowingLightCount;
-  uint16_t const index      = m_IndirectionFreeHead;
-
-  uint16_t const generation = m_HandleGeneration[index];
-
-  if ( range <= 0 )
-  {
-    // Auto-calculate the range.
-    range = CalculateRange( color, intensity );
-  }
-
-  OmniLightHandle const handle{ index, generation };
-
-  SRVHandle const       shadow_map = AllocateOmniShadow( handle );
-
-  ASSERT( shadow_map );
-
-  m_LightData[true_index] = {
-    .Position    = position,
-    .Range       = range,
-    .Color       = color,
-    .Intensity   = intensity,
-    .Attenuation = attenuation,
-    .ShadowMap   = shadow_map,
-  };
-
-  m_IndirectionFreeHead   = m_IndirectionMap[index];
-  m_IndirectionMap[index] = true_index;
-  m_TotalLightCount++;
-  m_ShadowingLightCount++;
-
-  SetDirty();
-
-  return handle;
-}
-
-void Ember::Internal::OmniLightManager::SwapTrueLocations( uint16_t const first, uint16_t const second )
-{
-  if ( first == second ) return;
-
-  auto const indirection_first  = std::ranges::find( m_IndirectionMap, first );
-  auto const indirection_second = std::ranges::find( m_IndirectionMap, second );
-  ASSERT( indirection_first != std::ranges::end( m_IndirectionMap ) );
-  ASSERT( indirection_second != std::ranges::end( m_IndirectionMap ) );
-  *indirection_first  = second;
-  *indirection_second = first;
-
-  std::swap( m_LightData[first], m_LightData[second] );
-}
-
-Ember::SRVHandle Ember::Internal::OmniLightManager::AllocateOmniShadow( OmniLightHandle const omni_light_idx )
-{
-  ASSERT( not m_ShadowsInUse.Contains( omni_light_idx ) );
-
-  Texture tex;
-  if ( m_ShadowCache.empty() )
-  {
-    tex = m_RenderDevice->CreateTextureCube( {
+    m_ActiveShadows.emplace_back( m_RenderDevice->CreateTextureCube( {
         .Format    = DXGI_FORMAT_D16_UNORM,
         .Side      = kOmniShadowResolution,
         .Usage     = TextureUsage::kDepthSample,
         .MipLevels = MipLevels::kBase,
         .InitState = D3D12_RESOURCE_STATE_PIXEL_SHADER_RESOURCE,
-    } );
-    wchar_t buf[36];
-    swprintf_s( buf, L"Omni Shadow Map %llu", m_ShadowsInUse.Size() );
-    tex.SetName( buf );
-  }
-  else
-  {
-    tex = m_ShadowCache.front();
-    m_ShadowCache.pop();
+    } ) );
+
+    wchar_t buf[32];
+    swprintf_s( buf, L"Omni Shadow Map %u", m_AllocatedShadows );
+    m_ActiveShadows.back().SetName( buf );
   }
 
-  SRVHandle const handle         = tex.GetSRVHandle();
-  m_ShadowsInUse[omni_light_idx] = std::move( tex );
-  return handle;
+  return m_ActiveShadows[m_AllocatedShadows++].GetSRVHandle();
 }
 
-void Ember::Internal::OmniLightManager::FreeOmniShadow( OmniLightHandle const omni_light_idx )
+void Ember::Internal::OmniLightManager::ClearShadows()
 {
-  if ( auto it = m_ShadowsInUse.Find( omni_light_idx ); it != m_ShadowsInUse.end() )
-  {
-    m_ShadowCache.push( it->second );
-    m_ShadowsInUse.Erase( it );
-    return;
-  }
-
-  UNREACHABLE_M( "Point Light should be actually allocated." );
-}
-
-void Ember::Internal::OmniLightManager::Free( OmniLightHandle const omni_light_handle )
-{
-  uint16_t const index      = omni_light_handle.GetIndex();
-  uint16_t const generation = omni_light_handle.GetGeneration();
-
-  if ( m_HandleGeneration[index] != generation ) return;
-  m_HandleGeneration[index]++;
-
-  uint16_t const true_index          = m_IndirectionMap[index];
-
-  uint16_t const last_omni_light_idx = m_TotalLightCount - 1;
-
-  if ( true_index < m_ShadowingLightCount )
-  {
-    uint16_t const last_shadowing_idx = m_ShadowingLightCount - 1;
-    // To pack all shadow casters together
-    // Swap with last shadow caster
-    SwapTrueLocations( true_index, last_shadowing_idx );
-    // Then swap with last light
-    SwapTrueLocations( last_shadowing_idx, last_omni_light_idx );
-
-    FreeOmniShadow( omni_light_handle );
-    m_LightData[last_omni_light_idx].ShadowMap = {};
-  }
-  else
-  {
-    // True index non-shadow casting.
-    SwapTrueLocations( true_index, last_omni_light_idx );
-  }
-
-  m_TotalLightCount--;
-
-  SetDirty();
-
-  if ( m_HandleGeneration[index] == UINT16_MAX ) return; // Handle no longer usable.
-
-  m_IndirectionMap[index] = m_IndirectionFreeHead;
-  m_IndirectionFreeHead   = index;
+  m_AllocatedShadows = 0;
 }
 
 Ember::LightInfo Ember::Internal::OmniLightManager::PrepareFrame( uint32_t const frame_index )
 {
-  m_World->GetECS().defer(
-      [&]
-      {
-        m_InitShadowQuery.each(
-            [&]( flecs::entity e, WorldTransform const& wt, OmniLight const& ol )
-            {
-              DirectX::XMFLOAT3 const position = wt.GetTranslation();
+  m_LightData.clear();
+  ClearShadows();
 
-              OmniLightHandle const   olh      = ol.CastsShadow
-                                                     ? AddShadowingOmniLight( position, ol.Range, ol.Color, ol.Intensity )
-                                                     : AddOmniLight( position, ol.Range, ol.Color, ol.Intensity );
-              std::ignore                      = e.set<OmniLightHandle>( olh );
-            } );
+  m_ShadowLightQuery.each(
+      [&]( WorldTransform const& transform, OmniLight const& light )
+      {
+        DirectX::XMFLOAT3 const position = transform.GetTranslation();
+        float const range = light.Range > 0.0f ? light.Range : CalculateRange( light.Color, light.Intensity );
+
+        m_LightData.push_back( {
+            .Position    = position,
+            .Range       = range,
+            .Color       = light.Color,
+            .Intensity   = light.Intensity,
+            .Attenuation = 1.0f,
+            .ShadowMap   = AllocateOmniShadow(),
+        } );
       } );
 
-  m_DynamicShadowQuery.each(
-      [&]( WorldTransform const& wt, OmniLight const& ol, OmniLightHandle const& omni_light_handle )
+  m_ShadowingLightCount = ( uint32_t )m_LightData.size();
+
+  m_LightQuery.each(
+      [&]( WorldTransform const& transform, OmniLight const& light )
       {
-        DirectX::XMFLOAT3 const position   = wt.GetTranslation();
+        DirectX::XMFLOAT3 const position = transform.GetTranslation();
+        float const range = light.Range > 0.0f ? light.Range : CalculateRange( light.Color, light.Intensity );
 
-        uint16_t const          index      = omni_light_handle.GetIndex();
-        uint16_t const          generation = omni_light_handle.GetGeneration();
-
-        ASSERT( m_HandleGeneration[index] == generation );
-        if ( m_HandleGeneration[index] != generation ) return;
-
-        uint16_t const true_index         = m_IndirectionMap[index];
-
-        m_LightData[true_index].Position  = position;
-        m_LightData[true_index].Color     = ol.Color;
-        m_LightData[true_index].Intensity = ol.Intensity;
-        m_LightData[true_index].Range     = ol.Range >= 0 ? ol.Range : CalculateRange( ol.Color, ol.Intensity );
-
-        SetDirty();
+        m_LightData.push_back( {
+            .Position    = position,
+            .Range       = range,
+            .Color       = light.Color,
+            .Intensity   = light.Intensity,
+            .Attenuation = 1.0f,
+        } );
       } );
 
-  if ( m_DirtyFrames )
+  m_TotalLightCount = ( uint32_t )m_LightData.size();
+
+  if ( m_DataBuffers[frame_index].GetSize() < m_TotalLightCount * sizeof( OmniLightRepr ) )
   {
-    m_DataBuffers[frame_index].Write( 0, sizeof( OmniLightRepr ) * m_TotalLightCount, DataOf( m_LightData ) );
-    m_DirtyFrames--;
+    m_DataBuffers[frame_index] =
+        m_RenderDevice->CreateStorageBuffer( ByteSizeOf( m_LightData ), StrideOf( m_LightData ) );
+    wchar_t name[] = L"Omni Light Buffer 0";
+    name[18]       = L'0' + ( wchar_t )frame_index;
+    m_DataBuffers[frame_index].SetName( name );
   }
+  m_DataBuffers[frame_index].Write( 0, ByteSizeOf( m_LightData ), DataOf( m_LightData ) );
 
   return { m_DataBuffers[frame_index].GetSRVHandle(), m_ShadowingLightCount, m_TotalLightCount };
 }
 
-uint16_t Ember::Internal::OmniLightManager::GetOmniLightCount() const
+uint32_t Ember::Internal::OmniLightManager::GetOmniLightCount() const
 {
   return m_TotalLightCount;
 }
 
-uint16_t Ember::Internal::OmniLightManager::GetShadowingOmniLightCount() const
+uint32_t Ember::Internal::OmniLightManager::GetShadowingOmniLightCount() const
 {
   return m_ShadowingLightCount;
 }
@@ -432,12 +268,14 @@ void Ember::Internal::OmniLightManager::RenderAllShadows(
   command_list->RSSetScissorRects( 1, &scissor );
   command_list->RSSetViewports( 1, &viewport );
 
-  std::pmr::vector<CD3DX12_RESOURCE_BARRIER> barriers{ m_ShadowsInUse.Size(),
-                                                       std::pmr::polymorphic_allocator( &m_BumpAlloc ) };
-  auto&                                      textures = m_ShadowsInUse.Values();
+  std::pmr::vector<CD3DX12_RESOURCE_BARRIER> barriers{
+    m_AllocatedShadows,
+    std::pmr::polymorphic_allocator( &m_BumpAlloc ),
+  };
 
-  std::ranges::transform(
-      textures,
+  std::transform(
+      m_ActiveShadows.begin(),
+      m_ActiveShadows.begin() + m_AllocatedShadows,
       barriers.begin(),
       []( Texture const& tex )
       {
@@ -447,22 +285,22 @@ void Ember::Internal::OmniLightManager::RenderAllShadows(
 
   if ( not barriers.empty() ) command_list->ResourceBarrier( CountOf( barriers ), DataOf( barriers ) );
 
-  for ( auto const& [handle, texture] : m_ShadowsInUse )
+  for ( uint32_t index = 0; index < m_AllocatedShadows; ++index )
   {
     ZoneScopedN( "CheckOmniShadow" );
-    uint32_t const index = handle.GetIndex();
-    ASSERT( handle.GetGeneration() == m_HandleGeneration[index] );
-    OmniLightRepr const& light = m_LightData[index];
     ZoneValue( index );
+
+    OmniLightRepr const&    light = m_LightData[index];
 
     DirectX::BoundingSphere sphere_of_influence{ light.Position, light.Range };
     if ( camera_frustum.Contains( sphere_of_influence ) == DirectX::DISJOINT ) continue;
 
-    RenderOmniShadow( command_list, draw_list, rtm, light, texture );
+    RenderOmniShadow( command_list, draw_list, rtm, index );
   }
 
-  std::ranges::transform(
-      textures,
+  std::transform(
+      m_ActiveShadows.begin(),
+      m_ActiveShadows.begin() + m_AllocatedShadows,
       barriers.begin(),
       []( Texture const& tex )
       {
@@ -477,11 +315,13 @@ void Ember::Internal::OmniLightManager::RenderOmniShadow(
     ID3D12GraphicsCommandList6* command_list,
     DrawList::Batches const&    draw_list,
     RenderTargetManager const&  rtm,
-    OmniLightRepr const&        omni_light,
-    Texture const&              texture ) const
+    uint32_t const              light_index ) const
 {
-  PIXScopedEvent( command_list, PIX_COLOR_DEFAULT, "Render Omni Shadow %u", ( uint32_t )( &omni_light - m_LightData ) );
+  PIXScopedEvent( command_list, PIX_COLOR_DEFAULT, "Render Omni Shadow %u", light_index );
   ZoneScoped;
+
+  OmniLightRepr const& omni_light = m_LightData[light_index];
+  Texture const&       texture    = m_ActiveShadows[light_index];
 
   rtm.ClearDepthStencilView( command_list, texture, D3D12_CLEAR_FLAG_DEPTH, 1.0f, 0 );
 
@@ -496,12 +336,4 @@ void Ember::Internal::OmniLightManager::RenderOmniShadow(
   rtm.OMSetRenderTargets( command_list, 0, nullptr, &texture );
 
   command_list->DispatchMesh( draw_list.Opaque.DrawCount, 1, 1 );
-}
-
-Ember::Internal::OmniLightManager::~OmniLightManager()
-{
-  for ( auto& gen : m_HandleGeneration )
-  {
-    gen = UINT16_MAX;
-  }
 }
