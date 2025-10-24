@@ -66,9 +66,6 @@ private:
   ComPtr<ID3D12PipelineState> m_TransmittanceLUTPipeline;
   ComPtr<ID3D12PipelineState> m_SkyViewLUTPipeline;
 
-  ComPtr<ID3D12RootSignature> m_AerialPerspectiveRootSignature;
-  ComPtr<ID3D12PipelineState> m_AerialPerspectivePipeline;
-
   Texture                     m_TransmittanceLUT;
   Texture                     m_SkyViewLUT;
   std::vector<Buffer>         m_AtmosphereParamBuffers;
@@ -83,8 +80,6 @@ public:
       ComPtr<ID3D12RootSignature> root_signature,
       ComPtr<ID3D12PipelineState> transmittance_lut_pipeline,
       ComPtr<ID3D12PipelineState> sky_view_lut_pipeline,
-      ComPtr<ID3D12RootSignature> aerial_perspective_root_signature,
-      ComPtr<ID3D12PipelineState> aerial_perspective_pipeline,
       Texture                     transmittance_lut,
       Texture                     sky_view_lut,
       std::vector<Buffer>         atmosphere_param_buffers );

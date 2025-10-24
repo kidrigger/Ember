@@ -51,8 +51,10 @@ struct CopySrc
 
 struct Attachment
 {
-  WriteType Type  = WriteType::kRTV; // 2 bits
-  uint8_t   Index = 0xFF;            // 3 bits
+  WriteType Type   = WriteType::kRTV; // 2 bits
+  uint8_t   Index  = 0xFF;            // 3 bits
+  bool      IsSrgb = false;           // 1 bit
+
 
   operator uint32_t() const;
   static Attachment Decode( uint32_t flag );
@@ -152,6 +154,18 @@ private:
     void                Push( Texture tex );
   };
 
+  struct RenderTargets
+  {
+    std::vector<ID3D12Resource*>               Resources;
+    std::vector<D3D12_RENDER_TARGET_VIEW_DESC> Descriptions;
+  };
+
+  struct DepthTargetEntry
+  {
+    ID3D12Resource*               Resource{ nullptr };
+    D3D12_DEPTH_STENCIL_VIEW_DESC Desc;
+  };
+
   using SRVCacheType = FlatMap<uint64_t, SRVHandle>;
 
   RenderDevice*                          m_RenderDevice;
@@ -161,10 +175,15 @@ private:
   FlatMap<ID3D12Resource*, SRVCacheType> m_TextureSRVCache;
 
   std::vector<CD3DX12_RESOURCE_BARRIER>  m_Barriers;
+  RenderTargets                          m_CurrentRenderTargets;
+  DepthTargetEntry                       m_CurrentDepthTarget;
+  DirectX::XMUINT2                       m_RenderTargetSize;
+
   uint64_t                               m_TickCounter;
   uint32_t                               m_TextureCount;
 
   [[nodiscard]] Texture                  CreateTextureImpl( Texture::Desc const& desc ) const;
+  void                                   FlushBarriers();
 
 public:
   Context() = default;
@@ -178,13 +197,17 @@ public:
   [[nodiscard]] RenderTargetManager* GetRenderTargetManager() const;
 
   void                               PushBarrier( CD3DX12_RESOURCE_BARRIER const& barrier );
-  void                               FlushBarriers();
 
-  [[nodiscard]] Texture              CreateTexture( Texture::Desc const& desc );
-  void                               DestroyTexture( Texture::Desc const& desc, Texture tex );
+  void SetRenderTarget( uint32_t index, Texture const& render_target, Texture::Desc const& desc, bool as_srgb );
+  void SetDepthTarget( Texture const& depth_target, Texture::Desc const& desc );
 
-  [[nodiscard]] uint32_t             GetTextureCount() const;
-  void                               Update();
+  void PreparePass();
+
+  [[nodiscard]] Texture  CreateTexture( Texture::Desc const& desc );
+  void                   DestroyTexture( Texture::Desc const& desc, Texture tex );
+
+  [[nodiscard]] uint32_t GetTextureCount() const;
+  void                   Update();
   SRVHandle GetOrCreateSRVHandle( Texture const& texture, CD3DX12_SHADER_RESOURCE_VIEW_DESC const& srv_desc );
 
   Context( Context const& other )                = delete;

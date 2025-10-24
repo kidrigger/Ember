@@ -101,6 +101,10 @@ void FrameGraph::execute(void *context, void *allocator) {
       if (flags != kFlagsIgnored)
         _getResourceEntry(id).preWrite(flags, context);
     }
+
+    if (m_preExecCallback)
+      std::invoke(m_preExecCallback, context);
+
     FrameGraphPassResources resources{*this, pass};
     std::invoke(*pass.m_exec, resources, context);
 

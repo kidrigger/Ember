@@ -14,13 +14,13 @@ struct FrameGraphPassConcept {
   virtual void operator()(FrameGraphPassResources &, void *) = 0;
 };
 
-template <typename Data, typename Execute>
+template <typename Data, typename Context, typename Execute>
 struct FrameGraphPass final : FrameGraphPassConcept {
   explicit FrameGraphPass(Execute &&exec)
       : execFunction{std::forward<Execute>(exec)} {}
 
   void operator()(FrameGraphPassResources &resources, void *context) override {
-    execFunction(data, resources, context);
+    execFunction(data, resources, static_cast<Context *>(context));
   }
 
   Execute execFunction;

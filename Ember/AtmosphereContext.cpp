@@ -12,16 +12,12 @@ Ember::AtmosphereContext::AtmosphereContext(
     ComPtr<ID3D12RootSignature> root_signature,
     ComPtr<ID3D12PipelineState> transmittance_lut_pipeline,
     ComPtr<ID3D12PipelineState> sky_view_lut_pipeline,
-    ComPtr<ID3D12RootSignature> aerial_perspective_root_signature,
-    ComPtr<ID3D12PipelineState> aerial_perspective_pipeline,
     Texture                     transmittance_lut,
     Texture                     sky_view_lut,
     std::vector<Buffer>         atmosphere_param_buffers )
   : m_RootSignature{ std::move( root_signature ) }
   , m_TransmittanceLUTPipeline{ std::move( transmittance_lut_pipeline ) }
   , m_SkyViewLUTPipeline{ std::move( sky_view_lut_pipeline ) }
-  , m_AerialPerspectiveRootSignature{ std::move( aerial_perspective_root_signature ) }
-  , m_AerialPerspectivePipeline{ std::move( aerial_perspective_pipeline ) }
   , m_TransmittanceLUT{ std::move( transmittance_lut ) }
   , m_SkyViewLUT{ std::move( sky_view_lut ) }
   , m_AtmosphereParamBuffers{ std::move( atmosphere_param_buffers ) }
@@ -56,8 +52,6 @@ bool Ember::AtmosphereContext::Create( AtmosphereContext* out, RenderDevice* ren
   ERR_FAIL_RET_F( D3DReadFileToBlob( L"TransmittanceLUTPS.cso", &transmittance_pixel_shader_blob ) );
   ComPtr<ID3DBlob> sky_view_pixel_shader_blob;
   ERR_FAIL_RET_F( D3DReadFileToBlob( L"SkyViewLUTPS.cso", &sky_view_pixel_shader_blob ) );
-  ComPtr<ID3DBlob> aerial_perspective_comp_shader_blob;
-  ERR_FAIL_RET_F( D3DReadFileToBlob( L"AerialPerspectiveCS.cso", &aerial_perspective_comp_shader_blob ) );
 
   ComPtr<ID3D12Device2>       device                 = render_device->GetDevice();
 
@@ -141,59 +135,6 @@ bool Ember::AtmosphereContext::Create( AtmosphereContext* out, RenderDevice* ren
         device->CreatePipelineState( &pipeline_state_stream_desc, IID_PPV_ARGS( &sky_view_lut_pipeline ) ) );
   }
 
-  // Aerial Perspective Pipeline
-  {
-    CD3DX12_ROOT_PARAMETER1 root_parameters[3];
-    root_parameters[0].InitAsConstantBufferView( 0 );
-    root_parameters[1].InitAsConstants( sizeof( PerFrameConstants ) / 4, 1 );
-    root_parameters[2].InitAsConstants( 1, 2 );
-
-    CD3DX12_STATIC_SAMPLER_DESC      static_sampler_desc = CD3DX12_STATIC_SAMPLER_DESC{ 0 };
-
-    D3D12_ROOT_SIGNATURE_FLAGS const root_signature_flags =
-        D3D12_ROOT_SIGNATURE_FLAG_CBV_SRV_UAV_HEAP_DIRECTLY_INDEXED |
-        D3D12_ROOT_SIGNATURE_FLAG_SAMPLER_HEAP_DIRECTLY_INDEXED |
-        D3D12_ROOT_SIGNATURE_FLAG_DENY_AMPLIFICATION_SHADER_ROOT_ACCESS |
-        D3D12_ROOT_SIGNATURE_FLAG_DENY_MESH_SHADER_ROOT_ACCESS |
-        D3D12_ROOT_SIGNATURE_FLAG_DENY_GEOMETRY_SHADER_ROOT_ACCESS |
-        D3D12_ROOT_SIGNATURE_FLAG_DENY_DOMAIN_SHADER_ROOT_ACCESS |
-        D3D12_ROOT_SIGNATURE_FLAG_DENY_HULL_SHADER_ROOT_ACCESS;
-
-    CD3DX12_VERSIONED_ROOT_SIGNATURE_DESC root_signature_desc;
-    root_signature_desc.Init_1_1(
-        CountOf( root_parameters ), DataOf( root_parameters ), 1, &static_sampler_desc, root_signature_flags );
-
-    ComPtr<ID3DBlob> root_signature_blob;
-    ComPtr<ID3DBlob> error_blob;
-    ERR_FAIL_RET_F( D3DX12SerializeVersionedRootSignature(
-        &root_signature_desc, root_signature_version, root_signature_blob.ReleaseAndGetAddressOf(), &error_blob ) );
-
-    ERR_FAIL_RET_F( device->CreateRootSignature(
-        0,
-        root_signature_blob->GetBufferPointer(),
-        root_signature_blob->GetBufferSize(),
-        IID_PPV_ARGS( &root_signature ) ) );
-
-    struct PipelineStream
-    {
-      CD3DX12_PIPELINE_STATE_STREAM_ROOT_SIGNATURE RootSignature;
-      CD3DX12_PIPELINE_STATE_STREAM_CS             CS;
-    };
-
-    PipelineStream pipeline_stream = {
-      .RootSignature = root_signature.Get(),
-      .CS            = CD3DX12_SHADER_BYTECODE( aerial_perspective_comp_shader_blob.Get() ),
-    };
-
-    D3D12_PIPELINE_STATE_STREAM_DESC const pipeline_state_stream_desc = {
-      .SizeInBytes                   = sizeof pipeline_stream,
-      .pPipelineStateSubobjectStream = &pipeline_stream,
-    };
-
-    ERR_FAIL_RET_F(
-        device->CreatePipelineState( &pipeline_state_stream_desc, IID_PPV_ARGS( &aerial_perspective_pipeline ) ) );
-  }
-
   std::vector<Buffer> atmosphere_param_buffers;
   wchar_t             buf[64];
   for ( int i = 0; i < RenderDevice::kNumFrames; ++i )
@@ -205,14 +146,9 @@ bool Ember::AtmosphereContext::Create( AtmosphereContext* out, RenderDevice* ren
   }
 
   new ( out ) AtmosphereContext{
-    std::move( root_signature ),
-    std::move( transmittance_lut_pipeline ),
-    std::move( sky_view_lut_pipeline ),
-    std::move( aerial_perspective_root_signature ),
-    std::move( aerial_perspective_pipeline ),
-    std::move( transmittance_lut ),
-    std::move( sky_view_lut ),
-    std::move( atmosphere_param_buffers ),
+    std::move( root_signature ),        std::move( transmittance_lut_pipeline ),
+    std::move( sky_view_lut_pipeline ), std::move( transmittance_lut ),
+    std::move( sky_view_lut ),          std::move( atmosphere_param_buffers ),
   };
 
   return true;
@@ -248,7 +184,7 @@ Ember::AtmosphereContext::OutData Ember::AtmosphereContext::Render(
   bool const transmittance_lut_needs_update = m_LUTUpdatePendingFrames;
   if ( m_LUTUpdatePendingFrames ) --m_LUTUpdatePendingFrames;
 
-  OutData const transmittance = frame_graph->addCallbackPass<OutData>(
+  OutData const transmittance = frame_graph->addCallbackPass(
       "Update Transmittance LUT",
       [&]( FrameGraph::Builder& builder, OutData& data )
       {
@@ -262,12 +198,9 @@ Ember::AtmosphereContext::OutData Ember::AtmosphereContext::Render(
         }
         data.AtmosphereParams = builder.read( param_buffer );
       },
-      [mp = this]( OutData const& data, FrameGraphPassResources& resources, void* ctx )
+      [mp = this]( OutData const& data, FrameGraphPassResources& resources, FG::Context const* context )
       {
         ZoneScopedN( "Update Transmittance LUT" );
-
-        FG::Context* context = ( FG::Context* )ctx;
-        context->FlushBarriers();
 
         FG::Context::FrameData const& frame_data = context->GetFrameData();
         RenderTargetManager const*    rtm        = context->GetRenderTargetManager();
@@ -289,7 +222,7 @@ Ember::AtmosphereContext::OutData Ember::AtmosphereContext::Render(
         cmd->DrawInstanced( 3, 1, 0, 0 );
       } );
 
-  OutData const sky = frame_graph->addCallbackPass<OutData>(
+  OutData const sky = frame_graph->addCallbackPass(
       "Update Sky View LUT",
       [&]( FrameGraph::Builder& builder, OutData& data )
       {
@@ -312,12 +245,9 @@ Ember::AtmosphereContext::OutData Ember::AtmosphereContext::Render(
         data.AtmosphereParams = builder.read( param_buffer );
         data.SkyViewLUT       = builder.write( sky_view_lut, FG::Attachment{ .Index = 0 } );
       },
-      [mp = this, blackboard]( OutData const& data, FrameGraphPassResources& resources, void* ctx )
+      [mp = this, blackboard]( OutData const& data, FrameGraphPassResources& resources, FG::Context const* context )
       {
         ZoneScopedN( "Update Sky View LUT" );
-
-        FG::Context* context = ( FG::Context* )ctx;
-        context->FlushBarriers();
 
         FG::Context::FrameData const& frame_data = context->GetFrameData();
         RenderTargetManager const*    rtm        = context->GetRenderTargetManager();

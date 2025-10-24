@@ -1,5 +1,7 @@
 #include "FrameGraphHelper.hpp"
 
+#include <numeric>
+
 #include "RenderDevice.hpp"
 #include "RenderTargetManager.hpp"
 #include "Util/DataUtil.hpp"
@@ -117,6 +119,79 @@ void Ember::FG::Context::FlushBarriers()
   m_Barriers.clear();
 }
 
+void Ember::FG::Context::SetRenderTarget(
+    uint32_t const index, Texture const& render_target, Texture::Desc const& desc, bool const as_srgb )
+{
+  if ( m_RenderTargetSize.x == 0 ) m_RenderTargetSize = { desc.Width, desc.Height };
+
+  ASSERT_M(
+      m_RenderTargetSize.x == desc.Width and m_RenderTargetSize.y == desc.Height, "All RTs must have the same size." );
+
+  if ( m_CurrentRenderTargets.Resources.size() <= index )
+  {
+    m_CurrentRenderTargets.Resources.resize( index + 1 );
+    m_CurrentRenderTargets.Descriptions.resize( index + 1 );
+  }
+
+  m_CurrentRenderTargets.Resources[index] = render_target.Resource.Get();
+  m_CurrentRenderTargets.Descriptions[index] = {
+    .Format        = as_srgb ? DirectX::MakeSRGB(desc.Format) : desc.Format,
+    .ViewDimension = D3D12_RTV_DIMENSION_TEXTURE2D,
+    .Texture2D     = {
+      .MipSlice = 0,
+      .PlaneSlice = 0,
+    },
+  };
+}
+
+void Ember::FG::Context::SetDepthTarget( Texture const& depth_target, Texture::Desc const& desc )
+{
+  if ( m_RenderTargetSize.x == 0 ) m_RenderTargetSize = { desc.Width, desc.Height };
+
+  ASSERT_M(
+      m_RenderTargetSize.x == desc.Width and m_RenderTargetSize.y == desc.Height,
+      "Depth Target must have the same size as Render Targets." );
+
+  m_CurrentDepthTarget = {
+    .Resource = depth_target.Resource.Get(),
+    .Desc     = {
+      .Format        = desc.Format,
+      .ViewDimension = D3D12_DSV_DIMENSION_TEXTURE2D,
+      .Flags         = D3D12_DSV_FLAG_NONE,
+      .Texture2D     = { .MipSlice = 0 },
+    },
+  };
+}
+
+void Ember::FG::Context::PreparePass()
+{
+  FlushBarriers();
+
+  ASSERT_M(
+      std::accumulate(
+          m_CurrentRenderTargets.Resources.begin(),
+          m_CurrentRenderTargets.Resources.end(),
+          true,
+          []( bool const acc, ID3D12Resource const* res ) { return acc and res != nullptr; } ),
+      "All Render Targets from 0 to Largest must be set." );
+
+  m_RenderTargetManager->OMSetRenderTargets(
+      m_FrameData.CommandList,
+      CountOf( m_CurrentRenderTargets.Resources ),
+      DataOf( m_CurrentRenderTargets.Resources ),
+      DataOf( m_CurrentRenderTargets.Descriptions ),
+      m_CurrentDepthTarget.Resource,
+      &m_CurrentDepthTarget.Desc );
+
+  m_RenderTargetManager->RSSetScissorViewport( m_FrameData.CommandList, m_RenderTargetSize.x, m_RenderTargetSize.y );
+
+  // Clear for next pass
+  m_CurrentDepthTarget.Resource = nullptr;
+  m_CurrentRenderTargets.Resources.clear();
+  m_CurrentRenderTargets.Descriptions.clear();
+  m_RenderTargetSize = {};
+}
+
 Ember::FG::Texture Ember::FG::Context::CreateTexture( Texture::Desc const& desc )
 {
   uint64_t const hash      = HashFnv1A( sizeof( Texture::Desc ), ( byte* )&desc );
@@ -224,12 +299,12 @@ Ember::FG::CopySrc Ember::FG::CopySrc::Decode( uint32_t const flag )
 
 Ember::FG::Attachment::operator uint32_t() const
 {
-  return ( ( uint32_t )Type & 0x3 ) | ( ( ( uint32_t )Index & 0x7 ) << 2 );
+  return ( ( uint32_t )Type & 0x3 ) | ( ( ( uint32_t )Index & 0x7 ) << 2 ) | ( ( ( uint32_t )IsSrgb & 0x1 ) << 5 );
 }
 
 Ember::FG::Attachment Ember::FG::Attachment::Decode( uint32_t const flag )
 {
-  return Attachment{ ( WriteType )( flag & 0x3 ), ( uint8_t )( ( flag >> 2 ) & 0x7 ) };
+  return Attachment{ ( WriteType )( flag & 0x3 ), ( uint8_t )( ( flag >> 2 ) & 0x7 ), ( bool )( flag & 0b100000 ) };
 }
 
 Ember::FG::DepthStencil::operator uint32_t() const
@@ -306,9 +381,9 @@ void Ember::FG::Texture::preRead( Desc const& desc, uint32_t const flags, void* 
 
   auto const decoded = DecodeReadFlags( flags );
 
-  switch ( decoded.index() )
+  switch ( ( ReadType )decoded.index() )
   {
-    case 1:
+    case ReadType::kSRV:
     {
       ShaderResource const              srv            = std::get<ShaderResource>( decoded );
       D3D12_RESOURCE_STATES const       required_state = srv.PixelShaderUse ? D3D12_RESOURCE_STATE_PIXEL_SHADER_RESOURCE
@@ -326,7 +401,7 @@ void Ember::FG::Texture::preRead( Desc const& desc, uint32_t const flags, void* 
       }
     }
     break;
-    case 3:
+    case ReadType::kCopy:
     {
       if ( CurrentState != D3D12_RESOURCE_STATE_COPY_SOURCE )
       {
@@ -349,11 +424,12 @@ void Ember::FG::Texture::preWrite( [[maybe_unused]] Desc const& desc, uint32_t c
 
   auto     decoded = DecodeWriteFlags( flags );
 
-  switch ( decoded.index() )
+  switch ( ( WriteType )decoded.index() )
   {
-    case 0:
+    case WriteType::kRTV:
     {
       ASSERT( desc.Flags & D3D12_RESOURCE_FLAG_ALLOW_RENDER_TARGET );
+      Attachment const attachment = std::get<Attachment>( decoded );
 
       if ( CurrentState != D3D12_RESOURCE_STATE_RENDER_TARGET )
       {
@@ -361,9 +437,10 @@ void Ember::FG::Texture::preWrite( [[maybe_unused]] Desc const& desc, uint32_t c
             CD3DX12_RESOURCE_BARRIER::Transition( Resource.Get(), CurrentState, D3D12_RESOURCE_STATE_RENDER_TARGET ) );
         CurrentState = D3D12_RESOURCE_STATE_RENDER_TARGET;
       }
+      ctx->SetRenderTarget( attachment.Index, *this, desc, attachment.IsSrgb );
     }
     break;
-    case 1:
+    case WriteType::kDSV:
     {
       ASSERT( desc.Flags & D3D12_RESOURCE_FLAG_ALLOW_DEPTH_STENCIL );
 
@@ -373,9 +450,10 @@ void Ember::FG::Texture::preWrite( [[maybe_unused]] Desc const& desc, uint32_t c
             CD3DX12_RESOURCE_BARRIER::Transition( Resource.Get(), CurrentState, D3D12_RESOURCE_STATE_DEPTH_WRITE ) );
         CurrentState = D3D12_RESOURCE_STATE_DEPTH_WRITE;
       }
+      ctx->SetDepthTarget( *this, desc );
     }
     break;
-    case 2:
+    case WriteType::kCopy:
     {
       if ( CurrentState != D3D12_RESOURCE_STATE_COPY_DEST )
       {

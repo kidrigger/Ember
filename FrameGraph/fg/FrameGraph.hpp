@@ -3,9 +3,45 @@
 #include "fg/PassNode.hpp"
 #include "fg/ResourceNode.hpp"
 #include "fg/ResourceEntry.hpp"
+#include <functional>
 
 class FrameGraph {
+public:
+  class Builder;
+
+private:
   friend class FrameGraphPassResources;
+
+  template <typename Exec>
+  struct ExecFunctionRefl
+  {
+    template <typename F, typename Ret, typename Data, typename Context>
+    static Context ContextHelper( Ret ( F::* )( const Data&, FrameGraphPassResources&, Context* ) );
+
+    template <typename F, typename Ret, typename Data, typename Context>
+    static Context ContextHelper( Ret ( F::* )( const Data&, FrameGraphPassResources&, Context* ) const );
+
+    template <typename F, typename Ret, typename Data, typename Context>
+    static Data DataHelper( Ret ( F::* )( const Data&, FrameGraphPassResources&, Context* ) );
+
+    template <typename F, typename Ret, typename Data, typename Context>
+    static Data DataHelper( Ret ( F::* )( const Data&, FrameGraphPassResources&, Context* ) const );
+
+    using Context = decltype( ContextHelper( &Exec::operator() ) );
+    using Data    = decltype( DataHelper( &Exec::operator() ) );
+  };
+
+  template <typename Setup>
+  struct SetupFunctionRefl
+  {
+    template <typename F, typename Ret, typename Data>
+    static Data DataHelper( Ret ( F::* )( Builder&, Data& ) );
+
+    template <typename F, typename Ret, typename Data>
+    static Data DataHelper( Ret ( F::* )( Builder&, Data& ) const );
+
+    using Data = decltype( DataHelper( &Setup::operator() ) );
+  };
 
 public:
   FrameGraph() = default;
@@ -68,9 +104,12 @@ public:
    * @param exec Execution of this lambda is deferred until execute() phase
    * (must capture by value due to this).
    */
-  template <typename Data = NoData, typename Setup, typename Execute>
-  const Data &addCallbackPass(const std::string_view name, Setup &&setup,
-                              Execute &&exec);
+  template <typename Setup, typename Execute>
+  auto addCallbackPass(const std::string_view name, Setup &&setup,
+                              Execute &&exec) -> const SetupFunctionRefl<Setup>::Data&;
+
+  template <typename PreExec>
+  void setPreExecCallback( PreExec&& preExec );
 
   template <_VIRTUALIZABLE_CONCEPT(T)>
   [[nodiscard]] const typename T::Desc &
@@ -132,6 +171,7 @@ private:
   std::vector<PassNode> m_passNodes;
   std::vector<ResourceNode> m_resourceNodes;
   std::vector<ResourceEntry> m_resourceRegistry;
+  std::function<void(void*)> m_preExecCallback;
 };
 
 class FrameGraphPassResources {
