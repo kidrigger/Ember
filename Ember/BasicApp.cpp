@@ -492,11 +492,11 @@ void Ember::BasicApp::Update()
     m_Camera->SetYawPitch(
         m_Camera->GetYaw() - DirectX::XM_PI * mouse_dx, m_Camera->GetPitch() - DirectX::XM_PIDIV2 * mouse_dy );
 
-  if ( Input::Instance().IsPressed( 'R' ) )
+  if ( Input::Instance().IsPressed( 'R' ) or Input::Instance().IsPressed( 'A' ) )
   {
     m_Camera->LocalTranslate( -5 * delta_seconds, 0, 0 );
   }
-  if ( Input::Instance().IsPressed( 'F' ) )
+  if ( Input::Instance().IsPressed( 'F' ) or Input::Instance().IsPressed( 'W' ) )
   {
     m_Camera->LocalTranslate( 0, 0, -5 * delta_seconds );
   }
@@ -504,9 +504,17 @@ void Ember::BasicApp::Update()
   {
     m_Camera->LocalTranslate( 0, 0, 5 * delta_seconds );
   }
-  if ( Input::Instance().IsPressed( 'T' ) )
+  if ( Input::Instance().IsPressed( 'T' ) or Input::Instance().IsPressed( 'D' ) )
   {
     m_Camera->LocalTranslate( 5 * delta_seconds, 0, 0 );
+  }
+  if ( Input::Instance().IsPressed( 'Z' ) )
+  {
+    m_Camera->LocalTranslate( 0, -5 * delta_seconds, 0 );
+  }
+  if ( Input::Instance().IsPressed( 'X' ) )
+  {
+    m_Camera->LocalTranslate( 0, 5 * delta_seconds, 0 );
   }
 
   m_World.GetECS().each(
