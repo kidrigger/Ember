@@ -250,7 +250,18 @@ void Ember::BasicApp::LoadContent()
 
   // Setup Lights
   LightManager::Create( m_LightManager.get(), m_RenderDevice.get(), &m_World, RenderDevice::kNumFrames );
-  m_LightManager->AddShadowingDirLight( { 1.0f, -1.0f, 0.0f }, Color32::White(), 5.0f );
+
+  m_World.GetECS()
+      .entity( "Dir Light" )
+      .add<ShadowCaster>()
+      .insert(
+          [&]( WorldTransform&, LocalTransform& lt, DirectionalLight& dl )
+          {
+            lt.Rotation = DirectX::XMQuaternionRotationRollPitchYaw(
+                DirectX::XMConvertToRadians( -45.0f ), DirectX::XMConvertToRadians( 45.0f ), 0.0f );
+            dl.Intensity = 5.0f;
+            dl.FarPlane  = 100.0f;
+          } );
 
   m_World.GetECS()
       .entity( "OmniLight 0" )
@@ -987,10 +998,11 @@ void Ember::BasicApp::Render()
   auto bindless_desc_heaps = m_RenderDevice->GetBindlessDescriptorHeaps();
   command_list->SetDescriptorHeaps( CountOf( bindless_desc_heaps ), DataOf( bindless_desc_heaps ) );
 
+  LightManager::GpuInfo light_info = m_LightManager->PrepareFrame( *m_Camera, frame_idx );
+
   m_LightManager->RenderAllShadows( command_list.Get(), draw_list_info, *m_RenderTargetManager, *m_Camera, frame_idx );
 
-  LightManager::GpuInfo light_info        = m_LightManager->PrepareFrame( frame_idx );
-  SRVHandle const       materials_srv     = m_MaterialManager->PrepareFrame();
+  SRVHandle const materials_srv           = m_MaterialManager->PrepareFrame();
 
   m_FGBlackboard.get<PerFrameConstants>() = {
     .MaterialsBuffer = materials_srv,

@@ -17,13 +17,13 @@ void Ember::Camera::UpdateRepr()
   if ( m_DirtyFlags & kProjDirtyBit )
   {
     m_Repr.Projection =
-        DirectX::XMMatrixPerspectiveFovRH( m_HorizontalFoV / m_AspectRatio, m_AspectRatio, 0.1f, 100.0f );
+        DirectX::XMMatrixPerspectiveFovRH( m_HorizontalFoV / m_AspectRatio, m_AspectRatio, 0.1f, 1000.0f );
     m_Repr.InvProj       = XMMatrixInverse( nullptr, m_Repr.Projection );
 
     m_Repr.FrustumInfo.x = std::tan( m_HorizontalFoV * 0.5f );
     m_Repr.FrustumInfo.y = std::tan( m_HorizontalFoV / m_AspectRatio * 0.5f );
     m_Repr.FrustumInfo.z = 0.1f;
-    m_Repr.FrustumInfo.w = 100.0f;
+    m_Repr.FrustumInfo.w = 1000.0f;
   }
 
   if ( m_DirtyFlags )

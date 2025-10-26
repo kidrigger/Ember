@@ -18,7 +18,6 @@ namespace Internal
 
 class SpotLightManager
 {
-  using BumpAllocator                             = std::pmr::monotonic_buffer_resource;
   using QueryLights                               = flecs::query<WorldTransform const, SpotLight const>;
 
   uint32_t constexpr static kSpotShadowResolution = 1024;
@@ -50,8 +49,6 @@ class SpotLightManager
   uint32_t                    m_TotalLightCount{ 0 };
   uint32_t                    m_ShadowingLightCount{ 0 };
 
-  BumpAllocator               m_BumpAlloc;
-
   SRVHandle                   AllocateSpotShadow();
   void                        ClearShadows();
 
@@ -69,8 +66,6 @@ public:
   static void Create( SpotLightManager* light_manager, RenderDevice* render_device, World* world, uint32_t num_frames );
 
   LightInfo   PrepareFrame( uint32_t frame_index );
-  [[nodiscard]] uint32_t GetSpotLightCount() const;
-  [[nodiscard]] uint32_t GetShadowingSpotLightCount() const;
 
   //
   void RenderAllShadows(

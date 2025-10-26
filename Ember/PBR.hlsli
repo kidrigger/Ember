@@ -195,7 +195,9 @@ float3 CalcShadowingLightContrib(
   ls_position.xy      = float2( 0.5f, -0.5f ) * ls_position.xy + 0.5f; // must invert y
 
   // Shadow test
-  float shadowing = shadow_map.SampleCmp( shadow_sampler, float3( ls_position.xy, cascade ), ls_position.z );
+  float shadowing = ls_position.z > dir_light.FarPlane
+                        ? 1.0f
+                        : shadow_map.SampleCmp( shadow_sampler, float3( ls_position.xy, cascade ), ls_position.z );
 
   // Expects direction *to* light.
   return shadowing * brdf.Evaluate( dir_light.GetRadiance(), view_dir, -dir_light.Direction );

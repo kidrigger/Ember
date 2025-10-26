@@ -40,17 +40,9 @@ public:
       std::unique_ptr<Internal::OmniLightManager>      omni_light_manager,
       std::unique_ptr<Internal::DirectionLightManager> dir_light_manager,
       std::unique_ptr<Internal::SpotLightManager>      spot_light_manager );
-  static void    Create( LightManager* light_manager, RenderDevice* render_device, World* world, uint32_t num_frames );
+  static void Create( LightManager* light_manager, RenderDevice* render_device, World* world, uint32_t num_frames );
 
-  DirLightHandle AddDirLight( DirectX::XMFLOAT3 direction, Color32 color, float intensity );
-  DirLightHandle AddShadowingDirLight( DirectX::XMFLOAT3 direction, Color32 color, float intensity );
-  void           Free( DirLightHandle dir_light_handle );
-
-  [[nodiscard]] GpuInfo  PrepareFrame( uint32_t frame_index ) const;
-  [[nodiscard]] uint32_t GetOmniLightCount() const;
-  [[nodiscard]] uint32_t GetShadowingOmniLightCount() const;
-  [[nodiscard]] uint16_t GetDirLightCount() const;
-  [[nodiscard]] uint16_t GetShadowingDirLightCount() const;
+  [[nodiscard]] GpuInfo PrepareFrame( Camera const& camera, uint32_t frame_index ) const;
 
   //
   void RenderAllShadows(

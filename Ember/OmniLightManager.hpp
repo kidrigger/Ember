@@ -22,7 +22,6 @@ namespace Internal
 
 class OmniLightManager
 {
-  using BumpAllocator                             = std::pmr::monotonic_buffer_resource;
   using QueryLights                               = flecs::query<WorldTransform const, OmniLight const>;
 
   uint32_t constexpr static kOmniShadowResolution = 1024;
@@ -41,7 +40,6 @@ class OmniLightManager
   RenderDevice*               m_RenderDevice{ nullptr };
   World*                      m_World{ nullptr };
   Buffer                      m_ShadowProjectionBuffer;
-  BumpAllocator               m_BumpAlloc;
   ComPtr<ID3D12RootSignature> m_RootSignature;
   ComPtr<ID3D12PipelineState> m_Pipeline;
   std::vector<OmniLightRepr>  m_LightData;
@@ -71,8 +69,6 @@ public:
   static void Create( OmniLightManager* light_manager, RenderDevice* render_device, World* world, uint32_t num_frames );
 
   LightInfo   PrepareFrame( uint32_t frame_index );
-  [[nodiscard]] uint32_t GetOmniLightCount() const;
-  [[nodiscard]] uint32_t GetShadowingOmniLightCount() const;
 
   //
   void RenderAllShadows(
@@ -96,7 +92,6 @@ struct OmniLight
   Color32 Color{ Color32::White() };
   float   Range{ kRangeAuto };
   float   Intensity{ 1.0f };
-  bool    CastsShadow{ false };
 };
 
 } // namespace Ember

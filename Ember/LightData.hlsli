@@ -46,7 +46,7 @@ struct DirLight
   PackedColor32 Color;                       // 400
   float         Intensity;                   // 404
   ResID         ShadowIdx;                   // 408
-  uint          Pad0;                        // 412
+  float         FarPlane;                    // 412
   uint          Pad1;                        // 416
   float4        CascadesSph[NUM_CASCADES];   // 512
 

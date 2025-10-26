@@ -237,16 +237,6 @@ Ember::LightInfo Ember::Internal::SpotLightManager::PrepareFrame( uint32_t const
   return { m_DataBuffers[frame_index].GetSRVHandle(), m_ShadowingLightCount, m_TotalLightCount };
 }
 
-uint32_t Ember::Internal::SpotLightManager::GetSpotLightCount() const
-{
-  return m_TotalLightCount;
-}
-
-uint32_t Ember::Internal::SpotLightManager::GetShadowingSpotLightCount() const
-{
-  return m_ShadowingLightCount;
-}
-
 void Ember::Internal::SpotLightManager::RenderAllShadows(
     ID3D12GraphicsCommandList6* command_list,
     DrawList::Batches const&    draw_list,
@@ -268,10 +258,8 @@ void Ember::Internal::SpotLightManager::RenderAllShadows(
   command_list->RSSetScissorRects( 1, &scissor );
   command_list->RSSetViewports( 1, &viewport );
 
-  std::pmr::vector<CD3DX12_RESOURCE_BARRIER> barriers{
-    m_ShadowingLightCount,
-    std::pmr::polymorphic_allocator( &m_BumpAlloc ),
-  };
+  static std::vector<CD3DX12_RESOURCE_BARRIER> barriers;
+  barriers.resize( m_ShadowingLightCount );
 
   std::transform(
       m_ActiveShadows.begin(),

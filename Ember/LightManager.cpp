@@ -19,7 +19,7 @@ void Ember::LightManager::Create(
   Internal::OmniLightManager::Create( omni_light_manager.get(), render_device, world, num_frames );
 
   auto dir_light_manager = std::make_unique_for_overwrite<Internal::DirectionLightManager>();
-  Internal::DirectionLightManager::Create( dir_light_manager.get(), render_device, num_frames );
+  Internal::DirectionLightManager::Create( dir_light_manager.get(), render_device, world, num_frames );
 
   auto spot_light_manager = std::make_unique_for_overwrite<Internal::SpotLightManager>();
   Internal::SpotLightManager::Create( spot_light_manager.get(), render_device, world, num_frames );
@@ -31,50 +31,13 @@ void Ember::LightManager::Create(
   };
 }
 
-Ember::DirLightHandle Ember::LightManager::AddDirLight(
-    DirectX::XMFLOAT3 const direction, Color32 const color, float const intensity )
-{
-  return m_DirLightManager->AddDirLight( direction, color, intensity );
-}
-
-Ember::DirLightHandle Ember::LightManager::AddShadowingDirLight(
-    DirectX::XMFLOAT3 const direction, Color32 const color, float const intensity )
-{
-  return m_DirLightManager->AddShadowingDirLight( direction, color, intensity );
-}
-
-void Ember::LightManager::Free( DirLightHandle const dir_light_handle )
-{
-  m_DirLightManager->Free( dir_light_handle );
-}
-
-Ember::LightManager::GpuInfo Ember::LightManager::PrepareFrame( uint32_t const frame_index ) const
+Ember::LightManager::GpuInfo Ember::LightManager::PrepareFrame( Camera const& camera, uint32_t const frame_index ) const
 {
   return {
     .OmniLightInfo = m_OmniLightManager->PrepareFrame( frame_index ),
-    .DirLightInfo  = m_DirLightManager->PrepareFrame( frame_index ),
+    .DirLightInfo  = m_DirLightManager->PrepareFrame( camera, frame_index ),
     .SpotLightInfo = m_SpotLightManager->PrepareFrame( frame_index ),
   };
-}
-
-uint32_t Ember::LightManager::GetOmniLightCount() const
-{
-  return m_OmniLightManager->GetOmniLightCount();
-}
-
-uint32_t Ember::LightManager::GetShadowingOmniLightCount() const
-{
-  return m_OmniLightManager->GetShadowingOmniLightCount();
-}
-
-uint16_t Ember::LightManager::GetDirLightCount() const
-{
-  return m_DirLightManager->GetDirLightCount();
-}
-
-uint16_t Ember::LightManager::GetShadowingDirLightCount() const
-{
-  return m_DirLightManager->GetShadowingDirLightCount();
 }
 
 void Ember::LightManager::RenderAllShadows(

@@ -21,33 +21,11 @@ struct PackedData
 };
 } // namespace
 
-void Ember::Internal::DirectionLightManager::SetDirty()
+Ember::SRVHandle Ember::Internal::DirectionLightManager::AllocateShadow()
 {
-  m_DirtyFrames = ( uint8_t )m_DataBuffers.size();
-}
-
-void Ember::Internal::DirectionLightManager::SwapTrueLocations( uint16_t const first, uint16_t const second )
-{
-  if ( first == second ) return;
-
-  auto const indirection_first  = std::ranges::find( m_IndirectionMap, first );
-  auto const indirection_second = std::ranges::find( m_IndirectionMap, second );
-  ASSERT( indirection_first != std::ranges::end( m_IndirectionMap ) );
-  ASSERT( indirection_second != std::ranges::end( m_IndirectionMap ) );
-  *indirection_first  = second;
-  *indirection_second = first;
-
-  std::swap( m_LightData[first], m_LightData[second] );
-}
-
-Ember::SRVHandle Ember::Internal::DirectionLightManager::AllocateDirShadow( DirLightHandle const dir_light_idx )
-{
-  ASSERT( not m_ShadowsInUse.Contains( dir_light_idx ) );
-
-  Texture tex;
-  if ( m_ShadowCache.empty() )
+  if ( m_AllocatedShadows == m_ActiveShadows.size() )
   {
-    tex = m_RenderDevice->CreateTexture2D( {
+    m_ActiveShadows.emplace_back( m_RenderDevice->CreateTexture2D( {
         .Format    = DXGI_FORMAT_D16_UNORM,
         .Width     = kDirShadowResolution,
         .Height    = kDirShadowResolution,
@@ -55,59 +33,48 @@ Ember::SRVHandle Ember::Internal::DirectionLightManager::AllocateDirShadow( DirL
         .MipLevels = MipLevels::kBase,
         .ArraySize = kNumCascades,
         .InitState = D3D12_RESOURCE_STATE_PIXEL_SHADER_RESOURCE,
-    } );
-    wchar_t buf[36];
-    swprintf_s( buf, L"Dir Shadow Map %llu", m_ShadowsInUse.Size() );
-    tex.SetName( buf );
-  }
-  else
-  {
-    tex = m_ShadowCache.front();
-    m_ShadowCache.pop();
+    } ) );
+
+    wchar_t buf[32];
+    swprintf_s( buf, L"Dir Shadow Map %u", m_AllocatedShadows );
+    m_ActiveShadows.back().SetName( buf );
   }
 
-  SRVHandle const handle        = tex.GetSRVHandle();
-  m_ShadowsInUse[dir_light_idx] = std::move( tex );
-  return handle;
+  return m_ActiveShadows[m_AllocatedShadows++].GetSRVHandle();
 }
 
-void Ember::Internal::DirectionLightManager::FreeDirShadow( DirLightHandle const dir_light_idx )
+void Ember::Internal::DirectionLightManager::ClearShadows()
 {
-  if ( auto it = m_ShadowsInUse.Find( dir_light_idx ); it != m_ShadowsInUse.end() )
-  {
-    m_ShadowCache.push( it->second );
-    m_ShadowsInUse.Erase( it );
-    return;
-  }
-
-  UNREACHABLE_M( "Point Light should be actually allocated." );
+  m_AllocatedShadows = 0;
 }
 
 Ember::Internal::DirectionLightManager::DirectionLightManager(
     RenderDevice* const         render_device,
+    World* const                world,
     std::vector<Buffer>         data_buffers,
     ComPtr<ID3D12PipelineState> pipeline,
     ComPtr<ID3D12RootSignature> root_signature )
   : m_RenderDevice{ render_device }
+  , m_World{ world }
   , m_RootSignature{ std::move( root_signature ) }
   , m_Pipeline{ std::move( pipeline ) }
   , m_DataBuffers{ std::move( data_buffers ) }
 {
-  for ( uint16_t i = 0; i < kMaxDirLights; ++i )
-  {
-    m_IndirectionMap[i] = i + 1;
-  }
-  m_IndirectionFreeHead = 0;
+  m_LightQuery =
+      m_World->GetECS().query_builder<WorldTransform const, DirectionalLight const>().without<ShadowCaster>().build();
+
+  m_ShadowLightQuery =
+      m_World->GetECS().query_builder<WorldTransform const, DirectionalLight const>().with<ShadowCaster>().build();
 }
 
 void Ember::Internal::DirectionLightManager::Create(
-    DirectionLightManager* light_manager, RenderDevice* render_device, uint32_t const num_frames )
+    DirectionLightManager* light_manager, RenderDevice* render_device, World* world, uint32_t const num_frames )
 {
   std::vector<Buffer> data_buffers;
   for ( uint32_t i = 0; i < num_frames; i++ )
   {
     data_buffers.push_back(
-        render_device->CreateStorageBuffer( sizeof( DirLight ) * kMaxDirLights, sizeof( DirLight ) ) );
+        render_device->CreateStorageBuffer( sizeof( DirLightRepr ) * kMaxDirLights, sizeof( DirLightRepr ) ) );
   }
 
   ComPtr<ID3DBlob> shadow_amp_shader;
@@ -184,210 +151,13 @@ void Ember::Internal::DirectionLightManager::Create(
   ERR_ABORT( shadow_pipeline->SetName( L"Dir Shadow Pipeline" ) );
 
   new ( light_manager ) DirectionLightManager{
-    render_device,
-    std::move( data_buffers ),
-    std::move( shadow_pipeline ),
-    std::move( shadow_root_sig ),
+    render_device, world, std::move( data_buffers ), std::move( shadow_pipeline ), std::move( shadow_root_sig ),
   };
 }
 
-Ember::DirLightHandle Ember::Internal::DirectionLightManager::AddDirLight(
-    DirectX::XMFLOAT3 const direction, Color32 const color, float const intensity )
+void Ember::Internal::DirectionLightManager::CalculateShadowParameters(
+    DirectX::BoundingFrustum const& camera_frustum, DirLightRepr* dir_light )
 {
-  ASSERT_M( m_TotalLightCount < kMaxDirLights, "All free locs exhausted" );
-
-  uint16_t const    true_index = m_TotalLightCount;
-  uint16_t const    index      = m_IndirectionFreeHead;
-
-  uint16_t const    generation = m_HandleGeneration[index];
-
-  DirectX::XMFLOAT3 normalized_dir;
-  XMStoreFloat3( &normalized_dir, DirectX::XMVector3Normalize( XMLoadFloat3( &direction ) ) );
-
-  m_LightData[true_index] = DirLight{
-    .Direction = normalized_dir,
-    .Color     = color,
-    .Intensity = intensity,
-    .ShadowMap = {},
-  };
-
-  m_IndirectionFreeHead   = m_IndirectionMap[index];
-  m_IndirectionMap[index] = true_index;
-  m_TotalLightCount++;
-
-  SetDirty();
-
-  return DirLightHandle{ index, generation };
-}
-
-Ember::DirLightHandle Ember::Internal::DirectionLightManager::AddShadowingDirLight(
-    DirectX::XMFLOAT3 const direction, Color32 const color, float const intensity )
-{
-  ASSERT_M( m_TotalLightCount < kMaxDirLights, "All free locs exhausted" );
-
-  // Relocate the location to allocate at.
-  SwapTrueLocations( m_ShadowingLightCount, m_TotalLightCount );
-
-  uint16_t const       true_index = m_ShadowingLightCount;
-  uint16_t const       index      = m_IndirectionFreeHead;
-
-  uint16_t const       generation = m_HandleGeneration[index];
-
-  DirLightHandle const handle{ index, generation };
-
-  SRVHandle const      shadow_map = AllocateDirShadow( handle );
-
-  ASSERT( shadow_map );
-
-  DirectX::XMFLOAT3 normalized_dir;
-  XMStoreFloat3( &normalized_dir, DirectX::XMVector3Normalize( XMLoadFloat3( &direction ) ) );
-
-  m_LightData[true_index] = {
-    .Direction = normalized_dir,
-    .Color     = color,
-    .Intensity = intensity,
-    .ShadowMap = shadow_map,
-  };
-
-  m_IndirectionFreeHead   = m_IndirectionMap[index];
-  m_IndirectionMap[index] = true_index;
-  m_TotalLightCount++;
-  m_ShadowingLightCount++;
-
-  SetDirty();
-
-  return handle;
-}
-
-void Ember::Internal::DirectionLightManager::Free( DirLightHandle const dir_light_handle )
-{
-  uint16_t const index      = dir_light_handle.GetIndex();
-  uint16_t const generation = dir_light_handle.GetGeneration();
-
-  ASSERT( m_HandleGeneration[index] == generation );
-  m_HandleGeneration[index]++;
-
-  uint16_t const true_index         = m_IndirectionMap[index];
-
-  uint16_t const last_dir_light_idx = m_TotalLightCount - 1;
-
-  if ( true_index < m_ShadowingLightCount )
-  {
-    uint16_t const last_shadowing_idx = m_ShadowingLightCount - 1;
-    // To pack all shadow casters together
-    // Swap with last shadow caster
-    SwapTrueLocations( true_index, last_shadowing_idx );
-    // Then swap with last light
-    SwapTrueLocations( last_shadowing_idx, last_dir_light_idx );
-
-    FreeDirShadow( dir_light_handle );
-    m_LightData[last_dir_light_idx].ShadowMap = {};
-  }
-  else
-  {
-    // True index non-shadow casting.
-    SwapTrueLocations( true_index, last_dir_light_idx );
-  }
-
-  m_TotalLightCount--;
-
-  SetDirty();
-
-  if ( m_HandleGeneration[index] == UINT16_MAX ) return; // Handle no longer usable.
-
-  m_IndirectionMap[index] = m_IndirectionFreeHead;
-  m_IndirectionFreeHead   = index;
-}
-
-Ember::LightInfo Ember::Internal::DirectionLightManager::PrepareFrame( uint32_t const frame_index )
-{
-  if ( m_DirtyFrames )
-  {
-    m_DataBuffers[frame_index].Write( 0, sizeof( DirLight ) * m_TotalLightCount, DataOf( m_LightData ) );
-    m_DirtyFrames--;
-  }
-
-  return { m_DataBuffers[frame_index].GetSRVHandle(), m_ShadowingLightCount, m_TotalLightCount };
-}
-
-uint16_t Ember::Internal::DirectionLightManager::GetDirLightCount() const
-{
-  return m_TotalLightCount;
-}
-
-uint16_t Ember::Internal::DirectionLightManager::GetShadowingDirLightCount() const
-{
-  return m_ShadowingLightCount;
-}
-
-void Ember::Internal::DirectionLightManager::RenderAllShadows(
-    ID3D12GraphicsCommandList6* command_list,
-    DrawList::Batches const&    draw_info,
-    RenderTargetManager const&  rtm,
-    Camera const&               camera,
-    uint32_t const              frame_idx )
-{
-  ZoneScoped;
-  command_list->SetGraphicsRootSignature( m_RootSignature.Get() );
-  command_list->SetPipelineState( m_Pipeline.Get() );
-  command_list->IASetPrimitiveTopology( D3D_PRIMITIVE_TOPOLOGY_TRIANGLELIST );
-
-  D3D12_RECT const     scissor  = { 0, 0, kDirShadowResolution, kDirShadowResolution };
-  D3D12_VIEWPORT const viewport = { 0, 0, kDirShadowResolution, kDirShadowResolution, 0.0f, 1.0f };
-
-  command_list->RSSetScissorRects( 1, &scissor );
-  command_list->RSSetViewports( 1, &viewport );
-
-  static std::vector<CD3DX12_RESOURCE_BARRIER> barriers;
-  barriers.resize( m_ShadowsInUse.Size() );
-
-  std::ranges::transform(
-      m_ShadowsInUse.Values(),
-      barriers.begin(),
-      []( Texture const& tex )
-      {
-        return CD3DX12_RESOURCE_BARRIER::Transition(
-            tex.GetTexture(), D3D12_RESOURCE_STATE_PIXEL_SHADER_RESOURCE, D3D12_RESOURCE_STATE_DEPTH_WRITE );
-      } );
-  if ( not barriers.empty() ) command_list->ResourceBarrier( CountOf( barriers ), DataOf( barriers ) );
-
-  for ( auto const& [handle, texture] : m_ShadowsInUse )
-  {
-    uint32_t const index = handle.GetIndex();
-    ASSERT( handle.GetGeneration() == m_HandleGeneration[index] );
-    DirLight* light = &m_LightData[index];
-
-    RenderDirShadow( command_list, draw_info, rtm, light, texture, camera, frame_idx, index );
-  }
-
-  std::ranges::transform(
-      m_ShadowsInUse.Values(),
-      barriers.begin(),
-      []( Texture const& tex )
-      {
-        return CD3DX12_RESOURCE_BARRIER::Transition(
-            tex.GetTexture(), D3D12_RESOURCE_STATE_DEPTH_WRITE, D3D12_RESOURCE_STATE_PIXEL_SHADER_RESOURCE );
-      } );
-  if ( not barriers.empty() ) command_list->ResourceBarrier( CountOf( barriers ), DataOf( barriers ) );
-}
-
-void Ember::Internal::DirectionLightManager::RenderDirShadow(
-    ID3D12GraphicsCommandList6* command_list,
-    DrawList::Batches const&    draw_info,
-    RenderTargetManager const&  rtm,
-    DirLight*                   dir_light,
-    Texture const&              texture,
-    Camera const&               camera,
-    uint32_t const              frame_index,
-    uint32_t const              light_index )
-{
-  PIXScopedEvent( command_list, PIX_COLOR_DEFAULT, "Render Directional Shadow %u", light_index );
-  ZoneScoped;
-
-  DirectX::BoundingFrustum const& camera_frust = camera.GetLastUpdatedFrustum();
-
-  rtm.ClearDepthStencilView( command_list, texture, D3D12_CLEAR_FLAG_DEPTH, 1.0f, 0 );
-
   // Setup Light-Space basis
   DirectX::FXMVECTOR direction = XMLoadFloat3( &dir_light->Direction );
   ASSERT_M(
@@ -416,15 +186,16 @@ void Ember::Internal::DirectionLightManager::RenderDirShadow(
   float cascades[kNumCascades + 1];
   for ( int i = 0; i <= kNumCascades; i++ )
   {
-    float c_log = camera_frust.Near * pow( camera_frust.Far / camera_frust.Near, ( float )i / ( float )kNumCascades );
-    float c_uni = std::lerp( camera_frust.Near, camera_frust.Far, ( float )i / ( float )kNumCascades );
+    float c_log =
+        camera_frustum.Near * pow( camera_frustum.Far / camera_frustum.Near, ( float )i / ( float )kNumCascades );
+    float c_uni = std::lerp( camera_frustum.Near, camera_frustum.Far, ( float )i / ( float )kNumCascades );
     cascades[i] = std::lerp( c_log, c_uni, kCascadeLambda );
   }
 
   DirectX::XMFLOAT4 cull_params[kNumCascades];
   for ( int cascade_id = 0; cascade_id < kNumCascades; cascade_id++ )
   {
-    DirectX::BoundingFrustum frustum = camera_frust;
+    DirectX::BoundingFrustum frustum = camera_frustum;
 
     frustum.Near                     = cascades[cascade_id] - kCascadeOverlap;
     frustum.Far                      = cascades[cascade_id + 1] + kCascadeOverlap;
@@ -461,8 +232,135 @@ void Ember::Internal::DirectionLightManager::RenderDirShadow(
     dir_light->LightSpaceMatrix[cascade_id] = proj_view;
     dir_light->CascadeSph[cascade_id]       = cull_params[cascade_id];
   }
+}
 
-  SetDirty();
+Ember::LightInfo Ember::Internal::DirectionLightManager::PrepareFrame(
+    Camera const& camera, uint32_t const frame_index )
+{
+  m_LightData.clear();
+  ClearShadows();
+
+  DirectX::BoundingFrustum camera_frust = camera.GetLastUpdatedFrustum();
+
+  // Camera is right-handed but with DXMath, Near is positive, Far is negative
+  float const default_far_plane = std::max( camera_frust.Near, -150.0f );
+
+  m_ShadowLightQuery.each(
+      [&]( WorldTransform const& transform, DirectionalLight const& light )
+      {
+        DirectX::XMFLOAT3 direction;
+        XMStoreFloat3( &direction, XMVector3Transform( kForward, transform.Transform ) );
+        float const far_plane = light.FarPlane > 0.0f ? light.FarPlane : default_far_plane;
+
+        m_LightData.push_back( {
+            .Direction = direction,
+            .Color     = light.Color,
+            .Intensity = light.Intensity,
+            .ShadowMap = AllocateShadow(),
+            .FarPlane  = far_plane,
+        } );
+
+        // Camera is right-handed but with DXMath, Near is positive, Far is negative
+        camera_frust.Near = -far_plane;
+        CalculateShadowParameters( camera_frust, &m_LightData.back() );
+      } );
+
+  m_ShadowingLightCount = ( uint32_t )m_LightData.size();
+
+  m_LightQuery.each(
+      [&]( WorldTransform const& transform, DirectionalLight const& light )
+      {
+        DirectX::XMFLOAT3 direction;
+        XMStoreFloat3( &direction, XMVector3Transform( kForward, transform.Transform ) );
+
+        m_LightData.push_back( {
+            .Direction = direction,
+            .Color     = light.Color,
+            .Intensity = light.Intensity,
+        } );
+      } );
+
+  m_TotalLightCount = ( uint32_t )m_LightData.size();
+
+  if ( m_DataBuffers[frame_index].GetSize() < m_TotalLightCount * sizeof( DirLightRepr ) )
+  {
+    m_DataBuffers[frame_index] =
+        m_RenderDevice->CreateStorageBuffer( ByteSizeOf( m_LightData ), StrideOf( m_LightData ) );
+    wchar_t name[] = L"Dir Light Buffer 0";
+    name[18]       = L'0' + ( wchar_t )frame_index;
+    m_DataBuffers[frame_index].SetName( name );
+  }
+  m_DataBuffers[frame_index].Write( 0, ByteSizeOf( m_LightData ), DataOf( m_LightData ) );
+
+  return { m_DataBuffers[frame_index].GetSRVHandle(), m_ShadowingLightCount, m_TotalLightCount };
+}
+
+void Ember::Internal::DirectionLightManager::RenderAllShadows(
+    ID3D12GraphicsCommandList6* command_list,
+    DrawList::Batches const&    draw_info,
+    RenderTargetManager const&  rtm,
+    Camera const&               camera,
+    uint32_t const              frame_idx )
+{
+  ZoneScoped;
+  command_list->SetGraphicsRootSignature( m_RootSignature.Get() );
+  command_list->SetPipelineState( m_Pipeline.Get() );
+  command_list->IASetPrimitiveTopology( D3D_PRIMITIVE_TOPOLOGY_TRIANGLELIST );
+
+  D3D12_RECT const     scissor  = { 0, 0, kDirShadowResolution, kDirShadowResolution };
+  D3D12_VIEWPORT const viewport = { 0, 0, kDirShadowResolution, kDirShadowResolution, 0.0f, 1.0f };
+
+  command_list->RSSetScissorRects( 1, &scissor );
+  command_list->RSSetViewports( 1, &viewport );
+
+  static std::vector<CD3DX12_RESOURCE_BARRIER> barriers;
+  barriers.resize( m_ActiveShadows.size() );
+
+  std::transform(
+      m_ActiveShadows.begin(),
+      m_ActiveShadows.begin() + m_AllocatedShadows,
+      barriers.begin(),
+      []( Texture const& tex )
+      {
+        return CD3DX12_RESOURCE_BARRIER::Transition(
+            tex.GetTexture(), D3D12_RESOURCE_STATE_PIXEL_SHADER_RESOURCE, D3D12_RESOURCE_STATE_DEPTH_WRITE );
+      } );
+  if ( not barriers.empty() ) command_list->ResourceBarrier( CountOf( barriers ), DataOf( barriers ) );
+
+  for ( uint32_t index = 0; index < m_AllocatedShadows; index++ )
+  {
+    RenderDirShadow( command_list, draw_info, rtm, camera, frame_idx, index );
+  }
+
+  std::transform(
+      m_ActiveShadows.begin(),
+      m_ActiveShadows.begin() + m_AllocatedShadows,
+      barriers.begin(),
+      []( Texture const& tex )
+      {
+        return CD3DX12_RESOURCE_BARRIER::Transition(
+            tex.GetTexture(), D3D12_RESOURCE_STATE_DEPTH_WRITE, D3D12_RESOURCE_STATE_PIXEL_SHADER_RESOURCE );
+      } );
+
+  if ( not barriers.empty() ) command_list->ResourceBarrier( CountOf( barriers ), DataOf( barriers ) );
+}
+
+void Ember::Internal::DirectionLightManager::RenderDirShadow(
+    ID3D12GraphicsCommandList6* command_list,
+    DrawList::Batches const&    draw_info,
+    RenderTargetManager const&  rtm,
+    Camera const&               camera,
+    uint32_t const              frame_index,
+    uint32_t const              light_index )
+{
+  PIXScopedEvent( command_list, PIX_COLOR_DEFAULT, "Render Directional Shadow %u", light_index );
+  ZoneScoped;
+
+  Texture&      texture   = m_ActiveShadows[light_index];
+  DirLightRepr& dir_light = m_LightData[light_index];
+
+  rtm.ClearDepthStencilView( command_list, texture, D3D12_CLEAR_FLAG_DEPTH, 1.0f, 0 );
+
 
   PackedData packed_data{
     .DrawList     = draw_info.Opaque,
@@ -470,10 +368,12 @@ void Ember::Internal::DirectionLightManager::RenderDirShadow(
     .LightIdx     = light_index,
     .CameraBuffer = camera.GetLastUpdatedBuffer(),
   };
+
   command_list->SetGraphicsRoot32BitConstants( 0, sizeof( packed_data ) / 4, &packed_data, 0 );
   rtm.OMSetRenderTargets( command_list, 0, nullptr, &texture );
 
   // TODO: Alpha tested + Blended
-  command_list->SetGraphicsRoot32BitConstants( 1, ByteSizeOf( cull_params ) / 4, DataOf( cull_params ), 0 );
+  command_list->SetGraphicsRoot32BitConstants(
+      1, ByteSizeOf( dir_light.CascadeSph ) / 4, DataOf( dir_light.CascadeSph ), 0 );
   command_list->DispatchMesh( draw_info.Opaque.DrawCount, 1, 1 );
 }
