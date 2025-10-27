@@ -162,12 +162,12 @@ public:
 
 class World
 {
-  flecs::world                                                                 m_Ecs;
-  flecs::query<WorldTransform, LocalTransform const>                           m_UpdateRootWorldTransformQuery;
-  flecs::query<WorldTransform, LocalTransform const, WorldTransform const>     m_UpdateWorldTransformQuery;
-  flecs::query<WorldBoundingBox, LocalBoundingBox const, WorldTransform const> m_PrimeActualWorldAABBQuery;
-  flecs::query<WorldBoundingBox>                                               m_PrimeCollectingWorldAABBQuery;
-  flecs::query<WorldBoundingBox, WorldBoundingBox const>                       m_UpdateWorldAABBQuery;
+  flecs::world  m_Ecs;
+  flecs::system m_UpdateRootWorldTransformSys;
+  flecs::system m_UpdateWorldTransformSys;
+  flecs::system m_PrimeActualWorldAABBSys;
+  flecs::system m_PrimeCollectingWorldAABBSys;
+  flecs::system m_UpdateWorldAABBSys;
 
 public:
   static ObjectPool<GeometryImpl>& GeometryManager();

@@ -77,7 +77,7 @@ Ember::GeometryImpl* Ember::Geometry::operator->() const
   return m_Impl;
 }
 
-Ember::Geometry::Geometry( Ember::GeometryImpl* const geometry ) : m_Impl{ geometry }
+Ember::Geometry::Geometry( GeometryImpl* const geometry ) : m_Impl{ geometry }
 {}
 
 Ember::Geometry::Geometry( Geometry&& other ) noexcept : m_Impl{ other.m_Impl }
@@ -228,65 +228,64 @@ size_t Ember::DrawList::GetTotalCount() const
 
 Ember::World::World()
 {
-  m_UpdateRootWorldTransformQuery =
-      m_Ecs.query_builder<WorldTransform, LocalTransform const>().without( flecs::ChildOf ).build();
+  m_UpdateRootWorldTransformSys = m_Ecs.system<WorldTransform, LocalTransform const>()
+                                      .without( flecs::ChildOf )
+                                      .each(
+                                          []( WorldTransform& wt, LocalTransform const& lt )
+                                          {
+                                            wt.Transform    = lt.GetTransform();
+                                            wt.InvTransform = XMMatrixInverse( nullptr, wt.Transform );
+                                          } );
 
-  m_UpdateWorldTransformQuery = m_Ecs.query_builder<WorldTransform, LocalTransform const, WorldTransform const>()
-                                    .term_at( 2 )
-                                    .parent()
-                                    .cascade()
-                                    .build();
+  m_UpdateWorldTransformSys =
+      m_Ecs.system<WorldTransform, LocalTransform const, WorldTransform const>().term_at( 2 ).parent().cascade().each(
+          []( WorldTransform& wt, LocalTransform const& lt, WorldTransform const& parent_wt )
+          {
+            wt.Transform    = XMMatrixMultiply( lt.GetTransform(), parent_wt.Transform );
+            wt.InvTransform = XMMatrixInverse( nullptr, wt.Transform );
+          } );
 
-  m_PrimeActualWorldAABBQuery =
-      m_Ecs.query_builder<WorldBoundingBox, LocalBoundingBox const, WorldTransform const>().build();
+  m_PrimeCollectingWorldAABBSys =
+      m_Ecs.system<WorldBoundingBox>().without<LocalBoundingBox>().each( []( WorldBoundingBox& wbb ) { wbb = {}; } );
 
-  m_PrimeCollectingWorldAABBQuery = m_Ecs.query_builder<WorldBoundingBox>().without<LocalBoundingBox>().build();
+  m_PrimeActualWorldAABBSys = m_Ecs.system<WorldBoundingBox, LocalBoundingBox const, WorldTransform const>().each(
+      []( WorldBoundingBox& wbb, LocalBoundingBox const& lbb, WorldTransform const& wt )
+      { lbb.AABB.Transform( wbb.AABB, wt.Transform ); } );
 
-  m_UpdateWorldAABBQuery =
-      m_Ecs.query_builder<WorldBoundingBox, WorldBoundingBox const>().term_at( 0 ).parent().cascade().desc().build();
+  m_UpdateWorldAABBSys =
+      m_Ecs.system<WorldBoundingBox, WorldBoundingBox const>().term_at( 0 ).parent().cascade().desc().each(
+          []( WorldBoundingBox& parent_bb, WorldBoundingBox const& bb )
+          {
+            if ( parent_bb.IsInit() )
+            {
+              DirectX::BoundingBox::CreateMerged( parent_bb.AABB, parent_bb.AABB, bb.AABB );
+            }
+            else
+            {
+              parent_bb.AABB = bb.AABB;
+            }
+          } );
 }
 
-void Ember::World::Update( float ) const
+void Ember::World::Update( float const delta_time ) const
 {
   ZoneScoped;
 
   {
     ZoneScopedN( "UpdateWorldTransforms" );
-    m_UpdateRootWorldTransformQuery.each(
-        []( WorldTransform& wt, LocalTransform const& lt )
-        {
-          wt.Transform    = lt.GetTransform();
-          wt.InvTransform = XMMatrixInverse( nullptr, wt.Transform );
-        } );
-    m_UpdateWorldTransformQuery.each(
-        []( WorldTransform& wt, LocalTransform const& lt, WorldTransform const& parent_wt )
-        {
-          wt.Transform    = XMMatrixMultiply( lt.GetTransform(), parent_wt.Transform );
-          wt.InvTransform = XMMatrixInverse( nullptr, wt.Transform );
-        } );
+    m_UpdateRootWorldTransformSys.run( delta_time );
+    m_UpdateWorldTransformSys.run( delta_time );
   }
 
   {
     ZoneScopedN( "PrimeWorldBoundingBoxes" );
-    m_PrimeCollectingWorldAABBQuery.each( []( WorldBoundingBox& wbb ) { wbb = {}; } );
-    m_PrimeActualWorldAABBQuery.each( []( WorldBoundingBox& wbb, LocalBoundingBox const& lbb, WorldTransform const& wt )
-                                      { lbb.AABB.Transform( wbb.AABB, wt.Transform ); } );
+    m_PrimeCollectingWorldAABBSys.run( delta_time );
+    m_PrimeActualWorldAABBSys.run( delta_time );
   }
 
   {
     ZoneScopedN( "UpdateWorldAABBQuery" );
-    m_UpdateWorldAABBQuery.each(
-        []( WorldBoundingBox& parent_bb, WorldBoundingBox const& bb )
-        {
-          if ( parent_bb.IsInit() )
-          {
-            DirectX::BoundingBox::CreateMerged( parent_bb.AABB, parent_bb.AABB, bb.AABB );
-          }
-          else
-          {
-            parent_bb.AABB = bb.AABB;
-          }
-        } );
+    m_UpdateWorldAABBSys.run( delta_time );
   }
 }
 
