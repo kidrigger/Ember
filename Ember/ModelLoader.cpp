@@ -186,11 +186,15 @@ flecs::entity Ember::ModelLoader::ProcessNode( LoadingContext* context, flecs::e
   }
 
   auto const my_node = m_World->GetECS().entity().child_of( parent ).insert(
-      [&]( LocalTransform& lt, WorldTransform&, WorldBoundingBox& )
+      [&]( Translation& translation_comp,
+           Rotation& rotation_comp,
+           Scale& scale_comp,
+           WorldTransform&,
+           WorldBoundingBox& )
       {
-        XMStoreFloat3( &lt.Translation, translation );
-        XMStoreFloat4( &lt.Rotation, rotation );
-        XMStoreFloat3( &lt.Scale, scale );
+        translation_comp = Translation{ translation };
+        rotation_comp    = Rotation{ rotation };
+        scale_comp       = Scale{ scale };
       } );
 
   if ( node.mesh )
@@ -516,7 +520,9 @@ void Ember::ModelLoader::ProcessPrimitive(
       .entity()
       .insert(
           [&]( WorldTransform&,
-               LocalTransform&,
+               Translation&,
+               Rotation&,
+               Scale&,
                WorldBoundingBox&,
                Mesh&             prim,
                Material&         mat,
@@ -729,7 +735,8 @@ std::optional<flecs::entity> Ember::ModelLoader::TryLoadModel( char const* filen
     return {};
   }
 
-  auto entity = m_World->GetECS().entity().insert( [&]( LocalTransform&, WorldTransform&, WorldBoundingBox& ) {} );
+  auto entity = m_World->GetECS().entity().insert(
+      [&]( Translation&, Rotation&, Scale&, WorldTransform&, WorldBoundingBox& ) {} );
 
   LoadingContext     context       = { .Geometry = World::GeometryManager().Construct() };
 

@@ -105,8 +105,8 @@ void Ember::BasicApp::InitImGui( HWND const window_handle, RenderDevice* render_
   ImGui::CreateContext();
   ImGuiIO& io = ImGui::GetIO();
   ( void )io;
-  io.ConfigFlags |= ImGuiConfigFlags_NavEnableKeyboard; // Enable Keyboard Controls
-  io.ConfigFlags |= ImGuiConfigFlags_NavEnableGamepad;  // Enable Gamepad Controls
+  // io.ConfigFlags |= ImGuiConfigFlags_NavEnableKeyboard; // Enable Keyboard Controls
+  io.ConfigFlags |= ImGuiConfigFlags_NavEnableGamepad; // Enable Gamepad Controls
   io.ConfigFlags |= ImGuiConfigFlags_DockingEnable;
   io.ConfigFlags |= ImGuiConfigFlags_DpiEnableScaleFonts;
 
@@ -262,19 +262,18 @@ void Ember::BasicApp::LoadContent()
   // Setup Lights
   LightManager::Create( m_LightManager.get(), m_RenderDevice.get(), &m_World, RenderDevice::kNumFrames );
 
-  m_SceneRoot = m_World.GetECS().entity( "SceneRoot" ).insert( []( WorldTransform&, LocalTransform& ) {} );
+  m_SceneRoot =
+      m_World.GetECS().entity( "SceneRoot" ).insert( []( WorldTransform&, Translation&, Rotation&, Scale& ) {} );
 
   m_World.GetECS()
       .entity( "Sun" )
       .child_of( m_SceneRoot )
       .add<ShadowCaster>()
       .insert(
-          [&]( WorldTransform&, LocalTransform& lt, DirectionalLight& dl )
+          [&]( WorldTransform&, Translation&, Rotation& rotation, Scale&, DirectionalLight& dl )
           {
-            XMStoreFloat4(
-                &lt.Rotation,
-                DirectX::XMQuaternionRotationRollPitchYaw(
-                    DirectX::XMConvertToRadians( -45.0f ), DirectX::XMConvertToRadians( 45.0f ), 0.0f ) );
+            rotation = ( Rotation )DirectX::XMQuaternionRotationRollPitchYaw(
+                DirectX::XMConvertToRadians( -45.0f ), DirectX::XMConvertToRadians( 45.0f ), 0.0f );
             dl.Intensity = 5.0f;
             dl.FarPlane  = 100.0f;
           } );
@@ -284,12 +283,12 @@ void Ember::BasicApp::LoadContent()
       .child_of( m_SceneRoot )
       .add<ShadowCaster>()
       .insert(
-          [&]( WorldTransform&, LocalTransform& lt, OmniLight& ol )
+          [&]( WorldTransform&, Translation& translation, Rotation&, Scale&, OmniLight& ol )
           {
-            lt.Translation = { 15.0f, 2.0f, 12.0f };
-            ol.Color       = Color32::Blue();
-            ol.Intensity   = 15.0f;
-            ol.Range       = 10.0f;
+            translation  = { 15.0f, 2.0f, 12.0f };
+            ol.Color     = Color32::Blue();
+            ol.Intensity = 15.0f;
+            ol.Range     = 10.0f;
           } );
 
   m_World.GetECS()
@@ -297,12 +296,12 @@ void Ember::BasicApp::LoadContent()
       .child_of( m_SceneRoot )
       .add<ShadowCaster>()
       .insert(
-          [&]( WorldTransform&, LocalTransform& lt, OmniLight& ol )
+          [&]( WorldTransform&, Translation& translation, Rotation&, Scale&, OmniLight& ol )
           {
-            lt.Translation = { 0.0f, 2.0f, 5.0f };
-            ol.Color       = Color32::Green();
-            ol.Intensity   = 15.0f;
-            ol.Range       = 10.0f;
+            translation  = { 0.0f, 2.0f, 5.0f };
+            ol.Color     = Color32::Green();
+            ol.Intensity = 15.0f;
+            ol.Range     = 10.0f;
           } );
 
   m_World.GetECS()
@@ -310,12 +309,12 @@ void Ember::BasicApp::LoadContent()
       .child_of( m_SceneRoot )
       .add<ShadowCaster>()
       .insert(
-          [&]( WorldTransform&, LocalTransform& lt, OmniLight& ol )
+          [&]( WorldTransform&, Translation& translation, Rotation&, Scale&, OmniLight& ol )
           {
-            lt.Translation = { -15.0f, 2.0f, -5.0f };
-            ol.Color       = Color32::Red();
-            ol.Intensity   = 25.0f;
-            ol.Range       = 10.0f;
+            translation  = { -15.0f, 2.0f, -5.0f };
+            ol.Color     = Color32::Red();
+            ol.Intensity = 25.0f;
+            ol.Range     = 10.0f;
           } );
 
   m_World.GetECS()
@@ -323,13 +322,11 @@ void Ember::BasicApp::LoadContent()
       .child_of( m_SceneRoot )
       .add<ShadowCaster>()
       .insert(
-          [&]( WorldTransform&, LocalTransform& lt, SpotLight& sl, RotatingModel& rm )
+          [&]( WorldTransform&, Translation& translation, Rotation& rotation, Scale&, SpotLight& sl, RotatingModel& rm )
           {
-            lt.Translation = { -15.0f, 1.0f, -5.0f };
-            XMStoreFloat4(
-                &lt.Rotation,
-                DirectX::XMQuaternionRotationRollPitchYaw(
-                    DirectX::XMConvertToRadians( -10.0f ), DirectX::XMConvertToRadians( 0.0f ), 0.0f ) );
+            translation = { -15.0f, 1.0f, -5.0f };
+            rotation    = ( Rotation )DirectX::XMQuaternionRotationRollPitchYaw(
+                DirectX::XMConvertToRadians( -10.0f ), DirectX::XMConvertToRadians( 0.0f ), 0.0f );
             sl.Color              = Color32::White();
             sl.ConeInnerHalfAngle = DirectX::XMConvertToRadians( 10.0f );
             sl.ConeOuterHalfAngle = DirectX::XMConvertToRadians( 15.0f );
@@ -345,31 +342,35 @@ void Ember::BasicApp::LoadContent()
       m_RenderDevice.get(), &m_World, m_TextureLoader.get(), m_MaterialManager.get(), m_GeometryManager.get() );
 
   // Setup Scene Geometry
-  _ = m_ModelLoader->TryLoadModel( "Sponza.glb" ).value().child_of( m_SceneRoot ).set_name( "Scene" );
+  _                      = m_ModelLoader->TryLoadModel( "Sponza.glb" )->child_of( m_SceneRoot ).set_name( "Scene" );
 
-  flecs::entity const rm =
-      m_World.GetECS()
-          .entity( "HelmetRotator" )
-          .child_of( m_SceneRoot )
-          .insert(
-              []( LocalTransform& local_tx, WorldTransform&, RotatingModel& rot_model, WorldBoundingBox& )
-              {
-                rot_model.Speed      = 20.0f;
-                local_tx.Translation = { 0.0f, 1.0f, 5.0f };
-              } );
+  flecs::entity const rm = m_World.GetECS()
+                               .entity( "HelmetRotator" )
+                               .child_of( m_SceneRoot )
+                               .insert(
+                                   []( Translation& translation,
+                                       Rotation&,
+                                       Scale&,
+                                       WorldTransform&,
+                                       RotatingModel& rot_model,
+                                       WorldBoundingBox& )
+                                   {
+                                     rot_model.Speed = 20.0f;
+                                     translation     = { 0.0f, 1.0f, 5.0f };
+                                   } );
 
-  flecs::entity model = m_ModelLoader->TryLoadModel( "DamagedHelmet.glb" )->set_name( "DamagedHelmet" ).child_of( rm );
-  LocalTransform* local_tx = &model.get_mut<LocalTransform>();
-  local_tx->Scale          = { 0.3f, 0.3f, 0.3f };
+  _ = m_ModelLoader->TryLoadModel( "DamagedHelmet.glb" )
+          ->child_of( rm )
+          .set_name( "DamagedHelmet" )
+          .set<Scale>( { 0.3f, 0.3f, 0.3f } );
 
-  model = m_ModelLoader->TryLoadModel( "AlphaBlendModeTest.glb" )->set_name( "AlphaBlendTest" ).child_of( m_SceneRoot );
-  local_tx                          = &model.get_mut<LocalTransform>();
-  local_tx->Translation             = { 5.0f, 2.0f, 7.0f };
+  _ = m_ModelLoader->TryLoadModel( "AlphaBlendModeTest.glb" )
+          ->child_of( m_SceneRoot )
+          .set_name( "AlphaBlendTest" )
+          .set<Translation>( { 5.0f, 2.0f, 7.0f } );
 
   constexpr char const* kEnvMapFile = "OvercastSoil.hdr";
-  bool const            env_loaded =
-      Environment::TryLoadFrom( m_Environment.get(), m_RenderDevice.get(), m_TextureLoader.get(), kEnvMapFile );
-  ENSURE( env_loaded );
+  ENSURE( Environment::TryLoadFrom( m_Environment.get(), m_RenderDevice.get(), m_TextureLoader.get(), kEnvMapFile ) );
 
   SetupRenderPasses();
   FG::Context::Create( &m_FGContext, m_RenderDevice.get() );
@@ -508,7 +509,6 @@ void Ember::BasicApp::Update()
 
   m_ConfigurationBuffer.Write( 0, sizeof( g_Debug ), &g_Debug );
 
-
   // TODO: Remove function static variables.
   static SceneTree    scene_tree;
   static PickingGizmo picking_gizmo;
@@ -537,91 +537,96 @@ void Ember::BasicApp::Update()
     1.0f,
   };
 
-  mouse_ndc.x = mouse_ndc.x * 2.0f - 1.0f;
-  mouse_ndc.y = 1.0f - mouse_ndc.y * 2.0f;
+  mouse_ndc.x             = mouse_ndc.x * 2.0f - 1.0f;
+  mouse_ndc.y             = 1.0f - mouse_ndc.y * 2.0f;
 
-  if ( Input::Instance().IsLeftMouseReleased() and not ImGui::GetIO().WantCaptureMouse )
+  ImGuiIO const& imgui_io = ImGui::GetIO();
+  if ( not imgui_io.WantCaptureMouse )
   {
-    DirectX::XMVECTOR ray_origin  = m_Camera->GetPosition();
-    DirectX::XMVECTOR ray_dir     = XMVector4Transform( XMLoadFloat4( &mouse_ndc ), m_Camera->GetInvProj() );
-    float             w           = DirectX::XMVectorGetW( ray_dir );
-    ray_dir                       = DirectX::XMVectorScale( ray_dir, 1.0f / w );
-    ray_dir                       = XMVector3Transform( ray_dir, m_Camera->GetInvView() );
-    ray_dir                       = DirectX::XMVectorSubtract( ray_dir, ray_origin );
-    ray_dir                       = DirectX::XMVector3Normalize( ray_dir );
-
-    DirectX::XMVECTOR ray_rev_dir = DirectX::XMVectorNegate( ray_dir );
-
-    flecs::entity     hit;
-    float             closest_hit = FLT_MAX;
-
-    //
-    std::function<void( flecs::entity )> const hit_test = [&]( flecs::entity e )
+    if ( Input::Instance().IsLeftMouseReleased() )
     {
-      WorldBoundingBox const* lt              = e.try_get_mut<WorldBoundingBox>();
-      bool                    is_actual_bound = e.has<LocalBoundingBox>();
-      if ( lt )
+      DirectX::XMVECTOR ray_origin  = m_Camera->GetPosition();
+      DirectX::XMVECTOR ray_dir     = XMVector4Transform( XMLoadFloat4( &mouse_ndc ), m_Camera->GetInvProj() );
+      float             w           = DirectX::XMVectorGetW( ray_dir );
+      ray_dir                       = DirectX::XMVectorScale( ray_dir, 1.0f / w );
+      ray_dir                       = XMVector3Transform( ray_dir, m_Camera->GetInvView() );
+      ray_dir                       = DirectX::XMVectorSubtract( ray_dir, ray_origin );
+      ray_dir                       = DirectX::XMVector3Normalize( ray_dir );
+
+      DirectX::XMVECTOR ray_rev_dir = DirectX::XMVectorNegate( ray_dir );
+
+      flecs::entity     hit;
+      float             closest_hit = FLT_MAX;
+
+      //
+      std::function<void( flecs::entity )> const hit_test = [&]( flecs::entity e )
       {
-        float dist;
-        float rev_dist;
-        if ( lt->AABB.Intersects( ray_origin, ray_dir, dist ) )
+        WorldBoundingBox const* lt              = e.try_get_mut<WorldBoundingBox>();
+        bool                    is_actual_bound = e.has<LocalBoundingBox>();
+        if ( lt )
         {
-          if ( is_actual_bound and dist > 0.1f and dist < closest_hit and
-               not lt->AABB.Intersects( ray_origin, ray_rev_dir, rev_dist ) )
+          float dist;
+          float rev_dist;
+          if ( lt->AABB.Intersects( ray_origin, ray_dir, dist ) )
           {
-            hit         = e;
-            closest_hit = dist;
+            if ( is_actual_bound and dist > 0.1f and dist < closest_hit and
+                 not lt->AABB.Intersects( ray_origin, ray_rev_dir, rev_dist ) )
+            {
+              hit         = e;
+              closest_hit = dist;
+            }
+
+            e.children( hit_test );
           }
-
-          e.children( hit_test );
         }
-      }
-    };
+      };
 
-    m_SceneRoot.children( hit_test );
+      m_SceneRoot.children( hit_test );
 
-    scene_tree.SetSelected( hit );
+      scene_tree.SetSelected( hit );
+    }
+
+    if ( Input::Instance().IsRightMouseDown() )
+      m_Camera->SetYawPitch(
+          m_Camera->GetYaw() - DirectX::XM_PI * mouse_dx, m_Camera->GetPitch() - DirectX::XM_PIDIV2 * mouse_dy );
   }
 
-  if ( Input::Instance().IsRightMouseDown() )
-    m_Camera->SetYawPitch(
-        m_Camera->GetYaw() - DirectX::XM_PI * mouse_dx, m_Camera->GetPitch() - DirectX::XM_PIDIV2 * mouse_dy );
-
-  if ( Input::Instance().IsPressed( 'R' ) or Input::Instance().IsPressed( 'A' ) )
+  if ( not imgui_io.WantCaptureKeyboard )
   {
-    m_Camera->LocalTranslate( -5 * delta_seconds, 0, 0 );
-  }
-  if ( Input::Instance().IsPressed( 'F' ) or Input::Instance().IsPressed( 'W' ) )
-  {
-    m_Camera->LocalTranslate( 0, 0, -5 * delta_seconds );
-  }
-  if ( Input::Instance().IsPressed( 'S' ) )
-  {
-    m_Camera->LocalTranslate( 0, 0, 5 * delta_seconds );
-  }
-  if ( Input::Instance().IsPressed( 'T' ) or Input::Instance().IsPressed( 'D' ) )
-  {
-    m_Camera->LocalTranslate( 5 * delta_seconds, 0, 0 );
-  }
-  if ( Input::Instance().IsPressed( 'Z' ) )
-  {
-    m_Camera->LocalTranslate( 0, -5 * delta_seconds, 0 );
-  }
-  if ( Input::Instance().IsPressed( 'X' ) )
-  {
-    m_Camera->LocalTranslate( 0, 5 * delta_seconds, 0 );
+    if ( Input::Instance().IsPressed( 'R' ) or Input::Instance().IsPressed( 'A' ) )
+    {
+      m_Camera->LocalTranslate( -5 * delta_seconds, 0, 0 );
+    }
+    if ( Input::Instance().IsPressed( 'F' ) or Input::Instance().IsPressed( 'W' ) )
+    {
+      m_Camera->LocalTranslate( 0, 0, -5 * delta_seconds );
+    }
+    if ( Input::Instance().IsPressed( 'S' ) )
+    {
+      m_Camera->LocalTranslate( 0, 0, 5 * delta_seconds );
+    }
+    if ( Input::Instance().IsPressed( 'T' ) or Input::Instance().IsPressed( 'D' ) )
+    {
+      m_Camera->LocalTranslate( 5 * delta_seconds, 0, 0 );
+    }
+    if ( Input::Instance().IsPressed( 'Z' ) )
+    {
+      m_Camera->LocalTranslate( 0, -5 * delta_seconds, 0 );
+    }
+    if ( Input::Instance().IsPressed( 'X' ) )
+    {
+      m_Camera->LocalTranslate( 0, 5 * delta_seconds, 0 );
+    }
   }
 
   m_World.GetECS().each(
-      [&]( LocalTransform& lt, RotatingModel const& rm )
+      [&]( Rotation& lt, RotatingModel const& rm )
       {
-        XMStoreFloat4(
-            &lt.Rotation,
-            DirectX::XMQuaternionMultiply(
-                XMLoadFloat4( &lt.Rotation ),
-                DirectX::XMQuaternionRotationAxis(
-                    DirectX::XMVectorSet( 0.0f, 1.0f, 0.0f, 0.0f ),
-                    DirectX::XMConvertToRadians( rm.Speed ) * delta_seconds ) ) );
+        lt = ( Rotation )DirectX::XMQuaternionMultiply(
+            ( DirectX::XMVECTOR )lt,
+            DirectX::XMQuaternionRotationAxis(
+                DirectX::XMVectorSet( 0.0f, 1.0f, 0.0f, 0.0f ),
+                DirectX::XMConvertToRadians( rm.Speed ) * delta_seconds ) );
       } );
 
   m_World.Update( delta_seconds );

@@ -39,15 +39,92 @@ struct Quaternion
   }
 };
 
-struct LocalTransform
+struct Translation
 {
-  DirectX::XMFLOAT3               Translation{ 0.0f, 0.0f, 0.0f };
-  DirectX::XMFLOAT4               Rotation{ 0.0f, 0.0f, 0.0f, 1.0f };
-  DirectX::XMFLOAT3               Scale{ 1.0f, 1.0f, 1.0f };
+  DirectX::XMFLOAT3 Value{ 0.0f, 0.0f, 0.0f };
 
-  [[nodiscard]] DirectX::XMMATRIX GetTransform() const;
-  void                            SetTransform( DirectX::FXMMATRIX const& transform );
+  Translation() = default;
+  Translation( float const x, float const y, float const z ) : Value{ x, y, z }
+  {}
+  explicit Translation( DirectX::XMFLOAT3 const& vec ) : Value{ vec }
+  {}
+  explicit Translation( DirectX::FXMVECTOR vec )
+  {
+    XMStoreFloat3( &Value, vec );
+  }
+
+  DirectX::XMVECTOR ToVector() const
+  {
+    return XMLoadFloat3( &Value );
+  }
 };
+
+struct Rotation
+{
+  DirectX::XMFLOAT4 Value{ 0.0f, 0.0f, 0.0f, 1.0f };
+
+  Rotation() = default;
+  Rotation( float const x, float const y, float const z, float const w ) : Value{ x, y, z, w }
+  {}
+  explicit Rotation( DirectX::XMFLOAT4 const& quat ) : Value{ quat }
+  {}
+  explicit Rotation( DirectX::FXMVECTOR quat )
+  {
+    XMStoreFloat4( &Value, quat );
+  }
+
+  DirectX::XMVECTOR ToVector() const
+  {
+    return XMLoadFloat4( &Value );
+  }
+
+  explicit operator DirectX::XMVECTOR() const
+  {
+    return ToVector();
+  }
+};
+
+struct RotationEuler
+{
+  float Pitch{ 0.0f };
+  float Yaw{ 0.0f };
+  float Roll{ 0.0f };
+
+  RotationEuler() = default;
+  RotationEuler( float const pitch, float const yaw, float const roll ) : Pitch{ pitch }, Yaw{ yaw }, Roll{ roll }
+  {}
+
+  RotationEuler( DirectX::XMFLOAT3 const& euler ) : Pitch{ euler.x }, Yaw{ euler.y }, Roll{ euler.z }
+  {}
+};
+
+struct Scale
+{
+  DirectX::XMFLOAT3 Value{ 1.0f, 1.0f, 1.0f };
+
+  Scale() = default;
+  Scale( float const x, float const y, float const z ) : Value{ x, y, z }
+  {}
+  explicit Scale( DirectX::XMFLOAT3 const& vec ) : Value{ vec }
+  {}
+  explicit Scale( DirectX::FXMVECTOR vec )
+  {
+    XMStoreFloat3( &Value, vec );
+  }
+
+  DirectX::XMVECTOR ToVector() const
+  {
+    return XMLoadFloat3( &Value );
+  }
+};
+
+namespace TransformUtil
+{
+void DecomposeMatrix(
+    Scale* out_scale, Rotation* out_rotation, Translation* out_translation, DirectX::XMMATRIX const& matrix );
+DirectX::XMMATRIX ConstructMatrix(
+    Scale const& out_scale, Rotation const& out_rotation, Translation const& out_translation );
+} // namespace TransformUtil
 
 struct WorldTransform
 {

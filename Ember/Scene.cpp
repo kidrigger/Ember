@@ -9,20 +9,26 @@
 #include "RenderDevice.hpp"
 #include "Util/DataUtil.hpp"
 
-DirectX::XMMATRIX Ember::LocalTransform::GetTransform() const
+void Ember::TransformUtil::DecomposeMatrix(
+    Scale* out_scale, Rotation* out_rotation, Translation* out_translation, DirectX::XMMATRIX const& matrix )
 {
-  return DirectX::XMMatrixAffineTransformation(
-      XMLoadFloat3( &Scale ), DirectX::XMVectorZero(), XMLoadFloat4( &Rotation ), XMLoadFloat3( &Translation ) );
+  ASSERT( out_scale );
+  ASSERT( out_rotation );
+  ASSERT( out_translation );
+
+  DirectX::XMVECTOR scale, rotation, translation;
+  ENSURE( XMMatrixDecompose( &scale, &rotation, &translation, matrix ) );
+
+  XMStoreFloat3( &out_scale->Value, scale );
+  XMStoreFloat4( &out_rotation->Value, rotation );
+  XMStoreFloat3( &out_translation->Value, translation );
 }
 
-void Ember::LocalTransform::SetTransform( DirectX::FXMMATRIX& transform )
+DirectX::XMMATRIX Ember::TransformUtil::ConstructMatrix(
+    Scale const& out_scale, Rotation const& out_rotation, Translation const& out_translation )
 {
-  DirectX::XMVECTOR translation, rotation, scale;
-  XMMatrixDecompose( &scale, &rotation, &translation, transform );
-
-  XMStoreFloat3( &Translation, translation );
-  XMStoreFloat4( &Rotation, rotation );
-  XMStoreFloat3( &Scale, scale );
+  return DirectX::XMMatrixAffineTransformation(
+      out_scale.ToVector(), DirectX::XMVectorZero(), out_rotation.ToVector(), out_translation.ToVector() );
 }
 
 DirectX::XMFLOAT3 Ember::WorldTransform::GetTranslation() const
@@ -240,16 +246,27 @@ Ember::World::World()
   m_Ecs.import <flecs::stats>();
   m_Ecs.set<flecs::Rest>( {} );
 
-  _ = m_Ecs.component<DirectX::XMFLOAT3>()
+  _ = m_Ecs.component<Translation>()
           .member<float>( "x", 0, offsetof( DirectX::XMFLOAT3, x ) )
           .member<float>( "y", 0, offsetof( DirectX::XMFLOAT3, y ) )
           .member<float>( "z", 0, offsetof( DirectX::XMFLOAT3, z ) )
           .set<InspectorView>( InspectorView{ []( char const* label, void* elem )
                                               {
                                                 DirectX::XMFLOAT3* vec = ( DirectX::XMFLOAT3* )elem;
-                                                ImGui::DragFloat3( label, ( float* )vec );
+                                                ImGui::DragFloat3( label ? label : "Value", ( float* )vec );
                                               } } );
-  _ = m_Ecs.component<Quaternion>()
+
+  _ = m_Ecs.component<Scale>()
+          .member<float>( "x", 0, offsetof( DirectX::XMFLOAT3, x ) )
+          .member<float>( "y", 0, offsetof( DirectX::XMFLOAT3, y ) )
+          .member<float>( "z", 0, offsetof( DirectX::XMFLOAT3, z ) )
+          .set<InspectorView>( InspectorView{ []( char const* label, void* elem )
+                                              {
+                                                DirectX::XMFLOAT3* vec = ( DirectX::XMFLOAT3* )elem;
+                                                ImGui::DragFloat3( label ? label : "Value", ( float* )vec );
+                                              } } );
+
+  _ = m_Ecs.component<Rotation>()
           .member<float>( "x", 0, offsetof( DirectX::XMFLOAT4, x ) )
           .member<float>( "y", 0, offsetof( DirectX::XMFLOAT4, y ) )
           .member<float>( "z", 0, offsetof( DirectX::XMFLOAT4, z ) )
@@ -261,7 +278,7 @@ Ember::World::World()
                                                 DirectX::XMFLOAT4* q     = ( DirectX::XMFLOAT4* )elem;
                                                 DirectX::XMFLOAT3  euler = Quaternion::ToEuler( *q );
 
-                                                ImGui::PushID( label );
+                                                ImGui::PushID( label ? label : "Rotation" );
                                                 ImGui::SliderAngle( "Pitch", &euler.x, -89.0f, 89.0f );
                                                 ImGui::SliderAngle( "Yaw", &euler.y, -180.0f, 180.0f );
                                                 ImGui::SliderAngle( "Roll", &euler.z, -180.0f, 180.0f );
@@ -269,36 +286,41 @@ Ember::World::World()
 
                                                 *q = Quaternion::FromEuler( euler );
                                               } } );
-  _ = m_Ecs.component<DirectX::XMFLOAT4>()
-          .member<float>( "x", 0, offsetof( DirectX::XMFLOAT4, x ) )
-          .member<float>( "y", 0, offsetof( DirectX::XMFLOAT4, y ) )
-          .member<float>( "z", 0, offsetof( DirectX::XMFLOAT4, z ) )
-          .member<float>( "w", 0, offsetof( DirectX::XMFLOAT4, w ) );
+
   _ = m_Ecs.component<WorldTransform>();
-  _ = m_Ecs.component<LocalTransform>()
-          .member<DirectX::XMFLOAT3>( "Translation", 0, offsetof( LocalTransform, Translation ) )
-          .member<Quaternion>( "Rotation", 0, offsetof( LocalTransform, Rotation ) )
-          .member<DirectX::XMFLOAT3>( "Scale", 0, offsetof( LocalTransform, Scale ) );
   _ = m_Ecs.component<WorldBoundingBox>();
   _ = m_Ecs.component<LocalBoundingBox>();
 
   //
-  m_UpdateRootWorldTransformSys = m_Ecs.system<WorldTransform, LocalTransform const>()
-                                      .without( flecs::ChildOf )
-                                      .each(
-                                          []( WorldTransform& wt, LocalTransform const& lt )
-                                          {
-                                            wt.Transform    = lt.GetTransform();
-                                            wt.InvTransform = XMMatrixInverse( nullptr, wt.Transform );
-                                          } );
+  m_UpdateRootWorldTransformSys =
+      m_Ecs.system<WorldTransform, Translation const, Rotation const, Scale const>()
+          .without( flecs::ChildOf )
+          .each(
+              []( WorldTransform& wt, Translation const& translation, Rotation const& rotation, Scale const& scale )
+              {
+                wt.Transform = DirectX::XMMatrixAffineTransformation(
+                    scale.ToVector(), DirectX::XMVectorZero(), rotation.ToVector(), translation.ToVector() );
+                wt.InvTransform = XMMatrixInverse( nullptr, wt.Transform );
+              } );
 
   m_UpdateWorldTransformSys =
-      m_Ecs.system<WorldTransform, LocalTransform const, WorldTransform const>().term_at( 2 ).parent().cascade().each(
-          []( WorldTransform& wt, LocalTransform const& lt, WorldTransform const& parent_wt )
-          {
-            wt.Transform    = XMMatrixMultiply( lt.GetTransform(), parent_wt.Transform );
-            wt.InvTransform = XMMatrixInverse( nullptr, wt.Transform );
-          } );
+      m_Ecs.system<WorldTransform, Translation const, Rotation const, Scale const, WorldTransform const>()
+          .term_at( 4 )
+          .parent()
+          .cascade()
+          .each(
+              []( WorldTransform& wt,
+                  Translation const& translation,
+                  Rotation const& rotation,
+                  Scale const& scale,
+                  WorldTransform const& parent_wt )
+              {
+                wt.Transform = XMMatrixMultiply(
+                    DirectX::XMMatrixAffineTransformation(
+                        scale.ToVector(), DirectX::XMVectorZero(), rotation.ToVector(), translation.ToVector() ),
+                    parent_wt.Transform );
+                wt.InvTransform = XMMatrixInverse( nullptr, wt.Transform );
+              } );
 
   m_PrimeCollectingWorldAABBSys =
       m_Ecs.system<WorldBoundingBox>().without<LocalBoundingBox>().each( []( WorldBoundingBox& wbb ) { wbb = {}; } );

@@ -13,10 +13,12 @@ Ember::PickingGizmo::PickingGizmo()
 
 void Ember::PickingGizmo::DrawGizmo( Camera const& camera, flecs::entity const selected ) const
 {
-  LocalTransform&       lt               = selected.get_mut<LocalTransform>();
-  WorldTransform const& wt               = selected.get<WorldTransform>();
+  Translation&          local_translation = selected.get_mut<Translation>();
+  Rotation&             local_rotation    = selected.get_mut<Rotation>();
+  Scale&                local_scale       = selected.get_mut<Scale>();
+  WorldTransform const& wt                = selected.get<WorldTransform>();
 
-  WorldTransform const* parent_transform = nullptr;
+  WorldTransform const* parent_transform  = nullptr;
   if ( auto parent = selected.parent(); parent.is_valid() )
   {
     parent_transform = parent.try_get<WorldTransform>();
@@ -47,7 +49,8 @@ void Ember::PickingGizmo::DrawGizmo( Camera const& camera, flecs::entity const s
   {
     local_mat = XMMatrixMultiply( local_mat, parent_transform->InvTransform );
   }
-  lt.SetTransform( local_mat );
+
+  TransformUtil::DecomposeMatrix( &local_scale, &local_rotation, &local_translation, local_mat );
 }
 
 void Ember::PickingGizmo::DrawMenu()

@@ -2,6 +2,8 @@
 
 #include <imgui.h>
 
+#include "Util/HelperUtils.hpp"
+
 void Ember::InspectorView::Draw( char const* label, void* data ) const
 {
   ASSERT( m_DrawFunc );
@@ -22,9 +24,9 @@ void Ember::Inspector::Draw( flecs::world* ecs, flecs::entity const entity )
   Inspector inspector{ ecs };
   entity.each( [&]( flecs::id const id ) { inspector.InspectComponent( id, entity ); } );
 
-  if ( not inspector.m_Pairs.empty() )
+  if ( ImGui::CollapsingHeader( "Pairs" ) )
   {
-    if ( ImGui::CollapsingHeader( "Pairs" ) )
+    if ( not inspector.m_Pairs.empty() )
     {
       ImGui::BeginTable( "Pairs", 3 );
       for ( auto& pair : inspector.m_Pairs )
@@ -44,11 +46,15 @@ void Ember::Inspector::Draw( flecs::world* ecs, flecs::entity const entity )
       }
       ImGui::EndTable();
     }
+    else
+    {
+      ImGui::Text( "<No Pairs>" );
+    }
   }
 
-  if ( not inspector.m_Tags.empty() )
+  if ( ImGui::CollapsingHeader( "Tags" ) )
   {
-    if ( ImGui::CollapsingHeader( "Tags" ) )
+    if ( not inspector.m_Tags.empty() )
     {
       ImGui::BeginTable( "Tags", 2 );
       for ( auto& tag : inspector.m_Tags )
@@ -65,6 +71,21 @@ void Ember::Inspector::Draw( flecs::world* ecs, flecs::entity const entity )
         ImGui::PopID();
       }
       ImGui::EndTable();
+    }
+    else
+    {
+      ImGui::Text( "<No Tags>" );
+    }
+
+    char buf[128];
+    ZeroMemory( DataOf( buf ), CountOf( buf ) );
+    if ( ImGui::InputText( "Tag", DataOf( buf ), CountOf( buf ), ImGuiInputTextFlags_EnterReturnsTrue ) )
+    {
+      flecs::entity const tag = ecs->lookup( buf, ".", "." );
+      if ( tag.is_valid() )
+      {
+        _ = entity.add( tag );
+      }
     }
   }
 
@@ -154,11 +175,13 @@ void Ember::Inspector::SerializeScope( flecs::meta::op_t* ops, void* ptr )
 
 void Ember::Inspector::SerializeStruct( flecs::meta::op_t* ops, void* ptr )
 {
-  if ( auto* inf = m_ECS->type_info( ops->type ) )
+  if ( auto* type_info = m_ECS->type_info( ops->type ) )
   {
-    if ( InspectorView const* view = flecs::entity{ m_ECS->c_ptr(), inf->component }.try_get<InspectorView>() )
+    if ( InspectorView const* view = flecs::entity{ m_ECS->c_ptr(), type_info->component }.try_get<InspectorView>() )
     {
+      ImGui::PushID( type_info->name );
       view->Draw( ops->name, ECS_OFFSET( ptr, ops[1].offset ) );
+      ImGui::PopID();
       return;
     }
   }
@@ -251,11 +274,11 @@ void Ember::Inspector::SerializeOps( flecs::meta::op_t* ops, int32_t op_count, v
 
     if ( op->name )
     {
-      sprintf_s( label, "%s", op->name );
+      _ = sprintf_s( label, "%s", op->name );
     }
     else
     {
-      sprintf_s( label, "##%p", op );
+      _ = sprintf_s( label, "##%p", op );
     }
 
     switch ( op->kind )
