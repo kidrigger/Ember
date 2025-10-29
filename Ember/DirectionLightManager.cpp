@@ -159,13 +159,12 @@ void Ember::Internal::DirectionLightManager::CalculateShadowParameters(
     DirectX::BoundingFrustum const& camera_frustum, DirLightRepr* dir_light )
 {
   // Setup Light-Space basis
-  DirectX::FXMVECTOR direction = XMLoadFloat3( &dir_light->Direction );
-  ASSERT_M(
-      fabsf( DirectX::XMVector3LengthSq( direction ).m128_f32[0] - 1.0f ) < FLT_EPSILON,
-      "This should be normalized on set" );
+  DirectX::XMVECTOR direction = XMLoadFloat3( &dir_light->Direction );
+  float             len       = DirectX::XMVectorGetX( DirectX::XMVector3LengthSq( direction ) );
+  ASSERT_M( std::abs( len - 1.0f ) < 1e-5, "This should be normalized on set" );
 
   DirectX::XMVECTOR ls_right = kRight;
-  if ( float dot = DirectX::XMVector3Dot( ls_right, direction ).m128_f32[0]; dot > 0.99f )
+  if ( float dot = DirectX::XMVectorGetX( DirectX::XMVector3Dot( ls_right, direction ) ); dot > 0.99f )
   {
     // If cam_right and direction are aligned, we need to use -fwd;
     ls_right = XMVectorNegate( kForward );
@@ -320,7 +319,7 @@ void Ember::Internal::DirectionLightManager::RenderAllShadows(
   command_list->RSSetViewports( 1, &viewport );
 
   static std::vector<CD3DX12_RESOURCE_BARRIER> barriers;
-  barriers.resize( m_ActiveShadows.size() );
+  barriers.resize( m_AllocatedShadows );
 
   std::transform(
       m_ActiveShadows.begin(),

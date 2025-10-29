@@ -82,7 +82,7 @@ public:
   static void Create(
       DirectionLightManager* light_manager, RenderDevice* render_device, World* world, uint32_t num_frames );
 
-  LightInfo PrepareFrame( Camera const& camera, uint32_t const frame_index );
+  LightInfo PrepareFrame( Camera const& camera, uint32_t frame_index );
 
   //
   void RenderAllShadows(
@@ -97,8 +97,8 @@ public:
       DrawList::Batches const&    draw_info,
       RenderTargetManager const&  rtm,
       Camera const&               camera,
-      uint32_t const              frame_index,
-      uint32_t const              light_index );
+      uint32_t                    frame_index,
+      uint32_t                    light_index );
 };
 
 } // namespace Internal
