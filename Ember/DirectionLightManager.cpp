@@ -249,7 +249,10 @@ Ember::LightInfo Ember::Internal::DirectionLightManager::PrepareFrame(
       [&]( WorldTransform const& transform, DirectionalLight const& light )
       {
         DirectX::XMFLOAT3 direction;
-        XMStoreFloat3( &direction, DirectX::XMVector3Normalize( XMVector3Transform( kForward, transform.Transform ) ) );
+        XMStoreFloat3(
+            &direction,
+            DirectX::XMVector3Normalize(
+                XMVector3Rotate( kForward, XMQuaternionRotationMatrix( transform.Transform ) ) ) );
         float const far_plane = light.FarPlane > 0.0f ? light.FarPlane : default_far_plane;
 
         m_LightData.push_back( {
@@ -271,7 +274,10 @@ Ember::LightInfo Ember::Internal::DirectionLightManager::PrepareFrame(
       [&]( WorldTransform const& transform, DirectionalLight const& light )
       {
         DirectX::XMFLOAT3 direction;
-        XMStoreFloat3( &direction, XMVector3Transform( kForward, transform.Transform ) );
+        XMStoreFloat3(
+            &direction,
+            DirectX::XMVector3Normalize(
+                XMVector3Rotate( kForward, XMQuaternionRotationMatrix( transform.Transform ) ) ) );
 
         m_LightData.push_back( {
             .Direction = direction,
