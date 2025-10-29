@@ -21,9 +21,9 @@ struct Static
 
 struct LocalTransform
 {
-  DirectX::XMVECTOR               Translation{ DirectX::XMVectorSet( 0.0f, 0.0f, 0.0f, 1.0f ) };
-  DirectX::XMVECTOR               Rotation{ DirectX::XMQuaternionIdentity() };
-  DirectX::XMVECTOR               Scale{ DirectX::XMVectorSplatOne() };
+  DirectX::XMFLOAT3               Translation{ 0.0f, 0.0f, 0.0f };
+  DirectX::XMFLOAT4               Rotation{ 0.0f, 0.0f, 0.0f, 1.0f };
+  DirectX::XMFLOAT3               Scale{ 1.0f, 1.0f, 1.0f };
 
   [[nodiscard]] DirectX::XMMATRIX GetTransform() const;
   void                            SetTransform( DirectX::FXMMATRIX const& transform );
@@ -179,6 +179,7 @@ public:
 
   //
   flecs::world const& GetECS() const;
+  flecs::world&       GetECS();
 };
 
 } // namespace Ember

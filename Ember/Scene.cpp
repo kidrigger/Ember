@@ -1,5 +1,8 @@
 #include "Scene.hpp"
 
+#include <imgui.h>
+
+#include "Inspector.hpp"
 #include "Util/Profiling.hpp"
 
 #include "Material.hpp"
@@ -8,12 +11,18 @@
 
 DirectX::XMMATRIX Ember::LocalTransform::GetTransform() const
 {
-  return DirectX::XMMatrixAffineTransformation( Scale, DirectX::XMVectorZero(), Rotation, Translation );
+  return DirectX::XMMatrixAffineTransformation(
+      XMLoadFloat3( &Scale ), DirectX::XMVectorZero(), XMLoadFloat4( &Rotation ), XMLoadFloat3( &Translation ) );
 }
 
 void Ember::LocalTransform::SetTransform( DirectX::FXMMATRIX& transform )
 {
-  XMMatrixDecompose( &Scale, &Rotation, &Translation, transform );
+  DirectX::XMVECTOR translation, rotation, scale;
+  XMMatrixDecompose( &scale, &rotation, &translation, transform );
+
+  XMStoreFloat3( &Translation, translation );
+  XMStoreFloat4( &Rotation, rotation );
+  XMStoreFloat3( &Scale, scale );
 }
 
 DirectX::XMFLOAT3 Ember::WorldTransform::GetTranslation() const
@@ -226,8 +235,77 @@ size_t Ember::DrawList::GetTotalCount() const
   return m_OpaqueDrawInfos.size() + m_AlphaBlendedDrawInfos.size() + m_AlphaTestedDrawInfos.size();
 }
 
+struct Quaternion
+{
+  DirectX::XMFLOAT4 Inner;
+};
+
+struct Euler
+{
+  DirectX::XMFLOAT3 Inner;
+};
+
 Ember::World::World()
 {
+  m_Ecs.import <flecs::stats>();
+  m_Ecs.set<flecs::Rest>( {} );
+
+  _ = m_Ecs.component<DirectX::XMFLOAT3>()
+          .member<float>( "x", 0, offsetof( DirectX::XMFLOAT3, x ) )
+          .member<float>( "y", 0, offsetof( DirectX::XMFLOAT3, y ) )
+          .member<float>( "z", 0, offsetof( DirectX::XMFLOAT3, z ) )
+          .set<InspectorView>( InspectorView{ []( char const* label, void* elem )
+                                              {
+                                                DirectX::XMFLOAT3* vec = ( DirectX::XMFLOAT3* )elem;
+                                                ImGui::DragFloat3( label, ( float* )vec );
+                                              } } );
+  _ = m_Ecs.component<Quaternion>()
+          .member<float>( "x", 0, offsetof( DirectX::XMFLOAT4, x ) )
+          .member<float>( "y", 0, offsetof( DirectX::XMFLOAT4, y ) )
+          .member<float>( "z", 0, offsetof( DirectX::XMFLOAT4, z ) )
+          .member<float>( "w", 0, offsetof( DirectX::XMFLOAT4, w ) )
+          .set<InspectorView>( InspectorView{
+              []( char const* label, void* elem )
+              {
+                // TODO: Avoid all this by Caching the Euler angles.
+
+                DirectX::XMFLOAT4* q  = ( DirectX::XMFLOAT4* )elem;
+                q->x                  = -q->x;
+                DirectX::XMMATRIX mat = DirectX::XMMatrixRotationQuaternion( XMLoadFloat4( q ) );
+
+                float             euler[3];
+                euler[0] = -std::asin( mat.r[1].m128_f32[2] );                        // Pitch
+                euler[1] = std::atan2( -mat.r[0].m128_f32[2], mat.r[2].m128_f32[2] ); // Yaw
+                euler[2] = std::atan2( -mat.r[1].m128_f32[0], mat.r[1].m128_f32[1] ); // Roll
+
+                for ( float& angle : euler )
+                {
+                  angle = DirectX::XMConvertToDegrees( angle );
+                }
+
+                ImGui::DragFloat3( label, euler );
+
+                for ( float& angle : euler )
+                {
+                  angle = DirectX::XMConvertToRadians( angle );
+                }
+
+                XMStoreFloat4( q, DirectX::XMQuaternionRotationRollPitchYaw( euler[0], euler[1], euler[2] ) );
+              } } );
+  _ = m_Ecs.component<DirectX::XMFLOAT4>()
+          .member<float>( "x", 0, offsetof( DirectX::XMFLOAT4, x ) )
+          .member<float>( "y", 0, offsetof( DirectX::XMFLOAT4, y ) )
+          .member<float>( "z", 0, offsetof( DirectX::XMFLOAT4, z ) )
+          .member<float>( "w", 0, offsetof( DirectX::XMFLOAT4, w ) );
+  _ = m_Ecs.component<WorldTransform>();
+  _ = m_Ecs.component<LocalTransform>()
+          .member<DirectX::XMFLOAT3>( "Translation", 0, offsetof( LocalTransform, Translation ) )
+          .member<Quaternion>( "Rotation", 0, offsetof( LocalTransform, Rotation ) )
+          .member<DirectX::XMFLOAT3>( "Scale", 0, offsetof( LocalTransform, Scale ) );
+  _ = m_Ecs.component<WorldBoundingBox>();
+  _ = m_Ecs.component<LocalBoundingBox>();
+
+  //
   m_UpdateRootWorldTransformSys = m_Ecs.system<WorldTransform, LocalTransform const>()
                                       .without( flecs::ChildOf )
                                       .each(
@@ -290,6 +368,11 @@ void Ember::World::Update( float const delta_time ) const
 }
 
 flecs::world const& Ember::World::GetECS() const
+{
+  return m_Ecs;
+}
+
+flecs::world& Ember::World::GetECS()
 {
   return m_Ecs;
 }

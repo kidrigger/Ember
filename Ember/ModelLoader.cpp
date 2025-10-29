@@ -188,9 +188,9 @@ flecs::entity Ember::ModelLoader::ProcessNode( LoadingContext* context, flecs::e
   auto const my_node = m_World->GetECS().entity().child_of( parent ).insert(
       [&]( LocalTransform& lt, WorldTransform&, WorldBoundingBox& )
       {
-        lt.Translation = translation;
-        lt.Rotation    = rotation;
-        lt.Scale       = scale;
+        XMStoreFloat3( &lt.Translation, translation );
+        XMStoreFloat4( &lt.Rotation, rotation );
+        XMStoreFloat3( &lt.Scale, scale );
       } );
 
   if ( node.mesh )

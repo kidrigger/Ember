@@ -1,5 +1,8 @@
 #include "LightManager.hpp"
 
+#include <imgui.h>
+
+#include "Inspector.hpp"
 #include "OmniLightManager.hpp"
 #include "Util/Profiling.hpp"
 
@@ -23,6 +26,41 @@ void Ember::LightManager::Create(
 
   auto spot_light_manager = std::make_unique_for_overwrite<Internal::SpotLightManager>();
   Internal::SpotLightManager::Create( spot_light_manager.get(), render_device, world, num_frames );
+
+  _ = world->GetECS()
+          .component<Color32>()
+          .member<uint8_t>( "R", 0, offsetof( Color32, R ) )
+          .member<uint8_t>( "G", 0, offsetof( Color32, G ) )
+          .member<uint8_t>( "B", 0, offsetof( Color32, B ) )
+          .member<uint8_t>( "A", 0, offsetof( Color32, A ) )
+          .set<InspectorView>( InspectorView{ []( char const* label, void* data )
+                                              {
+                                                Color32*          packed_color = ( Color32* )data;
+                                                DirectX::XMFLOAT4 color        = packed_color->UnpackRgba();
+                                                ImGui::ColorEdit4( label, ( float* )&color );
+                                                *packed_color = Color32{ color };
+                                              } } );
+  _ = world->GetECS()
+          .component<OmniLight>()
+          .member<Color32>( "Color", 0, offsetof( OmniLight, Color ) )
+          .member<float>( "Range", 0, offsetof( OmniLight, Range ) )
+          .member<float>( "Intensity", 0, offsetof( OmniLight, Intensity ) );
+
+  _ = world->GetECS()
+          .component<SpotLight>()
+          .member<Color32>( "Color", 0, offsetof( SpotLight, Color ) )
+          .member<float>( "Range", 0, offsetof( SpotLight, Range ) )
+          .member<float>( "Intensity", 0, offsetof( SpotLight, Intensity ) )
+          .member<float>( "ConeInnerHalfAngle", 0, offsetof( SpotLight, ConeInnerHalfAngle ) )
+          .range( 0.0f, DirectX::XM_PI )
+          .member<float>( "ConeOuterHalfAngle", 0, offsetof( SpotLight, ConeOuterHalfAngle ) )
+          .range( 0.0f, DirectX::XM_PI );
+
+  _ = world->GetECS()
+          .component<DirectionalLight>()
+          .member<Color32>( "Color", 0, offsetof( DirectionalLight, Color ) )
+          .member<float>( "Intensity", 0, offsetof( DirectionalLight, Intensity ) )
+          .member<float>( "FarPlane", 0, offsetof( DirectionalLight, FarPlane ) );
 
   new ( light_manager ) LightManager{
     std::move( omni_light_manager ),

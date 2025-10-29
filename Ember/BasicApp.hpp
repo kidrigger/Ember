@@ -76,6 +76,8 @@ class BasicApp final : public IApp
   // TODO: Organize init and destroy.
   std::unique_ptr<LightManager> m_LightManager;
 
+  flecs::entity                 m_SceneRoot;
+
   void                          SetupRenderPasses();
 
   RenderPass::RTVData           ClearRenderTargets( FrameGraph* frame_graph ) const;
@@ -86,6 +88,8 @@ class BasicApp final : public IApp
                 RenderPass::RTVData const&        transparency_pass,
                 AtmosphereContext::OutData const& atmosphere );
   RenderPass::RTVData RenderOpaqueDfr( FrameGraph* frame_graph, RenderPass::RTVData const& clear_rtv );
+
+  static void         InitImGui( HWND const window_handle, RenderDevice* render_device );
 
 public:
   BasicApp(

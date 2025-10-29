@@ -312,6 +312,8 @@
   </ItemDefinitionGroup>
   <ItemGroup>
     <ClCompile Include="AtmosphereContext.cpp" />
+    <ClCompile Include="Inspector.cpp" />
+    <ClCompile Include="SceneTree.cpp" />
     <ClCompile Include="TransparencyPass.cpp" />
     <ClCompile Include="BackgroundPass.cpp" />
     <ClCompile Include="BasicApp.cpp" />
@@ -352,6 +354,8 @@
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="AtmosphereContext.hpp" />
+    <ClInclude Include="Inspector.hpp" />
+    <ClInclude Include="SceneTree.hpp" />
     <ClInclude Include="TransparencyPass.hpp" />
     <ClInclude Include="BackgroundPass.hpp" />
     <ClInclude Include="BasicApp.hpp" />

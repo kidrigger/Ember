@@ -79,6 +79,12 @@
     <Filter Include="Shaders\Atmosphere">
       <UniqueIdentifier>{1a829239-b011-4709-9d4e-8c5ad3903102}</UniqueIdentifier>
     </Filter>
+    <Filter Include="Header Files\Editor">
+      <UniqueIdentifier>{b57f4924-8a57-47ca-9c68-89f0a51be1f8}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="Source Files\Editor">
+      <UniqueIdentifier>{488073bf-8185-47bd-a2c7-8fb9162097da}</UniqueIdentifier>
+    </Filter>
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="Main.cpp">
@@ -194,6 +200,12 @@
     </ClCompile>
     <ClCompile Include="AtmosphereContext.cpp">
       <Filter>Source Files\Passes</Filter>
+    </ClCompile>
+    <ClCompile Include="Inspector.cpp">
+      <Filter>Source Files\Editor</Filter>
+    </ClCompile>
+    <ClCompile Include="SceneTree.cpp">
+      <Filter>Source Files\Editor</Filter>
     </ClCompile>
   </ItemGroup>
   <ItemGroup>
@@ -331,6 +343,12 @@
     </ClInclude>
     <ClInclude Include="AtmosphereContext.hpp">
       <Filter>Header Files\Passes</Filter>
+    </ClInclude>
+    <ClInclude Include="Inspector.hpp">
+      <Filter>Header Files\Editor</Filter>
+    </ClInclude>
+    <ClInclude Include="SceneTree.hpp">
+      <Filter>Header Files\Editor</Filter>
     </ClInclude>
   </ItemGroup>
   <ItemGroup>

@@ -11,12 +11,14 @@
 #include "FrameGraphHelper.hpp"
 #include "GeometryManager.hpp"
 #include "Input.hpp"
+#include "Inspector.hpp"
 #include "LightManager.hpp"
 #include "Material.hpp"
 #include "MaterialManager.hpp"
 #include "ModelLoader.hpp"
 #include "RenderDevice.hpp"
 #include "RenderPassCommon.hpp"
+#include "SceneTree.hpp"
 #include "TextureLoader.hpp"
 #include "Util/DataUtil.hpp"
 #include "Util/HelperUtils.hpp"
@@ -92,6 +94,59 @@ struct PerMeshConstants
   uint32_t              FirstIndex;
 };
 
+void Ember::BasicApp::InitImGui( HWND const window_handle, RenderDevice* render_device )
+{
+  ImGui_ImplWin32_EnableDpiAwareness();
+  float main_scale =
+      ImGui_ImplWin32_GetDpiScaleForMonitor( ::MonitorFromPoint( POINT{ 0, 0 }, MONITOR_DEFAULTTOPRIMARY ) );
+  // Setup Dear ImGui context
+  IMGUI_CHECKVERSION();
+  ImGui::CreateContext();
+  ImGuiIO& io = ImGui::GetIO();
+  ( void )io;
+  io.ConfigFlags |= ImGuiConfigFlags_NavEnableKeyboard; // Enable Keyboard Controls
+  io.ConfigFlags |= ImGuiConfigFlags_NavEnableGamepad;  // Enable Gamepad Controls
+  io.ConfigFlags |= ImGuiConfigFlags_DockingEnable;
+  io.ConfigFlags |= ImGuiConfigFlags_DpiEnableScaleFonts;
+
+  // Setup Dear ImGui style
+  ImGui::StyleColorsDark();
+  ImGuiStyle& style = ImGui::GetStyle();
+  style.ScaleAllSizes( main_scale ); // Bake a fixed style scale. (until we have a solution for dynamic style scaling,
+                                     // changing this requires resetting Style + calling this again)
+
+  // Setup Platform/Renderer backendss
+  ImGui_ImplWin32_Init( window_handle );
+
+  ImGui_ImplDX12_InitInfo init_info = {};
+  init_info.Device                  = render_device->GetDevice();
+  init_info.CommandQueue            = render_device->GetDirectQueue();
+  init_info.NumFramesInFlight       = RenderDevice::kNumFrames;
+  init_info.RTVFormat               = DXGI_FORMAT_R8G8B8A8_UNORM;
+  init_info.DSVFormat               = DXGI_FORMAT_UNKNOWN;
+  // Allocating SRV descriptors (for textures) is up to the application, so we provide callbacks.
+  // (current version of the backend will only allocate one descriptor, future versions will need to allocate more)
+  init_info.SrvDescriptorHeap    = render_device->GetBindlessDescriptorHeaps()[0];
+  init_info.SrvDescriptorAllocFn = []( ImGui_ImplDX12_InitInfo* init_info,
+                                       D3D12_CPU_DESCRIPTOR_HANDLE* out_cpu_handle,
+                                       D3D12_GPU_DESCRIPTOR_HANDLE* out_gpu_handle )
+  {
+    RenderDevice const* p_render_device = ( RenderDevice* )init_info->UserData;
+    g_ImguiHandleMap[out_cpu_handle->ptr] =
+        p_render_device->AllocateRawDescriptorHandle( out_cpu_handle, out_gpu_handle );
+  };
+  init_info.SrvDescriptorFreeFn =
+      []( ImGui_ImplDX12_InitInfo* init_info, D3D12_CPU_DESCRIPTOR_HANDLE cpu_handle, D3D12_GPU_DESCRIPTOR_HANDLE )
+  {
+    RenderDevice const* p_render_device = ( RenderDevice* )init_info->UserData;
+    p_render_device->FreeHandle( g_ImguiHandleMap[cpu_handle.ptr] );
+    g_ImguiHandleMap.erase( cpu_handle.ptr );
+  };
+
+  init_info.UserData = render_device;
+  ImGui_ImplDX12_Init( &init_info );
+}
+
 Ember::BasicApp::BasicApp(
     HWND                                 window_handle,
     std::unique_ptr<RenderDevice>        render_device,
@@ -115,54 +170,9 @@ Ember::BasicApp::BasicApp(
   m_TextureLoader = std::make_unique_for_overwrite<TextureLoader>();
   TextureLoader::Create( m_TextureLoader.get(), m_RenderDevice.get(), 3 );
 
-  ImGui_ImplWin32_EnableDpiAwareness();
-  float main_scale =
-      ImGui_ImplWin32_GetDpiScaleForMonitor( ::MonitorFromPoint( POINT{ 0, 0 }, MONITOR_DEFAULTTOPRIMARY ) );
-  // Setup Dear ImGui context
-  IMGUI_CHECKVERSION();
-  ImGui::CreateContext();
-  ImGuiIO& io = ImGui::GetIO();
-  ( void )io;
-  io.ConfigFlags |= ImGuiConfigFlags_NavEnableKeyboard; // Enable Keyboard Controls
-  io.ConfigFlags |= ImGuiConfigFlags_NavEnableGamepad;  // Enable Gamepad Controls
-  io.ConfigFlags |= ImGuiConfigFlags_DockingEnable;
-  io.ConfigFlags |= ImGuiConfigFlags_DpiEnableScaleFonts;
+  m_World.GetECS().component<RotatingModel>().member<float>( "Speed", 0, offsetof( RotatingModel, Speed ) );
 
-  // Setup Dear ImGui style
-  ImGui::StyleColorsDark();
-  ImGuiStyle& style = ImGui::GetStyle();
-  style.ScaleAllSizes( main_scale ); // Bake a fixed style scale. (until we have a solution for dynamic style scaling,
-                                     // changing this requires resetting Style + calling this again)
-
-  // Setup Platform/Renderer backends
-  ImGui_ImplWin32_Init( window_handle );
-
-  ImGui_ImplDX12_InitInfo init_info = {};
-  init_info.Device                  = m_RenderDevice->GetDevice();
-  init_info.CommandQueue            = m_RenderDevice->GetDirectQueue();
-  init_info.NumFramesInFlight       = RenderDevice::kNumFrames;
-  init_info.RTVFormat               = DXGI_FORMAT_R8G8B8A8_UNORM;
-  init_info.DSVFormat               = DXGI_FORMAT_UNKNOWN;
-  // Allocating SRV descriptors (for textures) is up to the application, so we provide callbacks.
-  // (current version of the backend will only allocate one descriptor, future versions will need to allocate more)
-  init_info.SrvDescriptorHeap    = m_RenderDevice->GetBindlessDescriptorHeaps()[0];
-  init_info.SrvDescriptorAllocFn = []( ImGui_ImplDX12_InitInfo* init_info,
-                                       D3D12_CPU_DESCRIPTOR_HANDLE* out_cpu_handle,
-                                       D3D12_GPU_DESCRIPTOR_HANDLE* out_gpu_handle )
-  {
-    RenderDevice const* render_device = ( RenderDevice* )init_info->UserData;
-    g_ImguiHandleMap[out_cpu_handle->ptr] =
-        render_device->AllocateRawDescriptorHandle( out_cpu_handle, out_gpu_handle );
-  };
-  init_info.SrvDescriptorFreeFn =
-      []( ImGui_ImplDX12_InitInfo* init_info, D3D12_CPU_DESCRIPTOR_HANDLE cpu_handle, D3D12_GPU_DESCRIPTOR_HANDLE )
-  {
-    RenderDevice const* render_device = ( RenderDevice* )init_info->UserData;
-    render_device->FreeHandle( g_ImguiHandleMap[cpu_handle.ptr] );
-    g_ImguiHandleMap.erase( cpu_handle.ptr );
-  };
-  init_info.UserData = m_RenderDevice.get();
-  ImGui_ImplDX12_Init( &init_info );
+  InitImGui( window_handle, m_RenderDevice.get() );
 
   m_FGBlackboard.add<PerFrameConstants>();
   m_FGBlackboard.add<DrawList::Batches>();
@@ -251,20 +261,26 @@ void Ember::BasicApp::LoadContent()
   // Setup Lights
   LightManager::Create( m_LightManager.get(), m_RenderDevice.get(), &m_World, RenderDevice::kNumFrames );
 
+  m_SceneRoot = m_World.GetECS().entity( "SceneRoot" ).insert( []( WorldTransform&, LocalTransform& ) {} );
+
   m_World.GetECS()
-      .entity( "Dir Light" )
+      .entity( "Sun" )
+      .child_of( m_SceneRoot )
       .add<ShadowCaster>()
       .insert(
           [&]( WorldTransform&, LocalTransform& lt, DirectionalLight& dl )
           {
-            lt.Rotation = DirectX::XMQuaternionRotationRollPitchYaw(
-                DirectX::XMConvertToRadians( -45.0f ), DirectX::XMConvertToRadians( 45.0f ), 0.0f );
+            XMStoreFloat4(
+                &lt.Rotation,
+                DirectX::XMQuaternionRotationRollPitchYaw(
+                    DirectX::XMConvertToRadians( -45.0f ), DirectX::XMConvertToRadians( 45.0f ), 0.0f ) );
             dl.Intensity = 5.0f;
             dl.FarPlane  = 100.0f;
           } );
 
   m_World.GetECS()
       .entity( "OmniLight 0" )
+      .child_of( m_SceneRoot )
       .add<ShadowCaster>()
       .insert(
           [&]( WorldTransform&, LocalTransform& lt, OmniLight& ol )
@@ -277,6 +293,7 @@ void Ember::BasicApp::LoadContent()
 
   m_World.GetECS()
       .entity( "OmniLight 1" )
+      .child_of( m_SceneRoot )
       .add<ShadowCaster>()
       .insert(
           [&]( WorldTransform&, LocalTransform& lt, OmniLight& ol )
@@ -289,6 +306,7 @@ void Ember::BasicApp::LoadContent()
 
   m_World.GetECS()
       .entity( "OmniLight 2" )
+      .child_of( m_SceneRoot )
       .add<ShadowCaster>()
       .insert(
           [&]( WorldTransform&, LocalTransform& lt, OmniLight& ol )
@@ -301,13 +319,16 @@ void Ember::BasicApp::LoadContent()
 
   m_World.GetECS()
       .entity( "SpotLight" )
+      .child_of( m_SceneRoot )
       .add<ShadowCaster>()
       .insert(
           [&]( WorldTransform&, LocalTransform& lt, SpotLight& sl, RotatingModel& rm )
           {
             lt.Translation = { -15.0f, 1.0f, -5.0f };
-            lt.Rotation    = DirectX::XMQuaternionRotationRollPitchYaw(
-                DirectX::XMConvertToRadians( -10.0f ), DirectX::XMConvertToRadians( 0.0f ), 0.0f );
+            XMStoreFloat4(
+                &lt.Rotation,
+                DirectX::XMQuaternionRotationRollPitchYaw(
+                    DirectX::XMConvertToRadians( -10.0f ), DirectX::XMConvertToRadians( 0.0f ), 0.0f ) );
             sl.Color              = Color32::White();
             sl.ConeInnerHalfAngle = DirectX::XMConvertToRadians( 10.0f );
             sl.ConeOuterHalfAngle = DirectX::XMConvertToRadians( 15.0f );
@@ -323,27 +344,26 @@ void Ember::BasicApp::LoadContent()
       m_RenderDevice.get(), &m_World, m_TextureLoader.get(), m_MaterialManager.get(), m_GeometryManager.get() );
 
   // Setup Scene Geometry
-  flecs::entity       model = m_ModelLoader->TryLoadModel( "Sponza.glb" ).value().set_name( "Scene" );
+  _ = m_ModelLoader->TryLoadModel( "Sponza.glb" ).value().child_of( m_SceneRoot ).set_name( "Scene" );
 
   flecs::entity const rm =
       m_World.GetECS()
           .entity( "HelmetRotator" )
+          .child_of( m_SceneRoot )
           .insert(
               []( LocalTransform& local_tx, WorldTransform&, RotatingModel& rot_model, WorldBoundingBox& )
               {
                 rot_model.Speed      = 20.0f;
-                local_tx.Translation = DirectX::XMVectorSet( 0.0f, 1.0f, 5.0f, 1.0f );
+                local_tx.Translation = { 0.0f, 1.0f, 5.0f };
               } );
 
-  model                             = m_ModelLoader->TryLoadModel( "DamagedHelmet.glb" )->child_of( rm );
-  LocalTransform* local_tx          = model.get_mut<LocalTransform>();
-  local_tx->Scale                   = DirectX::XMVectorSet( 0.3f, 0.3f, 0.3f, 0.0f );
-  local_tx->Rotation                = DirectX::XMQuaternionIdentity();
+  flecs::entity model = m_ModelLoader->TryLoadModel( "DamagedHelmet.glb" )->set_name( "DamagedHelmet" ).child_of( rm );
+  LocalTransform* local_tx = &model.get_mut<LocalTransform>();
+  local_tx->Scale          = { 0.3f, 0.3f, 0.3f };
 
-  model                             = m_ModelLoader->TryLoadModel( "AlphaBlendModeTest.glb" ).value();
-  local_tx                          = model.get_mut<LocalTransform>();
-  local_tx->Translation             = DirectX::XMVectorSet( 5.0f, 2.0f, 7.0f, 1.0f );
-  local_tx->Rotation                = DirectX::XMQuaternionIdentity();
+  model = m_ModelLoader->TryLoadModel( "AlphaBlendModeTest.glb" )->set_name( "AlphaBlendTest" ).child_of( m_SceneRoot );
+  local_tx                          = &model.get_mut<LocalTransform>();
+  local_tx->Translation             = { 5.0f, 2.0f, 7.0f };
 
   constexpr char const* kEnvMapFile = "OvercastSoil.hdr";
   bool const            env_loaded =
@@ -487,6 +507,13 @@ void Ember::BasicApp::Update()
 
   m_ConfigurationBuffer.Write( 0, sizeof( g_Debug ), &g_Debug );
 
+  {
+    static SceneTree scene_tree;
+
+    scene_tree.Draw( m_SceneRoot );
+    Inspector::Draw( &m_World.GetECS(), scene_tree.GetSelected() );
+  }
+
   // Rendering
   ImGui::Render();
 
@@ -531,11 +558,13 @@ void Ember::BasicApp::Update()
   m_World.GetECS().each(
       [&]( LocalTransform& lt, RotatingModel const& rm )
       {
-        lt.Rotation = DirectX::XMQuaternionMultiply(
-            lt.Rotation,
-            DirectX::XMQuaternionRotationAxis(
-                DirectX::XMVectorSet( 0.0f, 1.0f, 0.0f, 0.0f ),
-                DirectX::XMConvertToRadians( rm.Speed ) * delta_seconds ) );
+        XMStoreFloat4(
+            &lt.Rotation,
+            DirectX::XMQuaternionMultiply(
+                XMLoadFloat4( &lt.Rotation ),
+                DirectX::XMQuaternionRotationAxis(
+                    DirectX::XMVectorSet( 0.0f, 1.0f, 0.0f, 0.0f ),
+                    DirectX::XMConvertToRadians( rm.Speed ) * delta_seconds ) ) );
       } );
 
   m_World.Update( delta_seconds );

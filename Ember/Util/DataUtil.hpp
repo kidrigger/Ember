@@ -3,10 +3,15 @@
 #include <cstdint>
 #include <ranges>
 
+using byte = unsigned char;
+
 namespace Ember
 {
 
-constexpr uint32_t operator""_KiB( size_t const kibs )
+// ReSharper disable once CppInconsistentNaming
+constexpr std::_Ignore _{};
+
+constexpr uint32_t     operator""_KiB( size_t const kibs )
 {
   return ( uint32_t )kibs * ( 1 << 10 );
 }
@@ -76,13 +81,13 @@ class StringID
   uint64_t m_Value;
 
 public:
-  consteval StringID( std::string_view const& str ) : m_Value{ HashFnv1A( str ) }
+  constexpr StringID( std::string_view const& str ) : m_Value{ HashFnv1A( str ) }
   {}
 
-  consteval StringID( char const* c_str, size_t const size ) : m_Value{ HashFnv1A( size, ( byte const* )c_str ) }
+  constexpr StringID( char const* c_str, size_t const size ) : m_Value{ HashFnv1A( size, ( byte const* )c_str ) }
   {}
 
-  [[nodiscard]] consteval uint64_t GetValue() const
+  [[nodiscard]] constexpr uint64_t GetValue() const
   {
     return m_Value;
   }
@@ -90,7 +95,7 @@ public:
   constexpr auto operator<=>( StringID const& ) const = default;
 };
 
-consteval StringID operator""_id( char const* data, size_t const size )
+constexpr StringID operator""_id( char const* data, size_t const size )
 {
   return StringID{ data, size };
 }
