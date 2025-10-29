@@ -313,6 +313,7 @@
   <ItemGroup>
     <ClCompile Include="AtmosphereContext.cpp" />
     <ClCompile Include="Inspector.cpp" />
+    <ClCompile Include="PickingGizmo.cpp" />
     <ClCompile Include="SceneTree.cpp" />
     <ClCompile Include="TransparencyPass.cpp" />
     <ClCompile Include="BackgroundPass.cpp" />
@@ -355,6 +356,7 @@
   <ItemGroup>
     <ClInclude Include="AtmosphereContext.hpp" />
     <ClInclude Include="Inspector.hpp" />
+    <ClInclude Include="PickingGizmo.hpp" />
     <ClInclude Include="SceneTree.hpp" />
     <ClInclude Include="TransparencyPass.hpp" />
     <ClInclude Include="BackgroundPass.hpp" />

@@ -80,6 +80,17 @@ LRESULT CALLBACK WndProc( HWND const window_handle, UINT const message, WPARAM c
     {
       Ember::Input::Instance().SetRightMouseDown( false );
     }
+    break;
+    case WM_LBUTTONDOWN:
+    {
+      Ember::Input::Instance().SetLeftMouseDown( true );
+    }
+    break;
+    case WM_LBUTTONUP:
+    {
+      Ember::Input::Instance().SetLeftMouseDown( false );
+    }
+    break;
     // The default window procedure will play a system notification sound
     // when pressing the Alt+Enter keyboard combination if this message is
     // not handled.

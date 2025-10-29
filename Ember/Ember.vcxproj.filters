@@ -207,6 +207,9 @@
     <ClCompile Include="SceneTree.cpp">
       <Filter>Source Files\Editor</Filter>
     </ClCompile>
+    <ClCompile Include="PickingGizmo.cpp">
+      <Filter>Source Files\Editor</Filter>
+    </ClCompile>
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="Util\PerfCounter.hpp">
@@ -348,6 +351,9 @@
       <Filter>Header Files\Editor</Filter>
     </ClInclude>
     <ClInclude Include="SceneTree.hpp">
+      <Filter>Header Files\Editor</Filter>
+    </ClInclude>
+    <ClInclude Include="PickingGizmo.hpp">
       <Filter>Header Files\Editor</Filter>
     </ClInclude>
   </ItemGroup>

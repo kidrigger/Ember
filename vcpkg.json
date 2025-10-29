@@ -18,6 +18,7 @@
       ]
     },
     "winpixevent",
-    "nlohmann-json"
+    "nlohmann-json",
+    "imguizmo"
   ]
 }

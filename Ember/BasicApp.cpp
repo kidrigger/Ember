@@ -16,6 +16,7 @@
 #include "Material.hpp"
 #include "MaterialManager.hpp"
 #include "ModelLoader.hpp"
+#include "PickingGizmo.hpp"
 #include "RenderDevice.hpp"
 #include "RenderPassCommon.hpp"
 #include "SceneTree.hpp"
@@ -507,12 +508,15 @@ void Ember::BasicApp::Update()
 
   m_ConfigurationBuffer.Write( 0, sizeof( g_Debug ), &g_Debug );
 
-  {
-    static SceneTree scene_tree;
 
-    scene_tree.Draw( m_SceneRoot );
-    Inspector::Draw( &m_World.GetECS(), scene_tree.GetSelected() );
-  }
+  // TODO: Remove function static variables.
+  static SceneTree    scene_tree;
+  static PickingGizmo picking_gizmo;
+
+  scene_tree.Draw( m_SceneRoot );
+  picking_gizmo.Draw( *m_Camera, scene_tree.GetSelected() );
+  Inspector::Draw( &m_World.GetECS(), scene_tree.GetSelected() );
+
 
   // Rendering
   ImGui::Render();
@@ -525,6 +529,59 @@ void Ember::BasicApp::Update()
   float const            mouse_dx  = ( ( float )mouse_pos.x - ( float )m_PrevMouse.x ) / ( float )m_WindowWidth;
   float const            mouse_dy  = ( ( float )mouse_pos.y - ( float )m_PrevMouse.y ) / ( float )m_WindowHeight;
   m_PrevMouse                      = mouse_pos;
+
+  DirectX::XMFLOAT4 mouse_ndc      = {
+    ( float )mouse_pos.x / ( float )m_WindowWidth,
+    ( float )mouse_pos.y / ( float )m_WindowHeight,
+    1.0f,
+    1.0f,
+  };
+
+  mouse_ndc.x = mouse_ndc.x * 2.0f - 1.0f;
+  mouse_ndc.y = 1.0f - mouse_ndc.y * 2.0f;
+
+  if ( Input::Instance().IsLeftMouseReleased() and not ImGui::GetIO().WantCaptureMouse )
+  {
+    DirectX::XMVECTOR ray_origin  = m_Camera->GetPosition();
+    DirectX::XMVECTOR ray_dir     = XMVector4Transform( XMLoadFloat4( &mouse_ndc ), m_Camera->GetInvProj() );
+    float             w           = DirectX::XMVectorGetW( ray_dir );
+    ray_dir                       = DirectX::XMVectorScale( ray_dir, 1.0f / w );
+    ray_dir                       = XMVector3Transform( ray_dir, m_Camera->GetInvView() );
+    ray_dir                       = DirectX::XMVectorSubtract( ray_dir, ray_origin );
+    ray_dir                       = DirectX::XMVector3Normalize( ray_dir );
+
+    DirectX::XMVECTOR ray_rev_dir = DirectX::XMVectorNegate( ray_dir );
+
+    flecs::entity     hit;
+    float             closest_hit = FLT_MAX;
+
+    //
+    std::function<void( flecs::entity )> const hit_test = [&]( flecs::entity e )
+    {
+      WorldBoundingBox const* lt              = e.try_get_mut<WorldBoundingBox>();
+      bool                    is_actual_bound = e.has<LocalBoundingBox>();
+      if ( lt )
+      {
+        float dist;
+        float rev_dist;
+        if ( lt->AABB.Intersects( ray_origin, ray_dir, dist ) )
+        {
+          if ( is_actual_bound and dist > 0.1f and dist < closest_hit and
+               not lt->AABB.Intersects( ray_origin, ray_rev_dir, rev_dist ) )
+          {
+            hit         = e;
+            closest_hit = dist;
+          }
+
+          e.children( hit_test );
+        }
+      }
+    };
+
+    m_SceneRoot.children( hit_test );
+
+    scene_tree.SetSelected( hit );
+  }
 
   if ( Input::Instance().IsRightMouseDown() )
     m_Camera->SetYawPitch(

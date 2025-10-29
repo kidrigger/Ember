@@ -235,16 +235,6 @@ size_t Ember::DrawList::GetTotalCount() const
   return m_OpaqueDrawInfos.size() + m_AlphaBlendedDrawInfos.size() + m_AlphaTestedDrawInfos.size();
 }
 
-struct Quaternion
-{
-  DirectX::XMFLOAT4 Inner;
-};
-
-struct Euler
-{
-  DirectX::XMFLOAT3 Inner;
-};
-
 Ember::World::World()
 {
   m_Ecs.import <flecs::stats>();
@@ -264,34 +254,21 @@ Ember::World::World()
           .member<float>( "y", 0, offsetof( DirectX::XMFLOAT4, y ) )
           .member<float>( "z", 0, offsetof( DirectX::XMFLOAT4, z ) )
           .member<float>( "w", 0, offsetof( DirectX::XMFLOAT4, w ) )
-          .set<InspectorView>( InspectorView{
-              []( char const* label, void* elem )
-              {
-                // TODO: Avoid all this by Caching the Euler angles.
+          .set<InspectorView>( InspectorView{ []( char const* label, void* elem )
+                                              {
+                                                // TODO: Avoid all this by Caching the Euler angles.
 
-                DirectX::XMFLOAT4* q  = ( DirectX::XMFLOAT4* )elem;
-                q->x                  = -q->x;
-                DirectX::XMMATRIX mat = DirectX::XMMatrixRotationQuaternion( XMLoadFloat4( q ) );
+                                                DirectX::XMFLOAT4* q     = ( DirectX::XMFLOAT4* )elem;
+                                                DirectX::XMFLOAT3  euler = Quaternion::ToEuler( *q );
 
-                float             euler[3];
-                euler[0] = -std::asin( mat.r[1].m128_f32[2] );                        // Pitch
-                euler[1] = std::atan2( -mat.r[0].m128_f32[2], mat.r[2].m128_f32[2] ); // Yaw
-                euler[2] = std::atan2( -mat.r[1].m128_f32[0], mat.r[1].m128_f32[1] ); // Roll
+                                                ImGui::PushID( label );
+                                                ImGui::SliderAngle( "Pitch", &euler.x, -89.0f, 89.0f );
+                                                ImGui::SliderAngle( "Yaw", &euler.y, -180.0f, 180.0f );
+                                                ImGui::SliderAngle( "Roll", &euler.z, -180.0f, 180.0f );
+                                                ImGui::PopID();
 
-                for ( float& angle : euler )
-                {
-                  angle = DirectX::XMConvertToDegrees( angle );
-                }
-
-                ImGui::DragFloat3( label, euler );
-
-                for ( float& angle : euler )
-                {
-                  angle = DirectX::XMConvertToRadians( angle );
-                }
-
-                XMStoreFloat4( q, DirectX::XMQuaternionRotationRollPitchYaw( euler[0], euler[1], euler[2] ) );
-              } } );
+                                                *q = Quaternion::FromEuler( euler );
+                                              } } );
   _ = m_Ecs.component<DirectX::XMFLOAT4>()
           .member<float>( "x", 0, offsetof( DirectX::XMFLOAT4, x ) )
           .member<float>( "y", 0, offsetof( DirectX::XMFLOAT4, y ) )

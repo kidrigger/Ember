@@ -6,6 +6,21 @@ Ember::Input& Ember::Input::Instance()
   return instance;
 }
 
+bool Ember::Input::IsLeftMouseDown() const
+{
+  return m_IsLeftMouseDown;
+}
+
+void Ember::Input::SetLeftMouseDown( bool const v )
+{
+  m_IsLeftMouseDown = v;
+}
+
+bool Ember::Input::IsLeftMouseReleased() const
+{
+  return not m_IsLeftMouseDown and m_PrevLeftMouseDown;
+}
+
 bool Ember::Input::IsRightMouseDown() const
 {
   return m_IsRightMouseDown;
@@ -57,6 +72,7 @@ void Ember::Input::SetDown( char const c, bool const down )
 
 void Ember::Input::Update()
 {
+  m_PrevLeftMouseDown = m_IsLeftMouseDown;
   for ( auto& v : m_KeyPress.Values() )
   {
     v = ( byte )( ( v << 1 ) | v );

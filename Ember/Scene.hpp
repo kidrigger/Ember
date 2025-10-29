@@ -16,8 +16,28 @@ namespace Ember
 class RenderDevice;
 class MaterialImpl;
 
-struct Static
-{};
+struct Quaternion
+{
+  DirectX::XMFLOAT4        Inner;
+
+  static DirectX::XMFLOAT3 ToEuler( DirectX::XMFLOAT4 quat )
+  {
+    quat.x                      = -quat.x;
+    DirectX::XMMATRIX const mat = DirectX::XMMatrixRotationQuaternion( XMLoadFloat4( &quat ) );
+    DirectX::XMFLOAT3       euler;
+    euler.x = -std::asin( mat.r[1].m128_f32[2] );                        // Pitch
+    euler.y = std::atan2( -mat.r[0].m128_f32[2], mat.r[2].m128_f32[2] ); // Yaw
+    euler.z = std::atan2( -mat.r[1].m128_f32[0], mat.r[1].m128_f32[1] ); // Roll
+    return euler;
+  }
+
+  static DirectX::XMFLOAT4 FromEuler( DirectX::XMFLOAT3 euler )
+  {
+    DirectX::XMFLOAT4 quat;
+    XMStoreFloat4( &quat, DirectX::XMQuaternionRotationRollPitchYaw( euler.x, euler.y, euler.z ) );
+    return quat;
+  }
+};
 
 struct LocalTransform
 {
