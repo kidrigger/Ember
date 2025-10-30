@@ -496,7 +496,7 @@ void Ember::RenderDevice::Present()
   m_FrameReceipts[m_CurrentBackbufferIndex] = m_DirectContext.Signal();
 
   {
-    ZoneScopedN( "Wait For Next Frame" );
+    ZoneScopedNC( "Wait For Next Frame", tracy::Color::Gray );
     // At the end of the queue, we wait for the next frame.
     m_CurrentBackbufferIndex = m_Swapchain->GetCurrentBackBufferIndex();
 

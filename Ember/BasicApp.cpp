@@ -633,6 +633,8 @@ void Ember::BasicApp::Update()
 
 Ember::RenderPass::RTVData Ember::BasicApp::ClearRenderTargets( FrameGraph* frame_graph ) const
 {
+  ZoneScoped;
+
   return frame_graph->addCallbackPass(
       "Clear RTV",
       [&]( FrameGraph::Builder& builder, RenderPass::RTVData& data )
@@ -664,22 +666,26 @@ Ember::RenderPass::RTVData Ember::BasicApp::ClearRenderTargets( FrameGraph* fram
       },
       []( RenderPass::RTVData const& data, FrameGraphPassResources& resources, FG::Context const* context )
       {
-        FG::Context::FrameData const& frame_data    = context->GetFrameData();
-        RenderTargetManager const*    rtm           = context->GetRenderTargetManager();
+        ZoneScopedN( "Clear RTV" );
+        FG::Context::FrameData const& frame_data   = context->GetFrameData();
+        RenderTargetManager const*    rtm          = context->GetRenderTargetManager();
+        ID3D12GraphicsCommandList*    command_list = frame_data.CommandList;
+        PIXScopedEvent( command_list, PIX_COLOR_DEFAULT, "Clear RTV" );
 
-        FG::Texture const&            render_target = resources.get<FG::Texture>( data.RenderTarget );
-        FG::Texture const&            depth_target  = resources.get<FG::Texture>( data.DepthStencil );
+        FG::Texture const& render_target = resources.get<FG::Texture>( data.RenderTarget );
+        FG::Texture const& depth_target  = resources.get<FG::Texture>( data.DepthStencil );
 
-        FLOAT constexpr kBlack[4]                   = {};
-        rtm->ClearRenderTargetView( frame_data.CommandList, render_target.Resource.Get(), kBlack );
-        rtm->ClearDepthStencilView(
-            frame_data.CommandList, depth_target.Resource.Get(), D3D12_CLEAR_FLAG_DEPTH, 1.0f, 0 );
+        FLOAT constexpr kBlack[4]        = {};
+        rtm->ClearRenderTargetView( command_list, render_target.Resource.Get(), kBlack );
+        rtm->ClearDepthStencilView( command_list, depth_target.Resource.Get(), D3D12_CLEAR_FLAG_DEPTH, 1.0f, 0 );
       } );
 }
 
 Ember::RenderPass::RTVData Ember::BasicApp::RenderTransparency(
     FrameGraph* frame_graph, RenderPass::RTVData const& opaque_pass )
 {
+  ZoneScoped;
+
   RenderPass::RTVData alpha_tested_pass = frame_graph->addCallbackPass(
       "Alpha Tested Pass",
       [&]( FrameGraph::Builder& builder, RenderPass::RTVData& data )
@@ -743,6 +749,8 @@ Ember::RenderPass::RTVData Ember::BasicApp::RenderTransparency(
 Ember::RenderPass::RTVData Ember::BasicApp::RenderOpaqueFwd(
     FrameGraph* frame_graph, RenderPass::RTVData const& clear_rtv )
 {
+  ZoneScoped;
+
   return frame_graph->addCallbackPass(
       "Opaque Forward",
       [&]( FrameGraph::Builder& builder, RenderPass::RTVData& data )
@@ -778,6 +786,8 @@ Ember::RenderPass::RTVData Ember::BasicApp::RenderSkybox(
     RenderPass::RTVData const&        transparency_pass,
     AtmosphereContext::OutData const& atmosphere )
 {
+  ZoneScoped;
+
   struct SkyboxData
   {
     FrameGraphResource RenderTarget;
@@ -849,6 +859,8 @@ Ember::RenderPass::RTVData Ember::BasicApp::RenderSkybox(
 Ember::RenderPass::RTVData Ember::BasicApp::RenderOpaqueDfr(
     FrameGraph* frame_graph, RenderPass::RTVData const& clear_rtv )
 {
+  ZoneScoped;
+
   RenderPass::GBufferData clear_gbuffer = frame_graph->addCallbackPass(
       "Clear GBuffer",
       [&]( FrameGraph::Builder& builder, RenderPass::GBufferData& data )
@@ -871,10 +883,14 @@ Ember::RenderPass::RTVData Ember::BasicApp::RenderOpaqueDfr(
       },
       []( RenderPass::GBufferData const& data, FrameGraphPassResources& resources, FG::Context const* context )
       {
-        FG::Context::FrameData const& frame_data = context->GetFrameData();
-        RenderTargetManager const*    rtm        = context->GetRenderTargetManager();
+        ZoneScopedN( "Clear GBuffer" );
 
-        ID3D12Resource*               gbuffer[RenderPass::GBuffer::kGBufferCount];
+        FG::Context::FrameData const& frame_data   = context->GetFrameData();
+        RenderTargetManager const*    rtm          = context->GetRenderTargetManager();
+        ID3D12GraphicsCommandList*    command_list = frame_data.CommandList;
+        PIXScopedEvent( command_list, PIX_COLOR_DEFAULT, "Clear GBuffer" );
+
+        ID3D12Resource* gbuffer[RenderPass::GBuffer::kGBufferCount];
 
         for ( int i = 0; i < RenderPass::GBuffer::kGBufferCount; i++ )
         {
@@ -882,7 +898,7 @@ Ember::RenderPass::RTVData Ember::BasicApp::RenderOpaqueDfr(
         }
 
         FLOAT constexpr kBlack[4] = {};
-        rtm->ClearRenderTargetViews( frame_data.CommandList, CountOf( gbuffer ), DataOf( gbuffer ), kBlack );
+        rtm->ClearRenderTargetViews( command_list, CountOf( gbuffer ), DataOf( gbuffer ), kBlack );
       } );
 
   RenderPass::GBufferData gbuffer = frame_graph->addCallbackPass(
@@ -1158,14 +1174,22 @@ void Ember::BasicApp::Render()
         cmd->CopyResource( backbuffer.Resource.Get(), render_target.Resource.Get() );
       } );
 
-  frame_graph.compile();
+  {
+    ZoneScopedN( "FrameGraph Compile" );
+    frame_graph.compile();
+  }
+
   if ( g_OutputFrameGraph )
   {
     std::ofstream{ "fg.dot" } << frame_graph;
     std::ofstream f{ "fg.json" };
     frame_graph.debugOutput( f, JsonWriter{} );
   }
-  frame_graph.execute( &m_FGContext, &m_FGContext );
+
+  {
+    ZoneScopedN( "FrameGraph Execute" );
+    frame_graph.execute( &m_FGContext, &m_FGContext );
+  }
 
   CD3DX12_RESOURCE_BARRIER bottom_of_renderpass_barriers[] = {
     CD3DX12_RESOURCE_BARRIER::Transition( backbuffer, D3D12_RESOURCE_STATE_COPY_DEST, D3D12_RESOURCE_STATE_PRESENT ),
