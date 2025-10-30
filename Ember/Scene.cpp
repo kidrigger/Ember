@@ -24,11 +24,32 @@ void Ember::TransformUtil::DecomposeMatrix(
   XMStoreFloat3( &out_translation->Value, translation );
 }
 
+void Ember::TransformUtil::DecomposeMatrixPartial(
+    Scale* out_scale, Rotation* out_rotation, Translation* out_translation, DirectX::XMMATRIX const& matrix )
+{
+  DirectX::XMVECTOR scale, rotation, translation;
+  ENSURE( XMMatrixDecompose( &scale, &rotation, &translation, matrix ) );
+
+  if ( out_scale ) XMStoreFloat3( &out_scale->Value, scale );
+  if ( out_rotation ) XMStoreFloat4( &out_rotation->Value, rotation );
+  if ( out_translation ) XMStoreFloat3( &out_translation->Value, translation );
+}
+
 DirectX::XMMATRIX Ember::TransformUtil::ConstructMatrix(
-    Scale const& out_scale, Rotation const& out_rotation, Translation const& out_translation )
+    Scale const& scale, Rotation const& rotation, Translation const& translation )
 {
   return DirectX::XMMatrixAffineTransformation(
-      out_scale.ToVector(), DirectX::XMVectorZero(), out_rotation.ToVector(), out_translation.ToVector() );
+      scale.ToVector(), DirectX::XMVectorZero(), rotation.ToVector(), translation.ToVector() );
+}
+
+DirectX::XMMATRIX Ember::TransformUtil::ConstructMatrixPartial(
+    Scale const* scale, Rotation const* rotation, Translation const* translation )
+{
+  DirectX::XMVECTOR const v_scale       = scale ? scale->ToVector() : DirectX::XMVectorSplatOne();
+  DirectX::XMVECTOR const v_rotation    = rotation ? rotation->ToVector() : DirectX::XMQuaternionIdentity();
+  DirectX::XMVECTOR const v_translation = translation ? translation->ToVector() : DirectX::XMVectorZero();
+
+  return DirectX::XMMatrixAffineTransformation( v_scale, DirectX::XMVectorZero(), v_rotation, v_translation );
 }
 
 DirectX::XMFLOAT3 Ember::WorldTransform::GetTranslation() const
@@ -246,20 +267,15 @@ Ember::World::World()
   m_Ecs.import <flecs::stats>();
   m_Ecs.set<flecs::Rest>( {} );
 
-  _ = m_Ecs.component<Translation>()
-          .member<float>( "x", 0, offsetof( DirectX::XMFLOAT3, x ) )
-          .member<float>( "y", 0, offsetof( DirectX::XMFLOAT3, y ) )
-          .member<float>( "z", 0, offsetof( DirectX::XMFLOAT3, z ) )
-          .set<InspectorView>( InspectorView{ []( char const* label, void* elem )
-                                              {
-                                                DirectX::XMFLOAT3* vec = ( DirectX::XMFLOAT3* )elem;
-                                                ImGui::DragFloat3( label ? label : "Value", ( float* )vec );
-                                              } } );
+  flecs::entity world_transform = m_Ecs.component<WorldTransform>();
+  _                             = m_Ecs.component<WorldBoundingBox>();
+  _                             = m_Ecs.component<LocalBoundingBox>();
 
-  _ = m_Ecs.component<Scale>()
+  _                             = m_Ecs.component<Translation>()
           .member<float>( "x", 0, offsetof( DirectX::XMFLOAT3, x ) )
           .member<float>( "y", 0, offsetof( DirectX::XMFLOAT3, y ) )
           .member<float>( "z", 0, offsetof( DirectX::XMFLOAT3, z ) )
+          .add( flecs::With, world_transform )
           .set<InspectorView>( InspectorView{ []( char const* label, void* elem )
                                               {
                                                 DirectX::XMFLOAT3* vec = ( DirectX::XMFLOAT3* )elem;
@@ -271,6 +287,7 @@ Ember::World::World()
           .member<float>( "y", 0, offsetof( DirectX::XMFLOAT4, y ) )
           .member<float>( "z", 0, offsetof( DirectX::XMFLOAT4, z ) )
           .member<float>( "w", 0, offsetof( DirectX::XMFLOAT4, w ) )
+          .add( flecs::With, world_transform )
           .set<InspectorView>( InspectorView{ []( char const* label, void* elem )
                                               {
                                                 // TODO: Avoid all this by Caching the Euler angles.
@@ -287,38 +304,43 @@ Ember::World::World()
                                                 *q = Quaternion::FromEuler( euler );
                                               } } );
 
-  _ = m_Ecs.component<WorldTransform>();
-  _ = m_Ecs.component<WorldBoundingBox>();
-  _ = m_Ecs.component<LocalBoundingBox>();
+  _ = m_Ecs.component<Scale>()
+          .member<float>( "x", 0, offsetof( DirectX::XMFLOAT3, x ) )
+          .member<float>( "y", 0, offsetof( DirectX::XMFLOAT3, y ) )
+          .member<float>( "z", 0, offsetof( DirectX::XMFLOAT3, z ) )
+          .add( flecs::With, world_transform )
+          .set<InspectorView>( InspectorView{ []( char const* label, void* elem )
+                                              {
+                                                DirectX::XMFLOAT3* vec = ( DirectX::XMFLOAT3* )elem;
+                                                ImGui::DragFloat3( label ? label : "Value", ( float* )vec );
+                                              } } );
 
   //
   m_UpdateRootWorldTransformSys =
-      m_Ecs.system<WorldTransform, Translation const, Rotation const, Scale const>()
+      m_Ecs.system<WorldTransform, Translation const*, Rotation const*, Scale const*>()
           .without( flecs::ChildOf )
           .each(
-              []( WorldTransform& wt, Translation const& translation, Rotation const& rotation, Scale const& scale )
+              []( WorldTransform& wt, Translation const* translation, Rotation const* rotation, Scale const* scale )
               {
-                wt.Transform = DirectX::XMMatrixAffineTransformation(
-                    scale.ToVector(), DirectX::XMVectorZero(), rotation.ToVector(), translation.ToVector() );
+                wt.Transform    = TransformUtil::ConstructMatrixPartial( scale, rotation, translation );
                 wt.InvTransform = XMMatrixInverse( nullptr, wt.Transform );
               } );
 
   m_UpdateWorldTransformSys =
-      m_Ecs.system<WorldTransform, Translation const, Rotation const, Scale const, WorldTransform const>()
+      m_Ecs.system<WorldTransform, Translation const*, Rotation const*, Scale const*, WorldTransform const>()
           .term_at( 4 )
           .parent()
           .cascade()
           .each(
               []( WorldTransform& wt,
-                  Translation const& translation,
-                  Rotation const& rotation,
-                  Scale const& scale,
+                  Translation const* translation,
+                  Rotation const* rotation,
+                  Scale const* scale,
                   WorldTransform const& parent_wt )
               {
                 wt.Transform = XMMatrixMultiply(
-                    DirectX::XMMatrixAffineTransformation(
-                        scale.ToVector(), DirectX::XMVectorZero(), rotation.ToVector(), translation.ToVector() ),
-                    parent_wt.Transform );
+                    TransformUtil::ConstructMatrixPartial( scale, rotation, translation ), parent_wt.Transform );
+
                 wt.InvTransform = XMMatrixInverse( nullptr, wt.Transform );
               } );
 

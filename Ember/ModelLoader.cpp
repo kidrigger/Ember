@@ -172,6 +172,7 @@ flecs::entity Ember::ModelLoader::ProcessNode( LoadingContext* context, flecs::e
   DirectX::XMVECTOR translation{ DirectX::XMVectorSet( 0.0f, 0.0f, 0.0f, 1.0f ) };
   DirectX::XMVECTOR rotation{ DirectX::XMQuaternionIdentity() };
   DirectX::XMVECTOR scale{ DirectX::XMVectorSplatOne() };
+
   if ( node.has_matrix )
   {
     XMMatrixDecompose( &scale, &rotation, &translation, DirectX::XMMATRIX{ node.matrix } );
@@ -185,17 +186,14 @@ flecs::entity Ember::ModelLoader::ProcessNode( LoadingContext* context, flecs::e
     if ( node.has_scale ) scale = DirectX::XMVectorSet( node.scale[0], node.scale[1], node.scale[2], 1.0f );
   }
 
-  auto const my_node = m_World->GetECS().entity().child_of( parent ).insert(
-      [&]( Translation& translation_comp,
-           Rotation& rotation_comp,
-           Scale& scale_comp,
-           WorldTransform&,
-           WorldBoundingBox& )
-      {
-        translation_comp = Translation{ translation };
-        rotation_comp    = Rotation{ rotation };
-        scale_comp       = Scale{ scale };
-      } );
+  bool const          has_translation = node.has_matrix or node.has_translation;
+  bool const          has_rotation    = node.has_matrix or node.has_rotation;
+  bool const          has_scale       = node.has_matrix or node.has_scale;
+
+  flecs::entity const my_node         = m_World->GetECS().entity().child_of( parent ).add<WorldBoundingBox>();
+  if ( has_translation ) my_node.set<Translation>( Translation{ translation } );
+  if ( has_rotation ) my_node.set<Rotation>( Rotation{ rotation } );
+  if ( has_scale ) my_node.set<Scale>( Scale{ scale } );
 
   if ( node.mesh )
   {
@@ -519,15 +517,7 @@ void Ember::ModelLoader::ProcessPrimitive(
   ( void )m_World->GetECS()
       .entity()
       .insert(
-          [&]( WorldTransform&,
-               Translation&,
-               Rotation&,
-               Scale&,
-               WorldBoundingBox&,
-               Mesh&             prim,
-               Material&         mat,
-               Geometry&         geom,
-               LocalBoundingBox& bb )
+          [&]( WorldBoundingBox&, WorldTransform&, Mesh& prim, Material& mat, Geometry& geom, LocalBoundingBox& bb )
           {
             mat  = Material{ material };
             geom = Geometry{ geometry };
@@ -735,8 +725,7 @@ std::optional<flecs::entity> Ember::ModelLoader::TryLoadModel( char const* filen
     return {};
   }
 
-  auto entity = m_World->GetECS().entity().insert(
-      [&]( Translation&, Rotation&, Scale&, WorldTransform&, WorldBoundingBox& ) {} );
+  auto               entity        = m_World->GetECS().entity().insert( [&]( WorldTransform&, WorldBoundingBox& ) {} );
 
   LoadingContext     context       = { .Geometry = World::GeometryManager().Construct() };
 

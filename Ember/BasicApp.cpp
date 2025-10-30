@@ -171,7 +171,10 @@ Ember::BasicApp::BasicApp(
   m_TextureLoader = std::make_unique_for_overwrite<TextureLoader>();
   TextureLoader::Create( m_TextureLoader.get(), m_RenderDevice.get(), 3 );
 
-  m_World.GetECS().component<RotatingModel>().member<float>( "Speed", 0, offsetof( RotatingModel, Speed ) );
+  _ = m_World.GetECS()
+          .component<RotatingModel>()
+          .member<float>( "Speed", 0, offsetof( RotatingModel, Speed ) )
+          .add( flecs::With, m_World.GetECS().component<Rotation>() );
 
   InitImGui( window_handle, m_RenderDevice.get() );
 
@@ -262,15 +265,14 @@ void Ember::BasicApp::LoadContent()
   // Setup Lights
   LightManager::Create( m_LightManager.get(), m_RenderDevice.get(), &m_World, RenderDevice::kNumFrames );
 
-  m_SceneRoot =
-      m_World.GetECS().entity( "SceneRoot" ).insert( []( WorldTransform&, Translation&, Rotation&, Scale& ) {} );
+  m_SceneRoot = m_World.GetECS().entity( "SceneRoot" ).insert( []( Translation&, Rotation&, Scale& ) {} );
 
   m_World.GetECS()
       .entity( "Sun" )
       .child_of( m_SceneRoot )
       .add<ShadowCaster>()
       .insert(
-          [&]( WorldTransform&, Translation&, Rotation& rotation, Scale&, DirectionalLight& dl )
+          [&]( Rotation& rotation, DirectionalLight& dl )
           {
             rotation = ( Rotation )DirectX::XMQuaternionRotationRollPitchYaw(
                 DirectX::XMConvertToRadians( -45.0f ), DirectX::XMConvertToRadians( 45.0f ), 0.0f );
@@ -283,7 +285,7 @@ void Ember::BasicApp::LoadContent()
       .child_of( m_SceneRoot )
       .add<ShadowCaster>()
       .insert(
-          [&]( WorldTransform&, Translation& translation, Rotation&, Scale&, OmniLight& ol )
+          [&]( Translation& translation, OmniLight& ol )
           {
             translation  = { 15.0f, 2.0f, 12.0f };
             ol.Color     = Color32::Blue();
@@ -296,7 +298,7 @@ void Ember::BasicApp::LoadContent()
       .child_of( m_SceneRoot )
       .add<ShadowCaster>()
       .insert(
-          [&]( WorldTransform&, Translation& translation, Rotation&, Scale&, OmniLight& ol )
+          [&]( Translation& translation, OmniLight& ol )
           {
             translation  = { 0.0f, 2.0f, 5.0f };
             ol.Color     = Color32::Green();
@@ -309,7 +311,7 @@ void Ember::BasicApp::LoadContent()
       .child_of( m_SceneRoot )
       .add<ShadowCaster>()
       .insert(
-          [&]( WorldTransform&, Translation& translation, Rotation&, Scale&, OmniLight& ol )
+          [&]( Translation& translation, OmniLight& ol )
           {
             translation  = { -15.0f, 2.0f, -5.0f };
             ol.Color     = Color32::Red();
@@ -322,7 +324,7 @@ void Ember::BasicApp::LoadContent()
       .child_of( m_SceneRoot )
       .add<ShadowCaster>()
       .insert(
-          [&]( WorldTransform&, Translation& translation, Rotation& rotation, Scale&, SpotLight& sl, RotatingModel& rm )
+          [&]( Translation& translation, Rotation& rotation, SpotLight& sl, RotatingModel& rm )
           {
             translation = { -15.0f, 1.0f, -5.0f };
             rotation    = ( Rotation )DirectX::XMQuaternionRotationRollPitchYaw(
@@ -348,12 +350,7 @@ void Ember::BasicApp::LoadContent()
                                .entity( "HelmetRotator" )
                                .child_of( m_SceneRoot )
                                .insert(
-                                   []( Translation& translation,
-                                       Rotation&,
-                                       Scale&,
-                                       WorldTransform&,
-                                       RotatingModel& rot_model,
-                                       WorldBoundingBox& )
+                                   []( Translation& translation, RotatingModel& rot_model, WorldBoundingBox& )
                                    {
                                      rot_model.Speed = 20.0f;
                                      translation     = { 0.0f, 1.0f, 5.0f };

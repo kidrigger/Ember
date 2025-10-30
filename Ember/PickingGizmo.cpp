@@ -6,6 +6,7 @@
 
 #include "Camera.hpp"
 #include "Scene.hpp"
+#include "Util/DataUtil.hpp"
 
 Ember::PickingGizmo::PickingGizmo()
   : m_CurrentGizmoOperation{ ImGuizmo::TRANSLATE }, m_CurrentGizmoMode{ ImGuizmo::WORLD }
@@ -13,19 +14,16 @@ Ember::PickingGizmo::PickingGizmo()
 
 void Ember::PickingGizmo::DrawGizmo( Camera const& camera, flecs::entity const selected ) const
 {
-  Translation&          local_translation = selected.get_mut<Translation>();
-  Rotation&             local_rotation    = selected.get_mut<Rotation>();
-  Scale&                local_scale       = selected.get_mut<Scale>();
-  WorldTransform const& wt                = selected.get<WorldTransform>();
+  WorldTransform const& wt               = selected.get<WorldTransform>();
 
-  WorldTransform const* parent_transform  = nullptr;
-  if ( auto parent = selected.parent(); parent.is_valid() )
+  WorldTransform const* parent_transform = nullptr;
+  if ( flecs::entity const parent = selected.parent(); parent.is_valid() )
   {
     parent_transform = parent.try_get<WorldTransform>();
   }
 
   ImGuizmo::BeginFrame();
-  ImGuiIO& io = ImGui::GetIO();
+  ImGuiIO const& io = ImGui::GetIO();
   ImGuizmo::SetRect( 0, 0, io.DisplaySize.x, io.DisplaySize.y );
 
   DirectX::XMFLOAT4X4 view, proj;
@@ -35,7 +33,7 @@ void Ember::PickingGizmo::DrawGizmo( Camera const& camera, flecs::entity const s
   DirectX::XMFLOAT4X4 wt_mat;
   XMStoreFloat4x4( &wt_mat, wt.Transform );
 
-  ImGuizmo::Manipulate(
+  bool manipulated = Manipulate(
       ( float* )&view,
       ( float* )&proj,
       m_CurrentGizmoOperation,
@@ -44,13 +42,34 @@ void Ember::PickingGizmo::DrawGizmo( Camera const& camera, flecs::entity const s
       nullptr,
       nullptr );
 
+  if ( not manipulated ) return;
+
   DirectX::XMMATRIX local_mat = XMLoadFloat4x4( &wt_mat );
   if ( parent_transform )
   {
     local_mat = XMMatrixMultiply( local_mat, parent_transform->InvTransform );
   }
 
-  TransformUtil::DecomposeMatrix( &local_scale, &local_rotation, &local_translation, local_mat );
+  Translation* local_translation = nullptr;
+  Rotation*    local_rotation    = nullptr;
+  Scale*       local_scale       = nullptr;
+
+  switch ( m_CurrentGizmoOperation )
+  {
+    case ImGuizmo::TRANSLATE:
+      local_translation = &selected.ensure<Translation>();
+      break;
+    case ImGuizmo::ROTATE:
+      local_rotation = &selected.ensure<Rotation>();
+      break;
+    case ImGuizmo::SCALE:
+      local_scale = &selected.ensure<Scale>();
+      break;
+    default:
+      UNREACHABLE;
+  }
+
+  TransformUtil::DecomposeMatrixPartial( local_scale, local_rotation, local_translation, local_mat );
 }
 
 void Ember::PickingGizmo::DrawMenu()

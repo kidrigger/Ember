@@ -173,8 +173,9 @@ Ember::LightInfo Ember::Internal::SpotLightManager::PrepareFrame( uint32_t const
         DirectX::XMFLOAT3 direction;
         XMStoreFloat3(
             &direction,
-            DirectX::XMVector3Rotate(
-                DirectX::XMVectorSet( 0.0f, 0.0f, -1.0f, 0.0f ), XMQuaternionRotationMatrix( transform.Transform ) ) );
+            DirectX::XMVector3Normalize( DirectX::XMVector3Rotate(
+                DirectX::XMVectorSet( 0.0f, 0.0f, -1.0f, 0.0f ),
+                XMQuaternionRotationMatrix( transform.Transform ) ) ) );
 
         DirectX::XMMATRIX const view_mat = XMMatrixLookToRH(
             XMLoadFloat3( &position ), XMLoadFloat3( &direction ), DirectX::XMVECTORF32{ 0.0, 1.0f, 0.0f, 0.0f } );
@@ -207,8 +208,9 @@ Ember::LightInfo Ember::Internal::SpotLightManager::PrepareFrame( uint32_t const
         DirectX::XMFLOAT3 direction;
         XMStoreFloat3(
             &direction,
-            DirectX::XMVector3Rotate(
-                DirectX::XMVectorSet( 0.0f, 0.0f, -1.0f, 0.0f ), XMQuaternionRotationMatrix( transform.Transform ) ) );
+            DirectX::XMVector3Normalize( DirectX::XMVector3Rotate(
+                DirectX::XMVectorSet( 0.0f, 0.0f, -1.0f, 0.0f ),
+                XMQuaternionRotationMatrix( transform.Transform ) ) ) );
 
         m_LightData.push_back( {
             .Position        = position,

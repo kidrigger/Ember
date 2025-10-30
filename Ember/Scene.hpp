@@ -120,10 +120,28 @@ struct Scale
 
 namespace TransformUtil
 {
+// Decomposes a matrix into scale, rotation, and translation components.
+// All output parameters must be non-null.
 void DecomposeMatrix(
     Scale* out_scale, Rotation* out_rotation, Translation* out_translation, DirectX::XMMATRIX const& matrix );
-DirectX::XMMATRIX ConstructMatrix(
-    Scale const& out_scale, Rotation const& out_rotation, Translation const& out_translation );
+
+// Same as DecomposeMatrix but allows optional outputs.
+void DecomposeMatrixPartial(
+    Scale* out_scale, Rotation* out_rotation, Translation* out_translation, DirectX::XMMATRIX const& matrix );
+
+// Constructs a transformation matrix from scale, rotation, and translation components.
+DirectX::XMMATRIX ConstructMatrix( Scale const& scale, Rotation const& rotation, Translation const& translation );
+
+// Constructs a transformation matrix from scale, rotation, and translation components.
+// Uses default values for any missing components.
+//
+// Default values:
+// Scale = 1
+// Rotation = identity
+// Translation = origin
+DirectX::XMMATRIX ConstructMatrixPartial(
+    Scale const* scale, Rotation const* rotation, Translation const* translation );
+
 } // namespace TransformUtil
 
 struct WorldTransform
