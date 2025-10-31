@@ -8,7 +8,7 @@
 #include "Util/HelperUtils.hpp"
 
 bool Ember::RenderPass::OpaqueForward::Create(
-    OpaqueForward* out, RenderDevice* render_device, DXGI_FORMAT const rt_format )
+    OpaqueForward* out, RenderDevice* render_device, DXGI_FORMAT const rt_format, DXGI_FORMAT const depth_format )
 {
   out->RenderTargetFormat = rt_format;
 
@@ -76,7 +76,8 @@ bool Ember::RenderPass::OpaqueForward::Create(
   rasterizer_desc.CullMode              = D3D12_CULL_MODE_BACK;
 
   CD3DX12_DEPTH_STENCIL_DESC depth_stencil_desc{ D3D12_DEFAULT };
-  depth_stencil_desc.DepthFunc = D3D12_COMPARISON_FUNC_LESS_EQUAL;
+  depth_stencil_desc.DepthFunc      = D3D12_COMPARISON_FUNC_EQUAL;
+  depth_stencil_desc.DepthWriteMask = D3D12_DEPTH_WRITE_MASK_ZERO;
 
   struct PipelineStream
   {
@@ -100,7 +101,7 @@ bool Ember::RenderPass::OpaqueForward::Create(
     .Rasterizer            = rasterizer_desc,
     .DepthStencil          = depth_stencil_desc,
     .RTVFormats            = rtv_formats,
-    .DSVFormat             = DXGI_FORMAT_D32_FLOAT,
+    .DSVFormat             = depth_format,
   };
 
   D3D12_PIPELINE_STATE_STREAM_DESC const pipeline_state_stream_desc = {

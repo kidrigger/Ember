@@ -4,7 +4,7 @@
 #include "RenderPassCommon.hpp"
 #include "Util/DataUtil.hpp"
 
-bool Ember::RenderPass::GBuffer::Create( GBuffer* out, RenderDevice* render_device )
+bool Ember::RenderPass::GBuffer::Create( GBuffer* out, RenderDevice* render_device, DXGI_FORMAT const depth_format )
 {
   ComPtr<ID3DBlob> amp_shader_blob;
   ERR_FAIL_RET_F( D3DReadFileToBlob( L"TriangleAS.cso", &amp_shader_blob ) );
@@ -68,6 +68,10 @@ bool Ember::RenderPass::GBuffer::Create( GBuffer* out, RenderDevice* render_devi
   rasterizer_desc.FrontCounterClockwise = TRUE;
   rasterizer_desc.CullMode              = D3D12_CULL_MODE_BACK;
 
+  CD3DX12_DEPTH_STENCIL_DESC depth_stencil_desc{ D3D12_DEFAULT };
+  depth_stencil_desc.DepthFunc      = D3D12_COMPARISON_FUNC_EQUAL;
+  depth_stencil_desc.DepthWriteMask = D3D12_DEPTH_WRITE_MASK_ZERO;
+
   struct MainPipelineStream
   {
     CD3DX12_PIPELINE_STATE_STREAM_ROOT_SIGNATURE        RootSignature;
@@ -76,6 +80,7 @@ bool Ember::RenderPass::GBuffer::Create( GBuffer* out, RenderDevice* render_devi
     CD3DX12_PIPELINE_STATE_STREAM_MS                    MS;
     CD3DX12_PIPELINE_STATE_STREAM_PS                    PS;
     CD3DX12_PIPELINE_STATE_STREAM_RASTERIZER2           Rasterizer;
+    CD3DX12_PIPELINE_STATE_STREAM_DEPTH_STENCIL         DepthStencil;
     CD3DX12_PIPELINE_STATE_STREAM_RENDER_TARGET_FORMATS RTVFormats;
     CD3DX12_PIPELINE_STATE_STREAM_DEPTH_STENCIL_FORMAT  DSVFormat;
   };
@@ -87,8 +92,9 @@ bool Ember::RenderPass::GBuffer::Create( GBuffer* out, RenderDevice* render_devi
     .MS                    = CD3DX12_SHADER_BYTECODE( mesh_shader_blob.Get() ),
     .PS                    = CD3DX12_SHADER_BYTECODE( gbuffer_shader_blob.Get() ),
     .Rasterizer            = rasterizer_desc,
+    .DepthStencil          = depth_stencil_desc,
     .RTVFormats            = gbuffer_rt_formats,
-    .DSVFormat             = DXGI_FORMAT_D32_FLOAT,
+    .DSVFormat             = depth_format,
   };
 
   D3D12_PIPELINE_STATE_STREAM_DESC const pipeline_state_stream_desc = {

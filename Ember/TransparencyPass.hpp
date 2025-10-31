@@ -18,7 +18,8 @@ struct TransparencyForward
   ComPtr<ID3D12PipelineState> Pipeline;
   DXGI_FORMAT                 RenderTargetFormat{ DXGI_FORMAT_UNKNOWN };
 
-  static bool                 Create( TransparencyForward* out, RenderDevice* render_device, DXGI_FORMAT rt_format );
+  static bool                 Create(
+                      TransparencyForward* out, RenderDevice* render_device, DXGI_FORMAT rt_format, DXGI_FORMAT depth_format );
 };
 
 struct AlphaTestedForward
@@ -27,7 +28,8 @@ struct AlphaTestedForward
   ComPtr<ID3D12PipelineState> Pipeline;
   DXGI_FORMAT                 RenderTargetFormat{ DXGI_FORMAT_UNKNOWN };
 
-  static bool                 Create( AlphaTestedForward* out, RenderDevice* render_device, DXGI_FORMAT rt_format );
+  static bool                 Create(
+                      AlphaTestedForward* out, RenderDevice* render_device, DXGI_FORMAT rt_format, DXGI_FORMAT depth_format );
 };
 
 } // namespace Ember::RenderPass

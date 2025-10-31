@@ -2,6 +2,7 @@
 
 #include "AtmosphereContext.hpp"
 #include "BackgroundPass.hpp"
+#include "DepthPrePass.hpp"
 #include "Environment.hpp"
 #include "ForwardPass.hpp"
 #include "FrameGraphHelper.hpp"
@@ -29,6 +30,8 @@ class BasicApp final : public IApp
 {
   using RenderQueryType = flecs::query<WorldTransform const, Mesh const, Geometry const, Material const>;
 
+  DXGI_FORMAT constexpr static kDepthFormat = DXGI_FORMAT_D32_FLOAT;
+
   HWND                           m_WindowHandle{ nullptr };
   uint32_t                       m_WindowWidth{ 1280 };
   uint32_t                       m_WindowHeight{ 720 };
@@ -44,6 +47,7 @@ class BasicApp final : public IApp
   FrameGraphBlackboard m_FGBlackboard;
 
   // PBR Pipeline
+  RenderPass::DepthPrePass m_DepthPrePass;
 
   // Forward Only
   RenderPass::OpaqueForward m_OpaquePass;

@@ -76,16 +76,16 @@ void Ember::Inspector::Draw( flecs::world* ecs, flecs::entity const entity )
     {
       ImGui::Text( "<No Tags>" );
     }
+  }
 
-    char buf[128];
-    ZeroMemory( DataOf( buf ), CountOf( buf ) );
-    if ( ImGui::InputText( "Tag", DataOf( buf ), CountOf( buf ), ImGuiInputTextFlags_EnterReturnsTrue ) )
+  char buf[128];
+  ZeroMemory( DataOf( buf ), CountOf( buf ) );
+  if ( ImGui::InputText( "Add", DataOf( buf ), CountOf( buf ), ImGuiInputTextFlags_EnterReturnsTrue ) )
+  {
+    flecs::entity const component = ecs->lookup( buf, ".", "." );
+    if ( component.is_valid() )
     {
-      flecs::entity const tag = ecs->lookup( buf, ".", "." );
-      if ( tag.is_valid() )
-      {
-        _ = entity.add( tag );
-      }
+      _ = entity.add( component );
     }
   }
 
@@ -116,15 +116,32 @@ void Ember::Inspector::InspectComponent( flecs::id const type, flecs::entity con
   {
     if ( ImGui::CollapsingHeader( type.str().c_str() ) )
     {
+      ImGui::PushID( type.str().c_str() );
+
       ImGui::Text( "<Opaque>" );
+
+      if ( ImGui::Button( "Delete" ) )
+      {
+        _ = entity.remove( type );
+      }
+
+      ImGui::PopID();
     }
     return;
   }
 
   if ( ImGui::CollapsingHeader( type.str().c_str() ) )
   {
+    ImGui::PushID( type.str().c_str() );
     void* ptr = entity.get_mut( type );
     SerializeOps( ecs_vec_first_t( &ts->ops, flecs::meta::op_t ), ecs_vec_count( &ts->ops ), ptr );
+
+    if ( ImGui::Button( "Delete" ) )
+    {
+      _ = entity.remove( type );
+    }
+
+    ImGui::PopID();
   }
 }
 

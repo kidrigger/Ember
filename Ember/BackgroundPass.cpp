@@ -4,7 +4,8 @@
 #include "Util/DataUtil.hpp"
 #include "Util/HelperUtils.hpp"
 
-bool Ember::RenderPass::Background::Create( Background* out, RenderDevice* render_device, DXGI_FORMAT const rt_format )
+bool Ember::RenderPass::Background::Create(
+    Background* out, RenderDevice* render_device, DXGI_FORMAT const rt_format, DXGI_FORMAT const depth_format )
 {
   out->RenderTargetFormat = rt_format;
 
@@ -73,7 +74,7 @@ bool Ember::RenderPass::Background::Create( Background* out, RenderDevice* rende
     .PS                    = CD3DX12_SHADER_BYTECODE( bg_pixel_shader_blob.Get() ),
     .DepthStencil          = depth_stencil_desc,
     .RTVFormats            = rtv_formats,
-    .DSVFormat             = DXGI_FORMAT_D32_FLOAT,
+    .DSVFormat             = depth_format,
   };
 
   D3D12_PIPELINE_STATE_STREAM_DESC const pipeline_state_stream_desc = {

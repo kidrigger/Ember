@@ -20,7 +20,8 @@ struct OpaqueForward
   ComPtr<ID3D12PipelineState> Pipeline;
   DXGI_FORMAT                 RenderTargetFormat{ DXGI_FORMAT_UNKNOWN };
 
-  static bool                 Create( OpaqueForward* out, RenderDevice* render_device, DXGI_FORMAT rt_format );
+  static bool                 Create(
+                      OpaqueForward* out, RenderDevice* render_device, DXGI_FORMAT rt_format, DXGI_FORMAT depth_format );
 };
 
 struct RTVData

@@ -47,7 +47,7 @@ struct GBuffer
   ComPtr<ID3D12RootSignature> RootSignature;
   ComPtr<ID3D12PipelineState> Pipeline;
 
-  static bool                 Create( GBuffer* out, RenderDevice* render_device );
+  static bool                 Create( GBuffer* out, RenderDevice* render_device, DXGI_FORMAT depth_format );
 };
 
 struct MergeData

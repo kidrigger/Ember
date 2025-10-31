@@ -18,7 +18,7 @@ struct Background
   ComPtr<ID3D12PipelineState> AtmospherePipeline;
   DXGI_FORMAT                 RenderTargetFormat{ DXGI_FORMAT_UNKNOWN };
 
-  static bool                 Create( Background* out, RenderDevice* render_device, DXGI_FORMAT rt_format );
+  static bool Create( Background* out, RenderDevice* render_device, DXGI_FORMAT rt_format, DXGI_FORMAT depth_format );
 };
 
 } // namespace Ember::RenderPass

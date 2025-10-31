@@ -84,7 +84,7 @@ void Ember::Internal::DirectionLightManager::Create(
   ERR_ABORT( D3DReadFileToBlob( L"DirShadowMS.cso", &shadow_mesh_shader ) );
 
   ComPtr<ID3DBlob> shadow_pixel_shader;
-  ERR_ABORT( D3DReadFileToBlob( L"DirShadowPS.cso", &shadow_pixel_shader ) );
+  ERR_ABORT( D3DReadFileToBlob( L"EmptyPS.cso", &shadow_pixel_shader ) );
 
   D3D12_ROOT_SIGNATURE_FLAGS const root_signature_flags = D3D12_ROOT_SIGNATURE_FLAG_CBV_SRV_UAV_HEAP_DIRECTLY_INDEXED |
                                                           D3D12_ROOT_SIGNATURE_FLAG_SAMPLER_HEAP_DIRECTLY_INDEXED |

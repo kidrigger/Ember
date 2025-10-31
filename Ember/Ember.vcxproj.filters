@@ -85,6 +85,9 @@
     <Filter Include="Source Files\Editor">
       <UniqueIdentifier>{488073bf-8185-47bd-a2c7-8fb9162097da}</UniqueIdentifier>
     </Filter>
+    <Filter Include="Shaders\DepthPrePass">
+      <UniqueIdentifier>{393f6fa7-7e17-49b5-b98e-34d9dbbfc157}</UniqueIdentifier>
+    </Filter>
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="Main.cpp">
@@ -209,6 +212,9 @@
     </ClCompile>
     <ClCompile Include="PickingGizmo.cpp">
       <Filter>Source Files\Editor</Filter>
+    </ClCompile>
+    <ClCompile Include="DepthPrePass.cpp">
+      <Filter>Source Files\Passes</Filter>
     </ClCompile>
   </ItemGroup>
   <ItemGroup>
@@ -356,6 +362,9 @@
     <ClInclude Include="PickingGizmo.hpp">
       <Filter>Header Files\Editor</Filter>
     </ClInclude>
+    <ClInclude Include="DepthPrePass.hpp">
+      <Filter>Header Files\Passes</Filter>
+    </ClInclude>
   </ItemGroup>
   <ItemGroup>
     <None Include="..\.clang-format">
@@ -436,6 +445,9 @@
     <None Include="Constants.hlsli">
       <Filter>Shaders\Utils</Filter>
     </None>
+    <None Include="DepthPrePass.hlsli">
+      <Filter>Shaders\DepthPrePass</Filter>
+    </None>
   </ItemGroup>
   <ItemGroup>
     <FxCompile Include="EqrectToCube.hlsl">
@@ -463,9 +475,6 @@
       <Filter>Shaders\Shadows</Filter>
     </FxCompile>
     <FxCompile Include="DirShadowVS.hlsl">
-      <Filter>Shaders\Shadows</Filter>
-    </FxCompile>
-    <FxCompile Include="DirShadowPS.hlsl">
       <Filter>Shaders\Shadows</Filter>
     </FxCompile>
     <FxCompile Include="TriangleVS.hlsl">
@@ -557,6 +566,18 @@
     </FxCompile>
     <FxCompile Include="AtmosphereBackgroundPS.hlsl">
       <Filter>Shaders</Filter>
+    </FxCompile>
+    <FxCompile Include="EmptyPS.hlsl">
+      <Filter>Shaders</Filter>
+    </FxCompile>
+    <FxCompile Include="DepthPrePassAS.hlsl">
+      <Filter>Shaders\DepthPrePass</Filter>
+    </FxCompile>
+    <FxCompile Include="DepthPrePassMS.hlsl">
+      <Filter>Shaders\DepthPrePass</Filter>
+    </FxCompile>
+    <FxCompile Include="DepthPrePassAlphaTestedPS.hlsl">
+      <Filter>Shaders\DepthPrePass</Filter>
     </FxCompile>
   </ItemGroup>
   <ItemGroup>

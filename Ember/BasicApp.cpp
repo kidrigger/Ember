@@ -228,23 +228,24 @@ Ember::BasicApp::~BasicApp() // NOLINT(modernize-use-equals-default)
 
 void Ember::BasicApp::SetupRenderPasses()
 {
+  ENSURE( RenderPass::DepthPrePass::Create( &m_DepthPrePass, m_RenderDevice.get(), kDepthFormat ) );
   ENSURE( RenderPass::OpaqueForward::Create(
-      &m_OpaquePass, m_RenderDevice.get(), DirectX::MakeSRGB( m_SwapchainFormat ) ) );
+      &m_OpaquePass, m_RenderDevice.get(), DirectX::MakeSRGB( m_SwapchainFormat ), kDepthFormat ) );
 
-  ENSURE( RenderPass::GBuffer::Create( &m_GBufferPass, m_RenderDevice.get() ) );
+  ENSURE( RenderPass::GBuffer::Create( &m_GBufferPass, m_RenderDevice.get(), kDepthFormat ) );
   ENSURE( RenderPass::OmniLightDeferred::Create(
-      &m_OmniLightPass, m_RenderDevice.get(), DirectX::MakeSRGB( m_SwapchainFormat ) ) );
+      &m_OmniLightPass, m_RenderDevice.get(), DirectX::MakeSRGB( m_SwapchainFormat ), kDepthFormat ) );
   ENSURE( RenderPass::SpotLightDeferred::Create(
-      &m_SpotLightPass, m_RenderDevice.get(), DirectX::MakeSRGB( m_SwapchainFormat ) ) );
+      &m_SpotLightPass, m_RenderDevice.get(), DirectX::MakeSRGB( m_SwapchainFormat ), kDepthFormat ) );
   ENSURE( RenderPass::ScreenSpaceLightDeferred::Create(
       &m_ScreenSpaceLightPass, m_RenderDevice.get(), DirectX::MakeSRGB( m_SwapchainFormat ) ) );
 
   ENSURE( RenderPass::AlphaTestedForward::Create(
-      &m_AlphaTestedPass, m_RenderDevice.get(), DirectX::MakeSRGB( m_SwapchainFormat ) ) );
+      &m_AlphaTestedPass, m_RenderDevice.get(), DirectX::MakeSRGB( m_SwapchainFormat ), kDepthFormat ) );
   ENSURE( RenderPass::TransparencyForward::Create(
-      &m_TransparencyPass, m_RenderDevice.get(), DirectX::MakeSRGB( m_SwapchainFormat ) ) );
+      &m_TransparencyPass, m_RenderDevice.get(), DirectX::MakeSRGB( m_SwapchainFormat ), kDepthFormat ) );
   ENSURE( RenderPass::Background::Create(
-      &m_BackgroundPass, m_RenderDevice.get(), DirectX::MakeSRGB( m_SwapchainFormat ) ) );
+      &m_BackgroundPass, m_RenderDevice.get(), DirectX::MakeSRGB( m_SwapchainFormat ), kDepthFormat ) );
 }
 
 void Ember::BasicApp::LoadContent()
@@ -344,7 +345,7 @@ void Ember::BasicApp::LoadContent()
       m_RenderDevice.get(), &m_World, m_TextureLoader.get(), m_MaterialManager.get(), m_GeometryManager.get() );
 
   // Setup Scene Geometry
-  _                      = m_ModelLoader->TryLoadModel( "Sponza.glb" )->child_of( m_SceneRoot ).set_name( "Scene" );
+  _                      = m_ModelLoader->TryLoadModel( "Bistro.glb" )->child_of( m_SceneRoot ).set_name( "Scene" );
 
   flecs::entity const rm = m_World.GetECS()
                                .entity( "HelmetRotator" )
@@ -653,7 +654,7 @@ Ember::RenderPass::RTVData Ember::BasicApp::ClearRenderTargets( FrameGraph* fram
         data.DepthStencil = builder.create<FG::Texture>(
             "Main Depth Target",
             FG::Texture::Desc{
-                .Format    = DXGI_FORMAT_D32_FLOAT,
+                .Format    = kDepthFormat,
                 .Width     = m_WindowWidth,
                 .Height    = m_WindowHeight,
                 .MipLevels = MipLevels::kBase,
@@ -926,9 +927,10 @@ Ember::RenderPass::RTVData Ember::BasicApp::RenderOpaqueDfr(
 
         cmd->SetGraphicsRootSignature( mp.RootSignature.Get() );
         cmd->SetPipelineState( mp.Pipeline.Get() );
-        cmd->SetGraphicsRoot32BitConstants( 0, sizeof( DrawList::Info ) / 4, &draw_list_info_list.Opaque, 0 );
         cmd->SetGraphicsRoot32BitConstants( 1, sizeof( PerFrameConstants ) / 4, &constants, 0 );
         cmd->SetGraphicsRoot32BitConstants( 2, sizeof( Environment::GpuRepr ) / 4, &env, 0 );
+
+        cmd->SetGraphicsRoot32BitConstants( 0, sizeof( DrawList::Info ) / 4, &draw_list_info_list.Opaque, 0 );
         cmd->DispatchMesh( draw_list_info_list.Opaque.DrawCount, 1, 1 );
       } );
 
@@ -1121,15 +1123,18 @@ void Ember::BasicApp::Render()
   AtmosphereContext::OutData atmosphere      = m_AtmosphereContext->Render( &frame_graph, &m_FGBlackboard, frame_idx );
 
   RenderPass::RTVData        clear_rtv       = ClearRenderTargets( &frame_graph );
-  RenderPass::RTVData        opaque_pass_fwd = RenderOpaqueFwd( &frame_graph, clear_rtv );
-  RenderPass::RTVData        opaque_pass_dfr = RenderOpaqueDfr( &frame_graph, clear_rtv );
 
-  RenderPass::RTVData        opaque_pass     = g_UseDeferredRendering ? opaque_pass_dfr : opaque_pass_fwd;
+  clear_rtv.DepthStencil              = m_DepthPrePass.Execute( &frame_graph, m_FGBlackboard, clear_rtv.DepthStencil );
 
-  RenderPass::RTVData        transparency_pass = RenderTransparency( &frame_graph, opaque_pass );
-  RenderPass::RTVData        skybox_pass       = RenderSkybox( &frame_graph, transparency_pass, atmosphere );
+  RenderPass::RTVData opaque_pass_fwd = RenderOpaqueFwd( &frame_graph, clear_rtv );
+  RenderPass::RTVData opaque_pass_dfr = RenderOpaqueDfr( &frame_graph, clear_rtv );
 
-  RenderPass::RTVData        rtv_data          = frame_graph.addCallbackPass(
+  RenderPass::RTVData opaque_pass     = g_UseDeferredRendering ? opaque_pass_dfr : opaque_pass_fwd;
+
+  RenderPass::RTVData transparency_pass = RenderTransparency( &frame_graph, opaque_pass );
+  RenderPass::RTVData skybox_pass       = RenderSkybox( &frame_graph, transparency_pass, atmosphere );
+
+  RenderPass::RTVData rtv_data          = frame_graph.addCallbackPass(
       "ImGUI",
       [&]( FrameGraph::Builder& builder, RenderPass::RTVData& data )
       {

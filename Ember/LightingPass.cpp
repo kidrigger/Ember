@@ -5,7 +5,7 @@
 #include "Util/DataUtil.hpp"
 
 bool Ember::RenderPass::OmniLightDeferred::Create(
-    OmniLightDeferred* out, RenderDevice* render_device, DXGI_FORMAT const rt_format )
+    OmniLightDeferred* out, RenderDevice* render_device, DXGI_FORMAT const rt_format, DXGI_FORMAT const depth_format )
 {
   out->RenderTargetFormat = rt_format;
 
@@ -116,7 +116,7 @@ bool Ember::RenderPass::OmniLightDeferred::Create(
     .Blending              = light_vol_blend_desc,
     .RTVFormats            = final_rt_formats,
     .DepthStencil          = depth_stencil_desc,
-    .DSVFormat             = DXGI_FORMAT_D32_FLOAT,
+    .DSVFormat             = depth_format,
   };
 
   D3D12_PIPELINE_STATE_STREAM_DESC const volume_pipeline_stream_desc = {
@@ -131,7 +131,7 @@ bool Ember::RenderPass::OmniLightDeferred::Create(
 }
 
 bool Ember::RenderPass::SpotLightDeferred::Create(
-    SpotLightDeferred* out, RenderDevice* render_device, DXGI_FORMAT rt_format )
+    SpotLightDeferred* out, RenderDevice* render_device, DXGI_FORMAT const rt_format, DXGI_FORMAT const depth_format )
 {
   out->RenderTargetFormat = rt_format;
 
@@ -242,7 +242,7 @@ bool Ember::RenderPass::SpotLightDeferred::Create(
     .Blending              = light_vol_blend_desc,
     .RTVFormats            = final_rt_formats,
     .DepthStencil          = depth_stencil_desc,
-    .DSVFormat             = DXGI_FORMAT_D32_FLOAT,
+    .DSVFormat             = depth_format,
   };
 
   D3D12_PIPELINE_STATE_STREAM_DESC const volume_pipeline_stream_desc = {
@@ -257,7 +257,7 @@ bool Ember::RenderPass::SpotLightDeferred::Create(
 }
 
 bool Ember::RenderPass::ScreenSpaceLightDeferred::Create(
-    ScreenSpaceLightDeferred* out, RenderDevice* render_device, DXGI_FORMAT rt_format )
+    ScreenSpaceLightDeferred* out, RenderDevice* render_device, DXGI_FORMAT const rt_format )
 {
   out->RenderTargetFormat = rt_format;
 
