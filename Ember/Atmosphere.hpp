@@ -68,7 +68,7 @@ private:
   std::vector<Buffer>         m_AtmosphereParamBuffers;
 
   Params                      m_AtmosphereParams;
-  uint32_t                    m_Sun{ 0 };
+  uint32_t                    m_Sun{ 0xFFFFFFFF };
   uint8_t                     m_LUTUpdatePendingFrames;
 
 public:
@@ -86,6 +86,7 @@ public:
   Data        Execute( FrameGraph* frame_graph, FrameGraphBlackboard* blackboard, uint32_t frame_idx );
   Data        operator()( FrameGraph* frame_graph, FrameGraphBlackboard* blackboard, uint32_t frame_idx );
 
+  void        ResetSun();
   void        SetSun( uint32_t sun_index );
   void        SetAtmosphereParams( Params const& atmosphere_params );
   [[nodiscard]] Params const& GetAtmosphereParams() const;

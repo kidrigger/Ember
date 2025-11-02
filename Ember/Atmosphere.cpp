@@ -277,6 +277,11 @@ Ember::RenderPass::Atmosphere::Data Ember::RenderPass::Atmosphere::operator()(
   return Execute( frame_graph, blackboard, frame_idx );
 }
 
+void Ember::RenderPass::Atmosphere::ResetSun()
+{
+  SetSun( 0xFFFFFFFF );
+}
+
 void Ember::RenderPass::Atmosphere::SetSun( uint32_t const sun_index )
 {
   m_Sun = sun_index;

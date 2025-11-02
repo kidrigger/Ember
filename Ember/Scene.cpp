@@ -268,8 +268,8 @@ Ember::World::World()
   m_Ecs.set<flecs::Rest>( {} );
 
   flecs::entity world_transform = m_Ecs.component<WorldTransform>();
-  _                             = m_Ecs.component<WorldBoundingBox>();
-  _                             = m_Ecs.component<LocalBoundingBox>();
+  flecs::entity wbb             = m_Ecs.component<WorldBoundingBox>().add( flecs::With, world_transform );
+  _                             = m_Ecs.component<LocalBoundingBox>().add( flecs::With, wbb );
 
   _                             = m_Ecs.component<Translation>()
           .member<float>( "x", 0, offsetof( DirectX::XMFLOAT3, x ) )

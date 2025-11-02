@@ -84,10 +84,13 @@ float3 GetSkyView( float2 longlat )
 {
   ConstantBuffer<Camera>     camera     = ResourceDescriptorHeap[g_Camera];
   StructuredBuffer<DirLight> dir_lights = ResourceDescriptorHeap[g_DirLights];
-  DirLight                   sun        = dir_lights[g_SunIndex];
 
-  float3                     dir        = GetSkyViewDirFromLongLat( longlat );
-  float3                     x          = float3( 0, camera.Position.y + kRg, 0 );
+  if ( g_SunIndex == 0xFFFFFFFF ) return 0.0f;
+
+  DirLight sun = dir_lights[g_SunIndex];
+
+  float3   dir = GetSkyViewDirFromLongLat( longlat );
+  float3   x   = float3( 0, camera.Position.y + kRg, 0 );
   return L( x, dir, sun );
 }
 

@@ -280,6 +280,7 @@ void Ember::BasicApp::LoadContent()
       .entity( "Sun" )
       .child_of( m_SceneRoot )
       .add<ShadowCaster>()
+      .add<Sun>()
       .insert(
           [&]( Rotation& rotation, DirectionalLight& dl )
           {
@@ -634,6 +635,7 @@ void Ember::BasicApp::Update()
       } );
 
   uint32_t light_index = 0;
+  m_UpdateAtmosphericSky.ResetSun();
   m_World.GetECS().each(
       [&]( flecs::entity const e, DirectionalLight const& )
       {
