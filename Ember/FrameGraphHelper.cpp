@@ -9,6 +9,55 @@
 
 #pragma comment( lib, "FrameGraph.lib" )
 
+namespace
+{
+class ShiftingEncoder
+{
+  int      m_CurrentShift{ 0 };
+  uint32_t m_Result{ 0 };
+
+public:
+  ShiftingEncoder() = default;
+
+  ShiftingEncoder& Push( auto const& value, int const bits )
+    requires requires { static_cast<uint32_t>( value ); }
+  {
+    ASSERT( m_CurrentShift + bits <= 32 );
+    m_Result       |= ( ( ( uint32_t )value && ( ( 1 << bits ) - 1 ) ) << m_CurrentShift );
+    m_CurrentShift += bits;
+    return *this;
+  }
+
+  operator uint32_t() const
+  {
+    return m_Result;
+  }
+};
+
+class ShiftingDecoder
+{
+  uint32_t m_Value;
+  int      m_CurrentShift{ 0 };
+
+public:
+  explicit ShiftingDecoder( uint32_t const value ) : m_Value{ value }
+  {}
+
+  template <typename T>
+  auto Pop( int const bits )
+    requires requires { static_cast<T>( ( uint32_t )0 ); }
+  {
+    ASSERT( sizeof( T ) * 8 >= bits );
+    ASSERT( ( 32 - m_CurrentShift ) >= bits );
+
+    int const shift  = m_CurrentShift;
+    m_CurrentShift  += bits;
+
+    return ( T )( ( m_Value >> shift ) & ( ( 1 << bits ) - 1 ) );
+  }
+};
+} // namespace
+
 Ember::FG::Texture Ember::FG::Context::CreateTextureImpl( Texture::Desc const& desc ) const
 {
   auto [format, width, height, levels, array_size, init_state, flags] = desc;
@@ -74,6 +123,8 @@ Ember::FG::Context::Context( RenderDevice* render_device, std::unique_ptr<Render
   : m_RenderDevice{ render_device }
   , m_RenderTargetManager{ std::move( render_target_manager ) }
   , m_FrameData{}
+  , m_CurrentDepthTarget{}
+  , m_RenderTargetSize{}
   , m_TickCounter{ 0 }
   , m_TextureCount{ 0 }
 {}
@@ -275,56 +326,67 @@ Ember::FG::Context::~Context()
 
 Ember::FG::ShaderResource::operator uint32_t() const
 {
-  return ( ( uint32_t )Type & 0x3 ) | ( PixelShaderUse << 2 ) | OnlyTopMip << 3;
+  return ShiftingEncoder{}.Push( Type, 2 ).Push( PixelShaderUse, 1 ).Push( OnlyTopMip, 1 );
 }
 
 Ember::FG::ShaderResource Ember::FG::ShaderResource::Decode( uint32_t const flag )
 {
+  ShiftingDecoder decoder{ flag };
   return ShaderResource{
-    .Type           = ( ReadType )( flag & 0x3 ),
-    .PixelShaderUse = ( bool )( ( flag >> 2 ) & 0x1 ),
-    .OnlyTopMip     = ( bool )( ( flag >> 3 ) & 0x1 ),
+    .Type           = decoder.Pop<ReadType>( 2 ),
+    .PixelShaderUse = decoder.Pop<bool>( 1 ),
+    .OnlyTopMip     = decoder.Pop<bool>( 1 ),
   };
 }
 
 Ember::FG::CopySrc::operator uint32_t() const
 {
-  return ( ( uint32_t )Type & 0x3 );
+  return ShiftingEncoder{}.Push( Type, 2 );
 }
 
 Ember::FG::CopySrc Ember::FG::CopySrc::Decode( uint32_t const flag )
 {
-  return CopySrc{ ( ReadType )( flag & 0x3 ) };
+  ShiftingDecoder decoder{ flag };
+  return CopySrc{
+    .Type = decoder.Pop<ReadType>( 2 ),
+  };
 }
 
 Ember::FG::Attachment::operator uint32_t() const
 {
-  return ( ( uint32_t )Type & 0x3 ) | ( ( ( uint32_t )Index & 0x7 ) << 2 ) | ( ( ( uint32_t )IsSrgb & 0x1 ) << 5 );
+  return ShiftingEncoder{}.Push( Type, 2 ).Push( Index, 3 ).Push( IsSrgb, 1 );
 }
 
 Ember::FG::Attachment Ember::FG::Attachment::Decode( uint32_t const flag )
 {
-  return Attachment{ ( WriteType )( flag & 0x3 ), ( uint8_t )( ( flag >> 2 ) & 0x7 ), ( bool )( flag & 0b100000 ) };
+  ShiftingDecoder decoder{ flag };
+  return Attachment{
+    .Type   = decoder.Pop<WriteType>( 2 ),
+    .Index  = decoder.Pop<uint8_t>( 3 ),
+    .IsSrgb = decoder.Pop<bool>( 1 ),
+  };
 }
 
 Ember::FG::DepthStencil::operator uint32_t() const
 {
-  return ( uint32_t )Type & 0x3;
+  return ShiftingEncoder{}.Push( Type, 2 );
 }
 
 Ember::FG::DepthStencil Ember::FG::DepthStencil::Decode( uint32_t const flag )
 {
-  return DepthStencil{ ( WriteType )( flag & 0x3 ) };
+  ShiftingDecoder decoder{ flag };
+  return DepthStencil{ .Type = decoder.Pop<WriteType>( 2 ) };
 }
 
 Ember::FG::CopyDst::operator uint32_t() const
 {
-  return ( uint32_t )Type & 0x3;
+  return ShiftingEncoder{}.Push( Type, 2 );
 }
 
 Ember::FG::CopyDst Ember::FG::CopyDst::Decode( uint32_t const flag )
 {
-  return CopyDst{ ( WriteType )( flag & 0x3 ) };
+  ShiftingDecoder decoder{ flag };
+  return CopyDst{ .Type = decoder.Pop<WriteType>( 2 ) };
 }
 
 Ember::FG::Read Ember::FG::DecodeReadFlags( uint32_t const v )
