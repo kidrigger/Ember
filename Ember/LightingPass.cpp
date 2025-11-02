@@ -1,14 +1,16 @@
 #include "LightingPass.hpp"
 
 #include "Environment.hpp"
+#include "ForwardPass.hpp"
+#include "FrameGraphHelper.hpp"
 #include "RenderPassCommon.hpp"
 #include "Util/DataUtil.hpp"
+#include "Util/Profiling.hpp"
+#include "fg/FrameGraph.hpp"
 
 bool Ember::RenderPass::OmniLightDeferred::Create(
     OmniLightDeferred* out, RenderDevice* render_device, DXGI_FORMAT const rt_format, DXGI_FORMAT const depth_format )
 {
-  out->RenderTargetFormat = rt_format;
-
   ComPtr<ID3DBlob> omni_volume_amp_shader_blob;
   ERR_FAIL_RET_F( D3DReadFileToBlob( L"OmniLightingAS.cso", &omni_volume_amp_shader_blob ) );
   ComPtr<ID3DBlob> omni_volume_mesh_shader_blob;
@@ -128,6 +130,82 @@ bool Ember::RenderPass::OmniLightDeferred::Create(
       &volume_pipeline_stream_desc, IID_PPV_ARGS( out->Pipeline.ReleaseAndGetAddressOf() ) ) );
 
   return true;
+}
+
+namespace Ember::RenderPass
+{
+struct MergeData
+{
+  std::array<FrameGraphResource, GBuffer::kGBufferCount> GBuffer;
+  FrameGraphResource                                     RenderTarget;
+  FrameGraphResource                                     DepthStencil;
+};
+} // namespace Ember::RenderPass
+
+FrameGraphResource Ember::RenderPass::OmniLightDeferred::Execute(
+    FrameGraph* frame_graph, FrameGraphBlackboard const& bb, GBuffer::Data const& gbuffer ) const
+{
+  MergeData const& result = frame_graph->addCallbackPass(
+      "OmniLight Pass",
+      [&]( FrameGraph::Builder& builder, MergeData& data )
+      {
+        for ( uint32_t i = 0; i < GBuffer::kGBufferCount; i++ )
+        {
+          data.GBuffer[i] = builder.read( gbuffer.GBuffer[i], FG::ShaderResource{ .PixelShaderUse = true } );
+        }
+
+        auto const&              backbuffer_info = bb.get<FG::BackbufferInfo>();
+        FrameGraphResource const render_target   = builder.create<FG::Texture>(
+            "Main Render Target",
+            FG::Texture::Desc{
+                  .Format    = backbuffer_info.SwapchainFormat,
+                  .Width     = backbuffer_info.Width,
+                  .Height    = backbuffer_info.Height,
+                  .MipLevels = MipLevels::kBase,
+                  .InitState = D3D12_RESOURCE_STATE_RENDER_TARGET,
+                  .Flags     = D3D12_RESOURCE_FLAG_ALLOW_RENDER_TARGET,
+            } );
+
+        data.RenderTarget = builder.write(
+            render_target,
+            FG::Attachment{
+                .Index     = 0,
+                .ForceSrgb = true,
+                .LoadOp    = FG::LoadOperation::kClear,
+            } );
+        data.DepthStencil = builder.read( gbuffer.DepthStencil, FG::DepthStencilRead{} );
+      },
+      [self = this, bb = &bb]( MergeData const& data, FrameGraphPassResources& resources, FG::Context const* context )
+      {
+        ZoneScopedN( "OmniLight Pass" );
+
+        FG::Context::FrameData const& frame_data = context->GetFrameData();
+        ID3D12GraphicsCommandList6*   cmd        = frame_data.CommandList;
+        PIXScopedEvent( cmd, PIX_COLOR_DEFAULT, "OmniLight Pass" );
+
+        auto const& constants = bb->get<PerFrameConstants>();
+        auto const& env       = bb->get<Environment::GpuRepr>();
+
+        SRVHandle   gbuffer_handles[GBuffer::kGBufferCount];
+        for ( uint32_t i = 0; i < GBuffer::kGBufferCount; i++ )
+        {
+          gbuffer_handles[i] = resources.get<FG::Texture>( data.GBuffer[i] ).AsSRV;
+        }
+
+        cmd->SetGraphicsRootSignature( self->RootSignature.Get() );
+        cmd->SetPipelineState( self->Pipeline.Get() );
+        cmd->SetGraphicsRoot32BitConstants( 0, CountOf( gbuffer_handles ), DataOf( gbuffer_handles ), 0 );
+        cmd->SetGraphicsRoot32BitConstants( 1, sizeof( PerFrameConstants ) / 4, &constants, 0 );
+        cmd->SetGraphicsRoot32BitConstants( 2, sizeof( Environment::GpuRepr ) / 4, &env, 0 );
+        cmd->DispatchMesh( ( constants.LightInfo.OmniLightInfo.TotalLightCount + 31 ) / 32, 1, 1 );
+      } );
+  return result.RenderTarget;
+}
+
+FrameGraphResource Ember::RenderPass::OmniLightDeferred::operator()(
+    FrameGraph* frame_graph, FrameGraphBlackboard const& bb, GBuffer::Data const& gbuffer ) const
+{
+  return Execute( frame_graph, bb, gbuffer );
 }
 
 bool Ember::RenderPass::SpotLightDeferred::Create(
@@ -256,6 +334,59 @@ bool Ember::RenderPass::SpotLightDeferred::Create(
   return true;
 }
 
+FrameGraphResource Ember::RenderPass::SpotLightDeferred::Execute(
+    FrameGraph*                 frame_graph,
+    FrameGraphBlackboard const& bb,
+    GBuffer::Data const&        gbuffer,
+    FrameGraphResource const    render_target ) const
+{
+  MergeData const& result = frame_graph->addCallbackPass(
+      "SpotLight Pass",
+      [&]( FrameGraph::Builder& builder, MergeData& data )
+      {
+        for ( uint32_t i = 0; i < GBuffer::kGBufferCount; i++ )
+        {
+          data.GBuffer[i] = builder.read( gbuffer.GBuffer[i], FG::ShaderResource{ .PixelShaderUse = true } );
+        }
+        data.RenderTarget = builder.write( render_target, FG::Attachment{ .Index = 0, .ForceSrgb = true } );
+        data.DepthStencil = builder.read( gbuffer.DepthStencil, FG::DepthStencilRead{} );
+      },
+      [self = this, bb = &bb]( MergeData const& data, FrameGraphPassResources& resources, FG::Context const* context )
+      {
+        ZoneScopedN( "SpotLight Pass" );
+
+        FG::Context::FrameData const& frame_data = context->GetFrameData();
+        ID3D12GraphicsCommandList6*   cmd        = frame_data.CommandList;
+        PIXScopedEvent( cmd, PIX_COLOR_DEFAULT, "SpotLight Pass" );
+
+        SRVHandle gbuffer_handles[GBuffer::kGBufferCount];
+        for ( uint32_t i = 0; i < GBuffer::kGBufferCount; i++ )
+        {
+          gbuffer_handles[i] = resources.get<FG::Texture>( data.GBuffer[i] ).AsSRV;
+        }
+
+        auto const& constants = bb->get<PerFrameConstants>();
+        auto const& env       = bb->get<Environment::GpuRepr>();
+
+        cmd->SetGraphicsRootSignature( self->RootSignature.Get() );
+        cmd->SetPipelineState( self->Pipeline.Get() );
+        cmd->SetGraphicsRoot32BitConstants( 0, CountOf( gbuffer_handles ), DataOf( gbuffer_handles ), 0 );
+        cmd->SetGraphicsRoot32BitConstants( 1, sizeof( PerFrameConstants ) / 4, &constants, 0 );
+        cmd->SetGraphicsRoot32BitConstants( 2, sizeof( Environment::GpuRepr ) / 4, &env, 0 );
+        cmd->DispatchMesh( ( constants.LightInfo.SpotLightInfo.TotalLightCount + 31 ) / 32, 1, 1 );
+      } );
+  return result.RenderTarget;
+}
+
+FrameGraphResource Ember::RenderPass::SpotLightDeferred::operator()(
+    FrameGraph*                 frame_graph,
+    FrameGraphBlackboard const& bb,
+    GBuffer::Data const&        gbuffer,
+    FrameGraphResource const    render_target ) const
+{
+  return Execute( frame_graph, bb, gbuffer, render_target );
+}
+
 bool Ember::RenderPass::ScreenSpaceLightDeferred::Create(
     ScreenSpaceLightDeferred* out, RenderDevice* render_device, DXGI_FORMAT const rt_format )
 {
@@ -360,4 +491,59 @@ bool Ember::RenderPass::ScreenSpaceLightDeferred::Create(
       &merge_pipeline_state_stream_desc, IID_PPV_ARGS( out->Pipeline.ReleaseAndGetAddressOf() ) ) );
 
   return true;
+}
+
+FrameGraphResource Ember::RenderPass::ScreenSpaceLightDeferred::Execute(
+    FrameGraph*                 frame_graph,
+    FrameGraphBlackboard const& bb,
+    GBuffer::Data const&        gbuffer,
+    FrameGraphResource const    render_target ) const
+{
+  MergeData const& result = frame_graph->addCallbackPass(
+      "Screen Space Light Pass",
+      [&]( FrameGraph::Builder& builder, MergeData& data )
+      {
+        for ( uint32_t i = 0; i < GBuffer::kGBufferCount; i++ )
+        {
+          data.GBuffer[i] = builder.read( gbuffer.GBuffer[i], FG::ShaderResource{ .PixelShaderUse = true } );
+        }
+        data.DepthStencil = builder.read( gbuffer.DepthStencil, FG::DepthStencilRead{} );
+
+        data.RenderTarget = builder.write( render_target, FG::Attachment{ .Index = 0, .ForceSrgb = true } );
+      },
+      [self = this, bb = &bb]( MergeData const& data, FrameGraphPassResources& resources, FG::Context const* context )
+      {
+        ZoneScopedN( "Screen Space Light Pass" );
+
+        FG::Context::FrameData const& frame_data = context->GetFrameData();
+        ID3D12GraphicsCommandList6*   cmd        = frame_data.CommandList;
+        PIXScopedEvent( cmd, PIX_COLOR_DEFAULT, "Screen Space Light Pass" );
+
+        SRVHandle gbuffer_handles[GBuffer::kGBufferCount];
+        for ( uint32_t i = 0; i < GBuffer::kGBufferCount; i++ )
+        {
+          gbuffer_handles[i] = resources.get<FG::Texture>( data.GBuffer[i] ).AsSRV;
+        }
+
+        auto const& constants = bb->get<PerFrameConstants>();
+        auto const& env       = bb->get<Environment::GpuRepr>();
+
+        cmd->SetGraphicsRootSignature( self->RootSignature.Get() );
+        cmd->SetPipelineState( self->Pipeline.Get() );
+        cmd->SetGraphicsRoot32BitConstants( 0, CountOf( gbuffer_handles ), DataOf( gbuffer_handles ), 0 );
+        cmd->SetGraphicsRoot32BitConstants( 1, sizeof( PerFrameConstants ) / 4, &constants, 0 );
+        cmd->SetGraphicsRoot32BitConstants( 2, sizeof( Environment::GpuRepr ) / 4, &env, 0 );
+        cmd->DispatchMesh( 1, 1, 1 );
+      } );
+
+  return result.RenderTarget;
+}
+
+FrameGraphResource Ember::RenderPass::ScreenSpaceLightDeferred::operator()(
+    FrameGraph*                 frame_graph,
+    FrameGraphBlackboard const& bb,
+    GBuffer::Data const&        gbuffer,
+    FrameGraphResource const    render_target ) const
+{
+  return Execute( frame_graph, bb, gbuffer, render_target );
 }

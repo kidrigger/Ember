@@ -1,11 +1,15 @@
 #include "TransparencyPass.hpp"
 
 #include "Environment.hpp"
+#include "FrameGraphHelper.hpp"
 #include "RenderDevice.hpp"
 #include "RenderPassCommon.hpp"
 #include "Scene.hpp"
 #include "Util/DataUtil.hpp"
 #include "Util/HelperUtils.hpp"
+#include "Util/Profiling.hpp"
+#include "fg/Blackboard.hpp"
+#include "fg/FrameGraph.hpp"
 
 bool Ember::RenderPass::TransparencyForward::Create(
     TransparencyForward* out, RenderDevice* render_device, DXGI_FORMAT const rt_format, DXGI_FORMAT const depth_format )
@@ -125,6 +129,44 @@ bool Ember::RenderPass::TransparencyForward::Create(
   return true;
 }
 
+Ember::RenderPass::RenderDepthData Ember::RenderPass::TransparencyForward::Execute(
+    FrameGraph* frame_graph, FrameGraphBlackboard const& bb, RenderDepthData const& render_depth ) const
+{
+  return frame_graph->addCallbackPass(
+      "Transparency Pass",
+      [&]( FrameGraph::Builder& builder, RenderPass::RenderDepthData& data )
+      {
+        data.RenderTarget = builder.write( render_depth.RenderTarget, FG::Attachment{ .Index = 0, .ForceSrgb = true } );
+        data.DepthStencil = builder.write( render_depth.DepthStencil, FG::DepthStencil{} );
+      },
+      [self = this, bb = &bb]( RenderDepthData const&, FrameGraphPassResources&, FG::Context* context )
+      {
+        ZoneScopedN( "Transparency Pass" );
+
+        FG::Context::FrameData const& frame_data = context->GetFrameData();
+        ID3D12GraphicsCommandList6*   cmd        = frame_data.CommandList;
+        PIXScopedEvent( cmd, PIX_COLOR_DEFAULT, "Transparency Pass" );
+
+        auto const& constants = bb->get<PerFrameConstants>();
+        auto const& env       = bb->get<Environment::GpuRepr>();
+        auto const& draw_list = bb->get<DrawList::Batches>().AlphaBlended;
+
+        cmd->SetGraphicsRootSignature( self->RootSignature.Get() );
+        // TODO: Sort transparent objects back to front
+        cmd->SetPipelineState( self->Pipeline.Get() );
+        cmd->SetGraphicsRoot32BitConstants( 0, sizeof( draw_list ) / 4, &draw_list, 0 );
+        cmd->SetGraphicsRoot32BitConstants( 1, sizeof( constants ) / 4, &constants, 0 );
+        cmd->SetGraphicsRoot32BitConstants( 2, sizeof( env ) / 4, &env, 0 );
+        cmd->DispatchMesh( draw_list.DrawCount, 1, 1 );
+      } );
+}
+
+Ember::RenderPass::RenderDepthData Ember::RenderPass::TransparencyForward::operator()(
+    FrameGraph* frame_graph, FrameGraphBlackboard const& bb, RenderDepthData const& render_depth ) const
+{
+  return Execute( frame_graph, bb, render_depth );
+}
+
 bool Ember::RenderPass::AlphaTestedForward::Create(
     AlphaTestedForward* out, RenderDevice* render_device, DXGI_FORMAT const rt_format, DXGI_FORMAT const depth_format )
 {
@@ -135,7 +177,7 @@ bool Ember::RenderPass::AlphaTestedForward::Create(
   ComPtr<ID3DBlob> mesh_shader_blob;
   ERR_FAIL_RET_F( D3DReadFileToBlob( L"TriangleMS.cso", &mesh_shader_blob ) );
   ComPtr<ID3DBlob> alpha_tested_pixel_shader_blob;
-  ERR_FAIL_RET_F( D3DReadFileToBlob( L"TriangleAlphaTestPS.cso", &alpha_tested_pixel_shader_blob ) );
+  ERR_FAIL_RET_F( D3DReadFileToBlob( L"TrianglePS.cso", &alpha_tested_pixel_shader_blob ) );
 
   ComPtr<ID3D12Device2>       device                 = render_device->GetDevice();
 
@@ -231,4 +273,43 @@ bool Ember::RenderPass::AlphaTestedForward::Create(
       &pipeline_state_stream_desc, IID_PPV_ARGS( out->Pipeline.ReleaseAndGetAddressOf() ) ) );
 
   return true;
+}
+
+Ember::RenderPass::RenderDepthData Ember::RenderPass::AlphaTestedForward::Execute(
+    FrameGraph* frame_graph, FrameGraphBlackboard const& bb, RenderDepthData const& render_depth_data ) const
+{
+  return frame_graph->addCallbackPass(
+      "Alpha Tested Pass",
+      [&]( FrameGraph::Builder& builder, RenderDepthData& data )
+      {
+        data.RenderTarget =
+            builder.write( render_depth_data.RenderTarget, FG::Attachment{ .Index = 0, .ForceSrgb = true } );
+        data.DepthStencil = builder.write( render_depth_data.DepthStencil, FG::DepthStencil{} );
+      },
+      [self = this, bb = &bb]( RenderDepthData const&, FrameGraphPassResources&, FG::Context const* context )
+      {
+        ZoneScopedN( "Alpha Tested Pass" );
+
+        FG::Context::FrameData const& frame_data = context->GetFrameData();
+        ID3D12GraphicsCommandList6*   cmd        = frame_data.CommandList;
+        PIXScopedEvent( cmd, PIX_COLOR_DEFAULT, "Alpha Tested Pass" );
+
+        auto const& constants = bb->get<PerFrameConstants>();
+        auto const& env       = bb->get<Environment::GpuRepr>();
+        auto const& draw_list = bb->get<DrawList::Batches>().AlphaTested;
+
+        cmd->SetGraphicsRootSignature( self->RootSignature.Get() );
+        // TODO: Sort transparent objects back to front
+        cmd->SetPipelineState( self->Pipeline.Get() );
+        cmd->SetGraphicsRoot32BitConstants( 0, sizeof( draw_list ) / 4, &draw_list, 0 );
+        cmd->SetGraphicsRoot32BitConstants( 1, sizeof( constants ) / 4, &constants, 0 );
+        cmd->SetGraphicsRoot32BitConstants( 2, sizeof( env ) / 4, &env, 0 );
+        cmd->DispatchMesh( draw_list.DrawCount, 1, 1 );
+      } );
+}
+
+Ember::RenderPass::RenderDepthData Ember::RenderPass::AlphaTestedForward::operator()(
+    FrameGraph* frame_graph, FrameGraphBlackboard const& bb, RenderDepthData const& render_depth ) const
+{
+  return Execute( frame_graph, bb, render_depth );
 }

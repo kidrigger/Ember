@@ -242,7 +242,7 @@ Ember::LightInfo Ember::Internal::DirectionLightManager::PrepareFrame(
   DirectX::BoundingFrustum camera_frust = camera.GetLastUpdatedFrustum();
 
   // Camera is right-handed but with DXMath, Near is positive, Far is negative
-  float const default_far_plane = std::max( camera_frust.Near, -150.0f );
+  float const default_far_plane = std::min( std::abs( camera_frust.Near ), 150.0f );
 
   m_ShadowLightQuery.each(
       [&]( WorldTransform const& transform, DirectionalLight const& light )

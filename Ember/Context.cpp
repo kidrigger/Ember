@@ -160,7 +160,7 @@ void Ember::Context::Create( Context* context, ComPtr<ID3D12Device2> device, D3D
   HANDLE fence_event;
   {
     fence_event = ::CreateEventA( nullptr, FALSE, FALSE, nullptr );
-    assert( fence_event && "Failed to create fence event" );
+    ASSERT_M( fence_event, "Failed to create fence event" );
   }
 
   new ( context ) Context{ std::move( device ), std::move( command_queue ), std::move( fence ), fence_event, type };

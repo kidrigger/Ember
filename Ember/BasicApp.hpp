@@ -1,7 +1,6 @@
 #pragma once
 
-#include "AtmosphereContext.hpp"
-#include "BackgroundPass.hpp"
+#include "Atmosphere.hpp"
 #include "DepthPrePass.hpp"
 #include "Environment.hpp"
 #include "ForwardPass.hpp"
@@ -13,6 +12,7 @@
 #include "RenderPassCommon.hpp"
 #include "RenderTargetManager.hpp"
 #include "Scene.hpp"
+#include "SkyboxPass.hpp"
 #include "TransparencyPass.hpp"
 #include "Util/DirectXHeaders.hpp"
 #include "Util/Runtime.hpp"
@@ -47,21 +47,24 @@ class BasicApp final : public IApp
   FrameGraphBlackboard m_FGBlackboard;
 
   // PBR Pipeline
-  RenderPass::DepthPrePass m_DepthPrePass;
+  RenderPass::DepthPrePass m_DrawPrePass;
 
   // Forward Only
-  RenderPass::OpaqueForward m_OpaquePass;
+  RenderPass::OpaqueForward m_RenderOpaqueMeshes;
 
   // Deferred Only
-  RenderPass::GBuffer                  m_GBufferPass;
-  RenderPass::OmniLightDeferred        m_OmniLightPass;
-  RenderPass::SpotLightDeferred        m_SpotLightPass;
-  RenderPass::ScreenSpaceLightDeferred m_ScreenSpaceLightPass;
+  RenderPass::GBuffer                  m_UpdateGBuffer;
+  RenderPass::OmniLightDeferred        m_RenderOmniLights;
+  RenderPass::SpotLightDeferred        m_RenderSpotLights;
+  RenderPass::ScreenSpaceLightDeferred m_RenderScreenSpaceLighting;
 
   // Forward + Deferred
-  RenderPass::AlphaTestedForward       m_AlphaTestedPass;
-  RenderPass::TransparencyForward      m_TransparencyPass;
-  RenderPass::Background               m_BackgroundPass;
+  RenderPass::AlphaTestedForward  m_RenderAlphaTestedMeshes;
+  RenderPass::TransparencyForward m_RenderTransparentMeshes;
+
+  // Environment
+  RenderPass::Atmosphere               m_UpdateAtmosphericSky;
+  RenderPass::Skybox                   m_RenderBackground;
 
   std::unique_ptr<RenderTargetManager> m_RenderTargetManager;
   DXGI_FORMAT                          m_SwapchainFormat;
@@ -73,7 +76,6 @@ class BasicApp final : public IApp
   std::unique_ptr<Environment>         m_Environment;
   std::unique_ptr<MaterialManager>     m_MaterialManager;
   std::unique_ptr<GeometryManager>     m_GeometryManager;
-  std::unique_ptr<AtmosphereContext>   m_AtmosphereContext;
   World                                m_World;
   DrawList                             m_DrawList;
   RenderQueryType                      m_RenderQuery;
@@ -84,16 +86,7 @@ class BasicApp final : public IApp
 
   void                          SetupRenderPasses();
 
-  RenderPass::RTVData           ClearRenderTargets( FrameGraph* frame_graph ) const;
-  RenderPass::RTVData           RenderTransparency( FrameGraph* frame_graph, RenderPass::RTVData const& opaque_pass );
-  RenderPass::RTVData           RenderOpaqueFwd( FrameGraph* frame_graph, RenderPass::RTVData const& clear_rtv );
-  RenderPass::RTVData           RenderSkybox(
-                FrameGraph*                       frame_graph,
-                RenderPass::RTVData const&        transparency_pass,
-                AtmosphereContext::OutData const& atmosphere );
-  RenderPass::RTVData RenderOpaqueDfr( FrameGraph* frame_graph, RenderPass::RTVData const& clear_rtv );
-
-  static void         InitImGui( HWND const window_handle, RenderDevice* render_device );
+  static void                   InitImGui( HWND const window_handle, RenderDevice* render_device );
 
 public:
   BasicApp(

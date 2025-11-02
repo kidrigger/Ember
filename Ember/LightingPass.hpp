@@ -1,12 +1,8 @@
 #pragma once
 
+#include "GBufferPass.hpp"
 #include "Util/DirectXHeaders.hpp"
 #include "Util/Runtime.hpp"
-
-namespace Ember
-{
-class RenderDevice;
-}
 
 namespace Ember::RenderPass
 {
@@ -15,10 +11,15 @@ struct OmniLightDeferred
 {
   ComPtr<ID3D12RootSignature> RootSignature;
   ComPtr<ID3D12PipelineState> Pipeline;
-  DXGI_FORMAT                 RenderTargetFormat{ DXGI_FORMAT_UNKNOWN };
 
   static bool                 Create(
                       OmniLightDeferred* out, RenderDevice* render_device, DXGI_FORMAT rt_format, DXGI_FORMAT depth_format );
+
+  FrameGraphResource Execute(
+      FrameGraph* frame_graph, FrameGraphBlackboard const& bb, GBuffer::Data const& gbuffer ) const;
+
+  FrameGraphResource operator()(
+      FrameGraph* frame_graph, FrameGraphBlackboard const& bb, GBuffer::Data const& gbuffer ) const;
 };
 
 struct SpotLightDeferred
@@ -29,6 +30,18 @@ struct SpotLightDeferred
 
   static bool                 Create(
                       SpotLightDeferred* out, RenderDevice* render_device, DXGI_FORMAT rt_format, DXGI_FORMAT depth_format );
+
+  FrameGraphResource Execute(
+      FrameGraph*                 frame_graph,
+      FrameGraphBlackboard const& bb,
+      GBuffer::Data const&        gbuffer,
+      FrameGraphResource          render_target ) const;
+
+  FrameGraphResource operator()(
+      FrameGraph*                 frame_graph,
+      FrameGraphBlackboard const& bb,
+      GBuffer::Data const&        gbuffer,
+      FrameGraphResource          render_target ) const;
 };
 
 struct ScreenSpaceLightDeferred
@@ -37,7 +50,19 @@ struct ScreenSpaceLightDeferred
   ComPtr<ID3D12PipelineState> Pipeline;
   DXGI_FORMAT                 RenderTargetFormat{ DXGI_FORMAT_UNKNOWN };
 
-  static bool Create( ScreenSpaceLightDeferred* out, RenderDevice* render_device, DXGI_FORMAT rt_format );
+  static bool        Create( ScreenSpaceLightDeferred* out, RenderDevice* render_device, DXGI_FORMAT rt_format );
+
+  FrameGraphResource Execute(
+      FrameGraph*                 frame_graph,
+      FrameGraphBlackboard const& bb,
+      GBuffer::Data const&        gbuffer,
+      FrameGraphResource          render_target ) const;
+
+  FrameGraphResource operator()(
+      FrameGraph*                 frame_graph,
+      FrameGraphBlackboard const& bb,
+      GBuffer::Data const&        gbuffer,
+      FrameGraphResource          render_target ) const;
 };
 
 } // namespace Ember::RenderPass

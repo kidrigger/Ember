@@ -1,11 +1,17 @@
-#include "BackgroundPass.hpp"
+#include "SkyboxPass.hpp"
 
+#include "Environment.hpp"
+#include "ForwardPass.hpp"
+#include "FrameGraphHelper.hpp"
 #include "RenderDevice.hpp"
 #include "Util/DataUtil.hpp"
 #include "Util/HelperUtils.hpp"
+#include "Util/Profiling.hpp"
+#include "fg/Blackboard.hpp"
+#include "fg/FrameGraph.hpp"
 
-bool Ember::RenderPass::Background::Create(
-    Background* out, RenderDevice* render_device, DXGI_FORMAT const rt_format, DXGI_FORMAT const depth_format )
+bool Ember::RenderPass::Skybox::Create(
+    Skybox* out, RenderDevice* render_device, DXGI_FORMAT const rt_format, DXGI_FORMAT const depth_format )
 {
   out->RenderTargetFormat = rt_format;
 
@@ -89,4 +95,69 @@ bool Ember::RenderPass::Background::Create(
       &pipeline_state_stream_desc, IID_PPV_ARGS( out->AtmospherePipeline.ReleaseAndGetAddressOf() ) ) );
 
   return true;
+}
+
+FrameGraphResource Ember::RenderPass::Skybox::Execute(
+    FrameGraph*                 frame_graph,
+    FrameGraphBlackboard const& bb,
+    RenderDepthData const&      render_depth,
+    FrameGraphResource const&   sky_view_lut ) const
+{
+  Data const& skybox = frame_graph->addCallbackPass(
+      "Render Skybox",
+      [&]( FrameGraph::Builder& builder, Data& data )
+      {
+        data.RenderTarget = builder.write( render_depth.RenderTarget, FG::Attachment{ .Index = 0, .ForceSrgb = true } );
+        data.DepthStencil = builder.write( render_depth.DepthStencil, FG::DepthStencil{} );
+
+        if ( UseProceduralAtmosphericSky )
+        {
+          data.SkyViewLUT = builder.read(
+              sky_view_lut,
+              FG::ShaderResource{
+                  .PixelShaderUse = true,
+                  .OnlyTopMip     = true,
+              } );
+        }
+      },
+      [self = this, bb = &bb]( Data const& data, FrameGraphPassResources& resources, FG::Context const* context )
+      {
+        ZoneScopedN( "Render Skybox" );
+
+        FG::Context::FrameData const& frame_data = context->GetFrameData();
+        ID3D12GraphicsCommandList6*   cmd        = frame_data.CommandList;
+
+        PIXScopedEvent( cmd, PIX_COLOR_DEFAULT, "Render Skybox" );
+
+        auto const& constants = bb->get<PerFrameConstants>();
+        auto const& env       = bb->get<Environment::GpuRepr>();
+
+        cmd->SetGraphicsRootSignature( self->RootSignature.Get() );
+        cmd->SetGraphicsRoot32BitConstant( 0, ( UINT )constants.Camera, 0 );
+
+        if ( self->UseProceduralAtmosphericSky )
+        {
+          FG::Texture const& sky_view = resources.get<FG::Texture>( data.SkyViewLUT );
+          cmd->SetPipelineState( self->AtmospherePipeline.Get() );
+          cmd->SetGraphicsRoot32BitConstant( 0, ( UINT )sky_view.AsSRV, 1 );
+        }
+        else
+        {
+          cmd->SetPipelineState( self->SkyboxPipeline.Get() );
+          cmd->SetGraphicsRoot32BitConstant( 0, ( UINT )env.Skybox, 1 );
+        }
+
+        cmd->DrawInstanced( 3, 1, 0, 0 );
+      } );
+
+  return skybox.RenderTarget;
+}
+
+FrameGraphResource Ember::RenderPass::Skybox::operator()(
+    FrameGraph*                 frame_graph,
+    FrameGraphBlackboard const& bb,
+    RenderDepthData const&      depth,
+    FrameGraphResource const    sky_view_lut ) const
+{
+  return Execute( frame_graph, bb, depth, sky_view_lut );
 }

@@ -16,6 +16,14 @@ class RenderDevice;
 namespace FG
 {
 
+struct BackbufferInfo
+{
+  DXGI_FORMAT SwapchainFormat;
+  DXGI_FORMAT DepthStencilFormat;
+  uint32_t    Width;
+  uint32_t    Height;
+};
+
 enum class ReadType
 {
   kDSV,
@@ -29,6 +37,14 @@ enum class WriteType
   kRTV,
   kDSV,
   kCopy,
+};
+
+struct DepthStencilRead
+{
+  ReadType Type = ReadType::kDSV; // 2 bits
+
+  operator uint32_t() const;
+  static DepthStencilRead Decode( uint32_t flag );
 };
 
 struct ShaderResource
@@ -49,12 +65,19 @@ struct CopySrc
   static CopySrc Decode( uint32_t flag );
 };
 
+enum class LoadOperation : uint32_t
+{
+  kLoad    = 0,
+  kDiscard = 1,
+  kClear   = 2,
+};
+
 struct Attachment
 {
-  WriteType Type   = WriteType::kRTV; // 2 bits
-  uint8_t   Index  = 0xFF;            // 3 bits
-  bool      IsSrgb = false;           // 1 bit
-
+  WriteType     Type      = WriteType::kRTV;      // 2 bits
+  uint8_t       Index     = 0xFF;                 // 3 bits
+  bool          ForceSrgb = false;                // 1 bit
+  LoadOperation LoadOp    = LoadOperation::kLoad; // 2 bits
 
   operator uint32_t() const;
   static Attachment Decode( uint32_t flag );
@@ -62,7 +85,8 @@ struct Attachment
 
 struct DepthStencil
 {
-  WriteType Type = WriteType::kDSV; // 2 bits
+  WriteType     Type   = WriteType::kDSV;      // 2 bits
+  LoadOperation LoadOp = LoadOperation::kLoad; // 2 bits
 
   operator uint32_t() const;
   static DepthStencil Decode( uint32_t flag );
@@ -76,7 +100,7 @@ struct CopyDst
   static CopyDst Decode( uint32_t flag );
 };
 
-using Read = std::variant<std::monostate, ShaderResource, std::monostate, CopySrc>;
+using Read = std::variant<DepthStencilRead, ShaderResource, std::monostate, CopySrc>;
 Read DecodeReadFlags( uint32_t v );
 
 using Write = std::variant<Attachment, DepthStencil, CopyDst>;
@@ -139,8 +163,6 @@ public:
   struct FrameData
   {
     ID3D12GraphicsCommandList6* CommandList;
-    uint32_t                    Width;
-    uint32_t                    Height;
   };
 
 private:
@@ -158,12 +180,14 @@ private:
   {
     std::vector<ID3D12Resource*>               Resources;
     std::vector<D3D12_RENDER_TARGET_VIEW_DESC> Descriptions;
+    std::vector<LoadOperation>                 LoadOps;
   };
 
   struct DepthTargetEntry
   {
     ID3D12Resource*               Resource{ nullptr };
     D3D12_DEPTH_STENCIL_VIEW_DESC Desc;
+    LoadOperation                 LoadOp;
   };
 
   using SRVCacheType = FlatMap<uint64_t, SRVHandle>;
@@ -198,13 +222,14 @@ public:
 
   void                               PushBarrier( CD3DX12_RESOURCE_BARRIER const& barrier );
 
-  void SetRenderTarget( uint32_t index, Texture const& render_target, Texture::Desc const& desc, bool as_srgb );
-  void SetDepthTarget( Texture const& depth_target, Texture::Desc const& desc );
+  void                               SetRenderTarget(
+                                    uint32_t index, Texture const& render_target, Texture::Desc const& desc, bool as_srgb, LoadOperation load_op );
+  void                  SetDepthTarget( Texture const& depth_target, Texture::Desc const& desc, LoadOperation load_op );
 
-  void PreparePass();
+  void                  PreparePass();
 
-  [[nodiscard]] Texture  CreateTexture( Texture::Desc const& desc );
-  void                   DestroyTexture( Texture::Desc const& desc, Texture tex );
+  [[nodiscard]] Texture CreateTexture( Texture::Desc const& desc );
+  void                  DestroyTexture( Texture::Desc const& desc, Texture tex );
 
   [[nodiscard]] uint32_t GetTextureCount() const;
   void                   Update();

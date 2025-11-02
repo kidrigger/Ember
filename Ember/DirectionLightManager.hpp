@@ -111,4 +111,7 @@ struct DirectionalLight
   float   FarPlane{ kRangeAuto };
 };
 
+struct Sun
+{};
+
 } // namespace Ember

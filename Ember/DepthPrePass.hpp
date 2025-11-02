@@ -2,10 +2,8 @@
 
 #include "Util/DirectXHeaders.hpp"
 #include "Util/Runtime.hpp"
-
-
+#include "fg/FrameGraph.hpp"
 #include "fg/FrameGraphResource.hpp"
-
 
 namespace Ember
 {
@@ -30,10 +28,10 @@ public:
       ComPtr<ID3D12PipelineState> opaque_pipeline,
       ComPtr<ID3D12PipelineState> alpha_tested_pipeline );
 
-  FrameGraphResource Execute(
-      FrameGraph* frame_graph, FrameGraphBlackboard const& blackboard, FrameGraphResource in_depth_texture );
+  static bool        Create( DepthPrePass* out, RenderDevice* render_device, DXGI_FORMAT depth_format );
 
-  static bool Create( DepthPrePass* out, RenderDevice* render_device, DXGI_FORMAT const depth_format );
+  FrameGraphResource Execute( FrameGraph* frame_graph, FrameGraphBlackboard const& blackboard ) const;
+  FrameGraphResource operator()( FrameGraph* frame_graph, FrameGraphBlackboard const& blackboard ) const;
 };
 
 } // namespace Ember::RenderPass

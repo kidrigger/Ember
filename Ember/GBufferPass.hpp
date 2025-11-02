@@ -2,10 +2,14 @@
 
 #include <array>
 
+#include "Scene.hpp"
 #include "Util/DirectXHeaders.hpp"
 #include "Util/Runtime.hpp"
+#include "fg/Blackboard.hpp"
 #include "fg/FrameGraphResource.hpp"
 
+
+class FrameGraph;
 namespace Ember
 {
 class RenderDevice;
@@ -41,6 +45,12 @@ struct GBuffer
     DXGI_FORMAT_R8G8B8A8_UNORM_SRGB, // Emissive
   };
 
+  struct Data
+  {
+    std::array<FrameGraphResource, kGBufferCount> GBuffer;
+    FrameGraphResource                            DepthStencil;
+  };
+
   // Specifics
 
   // PBR Pipeline
@@ -48,19 +58,9 @@ struct GBuffer
   ComPtr<ID3D12PipelineState> Pipeline;
 
   static bool                 Create( GBuffer* out, RenderDevice* render_device, DXGI_FORMAT depth_format );
-};
 
-struct MergeData
-{
-  std::array<FrameGraphResource, GBuffer::kGBufferCount> GBuffer;
-  FrameGraphResource                                     RenderTarget;
-  FrameGraphResource                                     DepthStencil;
-};
-
-struct GBufferData
-{
-  std::array<FrameGraphResource, GBuffer::kGBufferCount> GBuffer;
-  FrameGraphResource                                     DepthStencil;
+  Data Execute( FrameGraph* frame_graph, FrameGraphBlackboard const& bb, FrameGraphResource depth_stencil );
+  Data operator()( FrameGraph* frame_graph, FrameGraphBlackboard const& bb, FrameGraphResource depth_stencil );
 };
 
 } // namespace Ember::RenderPass

@@ -13,8 +13,7 @@ private:
   friend class FrameGraphPassResources;
 
   template <typename Exec>
-  struct ExecFunctionRefl
-  {
+  struct ExecFunctionRefl {
     template <typename F, typename Ret, typename Data, typename Context>
     static Context ContextHelper( Ret ( F::* )( const Data&, FrameGraphPassResources&, Context* ) );
 
@@ -32,8 +31,7 @@ private:
   };
 
   template <typename Setup>
-  struct SetupFunctionRefl
-  {
+  struct SetupFunctionRefl {
     template <typename F, typename Ret, typename Data>
     static Data DataHelper( Ret ( F::* )( Builder&, Data& ) );
 

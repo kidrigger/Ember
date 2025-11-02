@@ -186,7 +186,7 @@
     <ClCompile Include="FrameGraphHelper.cpp">
       <Filter>Source Files\Graphics</Filter>
     </ClCompile>
-    <ClCompile Include="BackgroundPass.cpp">
+    <ClCompile Include="SkyboxPass.cpp">
       <Filter>Source Files\Passes</Filter>
     </ClCompile>
     <ClCompile Include="ForwardPass.cpp">
@@ -201,7 +201,7 @@
     <ClCompile Include="LightingPass.cpp">
       <Filter>Source Files\Passes</Filter>
     </ClCompile>
-    <ClCompile Include="AtmosphereContext.cpp">
+    <ClCompile Include="Atmosphere.cpp">
       <Filter>Source Files\Passes</Filter>
     </ClCompile>
     <ClCompile Include="Inspector.cpp">
@@ -332,7 +332,7 @@
     <ClInclude Include="FrameGraphHelper.hpp">
       <Filter>Header Files\Graphics</Filter>
     </ClInclude>
-    <ClInclude Include="BackgroundPass.hpp">
+    <ClInclude Include="SkyboxPass.hpp">
       <Filter>Header Files\Passes</Filter>
     </ClInclude>
     <ClInclude Include="ForwardPass.hpp">
@@ -350,7 +350,7 @@
     <ClInclude Include="LightingPass.hpp">
       <Filter>Header Files\Passes</Filter>
     </ClInclude>
-    <ClInclude Include="AtmosphereContext.hpp">
+    <ClInclude Include="Atmosphere.hpp">
       <Filter>Header Files\Passes</Filter>
     </ClInclude>
     <ClInclude Include="Inspector.hpp">

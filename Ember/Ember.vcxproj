@@ -311,13 +311,13 @@
     </FxCompile>
   </ItemDefinitionGroup>
   <ItemGroup>
-    <ClCompile Include="AtmosphereContext.cpp" />
+    <ClCompile Include="Atmosphere.cpp" />
     <ClCompile Include="DepthPrePass.cpp" />
     <ClCompile Include="Inspector.cpp" />
     <ClCompile Include="PickingGizmo.cpp" />
     <ClCompile Include="SceneTree.cpp" />
     <ClCompile Include="TransparencyPass.cpp" />
-    <ClCompile Include="BackgroundPass.cpp" />
+    <ClCompile Include="SkyboxPass.cpp" />
     <ClCompile Include="BasicApp.cpp" />
     <ClCompile Include="BindlessManager.cpp" />
     <ClCompile Include="Buffer.cpp" />
@@ -355,13 +355,13 @@
     <ClCompile Include="Util\ScopedHandle.cpp" />
   </ItemGroup>
   <ItemGroup>
-    <ClInclude Include="AtmosphereContext.hpp" />
+    <ClInclude Include="Atmosphere.hpp" />
     <ClInclude Include="DepthPrePass.hpp" />
     <ClInclude Include="Inspector.hpp" />
     <ClInclude Include="PickingGizmo.hpp" />
     <ClInclude Include="SceneTree.hpp" />
     <ClInclude Include="TransparencyPass.hpp" />
-    <ClInclude Include="BackgroundPass.hpp" />
+    <ClInclude Include="SkyboxPass.hpp" />
     <ClInclude Include="BasicApp.hpp" />
     <ClInclude Include="DeviceHandle.hpp" />
     <ClInclude Include="BindlessManager.hpp" />

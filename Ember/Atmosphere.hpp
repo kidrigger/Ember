@@ -13,22 +13,19 @@ class FrameGraph;
 namespace Ember
 {
 class RenderDevice;
+}
 
-class AtmosphereContext
+namespace Ember::RenderPass
+{
+
+class Atmosphere
 {
 public:
-  struct OutData
+  struct Data
   {
     FrameGraphResource TransmittanceLUT;
     FrameGraphResource SkyViewLUT;
     FrameGraphResource AtmosphereParams;
-  };
-
-  struct SunData
-  {
-    DirectX::XMFLOAT3 Direction{ 1.0f, 0.0f, 0.0f };
-    Color32           Color{ Color32::White() };
-    float             Intensity{ 12.8f };
   };
 
   struct Params
@@ -75,8 +72,8 @@ private:
   uint8_t                     m_LUTUpdatePendingFrames;
 
 public:
-  AtmosphereContext() = default;
-  AtmosphereContext(
+  Atmosphere() = default;
+  Atmosphere(
       ComPtr<ID3D12RootSignature> root_signature,
       ComPtr<ID3D12PipelineState> transmittance_lut_pipeline,
       ComPtr<ID3D12PipelineState> sky_view_lut_pipeline,
@@ -84,13 +81,14 @@ public:
       Texture                     sky_view_lut,
       std::vector<Buffer>         atmosphere_param_buffers );
 
-  static bool                 Create( AtmosphereContext* out, RenderDevice* render_device );
+  static bool Create( Atmosphere* out, RenderDevice* render_device );
 
-  OutData                     Render( FrameGraph* frame_graph, FrameGraphBlackboard* blackboard, uint32_t frame_idx );
+  Data        Execute( FrameGraph* frame_graph, FrameGraphBlackboard* blackboard, uint32_t frame_idx );
+  Data        operator()( FrameGraph* frame_graph, FrameGraphBlackboard* blackboard, uint32_t frame_idx );
 
-  void                        SetSun( uint32_t sun_index );
-  void                        SetAtmosphereParams( Params const& atmosphere_params );
+  void        SetSun( uint32_t sun_index );
+  void        SetAtmosphereParams( Params const& atmosphere_params );
   [[nodiscard]] Params const& GetAtmosphereParams() const;
 };
 
-} // namespace Ember
+} // namespace Ember::RenderPass

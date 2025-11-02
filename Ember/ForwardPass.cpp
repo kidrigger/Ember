@@ -1,17 +1,19 @@
 #include "ForwardPass.hpp"
 
 #include "Environment.hpp"
+#include "FrameGraphHelper.hpp"
 #include "RenderDevice.hpp"
 #include "RenderPassCommon.hpp"
 #include "Scene.hpp"
 #include "Util/DataUtil.hpp"
 #include "Util/HelperUtils.hpp"
+#include "Util/Profiling.hpp"
+#include "fg/Blackboard.hpp"
+#include "fg/FrameGraph.hpp"
 
-bool Ember::RenderPass::OpaqueForward::Create(
-    OpaqueForward* out, RenderDevice* render_device, DXGI_FORMAT const rt_format, DXGI_FORMAT const depth_format )
+
+bool Ember::RenderPass::OpaqueForward::Create( OpaqueForward* out, Desc const& desc )
 {
-  out->RenderTargetFormat = rt_format;
-
   ComPtr<ID3DBlob> amp_shader_blob;
   ERR_FAIL_RET_F( D3DReadFileToBlob( L"TriangleAS.cso", &amp_shader_blob ) );
   ComPtr<ID3DBlob> mesh_shader_blob;
@@ -19,9 +21,9 @@ bool Ember::RenderPass::OpaqueForward::Create(
   ComPtr<ID3DBlob> pixel_shader_blob;
   ERR_FAIL_RET_F( D3DReadFileToBlob( L"TrianglePS.cso", &pixel_shader_blob ) );
 
-  ID3D12Device2*              device                 = render_device->GetDevice();
+  ID3D12Device2*              device                 = desc.RenderDevice->GetDevice();
 
-  D3D_ROOT_SIGNATURE_VERSION  root_signature_version = render_device->FetchHighestRootSignatureVersion();
+  D3D_ROOT_SIGNATURE_VERSION  root_signature_version = desc.RenderDevice->FetchHighestRootSignatureVersion();
 
   CD3DX12_STATIC_SAMPLER_DESC static_sampler_desc[]  = {
     CD3DX12_STATIC_SAMPLER_DESC{ 0 },
@@ -67,7 +69,7 @@ bool Ember::RenderPass::OpaqueForward::Create(
       IID_PPV_ARGS( out->RootSignature.ReleaseAndGetAddressOf() ) ) );
 
   D3D12_RT_FORMAT_ARRAY rtv_formats{
-    .RTFormats        = { rt_format },
+    .RTFormats        = { desc.RenderTargetFormat },
     .NumRenderTargets = 1,
   };
 
@@ -76,8 +78,16 @@ bool Ember::RenderPass::OpaqueForward::Create(
   rasterizer_desc.CullMode              = D3D12_CULL_MODE_BACK;
 
   CD3DX12_DEPTH_STENCIL_DESC depth_stencil_desc{ D3D12_DEFAULT };
-  depth_stencil_desc.DepthFunc      = D3D12_COMPARISON_FUNC_EQUAL;
-  depth_stencil_desc.DepthWriteMask = D3D12_DEPTH_WRITE_MASK_ZERO;
+  if ( desc.DependsOnDepthPrePass )
+  {
+    // We read from depth as in pre-pass.
+    depth_stencil_desc.DepthFunc      = D3D12_COMPARISON_FUNC_EQUAL;
+    depth_stencil_desc.DepthWriteMask = D3D12_DEPTH_WRITE_MASK_ZERO;
+  }
+  else
+  {
+    depth_stencil_desc.DepthFunc = D3D12_COMPARISON_FUNC_LESS;
+  }
 
   struct PipelineStream
   {
@@ -101,7 +111,7 @@ bool Ember::RenderPass::OpaqueForward::Create(
     .Rasterizer            = rasterizer_desc,
     .DepthStencil          = depth_stencil_desc,
     .RTVFormats            = rtv_formats,
-    .DSVFormat             = depth_format,
+    .DSVFormat             = desc.DepthStencilFormat,
   };
 
   D3D12_PIPELINE_STATE_STREAM_DESC const pipeline_state_stream_desc = {
@@ -113,4 +123,60 @@ bool Ember::RenderPass::OpaqueForward::Create(
       &pipeline_state_stream_desc, IID_PPV_ARGS( out->Pipeline.ReleaseAndGetAddressOf() ) ) );
 
   return true;
+}
+
+FrameGraphResource Ember::RenderPass::OpaqueForward::Execute(
+    FrameGraph* frame_graph, FrameGraphBlackboard const& bb, FrameGraphResource const depth ) const
+{
+  return frame_graph->addCallbackPass(
+      "Opaque Forward",
+      [&]( FrameGraph::Builder& builder, FrameGraphResource& data )
+      {
+        auto const&              backbuffer_info = bb.get<FG::BackbufferInfo>();
+        FrameGraphResource const render_target   = builder.create<FG::Texture>(
+            "Main Render Target",
+            FG::Texture::Desc{
+                  .Format    = backbuffer_info.SwapchainFormat,
+                  .Width     = backbuffer_info.Width,
+                  .Height    = backbuffer_info.Height,
+                  .MipLevels = MipLevels::kBase,
+                  .InitState = D3D12_RESOURCE_STATE_RENDER_TARGET,
+                  .Flags     = D3D12_RESOURCE_FLAG_ALLOW_RENDER_TARGET,
+            } );
+
+        data = builder.write(
+            render_target,
+            FG::Attachment{
+                .Index     = 0,
+                .ForceSrgb = true,
+                .LoadOp    = FG::LoadOperation::kClear,
+            } );
+        builder.read( depth, FG::DepthStencilRead{} );
+      },
+      [self = this, bb = &bb]( FrameGraphResource const&, FrameGraphPassResources&, FG::Context const* context )
+      {
+        ZoneScopedN( "Opaque Forward" );
+
+        FG::Context::FrameData const& frame_data = context->GetFrameData();
+        ID3D12GraphicsCommandList6*   cmd        = frame_data.CommandList;
+        PIXScopedEvent( cmd, PIX_COLOR_DEFAULT, "Opaque Forward" );
+
+        auto const& constants = bb->get<PerFrameConstants>();
+        auto const& env       = bb->get<Environment::GpuRepr>();
+        auto const& draw_list = bb->get<DrawList::Batches>().Opaque;
+
+        cmd->SetGraphicsRootSignature( self->RootSignature.Get() );
+        cmd->SetGraphicsRoot32BitConstants( 1, sizeof( constants ) / 4, &constants, 0 );
+        cmd->SetGraphicsRoot32BitConstants( 2, sizeof( env ) / 4, &env, 0 );
+
+        cmd->SetPipelineState( self->Pipeline.Get() );
+        cmd->SetGraphicsRoot32BitConstants( 0, sizeof( draw_list ) / 4, &draw_list, 0 );
+        cmd->DispatchMesh( draw_list.DrawCount, 1, 1 );
+      } );
+}
+
+FrameGraphResource Ember::RenderPass::OpaqueForward::operator()(
+    FrameGraph* frame_graph, FrameGraphBlackboard const& bb, FrameGraphResource const depth ) const
+{
+  return Execute( frame_graph, bb, depth );
 }

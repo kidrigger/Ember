@@ -18,12 +18,30 @@ Ember::RenderPass::DepthPrePass::DepthPrePass(
 {}
 
 FrameGraphResource Ember::RenderPass::DepthPrePass::Execute(
-    FrameGraph* frame_graph, FrameGraphBlackboard const& blackboard, FrameGraphResource in_depth_texture )
+    FrameGraph* frame_graph, FrameGraphBlackboard const& blackboard ) const
 {
   return frame_graph->addCallbackPass(
       "Depth PrePass",
       [&]( FrameGraph::Builder& builder, FrameGraphResource& out_depth_texture )
-      { out_depth_texture = builder.write( in_depth_texture, FG::DepthStencil{} ); },
+      {
+        auto const& backbuffer_info = blackboard.get<FG::BackbufferInfo>();
+        auto const  depth_texture   = builder.create<FG::Texture>(
+            "Main Depth Target",
+            FG::Texture::Desc{
+                   .Format    = backbuffer_info.DepthStencilFormat,
+                   .Width     = backbuffer_info.Width,
+                   .Height    = backbuffer_info.Height,
+                   .MipLevels = MipLevels::kBase,
+                   .InitState = D3D12_RESOURCE_STATE_DEPTH_WRITE,
+                   .Flags     = D3D12_RESOURCE_FLAG_ALLOW_DEPTH_STENCIL,
+            } );
+
+        out_depth_texture = builder.write(
+            depth_texture,
+            FG::DepthStencil{
+                .LoadOp = FG::LoadOperation::kClear,
+            } );
+      },
       [this, &blackboard]( FrameGraphResource const&, FrameGraphPassResources&, FG::Context const* context )
       {
         ZoneScopedN( "Depth PrePass" );
@@ -46,6 +64,12 @@ FrameGraphResource Ember::RenderPass::DepthPrePass::Execute(
         cmd->SetGraphicsRoot32BitConstants( 0, sizeof( DrawList::Info ) / 4, &draw_list_info_list.AlphaTested, 0 );
         cmd->DispatchMesh( draw_list_info_list.AlphaTested.DrawCount, 1, 1 );
       } );
+}
+
+FrameGraphResource Ember::RenderPass::DepthPrePass::operator()(
+    FrameGraph* frame_graph, FrameGraphBlackboard const& blackboard ) const
+{
+  return Execute( frame_graph, blackboard );
 }
 
 bool Ember::RenderPass::DepthPrePass::Create(

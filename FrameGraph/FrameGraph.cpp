@@ -13,7 +13,7 @@ void FrameGraph::reserve(uint32_t numPasses, uint32_t numResources) {
 }
 
 bool FrameGraph::exists(FrameGraphResource id) const {
-  return id < m_resourceNodes.size();
+  return id >= 0 && id < m_resourceNodes.size();
 }
 
 void FrameGraph::compile() {
