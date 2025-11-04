@@ -85,7 +85,7 @@ void Ember::Inspector::Draw( flecs::world* ecs, flecs::entity const entity )
     flecs::entity const component = ecs->lookup( buf, ".", "." );
     if ( component.is_valid() )
     {
-      _ = entity.add( component );
+      _ = entity.ensure( component );
     }
   }
 

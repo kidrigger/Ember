@@ -191,6 +191,8 @@ flecs::entity Ember::ModelLoader::ProcessNode( LoadingContext* context, flecs::e
   bool const          has_scale       = node.has_matrix or node.has_scale;
 
   flecs::entity const my_node         = m_World->GetECS().entity().child_of( parent ).add<WorldBoundingBox>();
+  context->NodeCache[&node]           = my_node;
+
   if ( has_translation ) my_node.set<Translation>( Translation{ translation } );
   if ( has_rotation ) my_node.set<Rotation>( Rotation{ rotation } );
   if ( has_scale ) my_node.set<Scale>( Scale{ scale } );
@@ -733,6 +735,101 @@ std::optional<flecs::entity> Ember::ModelLoader::TryLoadModel( char const* filen
   for ( uint32_t node_idx = 0; node_idx < current_scene->nodes_count; ++node_idx )
   {
     ProcessNode( &context, entity, *current_scene->nodes[node_idx] );
+  }
+
+  for ( uint32_t anim_idx = 0; anim_idx < gltf_model->animations_count; ++anim_idx )
+  {
+    cgltf_animation const& animation    = gltf_model->animations[anim_idx];
+
+    float                  track_length = 0.0f;
+    std::vector<float>     timeline;
+    for ( uint32_t channel_idx = 0; channel_idx < animation.channels_count; ++channel_idx )
+    {
+      cgltf_animation_sampler const& sampler     = *animation.channels[channel_idx].sampler;
+
+      size_t const                   float_count = cgltf_accessor_unpack_floats( sampler.input, nullptr, 0 );
+      timeline.resize( float_count );
+      cgltf_accessor_unpack_floats( sampler.input, timeline.data(), float_count );
+
+      track_length = std::max( track_length, timeline.back() );
+    }
+
+    for ( uint32_t channel_idx = 0; channel_idx < animation.channels_count; ++channel_idx )
+    {
+      cgltf_animation_channel const& channel = animation.channels[channel_idx];
+
+      timeline.clear();
+      cgltf_animation_sampler const& sampler = *channel.sampler;
+      {
+        size_t const float_count = cgltf_accessor_unpack_floats( sampler.input, nullptr, 0 );
+        timeline.resize( float_count );
+        cgltf_accessor_unpack_floats( sampler.input, timeline.data(), float_count );
+      }
+
+      flecs::entity target_entity = context.NodeCache[channel.target_node];
+
+      switch ( channel.target_path )
+      {
+        case cgltf_animation_path_type_translation:
+        {
+          std::vector<DirectX::XMFLOAT3> translations;
+          size_t const                   float_count = cgltf_accessor_unpack_floats( sampler.output, nullptr, 0 );
+          ASSERT( float_count % 3 == 0 );
+          size_t const float3_count = float_count / 3;
+          translations.resize( float3_count );
+          cgltf_accessor_unpack_floats( sampler.output, ( float* )translations.data(), float_count );
+
+          target_entity.ensure<TranslatingAnimation>().Animations[animation.name] = {
+            .Keyframes={
+              std::move( timeline ),
+              std::move( translations ),
+            },
+            .Length = track_length,
+          };
+        }
+        break;
+        case cgltf_animation_path_type_rotation:
+        {
+          std::vector<DirectX::XMFLOAT4> rotations;
+          size_t const                   float_count = cgltf_accessor_unpack_floats( sampler.output, nullptr, 0 );
+          ASSERT( float_count % 4 == 0 );
+          size_t const float4_count = float_count / 4;
+          rotations.resize( float4_count );
+          cgltf_accessor_unpack_floats( sampler.output, ( float* )rotations.data(), float_count );
+
+          target_entity.ensure<RotatingAnimation>().Animations[animation.name] = {
+            .Keyframes= {
+              std::move( timeline ),
+              std::move( rotations ),
+            },
+            .Length = track_length,
+          };
+        }
+        break;
+        case cgltf_animation_path_type_scale:
+        {
+          std::vector<DirectX::XMFLOAT3> scales;
+          size_t const                   float_count = cgltf_accessor_unpack_floats( sampler.output, nullptr, 0 );
+          ASSERT( float_count % 3 == 0 );
+          size_t const float3_count = float_count / 3;
+          scales.resize( float3_count );
+          cgltf_accessor_unpack_floats( sampler.output, ( float* )scales.data(), float_count );
+
+          target_entity.ensure<ScalingAnimation>().Animations[animation.name] = {
+            .Keyframes = {
+              std::move( timeline ),
+              std::move( scales ),
+            },
+            .Length = track_length,
+          };
+        }
+        break;
+        case cgltf_animation_path_type_weights:
+          UNIMPLEMENTED;
+        default:
+          UNREACHABLE;
+      }
+    }
   }
 
   GeometryAllocation geom;

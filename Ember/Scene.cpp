@@ -292,16 +292,19 @@ Ember::World::World()
                                               {
                                                 // TODO: Avoid all this by Caching the Euler angles.
 
-                                                DirectX::XMFLOAT4* q     = ( DirectX::XMFLOAT4* )elem;
-                                                DirectX::XMFLOAT3  euler = Quaternion::ToEuler( *q );
+                                                DirectX::XMFLOAT4* q       = ( DirectX::XMFLOAT4* )elem;
+                                                DirectX::XMFLOAT3  euler   = Quaternion::ToEuler( *q );
 
+                                                bool               changed = false;
                                                 ImGui::PushID( label ? label : "Rotation" );
-                                                ImGui::SliderAngle( "Pitch", &euler.x, -89.0f, 89.0f );
-                                                ImGui::SliderAngle( "Yaw", &euler.y, -180.0f, 180.0f );
-                                                ImGui::SliderAngle( "Roll", &euler.z, -180.0f, 180.0f );
+                                                changed |= ImGui::SliderAngle( "Pitch", &euler.x, -89.0f, 89.0f );
+                                                changed |= ImGui::SliderAngle( "Yaw", &euler.y, -180.0f, 180.0f );
+                                                changed |= ImGui::SliderAngle( "Roll", &euler.z, -180.0f, 180.0f );
                                                 ImGui::PopID();
 
-                                                *q = Quaternion::FromEuler( euler );
+                                                ImGui::Text( "%.2f %.2f %.2f %.2f", q->x, q->y, q->z, q->w );
+
+                                                if ( changed ) *q = Quaternion::FromEuler( euler );
                                               } } );
 
   _ = m_Ecs.component<Scale>()
@@ -315,7 +318,101 @@ Ember::World::World()
                                                 ImGui::DragFloat3( label ? label : "Value", ( float* )vec );
                                               } } );
 
-  //
+  _ = m_Ecs.component<std::string>().set<InspectorView>(
+      InspectorView{ []( char const* label, void* elem )
+                     {
+                       std::string* str = ( std::string* )elem;
+                       char         buf[256];
+                       if ( ImGui::InputText( label ? label : "Value", buf, sizeof( buf ) ) )
+                       {
+                         *str = buf;
+                       }
+                     } } );
+
+  _ = m_Ecs.component<AnimationPlayerSubcomponent>().member<flecs::entity>(
+      "Player", 0, offsetof( AnimationPlayerSubcomponent, Player ) );
+  _ = m_Ecs.component<AnimationPlayer>()
+          .member<char>( "CurrentAnimationName", 256, offsetof( AnimationPlayer, CurrentAnimationName ) )
+          .member<StringID>( "CurrentAnimationID", 0, offsetof( AnimationPlayer, CurrentAnimationID ) )
+          .member<float>( "Elapsed", 0, offsetof( AnimationPlayer, Elapsed ) )
+          .member<float>( "Length", 0, offsetof( AnimationPlayer, Length ) )
+          .member<AnimationPlayer::State>( "CurrentState", 0, offsetof( AnimationPlayer, CurrentState ) )
+          .set<InspectorView>( InspectorView{
+              []( char const* label, void* elem )
+              {
+                AnimationPlayer* player = ( AnimationPlayer* )elem;
+                char             buf[256];
+                sprintf_s( buf, "%s", player->CurrentAnimationName );
+                if ( ImGui::InputText(
+                         label ? label : "Value", buf, sizeof( buf ), ImGuiInputTextFlags_EnterReturnsTrue ) )
+                {
+                  player->SetAnimation( buf );
+                }
+
+                ImGui::Text( "Elapsed: %f, Total: %f", player->Elapsed, player->Length );
+
+                AnimationPlayer::State const previous_state = player->CurrentState;
+                if ( ImGui::RadioButton( "Playing", ( int* )&previous_state, AnimationPlayer::kPlaying ) )
+                {
+                  player->SetState( previous_state );
+                }
+                ImGui::SameLine();
+                if ( ImGui::RadioButton( "Paused", ( int* )&previous_state, AnimationPlayer::kPaused ) )
+                {
+                  player->SetState( previous_state );
+                }
+                if ( ImGui::RadioButton( "Stopped", ( int* )&previous_state, AnimationPlayer::kStopped ) )
+                {
+                  player->SetState( previous_state );
+                }
+              } } );
+
+  _ = m_Ecs.component<TranslatingAnimation>().add( flecs::With, m_Ecs.component<Translation>() );
+  _ = m_Ecs.component<RotatingAnimation>().add( flecs::With, m_Ecs.component<Rotation>() );
+  _ = m_Ecs.component<ScalingAnimation>().add( flecs::With, m_Ecs.component<Scale>() );
+
+  m_Ecs.observer<AnimationPlayer>()
+      .event( flecs::OnAdd )
+      .each(
+          []( flecs::entity const& entity, AnimationPlayer& player )
+          {
+            std::queue<flecs::entity> bfs_subtree;
+            bfs_subtree.push( entity );
+            while ( not bfs_subtree.empty() )
+            {
+              flecs::entity ent = bfs_subtree.front();
+              bfs_subtree.pop();
+
+              if ( ent.has<TranslatingAnimation>() or ent.has<RotatingAnimation>() or ent.has<ScalingAnimation>() )
+              {
+                ent.set<AnimationPlayerSubcomponent>( { entity } );
+              }
+
+              ent.children( [&]( flecs::entity const child ) { bfs_subtree.push( child ); } );
+            }
+          } );
+
+  m_Ecs.observer<AnimationPlayer>()
+      .event( flecs::OnRemove )
+      .each(
+          []( flecs::entity const& entity, AnimationPlayer& player )
+          {
+            std::queue<flecs::entity> bfs_subtree;
+            bfs_subtree.push( entity );
+            while ( not bfs_subtree.empty() )
+            {
+              flecs::entity ent = bfs_subtree.front();
+              bfs_subtree.pop();
+
+              if ( auto* it = ent.try_get<AnimationPlayerSubcomponent>(); it and it->Player == entity )
+              {
+                _ = ent.remove<AnimationPlayerSubcomponent>();
+              }
+
+              ent.children( [&]( flecs::entity const child ) { bfs_subtree.push( child ); } );
+            }
+          } );
+
   m_UpdateRootWorldTransformSys =
       m_Ecs.system<WorldTransform, Translation const*, Rotation const*, Scale const*>()
           .without( flecs::ChildOf )
@@ -364,6 +461,174 @@ Ember::World::World()
               parent_bb.AABB = bb.AABB;
             }
           } );
+
+  m_UpdateAnimationPlayer = m_Ecs.system<AnimationPlayer>().each(
+      []( flecs::iter& it, size_t, AnimationPlayer& player )
+      {
+        if ( player.CurrentState == AnimationPlayer::State::kPlaying )
+        {
+          player.Elapsed += it.delta_time();
+        }
+      } );
+
+  m_UpdateAnimationTranslation =
+      m_Ecs.system<AnimationPlayerSubcomponent const, TranslatingAnimation const, Translation>().each(
+          []( flecs::entity e,
+              AnimationPlayerSubcomponent const& player,
+              TranslatingAnimation const& anim,
+              Translation& translation )
+          {
+            AnimationPlayer const* anim_player = player.Player.try_get_mut<AnimationPlayer>();
+            if ( not anim_player )
+            {
+              _ = e.remove<AnimationPlayerSubcomponent>();
+              return;
+            }
+
+            if ( auto const it = anim.Animations.Find( anim_player->CurrentAnimationID ); it != anim.Animations.end() )
+            {
+              float const          elapsed = std::fmodf( anim_player->Elapsed, it->second.Length );
+
+              std::optional<float> timeline_lo;
+              std::optional<float> timeline_hi;
+              DirectX::XMFLOAT3    value_lo = { 0.0f, 0.0f, 0.0f };
+              DirectX::XMFLOAT3    value_hi = { 0.0f, 0.0f, 0.0f };
+              for ( auto const& [time, value] : it->second.Keyframes )
+              {
+                if ( elapsed < time )
+                {
+                  value_hi    = value;
+                  timeline_hi = time;
+                  break;
+                }
+                value_lo    = value;
+                timeline_lo = time;
+              }
+
+              if ( not timeline_lo.has_value() )
+              {
+                translation.Value = value_hi;
+                return;
+              }
+              if ( not timeline_hi.has_value() )
+              {
+                translation.Value = value_lo;
+                return;
+              }
+
+              float const factor = ( elapsed - timeline_lo.value() ) / ( timeline_hi.value() - timeline_lo.value() );
+
+              translation.Value  = {
+                std::lerp( value_lo.x, value_hi.x, factor ),
+                std::lerp( value_lo.y, value_hi.y, factor ),
+                std::lerp( value_lo.z, value_hi.z, factor ),
+              };
+            }
+          } );
+
+  m_UpdateAnimationRotation = m_Ecs.system<AnimationPlayerSubcomponent const, RotatingAnimation const, Rotation>().each(
+      []( flecs::entity e,
+          AnimationPlayerSubcomponent const& player,
+          RotatingAnimation const& anim,
+          Rotation& rotation )
+      {
+        AnimationPlayer const* anim_player = player.Player.try_get_mut<AnimationPlayer>();
+        if ( not anim_player )
+        {
+          _ = e.remove<AnimationPlayerSubcomponent>();
+          return;
+        }
+
+        if ( auto const it = anim.Animations.Find( anim_player->CurrentAnimationID ); it != anim.Animations.end() )
+        {
+          float const          elapsed = std::fmodf( anim_player->Elapsed, it->second.Length );
+
+          std::optional<float> timeline_lo;
+          std::optional<float> timeline_hi;
+          DirectX::XMFLOAT4    value_lo = { 0.0f, 0.0f, 0.0f, 1.0f };
+          DirectX::XMFLOAT4    value_hi = { 0.0f, 0.0f, 0.0f, 1.0f };
+          for ( auto const& [time, value] : it->second.Keyframes )
+          {
+            if ( elapsed < time )
+            {
+              value_hi    = value;
+              timeline_hi = time;
+              break;
+            }
+            value_lo    = value;
+            timeline_lo = time;
+          }
+
+          if ( not timeline_lo.has_value() )
+          {
+            XMStoreFloat4( &rotation.Value, DirectX::XMQuaternionNormalize( XMLoadFloat4( &value_hi ) ) );
+            return;
+          }
+          if ( not timeline_hi.has_value() )
+          {
+            XMStoreFloat4( &rotation.Value, DirectX::XMQuaternionNormalize( XMLoadFloat4( &value_lo ) ) );
+            return;
+          }
+
+          float const factor = ( elapsed - timeline_lo.value() ) / ( timeline_hi.value() - timeline_lo.value() );
+
+          XMStoreFloat4(
+              &rotation.Value,
+              DirectX::XMQuaternionNormalize(
+                  DirectX::XMVectorLerp( XMLoadFloat4( &value_lo ), XMLoadFloat4( &value_hi ), factor ) ) );
+        }
+      } );
+
+  m_UpdateAnimationScale = m_Ecs.system<AnimationPlayerSubcomponent const, ScalingAnimation const, Scale>().each(
+      []( flecs::entity e, AnimationPlayerSubcomponent const& player, ScalingAnimation const& anim, Scale& scale )
+      {
+        AnimationPlayer const* anim_player = player.Player.try_get_mut<AnimationPlayer>();
+        if ( not anim_player )
+        {
+          _ = e.remove<AnimationPlayerSubcomponent>();
+          return;
+        }
+
+        if ( auto const it = anim.Animations.Find( anim_player->CurrentAnimationID ); it != anim.Animations.end() )
+        {
+          float const          elapsed = std::fmodf( anim_player->Elapsed, it->second.Length );
+
+          std::optional<float> timeline_lo;
+          std::optional<float> timeline_hi;
+          DirectX::XMFLOAT3    value_lo = { 1.0f, 1.0f, 1.0f };
+          DirectX::XMFLOAT3    value_hi = { 1.0f, 1.0f, 1.0f };
+          for ( auto const& [time, value] : it->second.Keyframes )
+          {
+            if ( elapsed < time )
+            {
+              value_hi    = value;
+              timeline_hi = time;
+              break;
+            }
+            value_lo    = value;
+            timeline_lo = time;
+          }
+
+          if ( not timeline_lo.has_value() )
+          {
+            scale.Value = value_hi;
+            return;
+          }
+          if ( not timeline_hi.has_value() )
+          {
+            scale.Value = value_lo;
+            return;
+          }
+
+          float const factor = ( elapsed - timeline_lo.value() ) / ( timeline_hi.value() - timeline_lo.value() );
+
+          scale.Value        = {
+            std::lerp( value_lo.x, value_hi.x, factor ),
+            std::lerp( value_lo.y, value_hi.y, factor ),
+            std::lerp( value_lo.z, value_hi.z, factor ),
+          };
+        }
+      } );
 }
 
 void Ember::World::Update( float const delta_time ) const
@@ -385,6 +650,14 @@ void Ember::World::Update( float const delta_time ) const
   {
     ZoneScopedN( "UpdateWorldAABBQuery" );
     m_UpdateWorldAABBSys.run( delta_time );
+  }
+
+  {
+    ZoneScopedN( "Animation" );
+    m_UpdateAnimationPlayer.run( delta_time );
+    m_UpdateAnimationTranslation.run( delta_time );
+    m_UpdateAnimationRotation.run( delta_time );
+    m_UpdateAnimationScale.run( delta_time );
   }
 }
 

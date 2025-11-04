@@ -1,15 +1,14 @@
 #pragma once
 
-#include <memory_resource>
-
 #include "Buffer.hpp"
-#include "Color.hpp"
 #include "ObjectPool.hpp"
 #include "Util/DirectXHeaders.hpp"
 
 #include <flecs.h>
 
 #include "GeometryManager.hpp"
+#include "Util/DataUtil.hpp"
+#include "Util/FlatMap.hpp"
 
 namespace Ember
 {
@@ -167,6 +166,76 @@ struct WorldBoundingBox
   bool IsInit() const;
 };
 
+struct TranslatingAnimation
+{
+  struct Track
+  {
+    FlatMap<float, DirectX::XMFLOAT3> Keyframes;
+    float                             Length;
+  };
+  FlatMap<StringID, Track> Animations;
+};
+
+struct RotatingAnimation
+{
+  struct Track
+  {
+    FlatMap<float, DirectX::XMFLOAT4> Keyframes;
+    float                             Length;
+  };
+  FlatMap<StringID, Track> Animations;
+};
+
+struct ScalingAnimation
+{
+  struct Track
+  {
+    FlatMap<float, DirectX::XMFLOAT3> Keyframes;
+    float                             Length;
+  };
+  FlatMap<StringID, Track> Animations;
+};
+
+struct AnimationPlayer
+{
+  enum State
+  {
+    kStopped,
+    kPaused,
+    kPlaying,
+  };
+
+  char     CurrentAnimationName[256]{};
+  StringID CurrentAnimationID;
+  float    Elapsed{ 0.0f };
+  float    Length{ 0.0f };
+  State    CurrentState{ kStopped };
+
+  void     SetAnimation( std::string_view const& name )
+  {
+    if ( name == CurrentAnimationName ) return;
+
+    strcpy_s( CurrentAnimationName, name.data() );
+    CurrentAnimationID = StringID{ CurrentAnimationName };
+    Elapsed            = 0.0f;
+    Length             = 0.0f;
+  }
+
+  void SetState( State const state )
+  {
+    if ( state == kStopped )
+    {
+      Elapsed = 0.0f;
+    }
+    CurrentState = state;
+  }
+};
+
+struct AnimationPlayerSubcomponent
+{
+  flecs::entity Player;
+};
+
 struct GeometryImpl
 {
   GeometryAllocation   GeometryAlloc;
@@ -283,6 +352,10 @@ class World
   flecs::system m_PrimeActualWorldAABBSys;
   flecs::system m_PrimeCollectingWorldAABBSys;
   flecs::system m_UpdateWorldAABBSys;
+  flecs::system m_UpdateAnimationPlayer;
+  flecs::system m_UpdateAnimationTranslation;
+  flecs::system m_UpdateAnimationRotation;
+  flecs::system m_UpdateAnimationScale;
 
 public:
   static ObjectPool<GeometryImpl>& GeometryManager();

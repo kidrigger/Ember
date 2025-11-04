@@ -48,6 +48,8 @@ constexpr auto DataOf( std::ranges::contiguous_range auto& range )
 
 constexpr uint64_t HashFnv1A( size_t const size, byte const* data )
 {
+  if ( size == 0 ) return 0;
+
   uint64_t hash = 0xcbf29ce484222325; /* Offset */
 
   for ( size_t i = 0; i < size; ++i )
@@ -81,10 +83,16 @@ class StringID
   uint64_t m_Value;
 
 public:
+  constexpr StringID() : m_Value{ HashFnv1A( 0, nullptr ) }
+  {}
+
   constexpr StringID( std::string_view const& str ) : m_Value{ HashFnv1A( str ) }
   {}
 
   constexpr StringID( char const* c_str, size_t const size ) : m_Value{ HashFnv1A( size, ( byte const* )c_str ) }
+  {}
+
+  StringID( char const* c_str ) : m_Value{ HashFnv1A( c_str ? strlen( c_str ) : 0, ( byte const* )c_str ) }
   {}
 
   [[nodiscard]] constexpr uint64_t GetValue() const

@@ -269,7 +269,7 @@ void Ember::BasicApp::LoadContent()
   m_Camera->SetHorizontalFoV( DirectX::XMConvertToRadians( 70.0f ) );
   m_Camera->SetAspectRatio( ( float )m_WindowWidth / ( float )m_WindowHeight );
   m_Camera->SetYawPitch( DirectX::XM_PI * 5.0f / 4.0f, 0.0f );
-  m_Camera->SetPosition( DirectX::XMVectorSet( -23.0f, 2.0f, -10.0f, 1.0f ) );
+  m_Camera->SetPosition( DirectX::XMVectorSet( 0.0f, 2.0f, 0.0f, 1.0f ) );
 
   // Setup Lights
   LightManager::Create( m_LightManager.get(), m_RenderDevice.get(), &m_World, RenderDevice::kNumFrames );
@@ -297,7 +297,7 @@ void Ember::BasicApp::LoadContent()
       .insert(
           [&]( Translation& translation, OmniLight& ol )
           {
-            translation  = { 15.0f, 2.0f, 12.0f };
+            translation  = { 5.0f, 2.0f, 0.0f };
             ol.Color     = Color32::Blue();
             ol.Intensity = 15.0f;
             ol.Range     = 10.0f;
@@ -310,7 +310,7 @@ void Ember::BasicApp::LoadContent()
       .insert(
           [&]( Translation& translation, OmniLight& ol )
           {
-            translation  = { 0.0f, 2.0f, 5.0f };
+            translation  = { 0.0f, 2.0f, 0.0f };
             ol.Color     = Color32::Green();
             ol.Intensity = 15.0f;
             ol.Range     = 10.0f;
@@ -323,7 +323,7 @@ void Ember::BasicApp::LoadContent()
       .insert(
           [&]( Translation& translation, OmniLight& ol )
           {
-            translation  = { -15.0f, 2.0f, -5.0f };
+            translation  = { -5.0f, 2.0f, 0.0f };
             ol.Color     = Color32::Red();
             ol.Intensity = 25.0f;
             ol.Range     = 10.0f;
@@ -336,9 +336,9 @@ void Ember::BasicApp::LoadContent()
       .insert(
           [&]( Translation& translation, Rotation& rotation, SpotLight& sl, RotatingModel& rm )
           {
-            translation = { -15.0f, 1.0f, -5.0f };
+            translation = { -5.0f, 1.0f, 0.0f };
             rotation    = ( Rotation )DirectX::XMQuaternionRotationRollPitchYaw(
-                DirectX::XMConvertToRadians( -10.0f ), DirectX::XMConvertToRadians( 0.0f ), 0.0f );
+                DirectX::XMConvertToRadians( -20.0f ), DirectX::XMConvertToRadians( 0.0f ), 0.0f );
             sl.Color              = Color32::White();
             sl.ConeInnerHalfAngle = DirectX::XMConvertToRadians( 10.0f );
             sl.ConeOuterHalfAngle = DirectX::XMConvertToRadians( 15.0f );
@@ -354,7 +354,8 @@ void Ember::BasicApp::LoadContent()
       m_RenderDevice.get(), &m_World, m_TextureLoader.get(), m_MaterialManager.get(), m_GeometryManager.get() );
 
   // Setup Scene Geometry
-  _                      = m_ModelLoader->TryLoadModel( "Sponza.glb" )->child_of( m_SceneRoot ).set_name( "Scene" );
+  _ = m_ModelLoader->TryLoadModel( "Sponza.glb" )->child_of( m_SceneRoot ).set_name( "Scene" );
+  _ = m_ModelLoader->TryLoadModel( "BoxAnimated.glb" )->child_of( m_SceneRoot ).set_name( "AnimTest" );
 
   flecs::entity const rm = m_World.GetECS()
                                .entity( "HelmetRotator" )
@@ -363,7 +364,7 @@ void Ember::BasicApp::LoadContent()
                                    []( Translation& translation, RotatingModel& rot_model, WorldBoundingBox& )
                                    {
                                      rot_model.Speed = 20.0f;
-                                     translation     = { 0.0f, 1.0f, 5.0f };
+                                     translation     = { 0.0f, 1.0f, 0.0f };
                                    } );
 
   _ = m_ModelLoader->TryLoadModel( "DamagedHelmet.glb" )

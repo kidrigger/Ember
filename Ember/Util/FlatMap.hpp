@@ -105,9 +105,9 @@ public:
 
     struct KeyValueProxy
     {
-      std::pair<TKey const&, TValue const&>  Val;
+      std::pair<TKey const&, TValue const&>        Val;
 
-      std::pair<TKey const&, TValue const&>* operator->() const
+      std::pair<TKey const&, TValue const&> const* operator->() const
       {
         return &Val;
       }
@@ -121,6 +121,11 @@ public:
     std::pair<TKey const&, TValue const&> operator*() const
     {
       return { *m_KeyIter, *m_ValueIter };
+    }
+
+    ConstIterator operator+( ptrdiff_t const offset ) const
+    {
+      return { m_KeyIter + offset, m_ValueIter + offset };
     }
 
     ConstIterator& operator++()
@@ -156,6 +161,13 @@ public:
     }
   };
 
+  FlatMap() = default;
+  FlatMap( std::vector<TKey> keys, std::vector<TValue> values )
+    : m_Keys{ std::move( keys ) }, m_Values{ std::move( values ) }
+  {
+    ASSERT( keys.size() == values.size() );
+  }
+
   bool Contains( TKey const& key )
   {
     return std::ranges::binary_search( m_Keys, key );
@@ -166,6 +178,29 @@ public:
     auto key_it = std::ranges::lower_bound( m_Keys, key );
     if ( key_it == m_Keys.end() or *key_it != key ) return end();
 
+    ptrdiff_t offset = key_it - m_Keys.begin();
+    return { key_it, m_Values.begin() + offset };
+  }
+
+  ConstIterator Find( TKey const& key ) const
+  {
+    auto key_it = std::ranges::lower_bound( m_Keys, key );
+    if ( key_it == m_Keys.end() or *key_it != key ) return end();
+
+    ptrdiff_t offset = key_it - m_Keys.begin();
+    return { key_it, m_Values.begin() + offset };
+  }
+
+  Iterator LowerBound( TKey const& key )
+  {
+    auto      key_it = std::ranges::lower_bound( m_Keys, key );
+    ptrdiff_t offset = key_it - m_Keys.begin();
+    return { key_it, m_Values.begin() + offset };
+  }
+
+  ConstIterator LowerBound( TKey const& key ) const
+  {
+    auto      key_it = std::ranges::lower_bound( m_Keys, key );
     ptrdiff_t offset = key_it - m_Keys.begin();
     return { key_it, m_Values.begin() + offset };
   }

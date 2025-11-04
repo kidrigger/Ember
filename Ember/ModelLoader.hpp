@@ -3,6 +3,7 @@
 #include <cgltf.h>
 #include <map>
 
+#include "Color.hpp"
 #include "Float16.hpp"
 #include "Scene.hpp"
 #include "TextureLoader.hpp"
@@ -86,6 +87,7 @@ class ModelLoader
   struct LoadingContext
   {
     std::map<cgltf_material const*, MaterialImpl*> MaterialCache;
+    std::map<cgltf_node const*, flecs::entity>     NodeCache;
     GeometryImpl*                                  Geometry;
     std::vector<Meshlet>                           Meshlets;
     std::vector<uint32_t>                          MeshletVertices;

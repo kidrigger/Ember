@@ -2,6 +2,7 @@
 
 #include <memory_resource>
 
+#include "Color.hpp"
 #include "LightHandle.hpp"
 #include "Scene.hpp"
 #include "Util/FlatMap.hpp"
