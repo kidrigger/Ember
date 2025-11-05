@@ -23,7 +23,6 @@ struct MSVertexOut
 {
   float4 ScreenPosition : SV_POSITION;
   float2 TexCoord0 : TEXCOORD0;
-  float  Alpha : ALPHA;
 };
 
 struct MSPrimitiveOut
@@ -34,7 +33,6 @@ struct MSPrimitiveOut
 struct PSIn
 {
   float2 TexCoord0 : TEXCOORD0;
-  float  Alpha : ALPHA;
   MatID  Material : MATERIAL;
 };
 

@@ -27,40 +27,35 @@ constexpr D3D12_INPUT_ELEMENT_DESC PerVertexInput(
   };
 }
 
-struct ShadowVertex
+struct VertexLite
 {
-  Float16                                   Px;
-  Float16                                   Py;
-  Float16                                   Pz;
-  Float16                                   Pw;
+  Float16                                   PositionX;  // 02
+  Float16                                   PositionY;  // 04
+  Float16                                   PositionZ;  // 06
+  Float16                                   PositionW;  // 08
+  Float16                                   TexCoord0X; // 10
+  Float16                                   TexCoord0Y; // 12
+  Float16                                   TexCoord1X; // 14
+  Float16                                   TexCoord1Y; // 16
 
   constexpr static D3D12_INPUT_ELEMENT_DESC kInputElementDesc[] = {
     PerVertexInput( "POSITION", 0, DXGI_FORMAT_R16G16B16A16_FLOAT, 0 ),
+    PerVertexInput( "TEXCOORD", 0, DXGI_FORMAT_R16G16_FLOAT, 0 ),
+    PerVertexInput( "TEXCOORD", 1, DXGI_FORMAT_R16G16_FLOAT, 0 ),
   };
 };
 
 struct alignas( 16 ) VertexData
 {
-  Float16                                   PositionX;        // 02
-  Float16                                   PositionY;        // 04
-  Float16                                   PositionZ;        // 06
-  Float16                                   PositionW;        // 08
-  uint32_t                                  QuantizedNormal;  // 12
-  uint32_t                                  QuantizedTangent; // 16
-  Color32                                   Color;            // 20
-  Float16                                   TexCoord0X;       // 22
-  Float16                                   TexCoord0Y;       // 24
-  Float16                                   TexCoord1X;       // 26
-  Float16                                   TexCoord1Y;       // 28
-  uint32_t                                  Padding0;         // 32
+  uint32_t                                  QuantizedNormal;  // 04
+  uint32_t                                  QuantizedTangent; // 08
+  Color32                                   Color;            // 12
+  uint32_t                                  Padding0;         // 16
 
   constexpr static D3D12_INPUT_ELEMENT_DESC kInputElementDesc[] = {
-    PerVertexInput( "POSITION", 0, DXGI_FORMAT_R16G16B16A16_FLOAT, 0 ),
     PerVertexInput( "NORMAL", 0, DXGI_FORMAT_R10G10B10A2_UNORM, 0 ),
     PerVertexInput( "TANGENT", 0, DXGI_FORMAT_R10G10B10A2_UNORM, 0 ),
     PerVertexInput( "COLOR", 0, DXGI_FORMAT_R8G8B8A8_UNORM, 0 ),
-    PerVertexInput( "TEXCOORD", 0, DXGI_FORMAT_R16G16_FLOAT, 0 ),
-    PerVertexInput( "TEXCOORD", 1, DXGI_FORMAT_R16G16_FLOAT, 0 ),
   };
 };
 
@@ -92,7 +87,7 @@ class ModelLoader
     std::vector<Meshlet>                           Meshlets;
     std::vector<uint32_t>                          MeshletVertices;
     std::vector<byte>                              MeshletTriangles;
-    std::vector<ShadowVertex>                      VertexPositions;
+    std::vector<VertexLite>                        VertexPositions;
     std::vector<VertexData>                        VertexData;
     std::vector<uint32_t>                          Indices;
   };

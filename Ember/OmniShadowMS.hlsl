@@ -50,13 +50,13 @@ void OmniShadowMS(
 
   for ( int i = IN.LocalID.x; i < meshlet.VertexCount; i += 32 )
   {
-    uint   index          = meshlet_indices.Load<uint>( sizeof( uint ) * ( meshlet.VertexOffset + i ) );
+    uint       index  = meshlet_indices.Load<uint>( sizeof( uint ) * ( meshlet.VertexOffset + i ) );
 
-    float4 vertex         = vertex_buffer.Load<half4>( sizeof( Vertex ) * ( index + mesh_draw.FirstVertex ) );
+    VertexLite vertex = vertex_buffer.Load<VertexLite>( sizeof( VertexLite ) * ( index + mesh_draw.VertexLiteStart ) );
 
-    float4 world_position = mul( transform.Model, vertex );
+    float4     world_position = mul( transform.Model, vertex.Position );
 
-    float4 pos            = mul( proj_view.Views[view_idx], float4( world_position.xyz - g_LightPosition, 1.0f ) );
+    float4     pos            = mul( proj_view.Views[view_idx], float4( world_position.xyz - g_LightPosition, 1.0f ) );
 
     // Manually calculating the projection
     verts[i].ScreenPosition = float4( pos.x, pos.y, pos.z * f / ( f - n ) - pos.w * n * f / ( f - n ), pos.z );

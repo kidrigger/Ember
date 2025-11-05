@@ -15,6 +15,7 @@ struct MeshletPayload
   uint  MeshletID[32];
   uint  Transform;
   uint  FirstVertex;
+  uint  VertexLiteStart;
   uint  FirstMeshlet;
   MatID Material;
 };

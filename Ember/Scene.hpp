@@ -282,7 +282,8 @@ struct Mesh
 {
   uint32_t FirstIndex;
   uint32_t IndexCount;
-  uint32_t FirstVertex;
+  uint32_t VertexDataStart;
+  uint32_t VertexLiteStart;
   uint32_t MeshletCount;
   uint32_t FirstMeshlet;
 };
@@ -291,11 +292,12 @@ struct alignas( 16 ) MeshDraw
 {
   uint32_t       FirstTransform;
   uint32_t       TransformCount;
-  uint32_t       FirstVertex;
+  uint32_t       VertexDataStart;
+  uint32_t       VertexLiteStart;
   uint32_t       FirstMeshlet;
   uint32_t       MeshletCount;
   MaterialHandle Material;
-  uint32_t       Padding[2];
+  uint32_t       Padding;
 };
 
 class DrawList

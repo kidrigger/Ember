@@ -66,7 +66,7 @@ void GetTexCoord( SMikkTSpaceContext const* ctx, float out_tex[], int const face
   memcpy( out_tex, &payload[vertex_idx].TexCoord0, sizeof( float ) * 2 );
 }
 
-Ember::VertexData QuantizeData( LoadingData const& in_data )
+std::pair<Ember::VertexLite, Ember::VertexData> QuantizeData( LoadingData const& in_data )
 {
   DirectX::XMFLOAT3 norm;
   XMStoreFloat3( &norm, DirectX::XMVector3Normalize( XMLoadFloat3( &in_data.Normal ) ) );
@@ -81,18 +81,22 @@ Ember::VertexData QuantizeData( LoadingData const& in_data )
                            ( meshopt_quantizeUnorm( tang.z * 0.5f + 0.5f, 10 ) << 20 ) |
                            ( meshopt_quantizeUnorm( in_data.Tangent.w * 0.5f + 0.5f, 2 ) ) << 30;
 
-  return Ember::VertexData{
-    .PositionX        = in_data.Position.x,
-    .PositionY        = in_data.Position.y,
-    .PositionZ        = in_data.Position.z,
-    .PositionW        = 1,
-    .QuantizedNormal  = normal,
-    .QuantizedTangent = tangent,
-    .Color            = in_data.Color,
-    .TexCoord0X       = in_data.TexCoord0.x,
-    .TexCoord0Y       = in_data.TexCoord0.y,
-    .TexCoord1X       = in_data.TexCoord1.x,
-    .TexCoord1Y       = in_data.TexCoord1.y,
+  return {
+    {
+     .PositionX  = in_data.Position.x,
+     .PositionY  = in_data.Position.y,
+     .PositionZ  = in_data.Position.z,
+     .PositionW  = 1,
+     .TexCoord0X = in_data.TexCoord0.x,
+     .TexCoord0Y = in_data.TexCoord0.y,
+     .TexCoord1X = in_data.TexCoord1.x,
+     .TexCoord1Y = in_data.TexCoord1.y,
+     },
+    {
+     .QuantizedNormal  = normal,
+     .QuantizedTangent = tangent,
+     .Color            = in_data.Color,
+     }
   };
 }
 
@@ -227,8 +231,9 @@ void Ember::ModelLoader::ProcessPrimitive(
   using namespace std::string_view_literals;
 
   // VertexStart is per-primitive
-  int32_t const  vertex_start  = ( int32_t )context->VertexPositions.size();
-  uint32_t const meshlet_start = ( uint32_t )context->Meshlets.size();
+  int32_t const  vertex_start      = ( int32_t )context->VertexPositions.size();
+  uint32_t const meshlet_start     = ( uint32_t )context->Meshlets.size();
+  uint32_t const vertex_lite_start = ( uint32_t )context->VertexData.size();
 
   ASSERT( primitive.type == cgltf_primitive_type_triangles );
 
@@ -439,31 +444,34 @@ void Ember::ModelLoader::ProcessPrimitive(
 
   // Quantization
   {
-    scratch.resize( sizeof( VertexData ) * vertex_count );
+    scratch.resize( ( sizeof( VertexData ) + sizeof( VertexLite ) ) * vertex_count );
 
-    LoadingData const* read_ptr  = loaded_data.data();
-    VertexData*        write_ptr = ( VertexData* )scratch.data();
+    LoadingData const* read_ptr   = loaded_data.data();
+    VertexLite*        write_lite = ( VertexLite* )scratch.data();
+    VertexData*        write_data = ( VertexData* )( scratch.data() + sizeof( VertexLite ) * vertex_count );
     for ( int i = 0; i < vertex_count; i++ )
     {
-      *write_ptr = QuantizeData( *read_ptr );
-      write_ptr++;
+      std::tie( *write_lite, *write_data ) = QuantizeData( *read_ptr );
+      write_lite++;
+      write_data++;
       read_ptr++;
     }
   }
 
   // Finalize
-  VertexData* begin = ( VertexData* )scratch.data();
-  VertexData* end   = begin + vertex_count;
-  context->VertexData.insert( context->VertexData.end(), begin, end );
+  {
+    VertexLite* begin = ( VertexLite* )scratch.data();
+    VertexLite* end   = begin + vertex_count;
+    context->VertexPositions.insert( context->VertexPositions.end(), begin, end );
+  }
+  {
+    VertexData* begin = ( VertexData* )( scratch.data() + sizeof( VertexLite ) * vertex_count );
+    VertexData* end   = begin + vertex_count;
+    context->VertexData.insert( context->VertexData.end(), begin, end );
+  }
   context->Indices.insert( context->Indices.end(), loaded_indices.begin(), loaded_indices.end() );
 
   context->VertexPositions.reserve( context->VertexData.size() );
-
-  std::transform(
-      begin,
-      end,
-      std::back_inserter( context->VertexPositions ),
-      []( VertexData const& vd ) { return ShadowVertex{ vd.PositionX, vd.PositionY, vd.PositionZ, vd.PositionW }; } );
 
   uint32_t meshlet_vert_start = ( uint32_t )context->MeshletVertices.size();
   uint32_t triangle_start     = ( uint32_t )context->MeshletTriangles.size();
@@ -524,8 +532,12 @@ void Ember::ModelLoader::ProcessPrimitive(
             mat  = Material{ material };
             geom = Geometry{ geometry };
             prim = {
-              ( uint32_t )index_start,     ( uint32_t )index_count, ( uint32_t )vertex_start,
-              ( uint32_t )meshlets.size(), meshlet_start,
+              .FirstIndex      = ( uint32_t )index_start,
+              .IndexCount      = ( uint32_t )index_count,
+              .VertexDataStart = ( uint32_t )vertex_start,
+              .VertexLiteStart = vertex_lite_start,
+              .MeshletCount    = ( uint32_t )meshlets.size(),
+              .FirstMeshlet    = meshlet_start,
             };
             bb.AABB = prim_aabb;
           } )
@@ -925,8 +937,9 @@ std::optional<flecs::entity> Ember::ModelLoader::TryLoadModel( char const* filen
     ent.get(
         [&]( Mesh& mesh )
         {
-          mesh.FirstVertex  += vertex_data_offset / sizeof( VertexData );
-          mesh.FirstMeshlet += meshlet_offset / sizeof( Meshlet );
+          mesh.VertexDataStart += vertex_data_offset / sizeof( VertexData );
+          mesh.VertexLiteStart += vertex_position_offset / sizeof( VertexLite );
+          mesh.FirstMeshlet    += meshlet_offset / sizeof( Meshlet );
         } );
 
     ent.children( [&]( flecs::entity child ) { bfs_subtree.push( child ); } );

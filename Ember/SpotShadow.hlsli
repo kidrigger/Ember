@@ -17,7 +17,7 @@ struct SpotShadowPayload
 {
   uint MeshletID[32];
   uint FirstTransform;
-  uint FirstVertex;
+  uint VertexLiteStart;
   uint FirstMeshlet;
 };
 

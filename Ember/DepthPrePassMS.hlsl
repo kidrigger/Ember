@@ -45,17 +45,16 @@ void DepthPrePassMS(
 
   for ( int i = IN.LocalID.x; i < meshlet.VertexCount; i += 32 )
   {
-    uint   index            = meshlet_indices.Load( sizeof( uint ) * ( meshlet.VertexOffset + i ) );
+    uint       index  = meshlet_indices.Load( sizeof( uint ) * ( meshlet.VertexOffset + i ) );
 
-    Vertex vertex           = vertex_buffer.Load<Vertex>( sizeof( Vertex ) * ( index + meshlet_draw.FirstVertex ) );
+    VertexLite vertex = vertex_buffer.Load<VertexLite>( sizeof( VertexLite ) * ( index + meshlet_draw.FirstVertex ) );
 
-    float4 world_pos        = mul( transform.Model, vertex.GetPosition() );
-    float4 clip_pos         = mul( camera.View, world_pos );
-    float4 screen_pos       = mul( camera.Projection, clip_pos );
+    float4     world_pos    = mul( transform.Model, vertex.Position );
+    float4     clip_pos     = mul( camera.View, world_pos );
+    float4     screen_pos   = mul( camera.Projection, clip_pos );
 
     verts[i].ScreenPosition = screen_pos;
-    verts[i].TexCoord0      = vertex.GetTexCoord( 0 );
-    verts[i].Alpha          = vertex.GetColor().a;
+    verts[i].TexCoord0      = vertex.TexCoord[0];
   }
 
   for ( int i = IN.LocalID.x; i < meshlet.TriangleCount; i += 32 )

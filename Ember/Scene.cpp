@@ -180,7 +180,13 @@ void Ember::DrawList::PushDraw( WorldTransform const& transform, Mesh const& mes
   while ( remaining_meshlets > 0 )
   {
     draw_infos->emplace_back(
-        transform_idx, 1, mesh.FirstVertex, meshlet_offset, std::min( remaining_meshlets, 32 ), material->GetHandle() );
+        transform_idx,
+        1,
+        mesh.VertexDataStart,
+        mesh.VertexLiteStart,
+        meshlet_offset,
+        std::min( remaining_meshlets, 32 ),
+        material->GetHandle() );
 
     remaining_meshlets -= 32;
     meshlet_offset     += 32;

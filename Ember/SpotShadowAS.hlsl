@@ -54,9 +54,9 @@ void SpotShadowAS( uint3 group_id : SV_GroupID, uint3 local_id : SV_GroupThreadI
 
     if ( local_id.x == 0 )
     {
-      pl.FirstMeshlet   = current_draw.FirstMeshlet;
-      pl.FirstVertex    = current_draw.FirstVertex;
-      pl.FirstTransform = current_draw.FirstTransform;
+      pl.FirstMeshlet    = current_draw.FirstMeshlet;
+      pl.VertexLiteStart = current_draw.VertexLiteStart;
+      pl.FirstTransform  = current_draw.FirstTransform;
     }
   }
 

@@ -75,7 +75,7 @@ void DepthPrePassAS( uint3 group_id : SV_GroupID, uint3 local_id : SV_GroupThrea
     if ( local_id.x == 0 )
     {
       pl.Transform    = current_draw.FirstTransform;
-      pl.FirstVertex  = current_draw.FirstVertex;
+      pl.FirstVertex  = current_draw.VertexLiteStart;
       pl.FirstMeshlet = current_draw.FirstMeshlet;
       pl.Material     = current_draw.Material;
     }

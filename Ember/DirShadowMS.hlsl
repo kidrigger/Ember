@@ -53,12 +53,12 @@ void DirShadowMS(
 
   for ( int i = IN.LocalID.x; i < meshlet.VertexCount; i += GROUP_SIZE )
   {
-    uint   index            = meshlet_indices.Load<uint>( sizeof( uint ) * ( meshlet.VertexOffset + i ) );
-    float4 vertex           = vertex_buffer.Load<half4>( sizeof( Vertex ) * ( index + mesh_draw.FirstVertex ) );
+    uint       index  = meshlet_indices.Load<uint>( sizeof( uint ) * ( meshlet.VertexOffset + i ) );
+    VertexLite vertex = vertex_buffer.Load<VertexLite>( sizeof( VertexLite ) * ( index + mesh_draw.VertexLiteStart ) );
 
-    float4 world_position   = mul( transform.Model, vertex );
-    float4 screen_position  = mul( light_data[g_LightIdx].LightSpaceMat[view_idx], world_position );
-    screen_position        /= screen_position.w;
+    float4     world_position   = mul( transform.Model, vertex.Position );
+    float4     screen_position  = mul( light_data[g_LightIdx].LightSpaceMat[view_idx], world_position );
+    screen_position            /= screen_position.w;
 
     // Min 0 allows objects behind the near plane to cast shadows.
     // while still allowing max depth precision due to tight bounds for 0-1.

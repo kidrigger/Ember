@@ -7,7 +7,7 @@ void DepthPrePassAlphaTestedPS( PSIn IN )
 
   Material                   mat       = materials[NonUniformResourceIndex( IN.Material )];
 
-  float                      alpha     = IN.Alpha * mat.GetAlbedo( IN.TexCoord0, g_DefaultSampler ).a;
+  float                      alpha     = mat.GetAlbedo( IN.TexCoord0, g_DefaultSampler ).a;
 
   if ( alpha < mat.AlphaCutoff ) discard;
 }
