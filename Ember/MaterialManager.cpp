@@ -6,7 +6,7 @@ Ember::MaterialManager::MaterialManager( Buffer data_buffer, uint32_t const max_
   : m_DataBuffer{ std::move( data_buffer ) }, m_FreeList{ max_materials }
 {}
 
-void Ember::MaterialManager::Create(
+bool Ember::MaterialManager::Create(
     MaterialManager* material_manager, RenderDevice* render_device, uint32_t const max_materials )
 {
   size_t const req_size = max_materials * sizeof( MaterialImpl::GpuRepr );
@@ -14,6 +14,8 @@ void Ember::MaterialManager::Create(
   auto buffer = render_device->CreateStorageBuffer( ( uint32_t )req_size, sizeof( MaterialImpl::GpuRepr ) );
 
   new ( material_manager ) MaterialManager{ std::move( buffer ), max_materials };
+
+  return true;
 }
 
 Ember::MaterialHandle Ember::MaterialManager::CreateMaterialHandle( MaterialImpl::GpuRepr const& material )

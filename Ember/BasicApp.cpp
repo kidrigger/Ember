@@ -28,6 +28,7 @@
 #include "fg/FrameGraph.hpp"
 #include "fg/JsonWriter.hpp"
 
+#include "RenderTargetManager.hpp"
 #include "imgui.h"
 #include "imgui_impl_dx12.h"
 #include "imgui_impl_win32.h"
@@ -152,7 +153,14 @@ Ember::BasicApp::BasicApp(
     HWND                                 window_handle,
     std::unique_ptr<RenderDevice>        render_device,
     std::unique_ptr<PerfCounter>         perf_counter,
-    std::unique_ptr<RenderTargetManager> render_target_manager )
+    std::unique_ptr<RenderTargetManager> render_target_manager,
+    std::unique_ptr<Camera>              camera,
+    std::unique_ptr<Environment>         environment,
+    std::unique_ptr<MaterialManager>     material_manager,
+    std::unique_ptr<GeometryManager>     geometry_manager,
+    std::unique_ptr<World>               world,
+    std::unique_ptr<LightManager>        light_manager,
+    std::unique_ptr<TextureLoader>       texture_loader )
   : IApp{ nullptr }
   , m_WindowHandle{ window_handle }
   , m_RenderDevice{ std::move( render_device ) }
@@ -160,20 +168,24 @@ Ember::BasicApp::BasicApp(
   , m_FGContext{}
   , m_RenderTargetManager{ std::move( render_target_manager ) }
   , m_SwapchainFormat{ m_RenderDevice->FetchSwapchainFormat() }
-  , m_Camera{ std::make_unique<Camera>() }
-  , m_Environment{ std::make_unique<Environment>() }
-  , m_MaterialManager{ std::make_unique_for_overwrite<MaterialManager>() }
-  , m_GeometryManager{ std::make_unique_for_overwrite<GeometryManager>() }
+  , m_Camera{ std::move( camera ) }
+  , m_Environment{ std::move( environment ) }
+  , m_MaterialManager{ std::move( material_manager ) }
+  , m_GeometryManager{ std::move( geometry_manager ) }
   , m_DrawList{ m_RenderDevice.get(), m_GeometryManager.get(), RenderDevice::kNumFrames }
-  , m_LightManager{ std::make_unique_for_overwrite<LightManager>() }
+  , m_World{ std::move( world ) }
+  , m_LightManager{ std::move( light_manager ) }
+  , m_TextureLoader{ std::move( texture_loader ) }
 {
-  m_TextureLoader = std::make_unique_for_overwrite<TextureLoader>();
-  TextureLoader::Create( m_TextureLoader.get(), m_RenderDevice.get(), 3 );
+  m_RenderQuery = m_World->GetECS().query<WorldTransform const, Mesh const, Geometry const, Material const>();
 
-  _ = m_World.GetECS()
+  m_ModelLoader = std::make_unique<ModelLoader>(
+      m_RenderDevice.get(), m_World.get(), m_TextureLoader.get(), m_MaterialManager.get(), m_GeometryManager.get() );
+
+  _             = m_World->GetECS()
           .component<RotatingModel>()
           .member<float>( "Speed", 0, offsetof( RotatingModel, Speed ) )
-          .add( flecs::With, m_World.GetECS().component<Rotation>() );
+          .add( flecs::With, m_World->GetECS().component<Rotation>() );
 
   InitImGui( window_handle, m_RenderDevice.get() );
 
@@ -213,11 +225,27 @@ void Ember::BasicApp::Create( BasicApp* app, HINSTANCE const instance_handle )
   auto render_target_manager = std::make_unique_for_overwrite<RenderTargetManager>();
   RenderTargetManager::Create( render_target_manager.get(), render_device.get() );
 
+  auto world            = std::make_unique<World>();
+
+  auto camera           = std::make_unique<Camera>();
+  auto environment      = std::make_unique<Environment>();
+
+  auto material_manager = std::make_unique_for_overwrite<MaterialManager>();
+  ENSURE( MaterialManager::Create( material_manager.get(), render_device.get(), 10'000 ) );
+
+  auto geometry_manager = std::make_unique_for_overwrite<GeometryManager>();
+  ENSURE( GeometryManager::Create( geometry_manager.get(), render_device.get(), 256_MiB ) );
+
+  auto light_manager = std::make_unique_for_overwrite<LightManager>();
+  LightManager::Create( light_manager.get(), render_device.get(), world.get(), RenderDevice::kNumFrames );
+
+  auto texture_loader = std::make_unique_for_overwrite<TextureLoader>();
+  TextureLoader::Create( texture_loader.get(), render_device.get(), RenderDevice::kNumFrames );
+
   new ( app ) BasicApp{
-    window_handle,
-    std::move( render_device ),
-    std::move( perf_counter ),
-    std::move( render_target_manager ),
+    window_handle,       std::move( render_device ), std::move( perf_counter ),     std::move( render_target_manager ),
+    std::move( camera ), std::move( environment ),   std::move( material_manager ), std::move( geometry_manager ),
+    std::move( world ),  std::move( light_manager ), std::move( texture_loader ),
   };
 }
 
@@ -271,12 +299,11 @@ void Ember::BasicApp::LoadContent()
   m_Camera->SetYawPitch( DirectX::XM_PI * 5.0f / 4.0f, 0.0f );
   m_Camera->SetPosition( DirectX::XMVectorSet( 0.0f, 2.0f, 0.0f, 1.0f ) );
 
+  m_SceneRoot = m_World->GetECS().entity( "SceneRoot" ).insert( []( Translation&, Rotation&, Scale& ) {} );
+
   // Setup Lights
-  LightManager::Create( m_LightManager.get(), m_RenderDevice.get(), &m_World, RenderDevice::kNumFrames );
 
-  m_SceneRoot = m_World.GetECS().entity( "SceneRoot" ).insert( []( Translation&, Rotation&, Scale& ) {} );
-
-  m_World.GetECS()
+  m_World->GetECS()
       .entity( "Sun" )
       .child_of( m_SceneRoot )
       .add<ShadowCaster>()
@@ -290,7 +317,7 @@ void Ember::BasicApp::LoadContent()
             dl.FarPlane  = 100.0f;
           } );
 
-  m_World.GetECS()
+  m_World->GetECS()
       .entity( "OmniLight 0" )
       .child_of( m_SceneRoot )
       .add<ShadowCaster>()
@@ -303,7 +330,7 @@ void Ember::BasicApp::LoadContent()
             ol.Range     = 10.0f;
           } );
 
-  m_World.GetECS()
+  m_World->GetECS()
       .entity( "OmniLight 1" )
       .child_of( m_SceneRoot )
       .add<ShadowCaster>()
@@ -316,7 +343,7 @@ void Ember::BasicApp::LoadContent()
             ol.Range     = 10.0f;
           } );
 
-  m_World.GetECS()
+  m_World->GetECS()
       .entity( "OmniLight 2" )
       .child_of( m_SceneRoot )
       .add<ShadowCaster>()
@@ -329,7 +356,7 @@ void Ember::BasicApp::LoadContent()
             ol.Range     = 10.0f;
           } );
 
-  m_World.GetECS()
+  m_World->GetECS()
       .entity( "SpotLight" )
       .child_of( m_SceneRoot )
       .add<ShadowCaster>()
@@ -347,17 +374,11 @@ void Ember::BasicApp::LoadContent()
             rm.Speed              = 20.0f;
           } );
 
-  MaterialManager::Create( m_MaterialManager.get(), m_RenderDevice.get(), 10'000 );
-  GeometryManager::Create( m_GeometryManager.get(), m_RenderDevice.get(), 256_MiB );
-
-  m_ModelLoader = std::make_unique<ModelLoader>(
-      m_RenderDevice.get(), &m_World, m_TextureLoader.get(), m_MaterialManager.get(), m_GeometryManager.get() );
-
   // Setup Scene Geometry
   _ = m_ModelLoader->TryLoadModel( "Sponza.glb" )->child_of( m_SceneRoot ).set_name( "Scene" );
   _ = m_ModelLoader->TryLoadModel( "BoxAnimated.glb" )->child_of( m_SceneRoot ).set_name( "AnimTest" );
 
-  flecs::entity const rm = m_World.GetECS()
+  flecs::entity const rm = m_World->GetECS()
                                .entity( "HelmetRotator" )
                                .child_of( m_SceneRoot )
                                .insert(
@@ -383,9 +404,7 @@ void Ember::BasicApp::LoadContent()
   SetupRenderPasses();
   FG::Context::Create( &m_FGContext, m_RenderDevice.get() );
 
-  m_PrevMouse   = Input::Instance().GetMousePosition();
-
-  m_RenderQuery = m_World.GetECS().query<WorldTransform const, Mesh const, Geometry const, Material const>();
+  m_PrevMouse = Input::Instance().GetMousePosition();
 }
 
 void Ember::BasicApp::Update()
@@ -521,7 +540,7 @@ void Ember::BasicApp::Update()
 
   scene_tree.Draw( m_SceneRoot );
   picking_gizmo.Draw( *m_Camera, scene_tree.GetSelected() );
-  Inspector::Draw( &m_World.GetECS(), scene_tree.GetSelected() );
+  Inspector::Draw( &m_World->GetECS(), scene_tree.GetSelected() );
 
 
   // Rendering
@@ -625,7 +644,7 @@ void Ember::BasicApp::Update()
     }
   }
 
-  m_World.GetECS().each(
+  m_World->GetECS().each(
       [&]( Rotation& lt, RotatingModel const& rm )
       {
         lt = ( Rotation )DirectX::XMQuaternionMultiply(
@@ -637,7 +656,7 @@ void Ember::BasicApp::Update()
 
   uint32_t light_index = 0;
   m_UpdateAtmosphericSky.ResetSun();
-  m_World.GetECS().each(
+  m_World->GetECS().each(
       [&]( flecs::entity const e, DirectionalLight const& )
       {
         if ( e.has<Sun>() )
@@ -647,7 +666,7 @@ void Ember::BasicApp::Update()
         light_index++;
       } );
 
-  m_World.Update( delta_seconds );
+  m_World->Update( delta_seconds );
 
   Input::Instance().Update();
 }

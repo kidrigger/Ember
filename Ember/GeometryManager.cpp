@@ -52,7 +52,7 @@ Ember::GeometryManager::GeometryManager(
   , m_GeometryBufferAllocator{ std::move( geometry_buffer_allocator ) }
 {}
 
-void Ember::GeometryManager::Create(
+bool Ember::GeometryManager::Create(
     GeometryManager* geometry_manager, RenderDevice* render_device, uint32_t const total_ugb_size )
 {
   Buffer                            ugb = render_device->CreateRawStorageBuffer( total_ugb_size );
@@ -62,9 +62,11 @@ void Ember::GeometryManager::Create(
     .Flags = D3D12MA::VIRTUAL_BLOCK_FLAG_NONE,
     .Size  = total_ugb_size,
   };
-  ERR_ABORT( CreateVirtualBlock( &block_desc, &allocator ) );
+  ERR_FAIL_RET_F( CreateVirtualBlock( &block_desc, &allocator ) );
 
   new ( geometry_manager ) GeometryManager{ std::move( ugb ), std::move( allocator ) };
+
+  return true;
 }
 
 Ember::GeometryAllocation Ember::GeometryManager::CreateGeometry(

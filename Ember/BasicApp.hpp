@@ -76,7 +76,7 @@ class BasicApp final : public IApp
   std::unique_ptr<Environment>         m_Environment;
   std::unique_ptr<MaterialManager>     m_MaterialManager;
   std::unique_ptr<GeometryManager>     m_GeometryManager;
-  World                                m_World;
+  std::unique_ptr<World>               m_World;
   DrawList                             m_DrawList;
   RenderQueryType                      m_RenderQuery;
   // TODO: Organize init and destroy.
@@ -93,7 +93,14 @@ public:
       HWND                                 window_handle,
       std::unique_ptr<RenderDevice>        render_device,
       std::unique_ptr<PerfCounter>         perf_counter,
-      std::unique_ptr<RenderTargetManager> render_target_manager );
+      std::unique_ptr<RenderTargetManager> render_target_manager,
+      std::unique_ptr<Camera>              camera,
+      std::unique_ptr<Environment>         environment,
+      std::unique_ptr<MaterialManager>     material_manager,
+      std::unique_ptr<GeometryManager>     geometry_manager,
+      std::unique_ptr<World>               world,
+      std::unique_ptr<LightManager>        light_manager,
+      std::unique_ptr<TextureLoader>       texture_loader );
 
   void        LoadContent() override;
   void        Update() override;

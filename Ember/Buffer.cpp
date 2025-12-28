@@ -181,6 +181,7 @@ void AllocateBufferImpl(
 {
   CD3DX12_RESOURCE_DESC const buffer_desc = CD3DX12_RESOURCE_DESC::Buffer( size, flags );
 
+  // TODO: Buffer Allocation can fail. Handle by returning value.
 #if not defined( RENDERDOC_COMPAT )
   D3D12MA::ALLOCATION_DESC constexpr allocation_desc = {
     .Flags    = D3D12MA::ALLOCATION_FLAG_NONE,
