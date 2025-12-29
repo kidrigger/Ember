@@ -1,0 +1,24 @@
+{
+  "builtin-baseline": "f3c40c6ba7c058d84c9a9c9a3bef9553c4f7f351",
+  "dependencies": [
+    "directx-headers",
+    "d3d12-memory-allocator",
+    "directxtex",
+    "cgltf",
+    "tracy",
+    "flecs",
+    "mikktspace",
+    "meshoptimizer",
+    {
+      "name": "imgui",
+      "features": [
+        "dx12-binding",
+        "win32-binding",
+        "docking-experimental"
+      ]
+    },
+    "winpixevent",
+    "nlohmann-json",
+    "imguizmo"
+  ]
+}

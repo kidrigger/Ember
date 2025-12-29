@@ -5,6 +5,11 @@
 #include <unordered_set>
 #include <utility>
 
+#include <Graphics/RenderDevice.hpp>
+#include <Util/DataUtil.hpp>
+#include <Util/HelperUtils.hpp>
+#include <Util/PerfCounter.hpp>
+#include <Util/Profiling.hpp>
 #include "Atmosphere.hpp"
 #include "Camera.hpp"
 #include "Environment.hpp"
@@ -17,14 +22,9 @@
 #include "MaterialManager.hpp"
 #include "ModelLoader.hpp"
 #include "PickingGizmo.hpp"
-#include "RenderDevice.hpp"
 #include "RenderPassCommon.hpp"
 #include "SceneTree.hpp"
 #include "TextureLoader.hpp"
-#include "Util/DataUtil.hpp"
-#include "Util/HelperUtils.hpp"
-#include "Util/PerfCounter.hpp"
-#include "Util/Profiling.hpp"
 #include "fg/FrameGraph.hpp"
 #include "fg/JsonWriter.hpp"
 
@@ -182,7 +182,7 @@ Ember::BasicApp::BasicApp(
   m_ModelLoader = std::make_unique<ModelLoader>(
       m_RenderDevice.get(), m_World.get(), m_TextureLoader.get(), m_MaterialManager.get(), m_GeometryManager.get() );
 
-  _             = m_World->GetECS()
+  _ = m_World->GetECS()
           .component<RotatingModel>()
           .member<float>( "Speed", 0, offsetof( RotatingModel, Speed ) )
           .add( flecs::With, m_World->GetECS().component<Rotation>() );
@@ -677,9 +677,9 @@ void Ember::BasicApp::Render()
 
   m_FGContext.Update();
 
-  ID3D12Resource*      backbuffer   = m_RenderDevice->GetCurrentBackbuffer();
-  Context::CommandList command_list = m_RenderDevice->GetGraphicsCommandList();
-  uint32_t const       frame_idx    = m_RenderDevice->GetCurrentFrameIndex();
+  ID3D12Resource* backbuffer   = m_RenderDevice->GetCurrentBackbuffer();
+  CommandList     command_list = m_RenderDevice->GetGraphicsCommandList();
+  uint32_t const  frame_idx    = m_RenderDevice->GetCurrentFrameIndex();
 
   // All resources for this frame are guaranteed to be available for CPU modification at this time.
 
@@ -722,8 +722,7 @@ void Ember::BasicApp::Render()
 
   m_TextureLoader->FlushBarriers( command_list.Get() );
 
-  auto bindless_desc_heaps = m_RenderDevice->GetBindlessDescriptorHeaps();
-  command_list->SetDescriptorHeaps( CountOf( bindless_desc_heaps ), DataOf( bindless_desc_heaps ) );
+  command_list.SetDescriptorHeaps( m_RenderDevice->GetBindlessDescriptorHeaps() );
 
   LightManager::GpuInfo light_info = m_LightManager->PrepareFrame( *m_Camera, frame_idx );
 
@@ -828,7 +827,7 @@ void Ember::BasicApp::Render()
   CD3DX12_RESOURCE_BARRIER bottom_of_renderpass_barriers[] = {
     CD3DX12_RESOURCE_BARRIER::Transition( backbuffer, D3D12_RESOURCE_STATE_COPY_DEST, D3D12_RESOURCE_STATE_PRESENT ),
   };
-  command_list->ResourceBarrier( CountOf( bottom_of_renderpass_barriers ), DataOf( bottom_of_renderpass_barriers ) );
+  command_list.ResourceBarrier( bottom_of_renderpass_barriers );
 
   m_PerfCounter->EndQuery( command_list.Get(), frame_idx );
 

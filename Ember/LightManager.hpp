@@ -2,13 +2,13 @@
 
 #include <memory>
 
+#include <Graphics/DeviceHandle.hpp>
+#include <Util/DirectXHeaders.hpp>
 #include "Color.hpp"
-#include "DeviceHandle.hpp"
 #include "DirectionLightManager.hpp"
 #include "LightHandle.hpp"
 #include "OmniLightManager.hpp"
 #include "SpotLightManager.hpp"
-#include "Util/DirectXHeaders.hpp"
 
 namespace Ember
 {

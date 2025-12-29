@@ -1,11 +1,11 @@
 #include "ModelLoader.hpp"
 
+#include <Graphics/RenderDevice.hpp>
+#include <Util/DataUtil.hpp>
+#include <Util/HelperUtils.hpp>
 #include "BasicApp.hpp"
 #include "Material.hpp"
 #include "MaterialManager.hpp"
-#include "RenderDevice.hpp"
-#include "Util/DataUtil.hpp"
-#include "Util/HelperUtils.hpp"
 
 #include <meshoptimizer.h>
 #include <mikktspace.h>

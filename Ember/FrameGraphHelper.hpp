@@ -3,10 +3,11 @@
 #include <queue>
 #include <variant>
 
-#include "DeviceHandle.hpp"
+#include <Graphics/DeviceHandle.hpp>
+#include <Util/DirectXHeaders.hpp>
+#include <Util/FlatMap.hpp>
+
 #include "RenderPassCommon.hpp"
-#include "Util/DirectXHeaders.hpp"
-#include "Util/FlatMap.hpp"
 
 namespace Ember
 {

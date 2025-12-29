@@ -1,12 +1,11 @@
 #pragma once
 
-#include "Util/DirectXHeaders.hpp"
-#include "Util/Runtime.hpp"
-
 #include <memory_resource>
 #include <variant>
 
 #include "DeviceHandle.hpp"
+#include "Util/DirectXHeaders.hpp"
+#include "Util/Runtime.hpp"
 
 namespace Ember
 {

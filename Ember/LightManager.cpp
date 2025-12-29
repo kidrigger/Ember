@@ -2,9 +2,9 @@
 
 #include <imgui.h>
 
+#include <Util/Profiling.hpp>
 #include "Inspector.hpp"
 #include "OmniLightManager.hpp"
-#include "Util/Profiling.hpp"
 
 Ember::LightManager::LightManager(
     std::unique_ptr<Internal::OmniLightManager>      omni_light_manager,

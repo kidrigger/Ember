@@ -1,11 +1,11 @@
 #include "LightingPass.hpp"
 
+#include <Util/DataUtil.hpp>
+#include <Util/Profiling.hpp>
 #include "Environment.hpp"
 #include "ForwardPass.hpp"
 #include "FrameGraphHelper.hpp"
 #include "RenderPassCommon.hpp"
-#include "Util/DataUtil.hpp"
-#include "Util/Profiling.hpp"
 #include "fg/FrameGraph.hpp"
 
 bool Ember::RenderPass::OmniLightDeferred::Create(

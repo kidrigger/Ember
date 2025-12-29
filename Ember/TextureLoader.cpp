@@ -1,13 +1,13 @@
 #include "TextureLoader.hpp"
 
-#include "Util/HelperUtils.hpp"
+#include <Util/HelperUtils.hpp>
 
-#include <DirectXTex.h>
 #include <span>
 
-#include "RenderDevice.hpp"
-#include "Util/DataUtil.hpp"
-#include "Util/Profiling.hpp"
+#include <Graphics/RenderDevice.hpp>
+#include <Util/DataUtil.hpp>
+#include <Util/DirectXHeaders.hpp>
+#include <Util/Profiling.hpp>
 
 namespace
 {

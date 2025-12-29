@@ -1,12 +1,12 @@
 #include "DirectionLightManager.hpp"
 
+#include <Graphics/RenderDevice.hpp>
+#include <Util/DataUtil.hpp>
+#include <Util/Profiling.hpp>
 #include "Camera.hpp"
 #include "ModelLoader.hpp"
-#include "RenderDevice.hpp"
 #include "RenderTargetManager.hpp"
 #include "Scene.hpp"
-#include "Util/DataUtil.hpp"
-#include "Util/Profiling.hpp"
 
 #include <meshoptimizer.h>
 
@@ -159,8 +159,8 @@ void Ember::Internal::DirectionLightManager::CalculateShadowParameters(
     DirectX::BoundingFrustum const& camera_frustum, DirLightRepr* dir_light )
 {
   // Setup Light-Space basis
-  DirectX::XMVECTOR direction = XMLoadFloat3( &dir_light->Direction );
-  float             len       = DirectX::XMVectorGetX( DirectX::XMVector3LengthSq( direction ) );
+  DirectX::XMVECTOR      direction = XMLoadFloat3( &dir_light->Direction );
+  [[maybe_unused]] float len       = DirectX::XMVectorGetX( DirectX::XMVector3LengthSq( direction ) );
   ASSERT_M( std::abs( len - 1.0f ) < 1e-5, "This should be normalized on set" );
 
   DirectX::XMVECTOR ls_right = kRight;
@@ -365,7 +365,6 @@ void Ember::Internal::DirectionLightManager::RenderDirShadow(
   DirLightRepr& dir_light = m_LightData[light_index];
 
   rtm.ClearDepthStencilView( command_list, texture, D3D12_CLEAR_FLAG_DEPTH, 1.0f, 0 );
-
 
   PackedData packed_data{
     .DrawList     = draw_info.Opaque,

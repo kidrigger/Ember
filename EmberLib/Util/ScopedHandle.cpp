@@ -1,5 +1,7 @@
 #include "ScopedHandle.hpp"
 
+#include <utility>
+
 Ember::ScopedHandle::ScopedHandle( HANDLE const handle ) : m_Handle{ handle }
 {}
 

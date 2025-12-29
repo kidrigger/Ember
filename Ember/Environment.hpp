@@ -1,10 +1,12 @@
 #pragma once
-#include "DeviceHandle.hpp"
-#include "RenderDevice.hpp"
-#include "Texture.hpp"
+#include <Graphics/DeviceHandle.hpp>
+#include <Graphics/RenderDevice.hpp>
+#include <Graphics/Texture.hpp>
 
 namespace Ember
 {
+
+class TextureLoader;
 
 class Environment
 {
@@ -18,11 +20,12 @@ public:
   };
 
 private:
-  Texture m_Skybox;
-  Texture m_DiffuseIrradiance;
-  Texture m_Prefilter;
-  Texture m_BrdfLUT;
-  GpuRepr m_Repr;
+  RenderDevice* m_RenderDevice;
+  Texture       m_Skybox;
+  Texture       m_DiffuseIrradiance;
+  Texture       m_Prefilter;
+  Texture       m_BrdfLUT;
+  GpuRepr       m_Repr;
 
 public:
   Environment() = default;

@@ -1,13 +1,12 @@
 #include "GBufferPass.hpp"
 
+#include <Util/DataUtil.hpp>
+#include <Util/Profiling.hpp>
 #include "Environment.hpp"
 #include "FrameGraphHelper.hpp"
 #include "RenderPassCommon.hpp"
-#include "Util/DataUtil.hpp"
-#include "fg/FrameGraph.hpp"
-
-#include "Util/Profiling.hpp"
 #include "fg/Blackboard.hpp"
+#include "fg/FrameGraph.hpp"
 
 bool Ember::RenderPass::GBuffer::Create( GBuffer* out, RenderDevice* render_device, DXGI_FORMAT const depth_format )
 {

@@ -7,10 +7,11 @@
 #include <string>
 #include <unordered_map>
 
-#include "BindlessManager.hpp"
-#include "Context.hpp"
+#include <Graphics/BindlessManager.hpp>
+#include <Graphics/CommandList.hpp>
+#include <Graphics/Context.hpp>
+#include <Graphics/Texture.hpp>
 #include "ResourceTracker.hpp"
-#include "Texture.hpp"
 
 namespace Ember
 {
@@ -61,7 +62,7 @@ class TextureLoader
   Context                                m_CopyContext;
   std::vector<UploadBatch>               m_UploadBatches;
   uint32_t                               m_CurrentUploadBatch{ 0 };
-  Context::CommandList                   m_CurrentCommandList;
+  CommandList                            m_CurrentCommandList;
   uint32_t                               m_CurrentUploadBatchSize{ 0 };
 
   std::vector<D3D12_RESOURCE_BARRIER>    m_PendingBarriers;

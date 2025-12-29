@@ -1,9 +1,9 @@
 #pragma once
 
+#include <Graphics/DeviceHandle.hpp>
+#include <Graphics/Texture.hpp>
 #include "Color.hpp"
-#include "DeviceHandle.hpp"
 #include "Float16.hpp"
-#include "Texture.hpp"
 
 namespace Ember
 {

@@ -1,7 +1,7 @@
 #pragma once
 
-#include "Util/DirectXHeaders.hpp"
-#include "Util/Runtime.hpp"
+#include <Util/DirectXHeaders.hpp>
+#include <Util/Runtime.hpp>
 #include "fg/FrameGraphResource.hpp"
 
 class FrameGraphBlackboard;

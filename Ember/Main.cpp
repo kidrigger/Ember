@@ -1,10 +1,11 @@
 
+#include <Util/DirectXHeaders.hpp>
+#include <Util/Profiling.hpp>
+
 #include "BasicApp.hpp"
-#include "Util/DirectXHeaders.hpp"
-#include "Util/Profiling.hpp"
-#include "Util/Runtime.hpp"
 
 #pragma comment( lib, "dxguid.lib" )
+#pragma comment( lib, "emberlib.lib" )
 
 using AppType = Ember::BasicApp;
 

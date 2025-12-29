@@ -3,7 +3,7 @@
 #include <span>
 
 #include "BindlessManager.hpp"
-#include "Buffer.hpp"
+#include "Context.hpp"
 #include "Util/DataUtil.hpp"
 #include "Util/DirectXHeaders.hpp"
 #include "Util/HelperUtils.hpp"
@@ -456,7 +456,7 @@ ID3D12Resource* Ember::RenderDevice::GetCurrentBackbuffer() const noexcept
   return m_Backbuffers[m_CurrentBackbufferIndex].Get();
 }
 
-Ember::Context::CommandList Ember::RenderDevice::GetGraphicsCommandList() noexcept
+Ember::CommandList Ember::RenderDevice::GetGraphicsCommandList() noexcept
 {
   return m_DirectContext.GetCommandList();
 }
@@ -477,7 +477,7 @@ CD3DX12_CPU_DESCRIPTOR_HANDLE Ember::RenderDevice::GetCurrentDSVCpuDescriptorHan
   return CD3DX12_CPU_DESCRIPTOR_HANDLE( m_DSVDescriptorHeap->GetCPUDescriptorHandleForHeapStart() );
 }
 
-void Ember::RenderDevice::ExecuteCommandList( Context::CommandList&& command_list )
+void Ember::RenderDevice::ExecuteCommandList( CommandList&& command_list )
 {
   ZoneScoped;
   m_DirectContext.Submit( std::move( command_list ) );

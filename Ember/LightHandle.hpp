@@ -2,7 +2,7 @@
 
 #include <compare>
 
-#include "DeviceHandle.hpp"
+#include <Graphics/DeviceHandle.hpp>
 
 namespace Ember
 {

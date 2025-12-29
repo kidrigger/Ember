@@ -1,14 +1,16 @@
 #pragma once
 
-#include "Buffer.hpp"
+#include <Graphics/Buffer.hpp>
+#include <Util/DataUtil.hpp>
+#include <Util/DirectXHeaders.hpp>
+#include <Util/FlatMap.hpp>
 #include "ObjectPool.hpp"
-#include "Util/DirectXHeaders.hpp"
 
 #include <flecs.h>
 
 #include "GeometryManager.hpp"
-#include "Util/DataUtil.hpp"
-#include "Util/FlatMap.hpp"
+
+#include <cmath>
 
 namespace Ember
 {

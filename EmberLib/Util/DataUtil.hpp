@@ -1,7 +1,8 @@
 #pragma once
 
-#include <cstdint>
 #include <ranges>
+#include <string_view>
+#include <type_traits>
 
 using byte = unsigned char;
 
@@ -61,8 +62,10 @@ constexpr uint64_t HashFnv1A( size_t const size, byte const* data )
   return hash;
 }
 
-constexpr uint64_t HashFnv1A( auto& data )
-  requires not std::ranges::range<decltype( data )> and not std::is_pointer_v<decltype( data )>
+template <typename T>
+concept IsObject = not std::ranges::range<T> and not std::is_pointer_v<T>;
+
+constexpr uint64_t HashFnv1A( IsObject auto& data )
 {
   byte const*  bytes = ( byte* )&data;
   size_t const size  = sizeof( data );

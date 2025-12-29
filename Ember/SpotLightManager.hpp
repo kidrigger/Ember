@@ -2,10 +2,10 @@
 
 #include <memory_resource>
 
+#include <Util/FlatMap.hpp>
 #include "Color.hpp"
 #include "LightHandle.hpp"
 #include "Scene.hpp"
-#include "Util/FlatMap.hpp"
 
 namespace Ember
 {

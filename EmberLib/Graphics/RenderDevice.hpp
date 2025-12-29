@@ -1,12 +1,11 @@
 #pragma once
 
-#include <mutex>
-
 #include "BindlessManager.hpp"
 #include "Buffer.hpp"
+#include "CommandList.hpp"
+#include "Context.hpp"
 #include "DeviceHandle.hpp"
 #include "Texture.hpp"
-#include "TextureLoader.hpp"
 #include "Util/DirectXHeaders.hpp"
 #include "Util/Runtime.hpp"
 
@@ -111,11 +110,11 @@ public:
 
   // Per Frame getters.
   [[nodiscard]] ID3D12Resource*               GetCurrentBackbuffer() const noexcept;
-  [[nodiscard]] Context::CommandList          GetGraphicsCommandList() noexcept;
+  [[nodiscard]] CommandList                   GetGraphicsCommandList() noexcept;
   [[nodiscard]] uint32_t                      GetCurrentFrameIndex() const noexcept;
   [[nodiscard]] CD3DX12_CPU_DESCRIPTOR_HANDLE GetCurrentRTVCpuDescriptorHandle() const noexcept;
   [[nodiscard]] CD3DX12_CPU_DESCRIPTOR_HANDLE GetCurrentDSVCpuDescriptorHandle() const noexcept;
-  void                                        ExecuteCommandList( Context::CommandList&& command_list );
+  void                                        ExecuteCommandList( CommandList&& command_list );
   void                                        Present();
 
   [[nodiscard]] bool                          IsVsyncEnabled() const;

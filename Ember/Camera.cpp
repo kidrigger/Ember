@@ -1,8 +1,9 @@
 #include "Camera.hpp"
 
 #include <algorithm>
+#include <cmath>
 
-#include "RenderDevice.hpp"
+#include <Graphics/RenderDevice.hpp>
 
 void Ember::Camera::UpdateRepr()
 {

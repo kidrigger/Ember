@@ -1,8 +1,8 @@
 #pragma once
 
+#include <Util/DirectXHeaders.hpp>
+#include <Util/Runtime.hpp>
 #include "GBufferPass.hpp"
-#include "Util/DirectXHeaders.hpp"
-#include "Util/Runtime.hpp"
 
 namespace Ember::RenderPass
 {

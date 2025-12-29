@@ -1,7 +1,7 @@
 #include "SceneTree.hpp"
 
+#include <Util/DataUtil.hpp>
 #include <imgui.h>
-#include "Util/DataUtil.hpp"
 
 bool Ember::SceneTree::HasChildren( flecs::entity const e )
 {

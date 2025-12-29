@@ -1,5 +1,8 @@
 #pragma once
 
+#include <Graphics/RenderDevice.hpp>
+#include <Util/DirectXHeaders.hpp>
+#include <Util/Runtime.hpp>
 #include "Atmosphere.hpp"
 #include "DepthPrePass.hpp"
 #include "Environment.hpp"
@@ -8,14 +11,11 @@
 #include "GBufferPass.hpp"
 #include "IApp.hpp"
 #include "LightingPass.hpp"
-#include "RenderDevice.hpp"
 #include "RenderPassCommon.hpp"
 #include "RenderTargetManager.hpp"
 #include "Scene.hpp"
 #include "SkyboxPass.hpp"
 #include "TransparencyPass.hpp"
-#include "Util/DirectXHeaders.hpp"
-#include "Util/Runtime.hpp"
 #include "fg/Blackboard.hpp"
 
 namespace Ember
@@ -24,6 +24,7 @@ class LightManager;
 class ModelLoader;
 class PerfCounter;
 class RenderDevice;
+class TextureLoader;
 class Camera;
 
 class BasicApp final : public IApp

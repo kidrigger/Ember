@@ -1,9 +1,9 @@
 #pragma once
 
-#include "Buffer.hpp"
-#include "RenderDevice.hpp"
-#include "Util/HelperUtils.hpp"
-#include "Util/Runtime.hpp"
+#include <Graphics/Buffer.hpp>
+#include <Graphics/RenderDevice.hpp>
+#include <Util/HelperUtils.hpp>
+#include <Util/Runtime.hpp>
 
 namespace Ember
 {
@@ -40,7 +40,8 @@ public:
   GeometryManager() = default;
   GeometryManager( Buffer unified_geometry_buffer, ComPtr<D3D12MA::VirtualBlock> geometry_buffer_allocator );
 
-  [[nodiscard]] static bool Create( GeometryManager* geometry_manager, RenderDevice* render_device, uint32_t const total_ugb_size );
+  [[nodiscard]] static bool Create(
+      GeometryManager* geometry_manager, RenderDevice* render_device, uint32_t const total_ugb_size );
 
   GeometryAllocation      CreateGeometry( uint32_t const geometry_size, uint32_t const geometry_alignment );
 

@@ -4,9 +4,9 @@
 #include <memory_resource>
 #include <variant>
 
-#include "DeviceHandle.hpp"
-#include "Util/DirectXHeaders.hpp"
-#include "Util/Runtime.hpp"
+#include <Graphics/DeviceHandle.hpp>
+#include <Util/DirectXHeaders.hpp>
+#include <Util/Runtime.hpp>
 
 namespace Ember
 {
@@ -14,25 +14,21 @@ class RenderDevice;
 
 class ResourceTracker
 {
-  using HandleVariant = std::variant<CBVHandle, SRVHandle, UAVHandle, SamplerHandle>;
-  using ResourceList  = std::pmr::deque<ComPtr<IUnknown>>;
-  using HandleList    = std::pmr::deque<HandleVariant>;
-  using BarrierList   = std::pmr::deque<CD3DX12_RESOURCE_BARRIER>;
+  using HandleVariant     = std::variant<CBVHandle, SRVHandle, UAVHandle, SamplerHandle>;
+  using ResourceList      = std::pmr::deque<ComPtr<IUnknown>>;
+  using CBVHandleList     = std::pmr::deque<CBVHandle>;
+  using SRVHandleList     = std::pmr::deque<SRVHandle>;
+  using UAVHandleList     = std::pmr::deque<UAVHandle>;
+  using SamplerHandleList = std::pmr::deque<SamplerHandle>;
+  using BarrierList       = std::pmr::deque<CD3DX12_RESOURCE_BARRIER>;
 
-  struct HandleVariantDeleter
-  {
-    RenderDevice* Device;
-
-    void          operator()( CBVHandle handle ) const;
-    void          operator()( SRVHandle handle ) const;
-    void          operator()( UAVHandle handle ) const;
-    void          operator()( SamplerHandle handle ) const;
-  };
-
-  RenderDevice* m_Device;
-  ResourceList  m_Resources;
-  HandleList    m_Handles;
-  BarrierList   m_Barriers;
+  RenderDevice*     m_Device;
+  ResourceList      m_Resources;
+  CBVHandleList     m_CBVHandles;
+  SRVHandleList     m_SRVHandles;
+  UAVHandleList     m_UAVHandles;
+  SamplerHandleList m_SamplerHandles;
+  BarrierList       m_Barriers;
 
 public:
   ResourceTracker() = default;

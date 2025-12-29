@@ -2,13 +2,13 @@
 
 #include <map>
 
+#include <Graphics/RenderDevice.hpp>
+#include <Util/DirectXHeaders.hpp>
+#include <Util/FlatMap.hpp>
 #include "Color.hpp"
 #include "LightHandle.hpp"
-#include "RenderDevice.hpp"
 #include "RenderTargetManager.hpp"
 #include "Scene.hpp"
-#include "Util/DirectXHeaders.hpp"
-#include "Util/FlatMap.hpp"
 
 namespace Ember
 {

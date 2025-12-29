@@ -1,7 +1,7 @@
 #pragma once
 
-#include "Buffer.hpp"
-#include "Util/DirectXHeaders.hpp"
+#include <Graphics/Buffer.hpp>
+#include <Util/DirectXHeaders.hpp>
 
 namespace Ember
 {

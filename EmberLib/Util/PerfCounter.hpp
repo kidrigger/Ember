@@ -1,6 +1,6 @@
 #pragma once
 
-#include <vector>
+
 
 #include "DirectXHeaders.hpp"
 #include "Runtime.hpp"
@@ -13,7 +13,7 @@ class PerfCounter
 public:
   uint32_t constexpr static kPipelineStatsFrameGatherCount = 6;
   uint32_t constexpr static kSampleCount                   = 256;
-  float constexpr static kMaxDeltaMs = 1000.0 / 24.0; // Below 24fps, I'd rather slow down than jump.
+  float constexpr static kMaxDeltaMs = 1000.0f / 24.0f; // Below 24fps, I'd rather slow down than jump.
 
 private:
   D3D12_QUERY_DATA_PIPELINE_STATISTICS1 m_PipelineStats{};

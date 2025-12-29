@@ -1,7 +1,8 @@
 #pragma once
 
-#include <algorithm>
 #include <vector>
+#include <algorithm>
+
 #include "Util/HelperUtils.hpp"
 
 namespace Ember

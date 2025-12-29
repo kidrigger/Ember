@@ -1,10 +1,10 @@
 #include "OmniLightManager.hpp"
 
+#include <Util/DataUtil.hpp>
+#include <Util/Profiling.hpp>
 #include "Camera.hpp"
 #include "ModelLoader.hpp"
 #include "RenderTargetManager.hpp"
-#include "Util/DataUtil.hpp"
-#include "Util/Profiling.hpp"
 
 namespace
 {

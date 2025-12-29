@@ -1,6 +1,6 @@
 #include "MaterialManager.hpp"
 
-#include "RenderDevice.hpp"
+#include <Graphics/RenderDevice.hpp>
 
 Ember::MaterialManager::MaterialManager( Buffer data_buffer, uint32_t const max_materials )
   : m_DataBuffer{ std::move( data_buffer ) }, m_FreeList{ max_materials }

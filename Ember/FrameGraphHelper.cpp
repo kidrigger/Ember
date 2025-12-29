@@ -2,10 +2,11 @@
 
 #include <numeric>
 
-#include "RenderDevice.hpp"
+#include <Graphics/RenderDevice.hpp>
+#include <Util/DataUtil.hpp>
+#include <Util/DirectXHeaders.hpp>
+#include <Util/HelperUtils.hpp>
 #include "RenderTargetManager.hpp"
-#include "Util/DataUtil.hpp"
-#include "Util/HelperUtils.hpp"
 
 #pragma comment( lib, "FrameGraph.lib" )
 

@@ -1,10 +1,10 @@
 #pragma once
 
-#include "Buffer.hpp"
+#include <Graphics/Buffer.hpp>
+#include <Graphics/Texture.hpp>
+#include <Util/DirectXHeaders.hpp>
+#include <Util/Runtime.hpp>
 #include "Color.hpp"
-#include "Texture.hpp"
-#include "Util/DirectXHeaders.hpp"
-#include "Util/Runtime.hpp"
 #include "fg/FrameGraphResource.hpp"
 
 class FrameGraphBlackboard;

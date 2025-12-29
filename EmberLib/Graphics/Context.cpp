@@ -56,7 +56,7 @@ Ember::Context::Receipt Ember::Context::CreateReceipt( uint64_t value ) const
   return { m_Fence.Get(), value };
 }
 
-Ember::Context::CommandList Ember::Context::GetCommandList()
+Ember::CommandList Ember::Context::GetCommandList()
 {
   ComPtr<ID3D12CommandAllocator> command_allocator;
   if ( not m_CommandAllocators.empty() and IsFenceComplete( m_CommandAllocators.front().FenceValue ) )
@@ -71,41 +71,35 @@ Ember::Context::CommandList Ember::Context::GetCommandList()
     ERR_ABORT( m_Device->CreateCommandAllocator( m_CommandListType, IID_PPV_ARGS( &command_allocator ) ) );
   }
 
-  CommandList command_list;
+  ComPtr<ID3D12GraphicsCommandList6> command_list;
   if ( m_CommandLists.empty() )
   {
     ERR_ABORT( m_Device->CreateCommandList(
         0, m_CommandListType, command_allocator.Get(), nullptr, IID_PPV_ARGS( &command_list ) ) );
-    ERR_ABORT( command_list->SetPrivateDataInterface( _uuidof( ID3D12CommandAllocator ), command_allocator.Get() ) );
 
-    return command_list;
+    return CommandList{ command_list, command_allocator };
   }
 
   command_list = m_CommandLists.front();
   m_CommandLists.pop();
 
   ERR_ABORT( command_list->Reset( command_allocator.Get(), nullptr ) );
-  ERR_ABORT( command_list->SetPrivateDataInterface( _uuidof( ID3D12CommandAllocator ), command_allocator.Get() ) );
 
-  return command_list;
+  return CommandList{ command_list, command_allocator };
 }
 
 Ember::Context::Receipt Ember::Context::Submit( CommandList&& command_list )
 {
-  ERR_ABORT( command_list->Close() );
+  ERR_ABORT( command_list.Close() );
   ID3D12CommandList* p_command_list = command_list.Get();
 
   m_CommandQueue->ExecuteCommandLists( 1, &p_command_list );
   uint64_t const signal_value = ++m_FenceValue;
   ERR_ABORT( m_CommandQueue->Signal( m_Fence.Get(), signal_value ) );
-  ComPtr<ID3D12CommandAllocator> command_allocator;
-  UINT                           data_size = sizeof( ID3D12CommandAllocator* );
-  ERR_ABORT(
-      command_list->GetPrivateData( _uuidof( ID3D12CommandAllocator ), &data_size, command_allocator.GetAddressOf() ) );
-  ERR_ABORT( command_list->SetPrivateDataInterface( _uuidof( ID3D12CommandAllocator ), nullptr ) );
 
-  m_CommandLists.emplace( std::move( command_list ) );
-  m_CommandAllocators.emplace( command_allocator, signal_value );
+  auto [gfx_command_list, command_allocator] = command_list.Release();
+  m_CommandLists.emplace( std::move( gfx_command_list ) );
+  m_CommandAllocators.emplace( std::move( command_allocator ), signal_value );
 
   return { m_Fence.Get(), signal_value };
 }

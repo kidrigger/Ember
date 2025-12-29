@@ -2,6 +2,7 @@
 
 #include <queue>
 
+#include "CommandList.hpp"
 #include "Util/DirectXHeaders.hpp"
 #include "Util/Runtime.hpp"
 #include "Util/ScopedHandle.hpp"
@@ -28,8 +29,6 @@ public:
     [[nodiscard]] uint64_t     GetFenceValue() const;
   };
 
-  using CommandList = ComPtr<ID3D12GraphicsCommandList6>;
-
 private:
   struct InFlightAllocators
   {
@@ -37,7 +36,7 @@ private:
     uint64_t                       FenceValue;
   };
 
-  using CommandListQueue      = std::queue<CommandList>;
+  using CommandListQueue      = std::queue<ComPtr<ID3D12GraphicsCommandList6>>;
   using CommandAllocatorQueue = std::queue<InFlightAllocators>;
 
   ComPtr<ID3D12Device2>      m_Device;
@@ -47,10 +46,7 @@ private:
   CommandAllocatorQueue      m_CommandAllocators;
   ScopedHandle               m_FenceEvent;
   uint64_t                   m_FenceValue{ 0 };
-  D3D12_COMMAND_LIST_TYPE    m_CommandListType;
-
-public:
-  Context() = default;
+  D3D12_COMMAND_LIST_TYPE    m_CommandListType{ D3D12_COMMAND_LIST_TYPE_DIRECT };
 
   Context(
       ComPtr<ID3D12Device2>      device,
@@ -58,6 +54,9 @@ public:
       ComPtr<ID3D12Fence>        fence,
       ScopedHandle               fence_event,
       D3D12_COMMAND_LIST_TYPE    command_list_type );
+
+public:
+  Context() = default;
 
   [[nodiscard]] ID3D12CommandQueue* GetCommandQueue() const;
   [[nodiscard]] bool                IsFenceComplete( uint64_t fence_value ) const;

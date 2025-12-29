@@ -1,6 +1,6 @@
 #pragma once
 
-#include "Buffer.hpp"
+#include <Graphics/Buffer.hpp>
 #include "Material.hpp"
 
 namespace Ember
@@ -30,7 +30,8 @@ public:
   MaterialManager() = default;
   MaterialManager( Buffer data_buffer, uint32_t max_materials );
 
-  [[nodiscard]] static bool Create( MaterialManager* material_manager, RenderDevice* render_device, uint32_t max_materials );
+  [[nodiscard]] static bool Create(
+      MaterialManager* material_manager, RenderDevice* render_device, uint32_t max_materials );
 
   [[nodiscard]] MaterialHandle CreateMaterialHandle( MaterialImpl::GpuRepr const& material );
   void                         Free( MaterialHandle handle );

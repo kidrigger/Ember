@@ -1,9 +1,9 @@
 #pragma once
 
-#include "DeviceHandle.hpp"
+#include <Graphics/DeviceHandle.hpp>
+#include <Util/DirectXHeaders.hpp>
+#include <Util/Runtime.hpp>
 #include "LightManager.hpp"
-#include "Util/DirectXHeaders.hpp"
-#include "Util/Runtime.hpp"
 #include "fg/FrameGraphResource.hpp"
 
 

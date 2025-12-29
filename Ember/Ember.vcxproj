@@ -193,14 +193,14 @@
       <SDLCheck>true</SDLCheck>
       <PreprocessorDefinitions>_DEBUG;%(PreprocessorDefinitions)</PreprocessorDefinitions>
       <ConformanceMode>true</ConformanceMode>
-      <LanguageStandard>stdcpp20</LanguageStandard>
+      <LanguageStandard>stdcpp23</LanguageStandard>
       <TreatAngleIncludeAsExternal>true</TreatAngleIncludeAsExternal>
       <EnableEnhancedInstructionSet>AdvancedVectorExtensions512</EnableEnhancedInstructionSet>
       <EnableVectorLength>VectorLength512</EnableVectorLength>
       <ExternalWarningLevel>TurnOffAllWarnings</ExternalWarningLevel>
       <FloatingPointModel>Fast</FloatingPointModel>
       <MultiProcessorCompilation>true</MultiProcessorCompilation>
-      <AdditionalIncludeDirectories>$(SolutionDir)FrameGraph;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
+      <AdditionalIncludeDirectories>$(SolutionDir)FrameGraph;$(SolutionDir)EmberLib;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
     </ClCompile>
     <Link>
       <SubSystem>Windows</SubSystem>
@@ -221,14 +221,14 @@
       <SDLCheck>true</SDLCheck>
       <PreprocessorDefinitions>RENDERDOC_COMPAT;_DEBUG;%(PreprocessorDefinitions)</PreprocessorDefinitions>
       <ConformanceMode>true</ConformanceMode>
-      <LanguageStandard>stdcpp20</LanguageStandard>
+      <LanguageStandard>stdcpp23</LanguageStandard>
       <TreatAngleIncludeAsExternal>true</TreatAngleIncludeAsExternal>
       <EnableEnhancedInstructionSet>AdvancedVectorExtensions512</EnableEnhancedInstructionSet>
       <EnableVectorLength>VectorLength512</EnableVectorLength>
       <ExternalWarningLevel>TurnOffAllWarnings</ExternalWarningLevel>
       <FloatingPointModel>Fast</FloatingPointModel>
       <MultiProcessorCompilation>true</MultiProcessorCompilation>
-      <AdditionalIncludeDirectories>$(SolutionDir)FrameGraph;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
+      <AdditionalIncludeDirectories>$(SolutionDir)FrameGraph;$(SolutionDir)EmberLib;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
     </ClCompile>
     <Link>
       <SubSystem>Windows</SubSystem>
@@ -251,14 +251,14 @@
       <SDLCheck>true</SDLCheck>
       <PreprocessorDefinitions>NDEBUG;%(PreprocessorDefinitions)</PreprocessorDefinitions>
       <ConformanceMode>true</ConformanceMode>
-      <LanguageStandard>stdcpp20</LanguageStandard>
+      <LanguageStandard>stdcpp23</LanguageStandard>
       <TreatAngleIncludeAsExternal>true</TreatAngleIncludeAsExternal>
       <EnableEnhancedInstructionSet>AdvancedVectorExtensions512</EnableEnhancedInstructionSet>
       <EnableVectorLength>VectorLength512</EnableVectorLength>
       <ExternalWarningLevel>TurnOffAllWarnings</ExternalWarningLevel>
       <FloatingPointModel>Fast</FloatingPointModel>
       <MultiProcessorCompilation>true</MultiProcessorCompilation>
-      <AdditionalIncludeDirectories>$(SolutionDir)FrameGraph;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
+      <AdditionalIncludeDirectories>$(SolutionDir)FrameGraph;$(SolutionDir)EmberLib;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
     </ClCompile>
     <Link>
       <SubSystem>Windows</SubSystem>
@@ -284,14 +284,14 @@
       <SDLCheck>true</SDLCheck>
       <PreprocessorDefinitions>PROFILE;NDEBUG;%(PreprocessorDefinitions)</PreprocessorDefinitions>
       <ConformanceMode>true</ConformanceMode>
-      <LanguageStandard>stdcpp20</LanguageStandard>
+      <LanguageStandard>stdcpp23</LanguageStandard>
       <TreatAngleIncludeAsExternal>true</TreatAngleIncludeAsExternal>
       <EnableEnhancedInstructionSet>AdvancedVectorExtensions512</EnableEnhancedInstructionSet>
       <EnableVectorLength>VectorLength512</EnableVectorLength>
       <ExternalWarningLevel>TurnOffAllWarnings</ExternalWarningLevel>
       <FloatingPointModel>Fast</FloatingPointModel>
       <MultiProcessorCompilation>true</MultiProcessorCompilation>
-      <AdditionalIncludeDirectories>$(SolutionDir)FrameGraph;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
+      <AdditionalIncludeDirectories>$(SolutionDir)FrameGraph;$(SolutionDir)EmberLib;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
     </ClCompile>
     <Link>
       <SubSystem>Windows</SubSystem>
@@ -319,8 +319,6 @@
     <ClCompile Include="TransparencyPass.cpp" />
     <ClCompile Include="SkyboxPass.cpp" />
     <ClCompile Include="BasicApp.cpp" />
-    <ClCompile Include="BindlessManager.cpp" />
-    <ClCompile Include="Buffer.cpp" />
     <ClCompile Include="Camera.cpp" />
     <ClCompile Include="CgltfImpl.cpp" />
     <ClCompile Include="DirectionLightManager.cpp" />
@@ -339,20 +337,12 @@
     <ClCompile Include="OmniLightManager.cpp" />
     <ClCompile Include="ModelLoader.cpp" />
     <ClCompile Include="ObjectPool.cpp" />
-    <ClCompile Include="RenderDevice.cpp" />
     <ClCompile Include="Main.cpp" />
     <ClCompile Include="RenderTargetManager.cpp" />
     <ClCompile Include="ResourceTracker.cpp" />
     <ClCompile Include="Scene.cpp" />
     <ClCompile Include="SpotLightManager.cpp" />
-    <ClCompile Include="Texture.cpp" />
     <ClCompile Include="TextureLoader.cpp" />
-    <ClCompile Include="Context.cpp" />
-    <ClCompile Include="Util\FreeList.cpp" />
-    <ClCompile Include="Util\HelperUtils.cpp" />
-    <ClCompile Include="Util\PerfCounter.cpp" />
-    <ClCompile Include="Util\RabbitPullingFreeList.cpp" />
-    <ClCompile Include="Util\ScopedHandle.cpp" />
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="Atmosphere.hpp" />
@@ -363,9 +353,6 @@
     <ClInclude Include="TransparencyPass.hpp" />
     <ClInclude Include="SkyboxPass.hpp" />
     <ClInclude Include="BasicApp.hpp" />
-    <ClInclude Include="DeviceHandle.hpp" />
-    <ClInclude Include="BindlessManager.hpp" />
-    <ClInclude Include="Buffer.hpp" />
     <ClInclude Include="Camera.hpp" />
     <ClInclude Include="Color.hpp" />
     <ClInclude Include="DirectionLightManager.hpp" />
@@ -385,25 +372,12 @@
     <ClInclude Include="OmniLightManager.hpp" />
     <ClInclude Include="ModelLoader.hpp" />
     <ClInclude Include="ObjectPool.hpp" />
-    <ClInclude Include="RenderDevice.hpp" />
     <ClInclude Include="RenderPassCommon.hpp" />
     <ClInclude Include="RenderTargetManager.hpp" />
     <ClInclude Include="ResourceTracker.hpp" />
     <ClInclude Include="Scene.hpp" />
     <ClInclude Include="SpotLightManager.hpp" />
-    <ClInclude Include="Texture.hpp" />
     <ClInclude Include="TextureLoader.hpp" />
-    <ClInclude Include="Context.hpp" />
-    <ClInclude Include="Util\DataUtil.hpp" />
-    <ClInclude Include="Util\DirectXHeaders.hpp" />
-    <ClInclude Include="Util\FlatMap.hpp" />
-    <ClInclude Include="Util\FreeList.hpp" />
-    <ClInclude Include="Util\HelperUtils.hpp" />
-    <ClInclude Include="Util\PerfCounter.hpp" />
-    <ClInclude Include="Util\Profiling.hpp" />
-    <ClInclude Include="Util\RabbitPullingFreeList.hpp" />
-    <ClInclude Include="Util\Runtime.hpp" />
-    <ClInclude Include="Util\ScopedHandle.hpp" />
   </ItemGroup>
   <ItemGroup>
     <None Include="..\.clang-format" />

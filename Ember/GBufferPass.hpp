@@ -2,9 +2,9 @@
 
 #include <array>
 
+#include <Util/DirectXHeaders.hpp>
+#include <Util/Runtime.hpp>
 #include "Scene.hpp"
-#include "Util/DirectXHeaders.hpp"
-#include "Util/Runtime.hpp"
 #include "fg/Blackboard.hpp"
 #include "fg/FrameGraphResource.hpp"
 

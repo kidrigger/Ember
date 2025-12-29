@@ -3,11 +3,11 @@
 #include <cgltf.h>
 #include <map>
 
+#include <Util/DirectXHeaders.hpp>
 #include "Color.hpp"
 #include "Float16.hpp"
 #include "Scene.hpp"
 #include "TextureLoader.hpp"
-#include "Util/DirectXHeaders.hpp"
 
 namespace Ember
 {

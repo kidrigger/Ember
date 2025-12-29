@@ -2,12 +2,11 @@
 
 #include <imgui.h>
 
+#include <Graphics/RenderDevice.hpp>
+#include <Util/DataUtil.hpp>
+#include <Util/Profiling.hpp>
 #include "Inspector.hpp"
-#include "Util/Profiling.hpp"
-
 #include "Material.hpp"
-#include "RenderDevice.hpp"
-#include "Util/DataUtil.hpp"
 
 void Ember::TransformUtil::DecomposeMatrix(
     Scale* out_scale, Rotation* out_rotation, Translation* out_translation, DirectX::XMMATRIX const& matrix )

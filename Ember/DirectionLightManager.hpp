@@ -3,13 +3,13 @@
 #include <map>
 #include <queue>
 
-#include "Buffer.hpp"
+#include <Graphics/Buffer.hpp>
+#include <Graphics/Texture.hpp>
+#include <Util/DirectXHeaders.hpp>
+#include <Util/FlatMap.hpp>
 #include "Color.hpp"
 #include "LightHandle.hpp"
 #include "Scene.hpp"
-#include "Texture.hpp"
-#include "Util/DirectXHeaders.hpp"
-#include "Util/FlatMap.hpp"
 
 namespace Ember
 {

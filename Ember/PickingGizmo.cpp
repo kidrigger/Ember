@@ -4,9 +4,9 @@
 
 #include <ImGuizmo.h>
 
+#include <Util/DataUtil.hpp>
 #include "Camera.hpp"
 #include "Scene.hpp"
-#include "Util/DataUtil.hpp"
 
 Ember::PickingGizmo::PickingGizmo()
   : m_CurrentGizmoOperation{ ImGuizmo::TRANSLATE }, m_CurrentGizmoMode{ ImGuizmo::WORLD }

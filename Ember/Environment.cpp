@@ -1,8 +1,9 @@
 #include "Environment.hpp"
 
-#include "RenderDevice.hpp"
-#include "Util/DataUtil.hpp"
-#include "Util/HelperUtils.hpp"
+#include <Graphics/RenderDevice.hpp>
+#include <Util/DataUtil.hpp>
+#include <Util/HelperUtils.hpp>
+#include "TextureLoader.hpp"
 
 
 Ember::Environment::Environment( Texture skybox, Texture diffuse_irradiance, Texture prefilter, Texture brdf_lut )
@@ -212,81 +213,104 @@ bool Ember::Environment::TryLoadFrom(
       prefilter_write_handles.push_back( uav_handle );
     }
 
-    auto            desc_heaps = render_device->GetBindlessDescriptorHeaps();
+    auto      desc_heaps        = render_device->GetBindlessDescriptorHeaps();
+
+    UAVHandle skybox_uav_handle = render_device->CreateBindlessHandle(
+        skybox.GetTexture(), CD3DX12_UNORDERED_ACCESS_VIEW_DESC::Tex2DArray( skybox.GetTexture()->GetDesc().Format ) );
+    tracker.PushHandle( skybox_uav_handle );
 
     EnvRootConstant env_cube_root_constant{
       .InputTextureHandle  = environment.GetSRVHandle(),
-      .OutputTextureHandle = skybox.GetUAVHandle(),
+      .OutputTextureHandle = skybox_uav_handle,
       .CubeSide            = kEnvCubeSide,
     };
 
+    UAVHandle diffuse_irradiance_uav_handle = render_device->CreateBindlessHandle(
+        diffuse_irradiance.GetTexture(),
+        CD3DX12_UNORDERED_ACCESS_VIEW_DESC::Tex2DArray( diffuse_irradiance.GetTexture()->GetDesc().Format ) );
+    tracker.PushHandle( diffuse_irradiance_uav_handle );
+
     EnvRootConstant diffuse_irradiance_root_constant{
       .InputTextureHandle  = skybox.GetSRVHandle(),
-      .OutputTextureHandle = diffuse_irradiance.GetUAVHandle(),
+      .OutputTextureHandle = diffuse_irradiance_uav_handle,
       .CubeSide            = kDiffuseCubeSide,
     };
+
+    UAVHandle prefilter_uav_handle = render_device->CreateBindlessHandle(
+        prefilter.GetTexture(),
+        CD3DX12_UNORDERED_ACCESS_VIEW_DESC::Tex2DArray( prefilter.GetTexture()->GetDesc().Format ) );
+    tracker.PushHandle( prefilter_uav_handle );
 
     PrefilterConstant prefilter_constant{
       .Skybox              = skybox.GetSRVHandle(),
       .SkyboxSide          = kEnvCubeSide,
-      .OutputTextureHandle = prefilter.GetUAVHandle(),
+      .OutputTextureHandle = prefilter_uav_handle,
       .OutputSide          = kPrefilterCubeSide,
       .Roughness           = 0.0f,
     };
 
+    UAVHandle brdf_lut_uav_handle = render_device->CreateBindlessHandle(
+        brdf_lut.GetTexture(), CD3DX12_UNORDERED_ACCESS_VIEW_DESC::Tex2D( brdf_lut.GetTexture()->GetDesc().Format ) );
+    tracker.PushHandle( brdf_lut_uav_handle );
+    
     BrdfLUTConstant brdf_lut_constant{
-      .OutputTextureHandle = brdf_lut.GetUAVHandle(),
+      .OutputTextureHandle = brdf_lut_uav_handle,
       .Width               = kBrdfLutSize,
       .Height              = kBrdfLutSize,
     };
 
     auto command_list = context.GetCommandList();
 
-    command_list->SetDescriptorHeaps( CountOf( desc_heaps ), DataOf( desc_heaps ) );
-    command_list->SetComputeRootSignature( root_signature.Get() );
+    command_list.SetDescriptorHeaps( desc_heaps );
+    command_list.SetComputeRootSignature( root_signature.Get() );
 
-    command_list->SetPipelineState( eqrect_to_cube_pipeline.Get() );
-    command_list->SetComputeRoot32BitConstants( 0, sizeof( EnvRootConstant ) / 4, &env_cube_root_constant, 0 );
-    command_list->Dispatch( kEnvCubeSide / kThreadGroupX, kEnvCubeSide / kThreadGroupY, 6 / kThreadGroupZ );
+    command_list.SetPipelineState( eqrect_to_cube_pipeline.Get() );
+    command_list.SetComputeRootConstants( 0, env_cube_root_constant );
+    command_list.Dispatch( {
+        .X = kEnvCubeSide / kThreadGroupX,
+        .Y = kEnvCubeSide / kThreadGroupY,
+        .Z = 6 / kThreadGroupZ,
+    } );
 
-    {
-      auto barrier = CD3DX12_RESOURCE_BARRIER::UAV( skybox.GetTexture() );
-      command_list->ResourceBarrier( 1, &barrier );
-    }
+    command_list.ResourceBarrier( CD3DX12_RESOURCE_BARRIER::UAV( skybox.GetTexture() ) );
 
     if ( not texture_loader->TryGenerateMipMapCube(
              command_list.Get(), &skybox, &tracker, D3D12_RESOURCE_STATE_UNORDERED_ACCESS ) )
       return false;
 
-    {
-      auto barrier = CD3DX12_RESOURCE_BARRIER::UAV( skybox.GetTexture() );
-      command_list->ResourceBarrier( 1, &barrier );
-    }
+    command_list.ResourceBarrier( CD3DX12_RESOURCE_BARRIER::UAV( skybox.GetTexture() ) );
 
-    command_list->SetComputeRootSignature( root_signature.Get() );
-    command_list->SetPipelineState( diffuse_irradiance_pipeline.Get() );
-    command_list->SetComputeRoot32BitConstants(
-        0, sizeof( EnvRootConstant ) / 4, &diffuse_irradiance_root_constant, 0 );
-    command_list->Dispatch( kDiffuseCubeSide / kThreadGroupX, kDiffuseCubeSide / kThreadGroupY, 6 / kThreadGroupZ );
+    command_list.SetComputeRootSignature( root_signature.Get() );
+    command_list.SetPipelineState( diffuse_irradiance_pipeline.Get() );
+    command_list.SetComputeRootConstants( 0, diffuse_irradiance_root_constant );
+    command_list.Dispatch( {
+        .X = kDiffuseCubeSide / kThreadGroupX,
+        .Y = kDiffuseCubeSide / kThreadGroupY,
+        .Z = 6 / kThreadGroupZ,
+    } );
 
     for ( uint32_t i = 0; i <= kPrefilterMaxLoD; i++ )
     {
       prefilter_constant.OutputTextureHandle = prefilter_write_handles[i];
       prefilter_constant.Roughness           = ( float )i / ( float )kPrefilterMaxLoD;
 
-      command_list->SetPipelineState( prefilter_pipeline.Get() );
-      command_list->SetComputeRoot32BitConstants( 0, sizeof( PrefilterConstant ) / 4, &prefilter_constant, 0 );
-      command_list->Dispatch(
-          std::max<uint32_t>( prefilter_constant.OutputSide / kThreadGroupX, 1 ),
-          std::max<uint32_t>( prefilter_constant.OutputSide / kThreadGroupY, 1 ),
-          6 / kThreadGroupZ );
+      command_list.SetPipelineState( prefilter_pipeline.Get() );
+      command_list.SetComputeRootConstants( 0, prefilter_constant );
+      command_list.Dispatch( {
+          .X = std::max<uint32_t>( prefilter_constant.OutputSide / kThreadGroupX, 1 ),
+          .Y = std::max<uint32_t>( prefilter_constant.OutputSide / kThreadGroupY, 1 ),
+          .Z = 6 / kThreadGroupZ,
+      } );
 
       prefilter_constant.OutputSide = std::max<uint32_t>( prefilter_constant.OutputSide / 2, 1 );
     }
 
-    command_list->SetPipelineState( brdf_lut_pipeline.Get() );
-    command_list->SetComputeRoot32BitConstants( 0, sizeof( BrdfLUTConstant ) / 4, &brdf_lut_constant, 0 );
-    command_list->Dispatch( kBrdfLutSize / kThreadGroupX, kBrdfLutSize / kThreadGroupY, 1 );
+    command_list.SetPipelineState( brdf_lut_pipeline.Get() );
+    command_list.SetComputeRootConstants( 0, brdf_lut_constant );
+    command_list.Dispatch( {
+        .X = kBrdfLutSize / kThreadGroupX,
+        .Y = kBrdfLutSize / kThreadGroupY,
+    } );
 
     Context::Receipt receipt = context.Submit( std::move( command_list ) );
     context.WaitOn( receipt );

@@ -3,8 +3,8 @@
 #include "Camera.hpp"
 #include "RenderTargetManager.hpp"
 
-#include "Util/DataUtil.hpp"
-#include "Util/Profiling.hpp"
+#include <Util/DataUtil.hpp>
+#include <Util/Profiling.hpp>
 
 namespace
 {
@@ -192,8 +192,8 @@ Ember::LightInfo Ember::Internal::SpotLightManager::PrepareFrame( uint32_t const
             .Direction       = direction,
             .Color           = light.Color,
             .Intensity       = light.Intensity,
-            .ConeInnerCutoff = cos( light.ConeInnerHalfAngle ),
-            .ConeOuterCutoff = cos( light.ConeOuterHalfAngle ),
+            .ConeInnerCutoff = std::cos( light.ConeInnerHalfAngle ),
+            .ConeOuterCutoff = std::cos( light.ConeOuterHalfAngle ),
             .ShadowMap       = AllocateSpotShadow(),
         } );
       } );

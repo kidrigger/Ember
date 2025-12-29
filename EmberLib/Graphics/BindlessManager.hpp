@@ -1,7 +1,7 @@
 #pragma once
 
-#include <array>
 #include <mutex>
+#include <array>
 
 #include "DeviceHandle.hpp"
 #include "Util/DirectXHeaders.hpp"
