@@ -11,6 +11,8 @@ namespace Ember
 {
 class BindlessManager;
 
+struct BufferImpl;
+
 class Buffer
 {
 public:
@@ -22,55 +24,13 @@ public:
     kConstantBuffer = 3,
   };
 
-  struct StorageBufferInfoImpl
-  {
-    BindlessManager* Bindless;
-    SRVHandle        AsSRV;
-    UAVHandle        AsUAV;
-
-    StorageBufferInfoImpl( BindlessManager* const bindless, SRVHandle srv_handle, UAVHandle uav_handle );
-    StorageBufferInfoImpl( StorageBufferInfoImpl const& other ) = delete;
-    StorageBufferInfoImpl( StorageBufferInfoImpl&& other ) noexcept;
-    StorageBufferInfoImpl& operator=( StorageBufferInfoImpl const& other ) = delete;
-    StorageBufferInfoImpl& operator=( StorageBufferInfoImpl&& other ) noexcept;
-    ~StorageBufferInfoImpl();
-  };
-  using StorageBufferInfo = std::shared_ptr<StorageBufferInfoImpl>;
-
-  struct ConstantBufferInfoImpl
-  {
-    BindlessManager* Bindless;
-    CBVHandle        AsCBV;
-
-    ConstantBufferInfoImpl( BindlessManager* bindless, CBVHandle cbv_handle );
-    ConstantBufferInfoImpl( ConstantBufferInfoImpl const& other ) = delete;
-    ConstantBufferInfoImpl( ConstantBufferInfoImpl&& other ) noexcept;
-    ConstantBufferInfoImpl& operator=( ConstantBufferInfoImpl const& other ) = delete;
-    ConstantBufferInfoImpl& operator=( ConstantBufferInfoImpl&& other ) noexcept;
-    ~ConstantBufferInfoImpl();
-  };
-  using ConstantBufferInfo = std::shared_ptr<ConstantBufferInfoImpl>;
-
 private:
-  using Views = std::variant<D3D12_VERTEX_BUFFER_VIEW, D3D12_INDEX_BUFFER_VIEW, StorageBufferInfo, ConstantBufferInfo>;
-
-  ComPtr<ID3D12Resource>      m_Buffer;
-  ComPtr<D3D12MA::Allocation> m_Allocation;
-  uint32_t                    m_Offset{ 0 };
-  uint32_t                    m_Size{ 0 };
-  D3D12_GPU_VIRTUAL_ADDRESS   m_GPUAddress{ 0 };
-  Views                       m_Views;
+  std::shared_ptr<BufferImpl> m_Impl;
 
 public:
   Buffer() = default;
 
-  Buffer(
-      ComPtr<ID3D12Resource>      buffer,
-      ComPtr<D3D12MA::Allocation> allocation,
-      uint32_t                    offset,
-      uint32_t                    size,
-      D3D12_GPU_VIRTUAL_ADDRESS   gpu_address,
-      Views                       view );
+  Buffer( std::shared_ptr<BufferImpl> impl );
 
   void                                          Write( uint32_t offset, uint32_t size, void const* data ) const;
   [[nodiscard]] ID3D12Resource*                 GetBuffer() const noexcept;
@@ -106,6 +66,8 @@ public:
   Buffer CreateRawStorageBuffer( uint32_t size );
   Buffer CreateReadWriteBuffer( uint32_t size, uint32_t stride );
   Buffer CreateConstantBuffer( uint32_t size );
+
+  std::pmr::polymorphic_allocator<> GetAllocator();
 };
 
 } // namespace Ember

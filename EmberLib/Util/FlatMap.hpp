@@ -1,7 +1,7 @@
 #pragma once
 
-#include <vector>
 #include <algorithm>
+#include <vector>
 
 #include "Util/HelperUtils.hpp"
 
@@ -167,6 +167,14 @@ public:
     : m_Keys{ std::move( keys ) }, m_Values{ std::move( values ) }
   {
     ASSERT( keys.size() == values.size() );
+  }
+
+  FlatMap( std::initializer_list<std::pair<TKey, TValue>> init_list )
+  {
+    for ( auto const& [key, value] : init_list )
+    {
+      Put( key, value );
+    }
   }
 
   bool Contains( TKey const& key )
