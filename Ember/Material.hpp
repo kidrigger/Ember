@@ -2,8 +2,8 @@
 
 #include <Graphics/DeviceHandle.hpp>
 #include <Graphics/Texture.hpp>
+#include <Util/Float16.hpp>
 #include "Color.hpp"
-#include "Float16.hpp"
 
 namespace Ember
 {

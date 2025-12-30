@@ -357,7 +357,6 @@
     <ClInclude Include="Color.hpp" />
     <ClInclude Include="DirectionLightManager.hpp" />
     <ClInclude Include="Environment.hpp" />
-    <ClInclude Include="Float16.hpp" />
     <ClInclude Include="ForwardPass.hpp" />
     <ClInclude Include="FrameGraphHelper.hpp" />
     <ClInclude Include="GBufferPass.hpp" />

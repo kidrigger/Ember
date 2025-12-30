@@ -4,8 +4,8 @@
 #include <map>
 
 #include <Util/DirectXHeaders.hpp>
+#include <Util/Float16.hpp>
 #include "Color.hpp"
-#include "Float16.hpp"
 #include "Scene.hpp"
 #include "TextureLoader.hpp"
 

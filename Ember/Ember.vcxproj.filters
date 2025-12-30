@@ -19,9 +19,6 @@
     <Filter Include="Shaders">
       <UniqueIdentifier>{6ebb7bb3-b9d2-4732-9069-cc6c9c511227}</UniqueIdentifier>
     </Filter>
-    <Filter Include="Header Files\Util">
-      <UniqueIdentifier>{7cb7b81c-6fba-438e-af55-3368f4ad66ff}</UniqueIdentifier>
-    </Filter>
     <Filter Include="Source Files\Util">
       <UniqueIdentifier>{fc249c3a-6ef3-43b0-908c-1daea7dce634}</UniqueIdentifier>
     </Filter>
@@ -241,9 +238,6 @@
     </ClInclude>
     <ClInclude Include="GeometryManager.hpp">
       <Filter>Header Files\Graphics</Filter>
-    </ClInclude>
-    <ClInclude Include="Float16.hpp">
-      <Filter>Header Files\Util</Filter>
     </ClInclude>
     <ClInclude Include="Input.hpp">
       <Filter>Header Files</Filter>
