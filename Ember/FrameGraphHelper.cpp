@@ -6,7 +6,6 @@
 #include <Util/DataUtil.hpp>
 #include <Util/DirectXHeaders.hpp>
 #include <Util/HelperUtils.hpp>
-#include "RenderTargetManager.hpp"
 
 #pragma comment( lib, "FrameGraph.lib" )
 
@@ -120,23 +119,14 @@ Ember::FG::Texture Ember::FG::Context::CreateTextureImpl( Texture::Desc const& d
   };
 }
 
-Ember::FG::Context::Context( RenderDevice* render_device, std::unique_ptr<RenderTargetManager> render_target_manager )
+Ember::FG::Context::Context( RenderDevice* render_device )
   : m_RenderDevice{ render_device }
-  , m_RenderTargetManager{ std::move( render_target_manager ) }
   , m_FrameData{}
   , m_CurrentDepthTarget{}
   , m_RenderTargetSize{}
   , m_TickCounter{ 0 }
   , m_TextureCount{ 0 }
 {}
-
-void Ember::FG::Context::Create( Context* out, RenderDevice* render_device )
-{
-  auto render_target_manager = std::make_unique_for_overwrite<RenderTargetManager>();
-  RenderTargetManager::Create( render_target_manager.get(), render_device );
-
-  new ( out ) Context{ render_device, std::move( render_target_manager ) };
-}
 
 Ember::RenderDevice* Ember::FG::Context::GetRenderDevice() const
 {
@@ -153,11 +143,6 @@ void Ember::FG::Context::SetFrameData( FrameData const& frame_data )
   m_FrameData = frame_data;
 }
 
-Ember::RenderTargetManager* Ember::FG::Context::GetRenderTargetManager() const
-{
-  return m_RenderTargetManager.get();
-}
-
 void Ember::FG::Context::PushBarrier( CD3DX12_RESOURCE_BARRIER const& barrier )
 {
   m_Barriers.push_back( barrier );
@@ -167,7 +152,7 @@ void Ember::FG::Context::FlushBarriers()
 {
   if ( m_Barriers.empty() ) return;
 
-  m_FrameData.CommandList->ResourceBarrier( CountOf( m_Barriers ), DataOf( m_Barriers ) );
+  m_FrameData.CommandList->ResourceBarrier( m_Barriers );
   m_Barriers.clear();
 }
 
@@ -237,15 +222,14 @@ void Ember::FG::Context::PreparePass()
           []( bool const acc, ID3D12Resource const* res ) { return acc and res != nullptr; } ),
       "All Render Targets from 0 to Largest must be set." );
 
-  m_RenderTargetManager->OMSetRenderTargets(
-      m_FrameData.CommandList,
+  m_FrameData.CommandList->OMSetRenderTargets(
       rt_count,
       DataOf( m_CurrentRenderTargets.Resources ),
       DataOf( m_CurrentRenderTargets.Descriptions ),
       m_CurrentDepthTarget.Resource,
       &m_CurrentDepthTarget.Desc );
 
-  m_RenderTargetManager->RSSetScissorViewport( m_FrameData.CommandList, m_RenderTargetSize.x, m_RenderTargetSize.y );
+  m_FrameData.CommandList->RSSetScissorViewport( m_RenderTargetSize.x, m_RenderTargetSize.y );
 
   for ( uint32_t i = 0; i < rt_count; i++ )
   {
@@ -255,14 +239,13 @@ void Ember::FG::Context::PreparePass()
         break;
       case LoadOperation::kDiscard:
       {
-        m_FrameData.CommandList->DiscardResource( m_CurrentRenderTargets.Resources[i], nullptr );
+        m_FrameData.CommandList->DiscardResource( m_CurrentRenderTargets.Resources[i] );
       }
       break;
       case LoadOperation::kClear:
       {
         FLOAT constexpr kBlack[4] = {};
-        m_RenderTargetManager->ClearRenderTargetView(
-            m_FrameData.CommandList, m_CurrentRenderTargets.Resources[i], kBlack );
+        m_FrameData.CommandList->ClearRenderTargetView( m_CurrentRenderTargets.Resources[i], kBlack );
       }
       break;
     }
@@ -274,13 +257,12 @@ void Ember::FG::Context::PreparePass()
       break;
     case LoadOperation::kDiscard:
     {
-      m_FrameData.CommandList->DiscardResource( m_CurrentDepthTarget.Resource, nullptr );
+      m_FrameData.CommandList->DiscardResource( m_CurrentDepthTarget.Resource );
     }
     break;
     case LoadOperation::kClear:
     {
-      m_RenderTargetManager->ClearDepthStencilView(
-          m_FrameData.CommandList, m_CurrentDepthTarget.Resource, D3D12_CLEAR_FLAG_DEPTH, 1.0f, 0 );
+      m_FrameData.CommandList->ClearDepthStencilView( m_CurrentDepthTarget.Resource, D3D12_CLEAR_FLAG_DEPTH, 1.0f, 0 );
     }
     break;
   }

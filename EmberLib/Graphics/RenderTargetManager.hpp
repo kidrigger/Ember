@@ -13,11 +13,11 @@ class RenderTargetManager
   ComPtr<ID3D12Device>         m_D3D12Device;
   ComPtr<ID3D12DescriptorHeap> m_RTVDescriptorHeap;
   ComPtr<ID3D12DescriptorHeap> m_DSVDescriptorHeap;
-  uint32_t                     m_RTVDescriptorSize;
-  uint32_t                     m_DSVDescriptorSize;
+  uint32_t                     m_RTVDescriptorSize{ 0 };
+  uint32_t                     m_DSVDescriptorSize{ 0 };
 
 public:
-  static void Create( RenderTargetManager* render_target_manager, RenderDevice* device );
+  static void Create( RenderTargetManager* render_target_manager, ComPtr<ID3D12Device> d3d_device );
 
   RenderTargetManager() = default;
   RenderTargetManager(

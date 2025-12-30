@@ -63,9 +63,9 @@ constexpr uint64_t HashFnv1A( size_t const size, byte const* data )
 }
 
 template <typename T>
-concept IsObject = not std::ranges::range<T> and not std::is_pointer_v<T>;
+concept IsUnitObject = not std::ranges::range<T> and not std::is_pointer_v<T>;
 
-constexpr uint64_t HashFnv1A( IsObject auto& data )
+constexpr uint64_t HashFnv1A( IsUnitObject auto& data )
 {
   byte const*  bytes = ( byte* )&data;
   size_t const size  = sizeof( data );

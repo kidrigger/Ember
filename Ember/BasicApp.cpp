@@ -28,7 +28,6 @@
 #include "fg/FrameGraph.hpp"
 #include "fg/JsonWriter.hpp"
 
-#include "RenderTargetManager.hpp"
 #include "imgui.h"
 #include "imgui_impl_dx12.h"
 #include "imgui_impl_win32.h"
@@ -150,23 +149,21 @@ void Ember::BasicApp::InitImGui( HWND const window_handle, RenderDevice* render_
 }
 
 Ember::BasicApp::BasicApp(
-    HWND                                 window_handle,
-    std::unique_ptr<RenderDevice>        render_device,
-    std::unique_ptr<PerfCounter>         perf_counter,
-    std::unique_ptr<RenderTargetManager> render_target_manager,
-    std::unique_ptr<Camera>              camera,
-    std::unique_ptr<Environment>         environment,
-    std::unique_ptr<MaterialManager>     material_manager,
-    std::unique_ptr<GeometryManager>     geometry_manager,
-    std::unique_ptr<World>               world,
-    std::unique_ptr<LightManager>        light_manager,
-    std::unique_ptr<TextureLoader>       texture_loader )
+    HWND                             window_handle,
+    std::unique_ptr<RenderDevice>    render_device,
+    std::unique_ptr<PerfCounter>     perf_counter,
+    std::unique_ptr<Camera>          camera,
+    std::unique_ptr<Environment>     environment,
+    std::unique_ptr<MaterialManager> material_manager,
+    std::unique_ptr<GeometryManager> geometry_manager,
+    std::unique_ptr<World>           world,
+    std::unique_ptr<LightManager>    light_manager,
+    std::unique_ptr<TextureLoader>   texture_loader )
   : IApp{ nullptr }
   , m_WindowHandle{ window_handle }
   , m_RenderDevice{ std::move( render_device ) }
   , m_PerfCounter{ std::move( perf_counter ) }
   , m_FGContext{}
-  , m_RenderTargetManager{ std::move( render_target_manager ) }
   , m_SwapchainFormat{ m_RenderDevice->FetchSwapchainFormat() }
   , m_Camera{ std::move( camera ) }
   , m_Environment{ std::move( environment ) }
@@ -222,9 +219,6 @@ void Ember::BasicApp::Create( BasicApp* app, HINSTANCE const instance_handle )
   auto perf_counter = std::make_unique_for_overwrite<PerfCounter>();
   PerfCounter::Create( perf_counter.get(), render_device->GetDevice(), RenderDevice::kNumFrames );
 
-  auto render_target_manager = std::make_unique_for_overwrite<RenderTargetManager>();
-  RenderTargetManager::Create( render_target_manager.get(), render_device.get() );
-
   auto world            = std::make_unique<World>();
 
   auto camera           = std::make_unique<Camera>();
@@ -243,9 +237,16 @@ void Ember::BasicApp::Create( BasicApp* app, HINSTANCE const instance_handle )
   TextureLoader::Create( texture_loader.get(), render_device.get(), RenderDevice::kNumFrames );
 
   new ( app ) BasicApp{
-    window_handle,       std::move( render_device ), std::move( perf_counter ),     std::move( render_target_manager ),
-    std::move( camera ), std::move( environment ),   std::move( material_manager ), std::move( geometry_manager ),
-    std::move( world ),  std::move( light_manager ), std::move( texture_loader ),
+    window_handle,
+    std::move( render_device ),
+    std::move( perf_counter ),
+    std::move( camera ),
+    std::move( environment ),
+    std::move( material_manager ),
+    std::move( geometry_manager ),
+    std::move( world ),
+    std::move( light_manager ),
+    std::move( texture_loader ),
   };
 }
 
@@ -402,7 +403,7 @@ void Ember::BasicApp::LoadContent()
   ENSURE( Environment::TryLoadFrom( m_Environment.get(), m_RenderDevice.get(), m_TextureLoader.get(), kEnvMapFile ) );
 
   SetupRenderPasses();
-  FG::Context::Create( &m_FGContext, m_RenderDevice.get() );
+  m_FGContext = { m_RenderDevice.get() };
 
   m_PrevMouse = Input::Instance().GetMousePosition();
 }
@@ -684,7 +685,7 @@ void Ember::BasicApp::Render()
   // All resources for this frame are guaranteed to be available for CPU modification at this time.
 
   m_FGContext.SetFrameData( {
-      .CommandList = command_list.Get(),
+      .CommandList = &command_list,
   } );
 
   FrameGraph frame_graph;
@@ -726,7 +727,7 @@ void Ember::BasicApp::Render()
 
   LightManager::GpuInfo light_info = m_LightManager->PrepareFrame( *m_Camera, frame_idx );
 
-  m_LightManager->RenderAllShadows( command_list.Get(), draw_list_info, *m_RenderTargetManager, *m_Camera, frame_idx );
+  m_LightManager->RenderAllShadows( &command_list, draw_list_info, *m_Camera, frame_idx );
 
   SRVHandle const materials_srv           = m_MaterialManager->PrepareFrame();
 
@@ -774,11 +775,11 @@ void Ember::BasicApp::Render()
         ZoneScopedN( "ImGUI" );
 
         FG::Context::FrameData const& frame_data = context->GetFrameData();
-        ID3D12GraphicsCommandList6*   cmd        = frame_data.CommandList;
+        CommandList*                  cmd        = frame_data.CommandList;
 
-        PIXScopedEvent( cmd, PIX_COLOR_DEFAULT, "ImGUI" );
+        PIXScopedEvent( cmd->Get(), PIX_COLOR_DEFAULT, "ImGUI" );
 
-        ImGui_ImplDX12_RenderDrawData( ImGui::GetDrawData(), cmd );
+        ImGui_ImplDX12_RenderDrawData( ImGui::GetDrawData(), cmd->Get() );
       } );
 
   struct FinalPassData
@@ -799,9 +800,9 @@ void Ember::BasicApp::Render()
         ZoneScopedN( "Copy to Backbuffer" );
 
         FG::Context::FrameData const& frame_data = context->GetFrameData();
-        ID3D12GraphicsCommandList6*   cmd        = frame_data.CommandList;
+        CommandList*                  cmd        = frame_data.CommandList;
 
-        PIXScopedEvent( cmd, PIX_COLOR_DEFAULT, "Copy to Backbuffer" );
+        PIXScopedEvent( cmd->Get(), PIX_COLOR_DEFAULT, "Copy to Backbuffer" );
         FG::Texture const& render_target = resources.get<FG::Texture>( data.RenderTarget );
         FG::Texture const& backbuffer    = resources.get<FG::Texture>( data.BackBuffer );
         cmd->CopyResource( backbuffer.Resource.Get(), render_target.Resource.Get() );

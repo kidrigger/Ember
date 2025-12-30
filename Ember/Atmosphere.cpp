@@ -207,8 +207,8 @@ Ember::RenderPass::Atmosphere::Data Ember::RenderPass::Atmosphere::Execute(
         ZoneScopedN( "Update Transmittance LUT" );
 
         FG::Context::FrameData const& frame_data = context->GetFrameData();
-        ID3D12GraphicsCommandList6*   cmd        = frame_data.CommandList;
-        PIXScopedEvent( cmd, PIX_COLOR_DEFAULT, "Update Transmittance LUT" );
+        CommandList*                  cmd        = frame_data.CommandList;
+        PIXScopedEvent( cmd->Get(), PIX_COLOR_DEFAULT, "Update Transmittance LUT" );
 
         FG::Buffer const& params = resources.get<FG::Buffer>( data.AtmosphereParams );
 
@@ -252,8 +252,8 @@ Ember::RenderPass::Atmosphere::Data Ember::RenderPass::Atmosphere::Execute(
         ZoneScopedN( "Update Sky View LUT" );
 
         FG::Context::FrameData const& frame_data = context->GetFrameData();
-        ID3D12GraphicsCommandList6*   cmd        = frame_data.CommandList;
-        PIXScopedEvent( cmd, PIX_COLOR_DEFAULT, "Update Sky View LUT" );
+        CommandList*                  cmd        = frame_data.CommandList;
+        PIXScopedEvent( cmd->Get(), PIX_COLOR_DEFAULT, "Update Sky View LUT" );
 
         FG::Texture const&       transmittance_lut = resources.get<FG::Texture>( data.TransmittanceLUT );
         FG::Buffer const&        params            = resources.get<FG::Buffer>( data.AtmosphereParams );
@@ -263,8 +263,8 @@ Ember::RenderPass::Atmosphere::Data Ember::RenderPass::Atmosphere::Execute(
         cmd->SetGraphicsRootSignature( self->m_RootSignature.Get() );
         cmd->SetPipelineState( self->m_SkyViewLUTPipeline.Get() );
         cmd->SetGraphicsRootConstantBufferView( 0, params.InnerBuffer.GetGPUVirtualAddress() );
-        cmd->SetGraphicsRoot32BitConstants( 1, sizeof( PerFrameConstants ) / 4, &constants, 0 );
-        cmd->SetGraphicsRoot32BitConstant( 2, ( UINT )transmittance_lut.AsSRV, 0 );
+        cmd->SetGraphicsRootConstants( 1, constants );
+        cmd->SetGraphicsRootConstants( 2, transmittance_lut.AsSRV );
         cmd->DrawInstanced( 3, 1, 0, 0 );
       } );
 

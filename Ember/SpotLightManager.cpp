@@ -1,7 +1,6 @@
 #include "SpotLightManager.hpp"
 
 #include "Camera.hpp"
-#include "RenderTargetManager.hpp"
 
 #include <Util/DataUtil.hpp>
 #include <Util/Profiling.hpp>
@@ -240,11 +239,7 @@ Ember::LightInfo Ember::Internal::SpotLightManager::PrepareFrame( uint32_t const
 }
 
 void Ember::Internal::SpotLightManager::RenderAllShadows(
-    ID3D12GraphicsCommandList6* command_list,
-    DrawList::Batches const&    draw_list,
-    RenderTargetManager const&  rtm,
-    Camera const&               camera,
-    uint32_t const              frame_idx )
+    CommandList* command_list, DrawList::Batches const& draw_list, Camera const& camera, uint32_t const frame_idx )
 {
   ZoneScoped;
 
@@ -254,11 +249,7 @@ void Ember::Internal::SpotLightManager::RenderAllShadows(
   command_list->SetPipelineState( m_Pipeline.Get() );
   command_list->IASetPrimitiveTopology( D3D_PRIMITIVE_TOPOLOGY_TRIANGLELIST );
 
-  D3D12_RECT const     scissor  = { 0, 0, kSpotShadowResolution, kSpotShadowResolution };
-  D3D12_VIEWPORT const viewport = { 0, 0, kSpotShadowResolution, kSpotShadowResolution, 0.0f, 1.0f };
-
-  command_list->RSSetScissorRects( 1, &scissor );
-  command_list->RSSetViewports( 1, &viewport );
+  command_list->RSSetScissorViewport( kSpotShadowResolution, kSpotShadowResolution );
 
   static std::vector<CD3DX12_RESOURCE_BARRIER> barriers;
   barriers.resize( m_ShadowingLightCount );
@@ -273,7 +264,7 @@ void Ember::Internal::SpotLightManager::RenderAllShadows(
             tex.GetTexture(), D3D12_RESOURCE_STATE_PIXEL_SHADER_RESOURCE, D3D12_RESOURCE_STATE_DEPTH_WRITE );
       } );
 
-  if ( not barriers.empty() ) command_list->ResourceBarrier( CountOf( barriers ), DataOf( barriers ) );
+  if ( not barriers.empty() ) command_list->ResourceBarrier( barriers );
 
   for ( uint32_t index = 0; index < m_ShadowingLightCount; index++ )
   {
@@ -315,7 +306,7 @@ void Ember::Internal::SpotLightManager::RenderAllShadows(
 
     if ( camera_frustum.Contains( bounding_box ) == DirectX::DISJOINT ) continue;
 
-    RenderSpotShadow( command_list, draw_list, rtm, index, frame_idx );
+    RenderSpotShadow( command_list, draw_list, index, frame_idx );
   }
 
   std::transform(
@@ -328,21 +319,20 @@ void Ember::Internal::SpotLightManager::RenderAllShadows(
             tex.GetTexture(), D3D12_RESOURCE_STATE_DEPTH_WRITE, D3D12_RESOURCE_STATE_PIXEL_SHADER_RESOURCE );
       } );
 
-  if ( not barriers.empty() ) command_list->ResourceBarrier( CountOf( barriers ), DataOf( barriers ) );
+  if ( not barriers.empty() ) command_list->ResourceBarrier( barriers );
 }
 
 void Ember::Internal::SpotLightManager::RenderSpotShadow(
-    ID3D12GraphicsCommandList6* command_list,
-    DrawList::Batches const&    draw_list,
-    RenderTargetManager const&  rtm,
-    uint32_t const              spot_light_index,
-    uint32_t const              frame_idx ) const
+    CommandList*             command_list,
+    DrawList::Batches const& draw_list,
+    uint32_t const           spot_light_index,
+    uint32_t const           frame_idx ) const
 {
-  PIXScopedEvent( command_list, PIX_COLOR_DEFAULT, "Render Spot Shadow %u", spot_light_index );
+  PIXScopedEvent( command_list->Get(), PIX_COLOR_DEFAULT, "Render Spot Shadow %u", spot_light_index );
   ZoneScoped;
 
   auto& texture = m_ActiveShadows[spot_light_index];
-  rtm.ClearDepthStencilView( command_list, texture, D3D12_CLEAR_FLAG_DEPTH, 1.0f, 0 );
+  command_list->ClearDepthStencilView( texture.GetTexture(), D3D12_CLEAR_FLAG_DEPTH, 1.0f, 0 );
 
   PackedData const packed_data{
     .DrawList    = draw_list.Opaque,
@@ -350,9 +340,9 @@ void Ember::Internal::SpotLightManager::RenderSpotShadow(
     .LightIndex  = spot_light_index,
   };
 
-  command_list->SetGraphicsRoot32BitConstants( 0, sizeof( PackedData ) / 4, &packed_data, 0 );
+  command_list->SetGraphicsRootConstants( 0, packed_data );
 
-  rtm.OMSetRenderTargets( command_list, 0, nullptr, &texture );
+  command_list->OMSetRenderTargets( 0, nullptr, &texture );
 
-  command_list->DispatchMesh( draw_list.Opaque.DrawCount, 1, 1 );
+  command_list->DispatchMesh( { .X = draw_list.Opaque.DrawCount } );
 }

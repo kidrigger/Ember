@@ -144,8 +144,8 @@ Ember::RenderPass::RenderDepthData Ember::RenderPass::TransparencyForward::Execu
         ZoneScopedN( "Transparency Pass" );
 
         FG::Context::FrameData const& frame_data = context->GetFrameData();
-        ID3D12GraphicsCommandList6*   cmd        = frame_data.CommandList;
-        PIXScopedEvent( cmd, PIX_COLOR_DEFAULT, "Transparency Pass" );
+        CommandList*                  cmd        = frame_data.CommandList;
+        PIXScopedEvent( cmd->Get(), PIX_COLOR_DEFAULT, "Transparency Pass" );
 
         auto const& constants = bb->get<PerFrameConstants>();
         auto const& env       = bb->get<Environment::GpuRepr>();
@@ -154,10 +154,10 @@ Ember::RenderPass::RenderDepthData Ember::RenderPass::TransparencyForward::Execu
         cmd->SetGraphicsRootSignature( self->RootSignature.Get() );
         // TODO: Sort transparent objects back to front
         cmd->SetPipelineState( self->Pipeline.Get() );
-        cmd->SetGraphicsRoot32BitConstants( 0, sizeof( draw_list ) / 4, &draw_list, 0 );
-        cmd->SetGraphicsRoot32BitConstants( 1, sizeof( constants ) / 4, &constants, 0 );
-        cmd->SetGraphicsRoot32BitConstants( 2, sizeof( env ) / 4, &env, 0 );
-        cmd->DispatchMesh( draw_list.DrawCount, 1, 1 );
+        cmd->SetGraphicsRootConstants( 0, draw_list );
+        cmd->SetGraphicsRootConstants( 1, constants );
+        cmd->SetGraphicsRootConstants( 2, env );
+        cmd->DispatchMesh( { .X = draw_list.DrawCount } );
       } );
 }
 
@@ -291,8 +291,8 @@ Ember::RenderPass::RenderDepthData Ember::RenderPass::AlphaTestedForward::Execut
         ZoneScopedN( "Alpha Tested Pass" );
 
         FG::Context::FrameData const& frame_data = context->GetFrameData();
-        ID3D12GraphicsCommandList6*   cmd        = frame_data.CommandList;
-        PIXScopedEvent( cmd, PIX_COLOR_DEFAULT, "Alpha Tested Pass" );
+        CommandList*                  cmd        = frame_data.CommandList;
+        PIXScopedEvent( cmd->Get(), PIX_COLOR_DEFAULT, "Alpha Tested Pass" );
 
         auto const& constants = bb->get<PerFrameConstants>();
         auto const& env       = bb->get<Environment::GpuRepr>();
@@ -301,10 +301,10 @@ Ember::RenderPass::RenderDepthData Ember::RenderPass::AlphaTestedForward::Execut
         cmd->SetGraphicsRootSignature( self->RootSignature.Get() );
         // TODO: Sort transparent objects back to front
         cmd->SetPipelineState( self->Pipeline.Get() );
-        cmd->SetGraphicsRoot32BitConstants( 0, sizeof( draw_list ) / 4, &draw_list, 0 );
-        cmd->SetGraphicsRoot32BitConstants( 1, sizeof( constants ) / 4, &constants, 0 );
-        cmd->SetGraphicsRoot32BitConstants( 2, sizeof( env ) / 4, &env, 0 );
-        cmd->DispatchMesh( draw_list.DrawCount, 1, 1 );
+        cmd->SetGraphicsRootConstants( 0, draw_list );
+        cmd->SetGraphicsRootConstants( 1, constants );
+        cmd->SetGraphicsRootConstants( 2, env );
+        cmd->DispatchMesh( { .X = draw_list.DrawCount } );
       } );
 }
 

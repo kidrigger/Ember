@@ -10,7 +10,6 @@
 namespace Ember
 {
 struct SpotLight;
-class RenderTargetManager;
 class Camera;
 class RenderDevice;
 
@@ -70,18 +69,13 @@ public:
 
   //
   void RenderAllShadows(
-      ID3D12GraphicsCommandList6* command_list,
-      DrawList::Batches const&    draw_list,
-      RenderTargetManager const&  rtm,
-      Camera const&               camera,
-      uint32_t                    frame_idx );
+      CommandList* command_list, DrawList::Batches const& draw_list, Camera const& camera, uint32_t frame_idx );
 
   void RenderSpotShadow(
-      ID3D12GraphicsCommandList6* command_list,
-      DrawList::Batches const&    draw_list,
-      RenderTargetManager const&  rtm,
-      uint32_t                    spot_light_index,
-      uint32_t                    frame_idx ) const;
+      CommandList*             command_list,
+      DrawList::Batches const& draw_list,
+      uint32_t                 spot_light_index,
+      uint32_t                 frame_idx ) const;
 };
 
 } // namespace Internal

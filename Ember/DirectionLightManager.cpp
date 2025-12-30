@@ -5,7 +5,6 @@
 #include <Util/Profiling.hpp>
 #include "Camera.hpp"
 #include "ModelLoader.hpp"
-#include "RenderTargetManager.hpp"
 #include "Scene.hpp"
 
 #include <meshoptimizer.h>
@@ -301,22 +300,14 @@ Ember::LightInfo Ember::Internal::DirectionLightManager::PrepareFrame(
 }
 
 void Ember::Internal::DirectionLightManager::RenderAllShadows(
-    ID3D12GraphicsCommandList6* command_list,
-    DrawList::Batches const&    draw_info,
-    RenderTargetManager const&  rtm,
-    Camera const&               camera,
-    uint32_t const              frame_idx )
+    CommandList* command_list, DrawList::Batches const& draw_info, Camera const& camera, uint32_t const frame_idx )
 {
   ZoneScoped;
   command_list->SetGraphicsRootSignature( m_RootSignature.Get() );
   command_list->SetPipelineState( m_Pipeline.Get() );
   command_list->IASetPrimitiveTopology( D3D_PRIMITIVE_TOPOLOGY_TRIANGLELIST );
 
-  D3D12_RECT const     scissor  = { 0, 0, kDirShadowResolution, kDirShadowResolution };
-  D3D12_VIEWPORT const viewport = { 0, 0, kDirShadowResolution, kDirShadowResolution, 0.0f, 1.0f };
-
-  command_list->RSSetScissorRects( 1, &scissor );
-  command_list->RSSetViewports( 1, &viewport );
+  command_list->RSSetScissorViewport( kDirShadowResolution, kDirShadowResolution );
 
   static std::vector<CD3DX12_RESOURCE_BARRIER> barriers;
   barriers.resize( m_AllocatedShadows );
@@ -330,11 +321,11 @@ void Ember::Internal::DirectionLightManager::RenderAllShadows(
         return CD3DX12_RESOURCE_BARRIER::Transition(
             tex.GetTexture(), D3D12_RESOURCE_STATE_PIXEL_SHADER_RESOURCE, D3D12_RESOURCE_STATE_DEPTH_WRITE );
       } );
-  if ( not barriers.empty() ) command_list->ResourceBarrier( CountOf( barriers ), DataOf( barriers ) );
+  if ( not barriers.empty() ) command_list->ResourceBarrier( barriers );
 
   for ( uint32_t index = 0; index < m_AllocatedShadows; index++ )
   {
-    RenderDirShadow( command_list, draw_info, rtm, camera, frame_idx, index );
+    RenderDirShadow( command_list, draw_info, camera, frame_idx, index );
   }
 
   std::transform(
@@ -347,24 +338,23 @@ void Ember::Internal::DirectionLightManager::RenderAllShadows(
             tex.GetTexture(), D3D12_RESOURCE_STATE_DEPTH_WRITE, D3D12_RESOURCE_STATE_PIXEL_SHADER_RESOURCE );
       } );
 
-  if ( not barriers.empty() ) command_list->ResourceBarrier( CountOf( barriers ), DataOf( barriers ) );
+  if ( not barriers.empty() ) command_list->ResourceBarrier( barriers );
 }
 
 void Ember::Internal::DirectionLightManager::RenderDirShadow(
-    ID3D12GraphicsCommandList6* command_list,
-    DrawList::Batches const&    draw_info,
-    RenderTargetManager const&  rtm,
-    Camera const&               camera,
-    uint32_t const              frame_index,
-    uint32_t const              light_index )
+    CommandList*             command_list,
+    DrawList::Batches const& draw_info,
+    Camera const&            camera,
+    uint32_t const           frame_index,
+    uint32_t const           light_index )
 {
-  PIXScopedEvent( command_list, PIX_COLOR_DEFAULT, "Render Directional Shadow %u", light_index );
+  PIXScopedEvent( command_list->Get(), PIX_COLOR_DEFAULT, "Render Directional Shadow %u", light_index );
   ZoneScoped;
 
   Texture&      texture   = m_ActiveShadows[light_index];
   DirLightRepr& dir_light = m_LightData[light_index];
 
-  rtm.ClearDepthStencilView( command_list, texture, D3D12_CLEAR_FLAG_DEPTH, 1.0f, 0 );
+  command_list->ClearDepthStencilView( texture.GetTexture(), D3D12_CLEAR_FLAG_DEPTH, 1.0f, 0 );
 
   PackedData packed_data{
     .DrawList     = draw_info.Opaque,
@@ -373,11 +363,10 @@ void Ember::Internal::DirectionLightManager::RenderDirShadow(
     .CameraBuffer = camera.GetLastUpdatedBuffer(),
   };
 
-  command_list->SetGraphicsRoot32BitConstants( 0, sizeof( packed_data ) / 4, &packed_data, 0 );
-  rtm.OMSetRenderTargets( command_list, 0, nullptr, &texture );
+  command_list->SetGraphicsRootConstants( 0, packed_data );
+  command_list->OMSetRenderTargets( 0, nullptr, &texture );
 
   // TODO: Alpha tested + Blended
-  command_list->SetGraphicsRoot32BitConstants(
-      1, ByteSizeOf( dir_light.CascadeSph ) / 4, DataOf( dir_light.CascadeSph ), 0 );
-  command_list->DispatchMesh( draw_info.Opaque.DrawCount, 1, 1 );
+  command_list->SetGraphicsRootConstants( 1, dir_light.CascadeSph );
+  command_list->DispatchMesh( { .X = draw_info.Opaque.DrawCount } );
 }

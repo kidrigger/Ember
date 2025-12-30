@@ -7,7 +7,6 @@
 #include <Util/FlatMap.hpp>
 #include "Color.hpp"
 #include "LightHandle.hpp"
-#include "RenderTargetManager.hpp"
 #include "Scene.hpp"
 
 namespace Ember
@@ -72,15 +71,13 @@ public:
 
   //
   void RenderAllShadows(
-      ID3D12GraphicsCommandList6* command_list,
+      CommandList* command_list,
       DrawList::Batches const&    draw_list,
-      RenderTargetManager const&  rtm,
       Camera const&               camera );
 
   void RenderOmniShadow(
-      ID3D12GraphicsCommandList6* command_list,
+      CommandList* command_list,
       DrawList::Batches const&    draw_list,
-      RenderTargetManager const&  rtm,
       uint32_t                    light_index ) const;
 };
 } // namespace Internal

@@ -217,6 +217,7 @@
     <ClCompile Include="Graphics\CommandList.cpp" />
     <ClCompile Include="Graphics\Context.cpp" />
     <ClCompile Include="Graphics\RenderDevice.cpp" />
+    <ClCompile Include="Graphics\RenderTargetManager.cpp" />
     <ClCompile Include="Graphics\ScopedDeviceHandle.cpp" />
     <ClCompile Include="Graphics\Texture.cpp" />
     <ClCompile Include="Util\FreeList.cpp" />
@@ -232,6 +233,7 @@
     <ClInclude Include="Graphics\Context.hpp" />
     <ClInclude Include="Graphics\DeviceHandle.hpp" />
     <ClInclude Include="Graphics\RenderDevice.hpp" />
+    <ClInclude Include="Graphics\RenderTargetManager.hpp" />
     <ClInclude Include="Graphics\ScopedDeviceHandle.hpp" />
     <ClInclude Include="Graphics\Texture.hpp" />
     <ClInclude Include="Util\DataUtil.hpp" />

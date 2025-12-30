@@ -1,12 +1,12 @@
 #include "TextureLoader.hpp"
 
-#include <Util/HelperUtils.hpp>
-
+#include <filesystem>
 #include <span>
 
 #include <Graphics/RenderDevice.hpp>
 #include <Util/DataUtil.hpp>
 #include <Util/DirectXHeaders.hpp>
+#include <Util/HelperUtils.hpp>
 #include <Util/Profiling.hpp>
 
 namespace

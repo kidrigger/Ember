@@ -12,7 +12,6 @@
 #include "IApp.hpp"
 #include "LightingPass.hpp"
 #include "RenderPassCommon.hpp"
-#include "RenderTargetManager.hpp"
 #include "Scene.hpp"
 #include "SkyboxPass.hpp"
 #include "TransparencyPass.hpp"
@@ -67,7 +66,6 @@ class BasicApp final : public IApp
   RenderPass::Atmosphere               m_UpdateAtmosphericSky;
   RenderPass::Skybox                   m_RenderBackground;
 
-  std::unique_ptr<RenderTargetManager> m_RenderTargetManager;
   DXGI_FORMAT                          m_SwapchainFormat;
 
   std::unique_ptr<Camera>              m_Camera;
@@ -94,7 +92,6 @@ public:
       HWND                                 window_handle,
       std::unique_ptr<RenderDevice>        render_device,
       std::unique_ptr<PerfCounter>         perf_counter,
-      std::unique_ptr<RenderTargetManager> render_target_manager,
       std::unique_ptr<Camera>              camera,
       std::unique_ptr<Environment>         environment,
       std::unique_ptr<MaterialManager>     material_manager,

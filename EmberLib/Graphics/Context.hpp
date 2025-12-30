@@ -37,12 +37,14 @@ private:
   };
 
   using CommandListQueue      = std::queue<ComPtr<ID3D12GraphicsCommandList6>>;
+  using RTMQueue              = std::queue<std::unique_ptr<RenderTargetManager>>;
   using CommandAllocatorQueue = std::queue<InFlightAllocators>;
 
   ComPtr<ID3D12Device2>      m_Device;
   ComPtr<ID3D12CommandQueue> m_CommandQueue;
   ComPtr<ID3D12Fence>        m_Fence;
   CommandListQueue           m_CommandLists;
+  RTMQueue                   m_RenderTargetManagers;
   CommandAllocatorQueue      m_CommandAllocators;
   ScopedHandle               m_FenceEvent;
   uint64_t                   m_FenceValue{ 0 };

@@ -3,7 +3,7 @@
 #include <Graphics/RenderDevice.hpp>
 #include <Util/HelperUtils.hpp>
 
-void Ember::RenderTargetManager::Create( RenderTargetManager* render_target_manager, RenderDevice* device )
+void Ember::RenderTargetManager::Create( RenderTargetManager* render_target_manager, ComPtr<ID3D12Device> d3d_device )
 {
   D3D12_DESCRIPTOR_HEAP_DESC const rtv_desc{
     .Type           = D3D12_DESCRIPTOR_HEAP_TYPE_RTV,
@@ -18,8 +18,6 @@ void Ember::RenderTargetManager::Create( RenderTargetManager* render_target_mana
 
   ComPtr<ID3D12DescriptorHeap> rtv_heap;
   ComPtr<ID3D12DescriptorHeap> dsv_heap;
-
-  ComPtr<ID3D12Device>         d3d_device = device->GetDevice();
 
   ERR_ABORT( d3d_device->CreateDescriptorHeap( &rtv_desc, IID_PPV_ARGS( &rtv_heap ) ) );
   ERR_ABORT( d3d_device->CreateDescriptorHeap( &dsv_desc, IID_PPV_ARGS( &dsv_heap ) ) );

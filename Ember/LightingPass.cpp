@@ -180,8 +180,8 @@ FrameGraphResource Ember::RenderPass::OmniLightDeferred::Execute(
         ZoneScopedN( "OmniLight Pass" );
 
         FG::Context::FrameData const& frame_data = context->GetFrameData();
-        ID3D12GraphicsCommandList6*   cmd        = frame_data.CommandList;
-        PIXScopedEvent( cmd, PIX_COLOR_DEFAULT, "OmniLight Pass" );
+        CommandList*                  cmd        = frame_data.CommandList;
+        PIXScopedEvent( cmd->Get(), PIX_COLOR_DEFAULT, "OmniLight Pass" );
 
         auto const& constants = bb->get<PerFrameConstants>();
         auto const& env       = bb->get<Environment::GpuRepr>();
@@ -194,10 +194,10 @@ FrameGraphResource Ember::RenderPass::OmniLightDeferred::Execute(
 
         cmd->SetGraphicsRootSignature( self->RootSignature.Get() );
         cmd->SetPipelineState( self->Pipeline.Get() );
-        cmd->SetGraphicsRoot32BitConstants( 0, CountOf( gbuffer_handles ), DataOf( gbuffer_handles ), 0 );
-        cmd->SetGraphicsRoot32BitConstants( 1, sizeof( PerFrameConstants ) / 4, &constants, 0 );
-        cmd->SetGraphicsRoot32BitConstants( 2, sizeof( Environment::GpuRepr ) / 4, &env, 0 );
-        cmd->DispatchMesh( ( constants.LightInfo.OmniLightInfo.TotalLightCount + 31 ) / 32, 1, 1 );
+        cmd->SetGraphicsRootConstants( 0, gbuffer_handles );
+        cmd->SetGraphicsRootConstants( 1, constants );
+        cmd->SetGraphicsRootConstants( 2, env );
+        cmd->DispatchMesh( { .X = ( constants.LightInfo.OmniLightInfo.TotalLightCount + 31 ) / 32 } );
       } );
   return result.RenderTarget;
 }
@@ -356,8 +356,8 @@ FrameGraphResource Ember::RenderPass::SpotLightDeferred::Execute(
         ZoneScopedN( "SpotLight Pass" );
 
         FG::Context::FrameData const& frame_data = context->GetFrameData();
-        ID3D12GraphicsCommandList6*   cmd        = frame_data.CommandList;
-        PIXScopedEvent( cmd, PIX_COLOR_DEFAULT, "SpotLight Pass" );
+        CommandList*                  cmd        = frame_data.CommandList;
+        PIXScopedEvent( cmd->Get(), PIX_COLOR_DEFAULT, "SpotLight Pass" );
 
         SRVHandle gbuffer_handles[GBuffer::kGBufferCount];
         for ( uint32_t i = 0; i < GBuffer::kGBufferCount; i++ )
@@ -370,10 +370,10 @@ FrameGraphResource Ember::RenderPass::SpotLightDeferred::Execute(
 
         cmd->SetGraphicsRootSignature( self->RootSignature.Get() );
         cmd->SetPipelineState( self->Pipeline.Get() );
-        cmd->SetGraphicsRoot32BitConstants( 0, CountOf( gbuffer_handles ), DataOf( gbuffer_handles ), 0 );
-        cmd->SetGraphicsRoot32BitConstants( 1, sizeof( PerFrameConstants ) / 4, &constants, 0 );
-        cmd->SetGraphicsRoot32BitConstants( 2, sizeof( Environment::GpuRepr ) / 4, &env, 0 );
-        cmd->DispatchMesh( ( constants.LightInfo.SpotLightInfo.TotalLightCount + 31 ) / 32, 1, 1 );
+        cmd->SetGraphicsRootConstants( 0, gbuffer_handles );
+        cmd->SetGraphicsRootConstants( 1, constants );
+        cmd->SetGraphicsRootConstants( 2, env );
+        cmd->DispatchMesh( { .X = ( constants.LightInfo.SpotLightInfo.TotalLightCount + 31 ) / 32 } );
       } );
   return result.RenderTarget;
 }
@@ -516,8 +516,8 @@ FrameGraphResource Ember::RenderPass::ScreenSpaceLightDeferred::Execute(
         ZoneScopedN( "Screen Space Light Pass" );
 
         FG::Context::FrameData const& frame_data = context->GetFrameData();
-        ID3D12GraphicsCommandList6*   cmd        = frame_data.CommandList;
-        PIXScopedEvent( cmd, PIX_COLOR_DEFAULT, "Screen Space Light Pass" );
+        CommandList*                  cmd        = frame_data.CommandList;
+        PIXScopedEvent( cmd->Get(), PIX_COLOR_DEFAULT, "Screen Space Light Pass" );
 
         SRVHandle gbuffer_handles[GBuffer::kGBufferCount];
         for ( uint32_t i = 0; i < GBuffer::kGBufferCount; i++ )
@@ -530,10 +530,10 @@ FrameGraphResource Ember::RenderPass::ScreenSpaceLightDeferred::Execute(
 
         cmd->SetGraphicsRootSignature( self->RootSignature.Get() );
         cmd->SetPipelineState( self->Pipeline.Get() );
-        cmd->SetGraphicsRoot32BitConstants( 0, CountOf( gbuffer_handles ), DataOf( gbuffer_handles ), 0 );
-        cmd->SetGraphicsRoot32BitConstants( 1, sizeof( PerFrameConstants ) / 4, &constants, 0 );
-        cmd->SetGraphicsRoot32BitConstants( 2, sizeof( Environment::GpuRepr ) / 4, &env, 0 );
-        cmd->DispatchMesh( 1, 1, 1 );
+        cmd->SetGraphicsRootConstants( 0, gbuffer_handles );
+        cmd->SetGraphicsRootConstants( 1, constants );
+        cmd->SetGraphicsRootConstants( 2, env );
+        cmd->DispatchMesh( {} );
       } );
 
   return result.RenderTarget;

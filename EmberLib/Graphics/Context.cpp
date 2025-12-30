@@ -77,15 +77,21 @@ Ember::CommandList Ember::Context::GetCommandList()
     ERR_ABORT( m_Device->CreateCommandList(
         0, m_CommandListType, command_allocator.Get(), nullptr, IID_PPV_ARGS( &command_list ) ) );
 
-    return CommandList{ command_list, command_allocator };
+    auto rtm = std::make_unique_for_overwrite<RenderTargetManager>();
+    RenderTargetManager::Create( rtm.get(), m_Device );
+
+    return CommandList{ std::move( command_list ), std::move( command_allocator ), std::move( rtm ) };
   }
 
   command_list = m_CommandLists.front();
   m_CommandLists.pop();
 
+  auto rtm = std::move( m_RenderTargetManagers.front() );
+  m_RenderTargetManagers.pop();
+
   ERR_ABORT( command_list->Reset( command_allocator.Get(), nullptr ) );
 
-  return CommandList{ command_list, command_allocator };
+  return CommandList{ std::move( command_list ), std::move( command_allocator ), std::move( rtm ) };
 }
 
 Ember::Context::Receipt Ember::Context::Submit( CommandList&& command_list )
@@ -97,9 +103,10 @@ Ember::Context::Receipt Ember::Context::Submit( CommandList&& command_list )
   uint64_t const signal_value = ++m_FenceValue;
   ERR_ABORT( m_CommandQueue->Signal( m_Fence.Get(), signal_value ) );
 
-  auto [gfx_command_list, command_allocator] = command_list.Release();
+  auto [gfx_command_list, command_allocator, rtm] = command_list.Release();
   m_CommandLists.emplace( std::move( gfx_command_list ) );
   m_CommandAllocators.emplace( std::move( command_allocator ), signal_value );
+  m_RenderTargetManagers.emplace( std::move( rtm ) );
 
   return { m_Fence.Get(), signal_value };
 }

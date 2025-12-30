@@ -47,22 +47,22 @@ FrameGraphResource Ember::RenderPass::DepthPrePass::Execute(
         ZoneScopedN( "Depth PrePass" );
 
         FG::Context::FrameData const& frame_data = context->GetFrameData();
-        ID3D12GraphicsCommandList6*   cmd        = frame_data.CommandList;
-        PIXScopedEvent( cmd, PIX_COLOR_DEFAULT, "Depth PrePass" );
+        CommandList*                  cmd        = frame_data.CommandList;
+        PIXScopedEvent( cmd->Get(), PIX_COLOR_DEFAULT, "Depth PrePass" );
 
         DrawList::Batches const& draw_list_info_list = blackboard.get<DrawList::Batches>();
         PerFrameConstants const& constants           = blackboard.get<PerFrameConstants>();
 
         cmd->SetGraphicsRootSignature( this->m_RootSignature.Get() );
-        cmd->SetGraphicsRoot32BitConstants( 1, sizeof( PerFrameConstants ) / 4, &constants, 0 );
+        cmd->SetGraphicsRootConstants( 1, constants );
 
         cmd->SetPipelineState( this->m_OpaquePipeline.Get() );
-        cmd->SetGraphicsRoot32BitConstants( 0, sizeof( DrawList::Info ) / 4, &draw_list_info_list.Opaque, 0 );
-        cmd->DispatchMesh( draw_list_info_list.Opaque.DrawCount, 1, 1 );
+        cmd->SetGraphicsRootConstants( 0, draw_list_info_list.Opaque );
+        cmd->DispatchMesh( { .X = draw_list_info_list.Opaque.DrawCount } );
 
         cmd->SetPipelineState( this->m_AlphaTestedPipeline.Get() );
-        cmd->SetGraphicsRoot32BitConstants( 0, sizeof( DrawList::Info ) / 4, &draw_list_info_list.AlphaTested, 0 );
-        cmd->DispatchMesh( draw_list_info_list.AlphaTested.DrawCount, 1, 1 );
+        cmd->SetGraphicsRootConstants( 0, draw_list_info_list.AlphaTested );
+        cmd->DispatchMesh( { .X = draw_list_info_list.AlphaTested.DrawCount } );
       } );
 }
 

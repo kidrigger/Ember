@@ -79,14 +79,13 @@ Ember::LightManager::GpuInfo Ember::LightManager::PrepareFrame( Camera const& ca
 }
 
 void Ember::LightManager::RenderAllShadows(
-    ID3D12GraphicsCommandList6* command_list,
-    DrawList::Batches const&    draw_list,
-    RenderTargetManager const&  rtm,
-    Camera const&               camera,
-    uint32_t const              frame_idx ) const
+    CommandList*             command_list,
+    DrawList::Batches const& draw_list,
+    Camera const&            camera,
+    uint32_t const           frame_idx ) const
 {
-  PIXScopedEvent( command_list, PIX_COLOR_DEFAULT, "Render All Shadows" );
-  m_OmniLightManager->RenderAllShadows( command_list, draw_list, rtm, camera );
-  m_DirLightManager->RenderAllShadows( command_list, draw_list, rtm, camera, frame_idx );
-  m_SpotLightManager->RenderAllShadows( command_list, draw_list, rtm, camera, frame_idx );
+  PIXScopedEvent( command_list->Get(), PIX_COLOR_DEFAULT, "Render All Shadows" );
+  m_OmniLightManager->RenderAllShadows( command_list, draw_list, camera );
+  m_DirLightManager->RenderAllShadows( command_list, draw_list, camera, frame_idx );
+  m_SpotLightManager->RenderAllShadows( command_list, draw_list, camera, frame_idx );
 }

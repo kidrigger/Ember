@@ -4,7 +4,6 @@
 #include <Util/Profiling.hpp>
 #include "Camera.hpp"
 #include "ModelLoader.hpp"
-#include "RenderTargetManager.hpp"
 
 namespace
 {
@@ -239,10 +238,7 @@ Ember::LightInfo Ember::Internal::OmniLightManager::PrepareFrame( uint32_t const
 }
 
 void Ember::Internal::OmniLightManager::RenderAllShadows(
-    ID3D12GraphicsCommandList6* command_list,
-    DrawList::Batches const&    draw_list,
-    RenderTargetManager const&  rtm,
-    Camera const&               camera )
+    CommandList* command_list, DrawList::Batches const& draw_list, Camera const& camera )
 {
   ZoneScoped;
 
@@ -252,11 +248,7 @@ void Ember::Internal::OmniLightManager::RenderAllShadows(
   command_list->SetPipelineState( m_Pipeline.Get() );
   command_list->IASetPrimitiveTopology( D3D_PRIMITIVE_TOPOLOGY_TRIANGLELIST );
 
-  D3D12_RECT const     scissor  = { 0, 0, kOmniShadowResolution, kOmniShadowResolution };
-  D3D12_VIEWPORT const viewport = { 0, 0, kOmniShadowResolution, kOmniShadowResolution, 0.0f, 1.0f };
-
-  command_list->RSSetScissorRects( 1, &scissor );
-  command_list->RSSetViewports( 1, &viewport );
+  command_list->RSSetScissorViewport( kOmniShadowResolution, kOmniShadowResolution );
 
   static std::vector<CD3DX12_RESOURCE_BARRIER> barriers;
   barriers.resize( m_AllocatedShadows );
@@ -271,7 +263,7 @@ void Ember::Internal::OmniLightManager::RenderAllShadows(
             tex.GetTexture(), D3D12_RESOURCE_STATE_PIXEL_SHADER_RESOURCE, D3D12_RESOURCE_STATE_DEPTH_WRITE );
       } );
 
-  if ( not barriers.empty() ) command_list->ResourceBarrier( CountOf( barriers ), DataOf( barriers ) );
+  if ( not barriers.empty() ) command_list->ResourceBarrier( barriers );
 
   for ( uint32_t index = 0; index < m_AllocatedShadows; ++index )
   {
@@ -283,7 +275,7 @@ void Ember::Internal::OmniLightManager::RenderAllShadows(
     DirectX::BoundingSphere sphere_of_influence{ light.Position, light.Range };
     if ( camera_frustum.Contains( sphere_of_influence ) == DirectX::DISJOINT ) continue;
 
-    RenderOmniShadow( command_list, draw_list, rtm, index );
+    RenderOmniShadow( command_list, draw_list, index );
   }
 
   std::transform(
@@ -296,22 +288,19 @@ void Ember::Internal::OmniLightManager::RenderAllShadows(
             tex.GetTexture(), D3D12_RESOURCE_STATE_DEPTH_WRITE, D3D12_RESOURCE_STATE_PIXEL_SHADER_RESOURCE );
       } );
 
-  if ( not barriers.empty() ) command_list->ResourceBarrier( CountOf( barriers ), DataOf( barriers ) );
+  if (not barriers.empty()) command_list->ResourceBarrier( barriers );
 }
 
 void Ember::Internal::OmniLightManager::RenderOmniShadow(
-    ID3D12GraphicsCommandList6* command_list,
-    DrawList::Batches const&    draw_list,
-    RenderTargetManager const&  rtm,
-    uint32_t const              light_index ) const
+    CommandList* command_list, DrawList::Batches const& draw_list, uint32_t const light_index ) const
 {
-  PIXScopedEvent( command_list, PIX_COLOR_DEFAULT, "Render Omni Shadow %u", light_index );
+  PIXScopedEvent( command_list->Get(), PIX_COLOR_DEFAULT, "Render Omni Shadow %u", light_index );
   ZoneScoped;
 
   OmniLightRepr const& omni_light = m_LightData[light_index];
   Texture const&       texture    = m_ActiveShadows[light_index];
 
-  rtm.ClearDepthStencilView( command_list, texture, D3D12_CLEAR_FLAG_DEPTH, 1.0f, 0 );
+  command_list->ClearDepthStencilView( texture.GetTexture(), D3D12_CLEAR_FLAG_DEPTH, 1.0f, 0 );
 
   PackedData const packed_data{
     .DrawList       = draw_list.Opaque,
@@ -319,9 +308,9 @@ void Ember::Internal::OmniLightManager::RenderOmniShadow(
     .FarPlane       = omni_light.Range,
     .ProjViewHandle = m_ShadowProjectionBuffer.GetCBVHandle(),
   };
-  command_list->SetGraphicsRoot32BitConstants( 0, sizeof( PackedData ) / 4, &packed_data, 0 );
+  command_list->SetGraphicsRootConstants( 0, packed_data );
 
-  rtm.OMSetRenderTargets( command_list, 0, nullptr, &texture );
+  command_list->OMSetRenderTargets( 0, nullptr, &texture );
 
-  command_list->DispatchMesh( draw_list.Opaque.DrawCount, 1, 1 );
+  command_list->DispatchMesh( { .X = draw_list.Opaque.DrawCount } );
 }

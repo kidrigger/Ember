@@ -1,13 +1,10 @@
 #pragma once
 
-#include <DirectXTex.h>
-#include <filesystem>
 #include <memory_resource>
 #include <span>
 #include <string>
 #include <unordered_map>
 
-#include <Graphics/BindlessManager.hpp>
 #include <Graphics/CommandList.hpp>
 #include <Graphics/Context.hpp>
 #include <Graphics/Texture.hpp>

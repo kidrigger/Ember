@@ -13,7 +13,6 @@
 namespace Ember
 {
 class RenderDevice;
-class RenderTargetManager;
 class World;
 class Camera;
 
@@ -46,11 +45,7 @@ public:
 
   //
   void RenderAllShadows(
-      ID3D12GraphicsCommandList6* command_list,
-      DrawList::Batches const&    draw_list,
-      RenderTargetManager const&  rtm,
-      Camera const&               camera,
-      uint32_t                    frame_idx ) const;
+      CommandList* command_list, DrawList::Batches const& draw_list, Camera const& camera, uint32_t frame_idx ) const;
 };
 
 } // namespace Ember

@@ -11,7 +11,6 @@
 
 namespace Ember
 {
-class RenderTargetManager;
 class RenderDevice;
 
 namespace FG
@@ -163,7 +162,7 @@ public:
 
   struct FrameData
   {
-    ID3D12GraphicsCommandList6* CommandList;
+    CommandList* CommandList;
   };
 
 private:
@@ -194,7 +193,6 @@ private:
   using SRVCacheType = FlatMap<uint64_t, SRVHandle>;
 
   RenderDevice*                          m_RenderDevice;
-  std::unique_ptr<RenderTargetManager>   m_RenderTargetManager;
   FrameData                              m_FrameData;
   FlatMap<uint64_t, TexturePoolEntry>    m_TransientTextures;
   FlatMap<ID3D12Resource*, SRVCacheType> m_TextureSRVCache;
@@ -212,19 +210,16 @@ private:
 
 public:
   Context() = default;
-  Context( RenderDevice* render_device, std::unique_ptr<RenderTargetManager> render_target_manager );
+  Context( RenderDevice* render_device );
 
-  static void                        Create( Context* out, RenderDevice* render_device );
+  [[nodiscard]] RenderDevice*    GetRenderDevice() const;
+  [[nodiscard]] FrameData const& GetFrameData() const;
+  void                           SetFrameData( FrameData const& frame_data );
 
-  [[nodiscard]] RenderDevice*        GetRenderDevice() const;
-  [[nodiscard]] FrameData const&     GetFrameData() const;
-  void                               SetFrameData( FrameData const& frame_data );
-  [[nodiscard]] RenderTargetManager* GetRenderTargetManager() const;
+  void                           PushBarrier( CD3DX12_RESOURCE_BARRIER const& barrier );
 
-  void                               PushBarrier( CD3DX12_RESOURCE_BARRIER const& barrier );
-
-  void                               SetRenderTarget(
-                                    uint32_t index, Texture const& render_target, Texture::Desc const& desc, bool as_srgb, LoadOperation load_op );
+  void                           SetRenderTarget(
+                                uint32_t index, Texture const& render_target, Texture::Desc const& desc, bool as_srgb, LoadOperation load_op );
   void                  SetDepthTarget( Texture const& depth_target, Texture::Desc const& desc, LoadOperation load_op );
 
   void                  PreparePass();
