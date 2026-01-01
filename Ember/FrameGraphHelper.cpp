@@ -370,7 +370,7 @@ Ember::FG::DepthStencilRead Ember::FG::DepthStencilRead::Decode( uint32_t const 
 
 Ember::FG::ShaderResource::operator uint32_t() const
 {
-  return ShiftingEncoder{}.Push( Type, 2 ).Push( PixelShaderUse, 1 ).Push( OnlyTopMip, 1 );
+  return ShiftingEncoder{}.Push( Type, 2 ).Push( PixelShaderUse, 1 );
 }
 
 Ember::FG::ShaderResource Ember::FG::ShaderResource::Decode( uint32_t const flag )
@@ -379,7 +379,6 @@ Ember::FG::ShaderResource Ember::FG::ShaderResource::Decode( uint32_t const flag
   return ShaderResource{
     .Type           = decoder.Pop<ReadType>( 2 ),
     .PixelShaderUse = decoder.Pop<bool>( 1 ),
-    .OnlyTopMip     = decoder.Pop<bool>( 1 ),
   };
 }
 
@@ -513,7 +512,7 @@ void Ember::FG::Texture::preRead( Desc const& desc, uint32_t const flags, void* 
       auto const required_state = srv.PixelShaderUse ? D3D12_RESOURCE_STATE_PIXEL_SHADER_RESOURCE
                                                      : D3D12_RESOURCE_STATE_NON_PIXEL_SHADER_RESOURCE;
 
-      auto       srv_desc       = CD3DX12_SHADER_RESOURCE_VIEW_DESC::Tex2D( desc.Format, srv.OnlyTopMip ? 1 : -1 );
+      auto       srv_desc       = CD3DX12_SHADER_RESOURCE_VIEW_DESC::Tex2D( desc.Format );
 
       AsSRV                     = ctx->GetOrCreateSRVHandle( *this, srv_desc );
 

@@ -232,12 +232,7 @@ Ember::RenderPass::Atmosphere::Data Ember::RenderPass::Atmosphere::Execute(
                 .InitState = D3D12_RESOURCE_STATE_PIXEL_SHADER_RESOURCE,
                 .Flags     = D3D12_RESOURCE_FLAG_ALLOW_RENDER_TARGET,
             } );
-        data.TransmittanceLUT = builder.read(
-            transmittance.TransmittanceLUT,
-            FG::ShaderResource{
-                .PixelShaderUse = true,
-                .OnlyTopMip     = true,
-            } );
+        data.TransmittanceLUT = builder.read( transmittance.TransmittanceLUT, FG::ShaderResource{} );
 
         data.AtmosphereParams = builder.read( param_buffer );
         data.SkyViewLUT       = builder.write(

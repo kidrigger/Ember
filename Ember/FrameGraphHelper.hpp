@@ -51,7 +51,6 @@ struct ShaderResource
 {
   ReadType Type           = ReadType::kSRV; // 2 bits
   bool     PixelShaderUse = true;           // 1 bit
-  bool     OnlyTopMip     = true;           // 1 bit
 
   operator uint32_t() const;
   static ShaderResource Decode( uint32_t flag );

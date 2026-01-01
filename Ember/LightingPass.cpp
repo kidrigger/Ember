@@ -151,7 +151,7 @@ FrameGraphResource Ember::RenderPass::OmniLightDeferred::Execute(
       {
         for ( uint32_t i = 0; i < GBuffer::kGBufferCount; i++ )
         {
-          data.GBuffer[i] = builder.read( gbuffer.GBuffer[i], FG::ShaderResource{ .PixelShaderUse = true } );
+          data.GBuffer[i] = builder.read( gbuffer.GBuffer[i], FG::ShaderResource{} );
         }
 
         auto const&              backbuffer_info = bb.get<FG::BackbufferInfo>();
@@ -346,7 +346,7 @@ FrameGraphResource Ember::RenderPass::SpotLightDeferred::Execute(
       {
         for ( uint32_t i = 0; i < GBuffer::kGBufferCount; i++ )
         {
-          data.GBuffer[i] = builder.read( gbuffer.GBuffer[i], FG::ShaderResource{ .PixelShaderUse = true } );
+          data.GBuffer[i] = builder.read( gbuffer.GBuffer[i], FG::ShaderResource{} );
         }
         data.RenderTarget = builder.write( render_target, FG::Attachment{ .Index = 0, .ForceSrgb = true } );
         data.DepthStencil = builder.read( gbuffer.DepthStencil, FG::DepthStencilRead{} );
@@ -505,7 +505,7 @@ FrameGraphResource Ember::RenderPass::ScreenSpaceLightDeferred::Execute(
       {
         for ( uint32_t i = 0; i < GBuffer::kGBufferCount; i++ )
         {
-          data.GBuffer[i] = builder.read( gbuffer.GBuffer[i], FG::ShaderResource{ .PixelShaderUse = true } );
+          data.GBuffer[i] = builder.read( gbuffer.GBuffer[i], FG::ShaderResource{} );
         }
         data.DepthStencil = builder.read( gbuffer.DepthStencil, FG::DepthStencilRead{} );
 

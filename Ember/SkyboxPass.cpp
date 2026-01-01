@@ -112,12 +112,7 @@ FrameGraphResource Ember::RenderPass::Skybox::Execute(
 
         if ( UseProceduralAtmosphericSky )
         {
-          data.SkyViewLUT = builder.read(
-              sky_view_lut,
-              FG::ShaderResource{
-                  .PixelShaderUse = true,
-                  .OnlyTopMip     = true,
-              } );
+          data.SkyViewLUT = builder.read( sky_view_lut, FG::ShaderResource{} );
         }
       },
       [self = this, bb = &bb]( Data const& data, FrameGraphPassResources& resources, FG::Context const* context )
