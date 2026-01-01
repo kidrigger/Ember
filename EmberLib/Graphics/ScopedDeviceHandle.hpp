@@ -8,45 +8,56 @@
 namespace Ember
 {
 
-template <std::derived_from<DeviceHandle> T>
-class Scoped
+class ScopedHandlePair
 {
-  using Handle = T;
   BindlessManager* m_Bindless{ nullptr };
-  Handle           m_Handle;
+  SRVHandle        m_SRV;
+  UAVHandle        m_UAV;
 
 public:
-  Scoped() = default;
-  Scoped( BindlessManager* bindless, Handle handle ) : m_Bindless{ bindless }, m_Handle{ handle }
+  ScopedHandlePair() = default;
+  ScopedHandlePair( BindlessManager* bindless, SRVHandle srv, UAVHandle uav = {} )
+    : m_Bindless{ bindless }, m_SRV{ srv }, m_UAV{ uav }
   {}
 
-  operator Handle() const
+  SRVHandle GetSRV() const noexcept
   {
-    return m_Handle;
+    return m_SRV;
   }
 
-  ~Scoped()
+  UAVHandle GetUAV() const noexcept
+  {
+    return m_UAV;
+  }
+
+  ~ScopedHandlePair()
   {
     if ( not m_Bindless ) return;
-    m_Bindless->Free( m_Handle );
+    m_Bindless->Free( m_SRV );
+    m_Bindless->Free( m_UAV );
   }
 
-  Scoped( Scoped const& other )            = delete;
-  Scoped& operator=( Scoped const& other ) = delete;
-  Scoped( Scoped&& other ) noexcept : m_Bindless{ other.m_Bindless }, m_Handle{ other.m_Handle }
+  ScopedHandlePair( ScopedHandlePair const& other )            = delete;
+  ScopedHandlePair& operator=( ScopedHandlePair const& other ) = delete;
+  ScopedHandlePair( ScopedHandlePair&& other ) noexcept
+    : m_Bindless{ other.m_Bindless }, m_SRV{ other.m_SRV }, m_UAV{ other.m_UAV }
   {
     other.m_Bindless = nullptr;
-    other.m_Handle   = {};
+    other.m_SRV      = {};
+    other.m_UAV      = {};
   }
 
-  Scoped& operator=( Scoped&& other ) noexcept
+  ScopedHandlePair& operator=( ScopedHandlePair&& other ) noexcept
   {
     if ( this == &other ) return *this;
 
     std::swap( m_Bindless, other.m_Bindless );
-    std::swap( m_Handle, other.m_Handle );
+    std::swap( m_SRV, other.m_SRV );
+    std::swap( m_UAV, other.m_UAV );
 
     return *this;
   }
 };
+
+
 } // namespace Ember

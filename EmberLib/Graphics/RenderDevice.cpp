@@ -368,12 +368,12 @@ Ember::Buffer Ember::RenderDevice::CreateConstantBuffer( uint32_t const size )
   return m_BufferManager.CreateConstantBuffer( size );
 }
 
-Ember::Texture Ember::RenderDevice::CreateTexture2D( Texture2DCreateInfo const& create_info )
+Ember::Texture Ember::RenderDevice::CreateTexture2D( Tex2DDesc const& create_info )
 {
   return m_TextureManager.CreateTexture2D( create_info );
 }
 
-Ember::Texture Ember::RenderDevice::CreateTextureCube( TextureCubeCreateInfo const& create_info )
+Ember::Texture Ember::RenderDevice::CreateTextureCube( TexCubeDesc const& create_info )
 {
   return m_TextureManager.CreateTextureCube( create_info );
 }

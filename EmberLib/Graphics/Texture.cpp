@@ -1,5 +1,6 @@
 #include "Texture.hpp"
 
+#include "ScopedDeviceHandle.hpp"
 #include "Util/DirectXHeaders.hpp"
 #include "Util/HelperUtils.hpp"
 
@@ -47,12 +48,11 @@ namespace Ember
 
 struct TextureImpl
 {
-
   ComPtr<ID3D12Resource>      Resource;
   ComPtr<D3D12MA::Allocation> Allocation;
   D3D12_RESOURCE_STATES       CurrentState;
   Texture::Type               Type;
-  Scoped<SRVHandle>           AsSRV;
+  ScopedHandlePair            Handles;
 };
 
 } // namespace Ember
@@ -87,7 +87,15 @@ D3D12_RESOURCE_STATES Ember::Texture::GetCurrentState() const noexcept
 
 Ember::SRVHandle Ember::Texture::GetSRVHandle() const
 {
-  return m_Impl->AsSRV;
+  return m_Impl->Handles.GetSRV();
+}
+
+Ember::UAVHandle Ember::Texture::GetUAVHandle() const
+{
+  ASSERT( m_Impl->Type == Texture::Type::kStorage );
+  auto uav = m_Impl->Handles.GetUAV();
+  ASSERT( uav );
+  return uav;
 }
 
 void Ember::Texture::SetName( LPCWSTR const name ) const
@@ -125,7 +133,7 @@ DXGI_FORMAT MakeSRVCompat( DXGI_FORMAT const format )
   }
 }
 
-Ember::Texture Ember::TextureManager::CreateDepthTexture2D( Texture2DCreateInfo const& create_info )
+Ember::Texture Ember::TextureManager::CreateDepthTexture2D( Tex2DDesc const& create_info )
 {
   auto [format, width, height, usage, levels, array_size, init_state] = create_info;
   ASSERT( usage == TextureUsage::kDepthSample );
@@ -159,13 +167,13 @@ Ember::Texture Ember::TextureManager::CreateDepthTexture2D( Texture2DCreateInfo 
                     .Allocation   = std::move( allocation ),
                     .CurrentState = init_state.value_or( D3D12_RESOURCE_STATE_DEPTH_WRITE ),
                     .Type         = Texture::Type::kDepth,
-                    .AsSRV        = { m_Bindless, srv_handle },
+                    .Handles      = { m_Bindless, srv_handle },
                     }
         )
   };
 }
 
-Ember::Texture Ember::TextureManager::CreateRenderTexture2D( Texture2DCreateInfo const& create_info )
+Ember::Texture Ember::TextureManager::CreateRenderTexture2D( Tex2DDesc const& create_info )
 {
   auto [format, width, height, usage, levels, array_size, init_state] = create_info;
   ASSERT( usage == TextureUsage::kRenderTarget );
@@ -198,7 +206,7 @@ Ember::Texture Ember::TextureManager::CreateRenderTexture2D( Texture2DCreateInfo
                     .Allocation   = std::move( allocation ),
                     .CurrentState = init_state.value_or( D3D12_RESOURCE_STATE_RENDER_TARGET ),
                     .Type         = Texture::Type::kAttachment,
-                    .AsSRV        = { m_Bindless, srv_handle },
+                    .Handles      = { m_Bindless, srv_handle },
                     }
         )
   };
@@ -226,7 +234,7 @@ void Ember::TextureManager::CreateResourceImpl(
 #endif
 }
 
-Ember::Texture Ember::TextureManager::CreateTexture2D( Texture2DCreateInfo const& create_info )
+Ember::Texture Ember::TextureManager::CreateTexture2D( Tex2DDesc const& create_info )
 {
   auto [format, width, height, usage, levels, array_size, init_state] = create_info;
   // TODO: Check if still work keeping splits.
@@ -267,13 +275,17 @@ Ember::Texture Ember::TextureManager::CreateTexture2D( Texture2DCreateInfo const
                         .Allocation   = std::move( allocation ),
                         .CurrentState = init_state.value_or( D3D12_RESOURCE_STATE_COMMON ),
                         .Type         = Texture::Type::kSampled,
-                        .AsSRV        = { m_Bindless, srv_handle },
+                        .Handles      = { m_Bindless, srv_handle },
                         }
             )
       };
     }
     case TextureUsage::kReadWrite:
     {
+      UAVHandle uav_handle = m_Bindless->CreateDescriptorHandle(
+          texture.Get(),
+          array_size == 1 ? CD3DX12_UNORDERED_ACCESS_VIEW_DESC::Tex2D( DirectX::MakeLinear( format ) )
+                          : CD3DX12_UNORDERED_ACCESS_VIEW_DESC::Tex2DArray( DirectX::MakeLinear( format ) ) );
       return Texture{
         std::allocate_shared<TextureImpl>(
             GetAllocator(),
@@ -282,7 +294,7 @@ Ember::Texture Ember::TextureManager::CreateTexture2D( Texture2DCreateInfo const
                         .Allocation   = std::move( allocation ),
                         .CurrentState = init_state.value_or( D3D12_RESOURCE_STATE_COMMON ),
                         .Type         = Texture::Type::kStorage,
-                        .AsSRV        = { m_Bindless, srv_handle },
+                        .Handles      = { m_Bindless, srv_handle, uav_handle },
                         }
             )
       };
@@ -292,7 +304,7 @@ Ember::Texture Ember::TextureManager::CreateTexture2D( Texture2DCreateInfo const
   }
 }
 
-Ember::Texture Ember::TextureManager::CreateDepthTextureCube( TextureCubeCreateInfo const& create_info )
+Ember::Texture Ember::TextureManager::CreateDepthTextureCube( TexCubeDesc const& create_info )
 {
   auto [format, side, usage, levels, init_state] = create_info;
   ASSERT( usage == TextureUsage::kDepthSample );
@@ -324,13 +336,13 @@ Ember::Texture Ember::TextureManager::CreateDepthTextureCube( TextureCubeCreateI
                     .Allocation   = std::move( allocation ),
                     .CurrentState = init_state.value_or( D3D12_RESOURCE_STATE_COMMON ),
                     .Type         = Texture::Type::kDepth,
-                    .AsSRV        = { m_Bindless, srv_handle },
+                    .Handles      = { m_Bindless, srv_handle },
                     }
         )
   };
 }
 
-Ember::Texture Ember::TextureManager::CreateTextureCube( TextureCubeCreateInfo const& create_info )
+Ember::Texture Ember::TextureManager::CreateTextureCube( TexCubeDesc const& create_info )
 {
   auto [format, side, usage, levels, init_state] = create_info;
   if ( usage == TextureUsage::kDepthSample )
@@ -352,6 +364,7 @@ Ember::Texture Ember::TextureManager::CreateTextureCube( TextureCubeCreateInfo c
   SRVHandle srv_handle =
       m_Bindless->CreateDescriptorHandle( texture.Get(), CD3DX12_SHADER_RESOURCE_VIEW_DESC::TexCube( format ) );
 
+  UAVHandle     uav_handle;
   Texture::Type type;
   switch ( usage )
   {
@@ -359,7 +372,9 @@ Ember::Texture Ember::TextureManager::CreateTextureCube( TextureCubeCreateInfo c
       type = Texture::Type::kSampled;
       break;
     case TextureUsage::kReadWrite:
-      type = Texture::Type::kStorage;
+      type       = Texture::Type::kStorage;
+      uav_handle = m_Bindless->CreateDescriptorHandle(
+          texture.Get(), CD3DX12_UNORDERED_ACCESS_VIEW_DESC::Tex2DArray( DirectX::MakeLinear( format ) ) );
       break;
     case TextureUsage::kDepthSample:
       type = Texture::Type::kDepth;
@@ -375,7 +390,7 @@ Ember::Texture Ember::TextureManager::CreateTextureCube( TextureCubeCreateInfo c
                     .Allocation   = std::move( allocation ),
                     .CurrentState = init_state.value_or( D3D12_RESOURCE_STATE_COMMON ),
                     .Type         = type,
-                    .AsSRV        = { m_Bindless, srv_handle },
+                    .Handles      = { m_Bindless, srv_handle, uav_handle },
                     }
         )
   };

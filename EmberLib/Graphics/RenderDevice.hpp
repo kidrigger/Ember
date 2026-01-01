@@ -82,8 +82,8 @@ public:
   [[nodiscard]] Buffer  CreateRawStorageBuffer( uint32_t size );
   [[nodiscard]] Buffer  CreateConstantBuffer( uint32_t size );
 
-  [[nodiscard]] Texture CreateTexture2D( Texture2DCreateInfo const& create_info );
-  [[nodiscard]] Texture CreateTextureCube( TextureCubeCreateInfo const& create_info );
+  [[nodiscard]] Texture CreateTexture2D( Tex2DDesc const& create_info );
+  [[nodiscard]] Texture CreateTextureCube( TexCubeDesc const& create_info );
 
   [[nodiscard]] Sampler CreateSampler( D3D12_SAMPLER_DESC const& sampler_desc );
 

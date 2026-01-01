@@ -190,12 +190,13 @@ Ember::Buffer Ember::BufferManager::CreateVertexBuffer( uint32_t const size, uin
   ComPtr<D3D12MA::Allocation> allocation;
   AllocateBufferImpl( m_Device.Get(), m_GpuAllocator.Get(), size, &allocation, &buffer );
 
+  auto const virtual_address = buffer->GetGPUVirtualAddress();
   return Buffer{ std::allocate_shared<BufferImpl>(
       GetAllocator(),
       BufferImpl{
           .Resource   = std::move( buffer ),
           .Allocation = std::move( allocation ),
-          .GPUAddress = buffer->GetGPUVirtualAddress(),
+          .GPUAddress = virtual_address,
           .Offset     = 0,
           .Size       = size,
           .Type       = Buffer::Type::kVertexBuffer,
@@ -208,12 +209,13 @@ Ember::Buffer Ember::BufferManager::CreateIndexBuffer( uint32_t const size, DXGI
   ComPtr<D3D12MA::Allocation> allocation;
   AllocateBufferImpl( m_Device.Get(), m_GpuAllocator.Get(), size, &allocation, &buffer );
 
+  auto const virtual_address = buffer->GetGPUVirtualAddress();
   return Buffer{ std::allocate_shared<BufferImpl>(
       GetAllocator(),
       BufferImpl{
           .Resource   = std::move( buffer ),
           .Allocation = std::move( allocation ),
-          .GPUAddress = buffer->GetGPUVirtualAddress(),
+          .GPUAddress = virtual_address,
           .Offset     = 0,
           .Size       = size,
           .Type       = Buffer::Type::kIndexBuffer,

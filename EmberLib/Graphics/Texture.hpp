@@ -7,7 +7,6 @@
 
 #include "BindlessManager.hpp"
 #include "DeviceHandle.hpp"
-#include "ScopedDeviceHandle.hpp"
 #include "Util/DirectXHeaders.hpp"
 
 namespace Ember
@@ -71,6 +70,7 @@ public:
   void                                SetName( LPCWSTR name ) const;
 
   [[nodiscard]] SRVHandle             GetSRVHandle() const;
+  [[nodiscard]] UAVHandle             GetUAVHandle() const;
 };
 
 enum class TextureUsage
@@ -93,7 +93,7 @@ public:
   operator UINT16() const;
 };
 
-struct Texture2DCreateInfo
+struct Tex2DDesc
 {
   DXGI_FORMAT                          Format;
   uint32_t                             Width;
@@ -104,7 +104,7 @@ struct Texture2DCreateInfo
   std::optional<D3D12_RESOURCE_STATES> InitState;
 };
 
-struct TextureCubeCreateInfo
+struct TexCubeDesc
 {
   DXGI_FORMAT                          Format;
   uint32_t                             Side;
@@ -128,17 +128,16 @@ class TextureManager
       D3D12_CLEAR_VALUE const*     clear_value = nullptr,
       D3D12_RESOURCE_STATES initial_states     = D3D12_RESOURCE_STATE_COMMON ) const;
 
+  Texture                           CreateDepthTexture2D( Tex2DDesc const& create_info );
+  Texture                           CreateRenderTexture2D( Tex2DDesc const& create_info );
+  Texture                           CreateDepthTextureCube( TexCubeDesc const& create_info );
 public:
   TextureManager() = default;
   TextureManager(
       ComPtr<ID3D12Device2> device, ComPtr<D3D12MA::Allocator> allocator, BindlessManager* bindless_manager );
 
-  Texture                           CreateDepthTexture2D( Texture2DCreateInfo const& create_info );
-  Texture                           CreateRenderTexture2D( Texture2DCreateInfo const& create_info );
-  Texture                           CreateTexture2D( Texture2DCreateInfo const& create_info );
-
-  Texture                           CreateDepthTextureCube( TextureCubeCreateInfo const& create_info );
-  Texture                           CreateTextureCube( TextureCubeCreateInfo const& create_info );
+  Texture                           CreateTexture2D( Tex2DDesc const& create_info );
+  Texture                           CreateTextureCube( TexCubeDesc const& create_info );
 
   Sampler                           CreateSampler( D3D12_SAMPLER_DESC const& sampler_desc );
 

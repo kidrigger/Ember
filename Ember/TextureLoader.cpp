@@ -65,28 +65,6 @@ void Ember::TextureLoader::UploadBatch::ClearResources( std::vector<D3D12_RESOUR
   Tracker.Clear( barriers );
 }
 
-DXGI_FORMAT MakeUAVCompat( DXGI_FORMAT const format )
-{
-  switch ( format )
-  {
-    case DXGI_FORMAT_B8G8R8A8_UNORM:
-    case DXGI_FORMAT_B8G8R8A8_UNORM_SRGB:
-    case DXGI_FORMAT_R8G8B8A8_UNORM_SRGB:
-      return DXGI_FORMAT_R8G8B8A8_UNORM;
-    case DXGI_FORMAT_R8G8B8A8_UNORM:
-    case DXGI_FORMAT_R32_FLOAT:
-    case DXGI_FORMAT_R32G32_FLOAT:
-    case DXGI_FORMAT_R32G32B32_FLOAT:
-    case DXGI_FORMAT_R32G32B32A32_FLOAT:
-    case DXGI_FORMAT_R11G11B10_FLOAT:
-    case DXGI_FORMAT_R8_UNORM:
-    case DXGI_FORMAT_R16G16B16A16_UNORM:
-      return format;
-    default:
-      UNIMPLEMENTED_M( "Add formats as used/required" );
-  }
-}
-
 // Thread unsafe
 bool Ember::TextureLoader::TryGenerateMipMaps(
     ID3D12GraphicsCommandList* command_list, Texture* texture, ResourceTracker* tracker ) const
@@ -106,7 +84,7 @@ bool Ember::TextureLoader::TryGenerateMipMaps(
 
   desc.Flags  &= ~( D3D12_RESOURCE_FLAG_ALLOW_RENDER_TARGET | D3D12_RESOURCE_FLAG_ALLOW_DEPTH_STENCIL );
   desc.Flags  |= D3D12_RESOURCE_FLAG_ALLOW_UNORDERED_ACCESS;
-  desc.Format  = MakeUAVCompat( desc.Format );
+  desc.Format  = DirectX::MakeLinear( desc.Format );
 
 #if not defined( RENDERDOC_COMPAT )
   bool const is_aliased = allocation->GetHeap() != nullptr;
@@ -271,7 +249,7 @@ bool Ember::TextureLoader::TryGenerateMipMapCube(
 
   desc.Flags  &= ~( D3D12_RESOURCE_FLAG_ALLOW_RENDER_TARGET | D3D12_RESOURCE_FLAG_ALLOW_DEPTH_STENCIL );
   desc.Flags  |= D3D12_RESOURCE_FLAG_ALLOW_UNORDERED_ACCESS;
-  desc.Format  = MakeUAVCompat( desc.Format );
+  desc.Format  = DirectX::MakeLinear( desc.Format );
 
 #if not defined( RENDERDOC_COMPAT )
   bool const is_aliased = allocation->GetHeap() != nullptr;
