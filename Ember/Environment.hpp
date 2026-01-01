@@ -20,12 +20,11 @@ public:
   };
 
 private:
-  RenderDevice* m_RenderDevice;
-  Texture       m_Skybox;
-  Texture       m_DiffuseIrradiance;
-  Texture       m_Prefilter;
-  Texture       m_BrdfLUT;
-  GpuRepr       m_Repr;
+  Texture m_Skybox;
+  Texture m_DiffuseIrradiance;
+  Texture m_Prefilter;
+  Texture m_BrdfLUT;
+  GpuRepr m_Repr;
 
 public:
   Environment() = default;

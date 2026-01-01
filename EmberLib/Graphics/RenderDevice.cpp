@@ -239,9 +239,12 @@ void Ember::RenderDevice::Create( RenderDevice* render_device, HWND window_handl
     ERR_ABORT( CreateAllocator( &allocator_desc, allocator.GetAddressOf() ) );
   }
 
+  auto bindless_manager = std::make_unique_for_overwrite<BindlessManager>();
+  BindlessManager::Create( bindless_manager.get(), device, 10'000, 1000 );
+
   // Context Creation
   Context direct_context;
-  Context::Create( &direct_context, device, D3D12_COMMAND_LIST_TYPE_DIRECT );
+  Context::Create( &direct_context, device, bindless_manager.get(), D3D12_COMMAND_LIST_TYPE_DIRECT );
 
   RECT window_rect;
   ::GetWindowRect( window_handle, &window_rect );
@@ -297,9 +300,6 @@ void Ember::RenderDevice::Create( RenderDevice* render_device, HWND window_handl
 
     ERR_ABORT( device->CreateDescriptorHeap( &desc, IID_PPV_ARGS( &dsv_descriptor_heap ) ) );
   }
-
-  auto bindless_manager = std::make_unique_for_overwrite<BindlessManager>();
-  BindlessManager::Create( bindless_manager.get(), device, 10'000, 1000 );
 
   new ( render_device ) RenderDevice{
     std::move( device ),
@@ -434,6 +434,13 @@ void Ember::RenderDevice::FreeHandle( RawDescriptorHandle const handle ) const
 void Ember::RenderDevice::FreeHandle( SamplerHandle const handle ) const
 {
   m_Bindless->Free( handle );
+}
+
+Ember::Context Ember::RenderDevice::CreateContext( D3D12_COMMAND_LIST_TYPE type )
+{
+  Context out_ctx;
+  Context::Create( &out_ctx, m_Device, m_Bindless.get(), type );
+  return out_ctx;
 }
 
 void Ember::RenderDevice::WaitOn( Context::Receipt const receipt ) const

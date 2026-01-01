@@ -59,4 +59,13 @@ TYPED_HANDLE( RawDescriptor, BindlessManager );
 TYPED_HANDLE( Material, MaterialManager );
 TYPED_HANDLE( Geometry, GeometryManager );
 
+enum class DeviceHandleType : uint8_t
+{
+  kRaw,
+  kCBV,
+  kSRV,
+  kUAV,
+  kSampler,
+};
+
 } // namespace Ember

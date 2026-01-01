@@ -32,20 +32,19 @@ public:
 
   Buffer( std::shared_ptr<BufferImpl> impl );
 
-  void                                          Write( uint32_t offset, uint32_t size, void const* data ) const;
-  [[nodiscard]] ID3D12Resource*                 GetBuffer() const noexcept;
-  [[nodiscard]] uint32_t                        GetSize() const noexcept;
-  [[nodiscard]] uint32_t                        GetOffset() const noexcept;
-  [[nodiscard]] Type                            GetType() const noexcept;
+  void                                    Write( uint32_t offset, uint32_t size, void const* data ) const;
+  [[nodiscard]] ID3D12Resource*           GetBuffer() const noexcept;
+  [[nodiscard]] uint32_t                  GetSize() const noexcept;
+  [[nodiscard]] uint32_t                  GetOffset() const noexcept;
+  [[nodiscard]] Type                      GetType() const noexcept;
 
-  [[nodiscard]] D3D12_VERTEX_BUFFER_VIEW const& GetVertexBufferView() const noexcept;
-  [[nodiscard]] D3D12_INDEX_BUFFER_VIEW const&  GetIndexBufferView() const noexcept;
-  [[nodiscard]] SRVHandle                       GetSRVHandle() const;
-  [[nodiscard]] UAVHandle                       GetUAVHandle() const;
-  [[nodiscard]] CBVHandle                       GetCBVHandle() const;
-  void                                          SetName( LPCWSTR name ) const;
+  [[nodiscard]] SRVHandle                 GetSRVHandle() const;
+  [[nodiscard]] UAVHandle                 GetUAVHandle() const;
+  [[nodiscard]] CBVHandle                 GetCBVHandle() const;
+  void                                    SetName( LPCWSTR name ) const;
 
-  [[nodiscard]] D3D12_GPU_VIRTUAL_ADDRESS       GetGPUVirtualAddress() const;
+  [[nodiscard]] D3D12_GPU_VIRTUAL_ADDRESS GetGPUVirtualAddress() const;
+  [[nodiscard]] uintptr_t                 GetPtrID() const;
 };
 
 class BufferManager
@@ -60,12 +59,12 @@ public:
   explicit BufferManager(
       ComPtr<ID3D12Device2> device, ComPtr<D3D12MA::Allocator> gpu_allocator, BindlessManager* bindless_manager );
 
-  Buffer CreateVertexBuffer( uint32_t size, uint32_t stride );
-  Buffer CreateIndexBuffer( uint32_t size, DXGI_FORMAT format );
-  Buffer CreateStorageBuffer( uint32_t size, uint32_t stride );
-  Buffer CreateRawStorageBuffer( uint32_t size );
-  Buffer CreateReadWriteBuffer( uint32_t size, uint32_t stride );
-  Buffer CreateConstantBuffer( uint32_t size );
+  Buffer                            CreateVertexBuffer( uint32_t size, uint32_t stride );
+  Buffer                            CreateIndexBuffer( uint32_t size, DXGI_FORMAT format );
+  Buffer                            CreateStorageBuffer( uint32_t size, uint32_t stride );
+  Buffer                            CreateRawStorageBuffer( uint32_t size );
+  Buffer                            CreateReadWriteBuffer( uint32_t size, uint32_t stride );
+  Buffer                            CreateConstantBuffer( uint32_t size );
 
   std::pmr::polymorphic_allocator<> GetAllocator();
 };

@@ -67,7 +67,7 @@ void Ember::TextureLoader::UploadBatch::ClearResources( std::vector<D3D12_RESOUR
 
 // Thread unsafe
 bool Ember::TextureLoader::TryGenerateMipMaps(
-    ID3D12GraphicsCommandList* command_list, Texture* texture, ResourceTracker* tracker ) const
+    CommandList* command_list, Texture* texture, ResourceTracker* tracker ) const
 {
   ComPtr<ID3D12Resource> uav_capable;
 
@@ -133,7 +133,7 @@ bool Ember::TextureLoader::TryGenerateMipMaps(
   {
     CD3DX12_RESOURCE_BARRIER const transition = CD3DX12_RESOURCE_BARRIER::Transition(
         resource, D3D12_RESOURCE_STATE_COPY_DEST, D3D12_RESOURCE_STATE_COPY_SOURCE );
-    command_list->ResourceBarrier( 1, &transition );
+    command_list->ResourceBarrier( transition );
   }
 
 #if not defined( RENDERDOC_COMPAT )
@@ -141,7 +141,7 @@ bool Ember::TextureLoader::TryGenerateMipMaps(
   {
     CD3DX12_RESOURCE_BARRIER aliasing_barrier =
         CD3DX12_RESOURCE_BARRIER::Aliasing( allocation->GetResource(), uav_capable.Get() );
-    command_list->ResourceBarrier( 1, &aliasing_barrier );
+    command_list->ResourceBarrier( aliasing_barrier );
   }
 #endif
 
@@ -175,11 +175,11 @@ bool Ember::TextureLoader::TryGenerateMipMaps(
   CD3DX12_RESOURCE_BARRIER pre_compute_barrier = CD3DX12_RESOURCE_BARRIER::Transition(
       uav_capable.Get(), D3D12_RESOURCE_STATE_COPY_DEST, D3D12_RESOURCE_STATE_UNORDERED_ACCESS );
 
-  command_list->ResourceBarrier( 1, &pre_compute_barrier );
+  command_list->ResourceBarrier( pre_compute_barrier );
 
   auto bindless_desc_heaps = m_RenderDevice->GetBindlessDescriptorHeaps();
 
-  command_list->SetDescriptorHeaps( CountOf( bindless_desc_heaps ), DataOf( bindless_desc_heaps ) );
+  command_list->SetDescriptorHeaps( bindless_desc_heaps );
   command_list->SetPipelineState( m_MipmapPipeline.Get() );
   command_list->SetComputeRootSignature( m_MipMapRootSig.Get() );
 
@@ -190,20 +190,20 @@ bool Ember::TextureLoader::TryGenerateMipMaps(
   CD3DX12_RESOURCE_BARRIER inter_mip_barrier = CD3DX12_RESOURCE_BARRIER::UAV( uav_capable.Get() );
   for ( int write_lvl = 1; write_lvl < desc.MipLevels; write_lvl++ )
   {
-    tex_width                 = std::max( tex_width / 2, 1u );
-    tex_height                = std::max( tex_height / 2, 1u );
+    tex_width                = std::max( tex_width / 2, 1u );
+    tex_height               = std::max( tex_height / 2, 1u );
 
-    mip_map_info.TexelSize    = { 1.0f / ( float )tex_width, 1.0f / ( float )tex_height };
-    mip_map_info.Dst          = mip_dst_handles[write_lvl];
-    mip_map_info.SrcMipLevel  = write_lvl - 1;
+    mip_map_info.TexelSize   = { 1.0f / ( float )tex_width, 1.0f / ( float )tex_height };
+    mip_map_info.Dst         = mip_dst_handles[write_lvl];
+    mip_map_info.SrcMipLevel = write_lvl - 1;
 
-    uint32_t const dispatch_x = std::max( 1u, tex_width / kThreadGroupX );
-    uint32_t const dispatch_y = std::max( 1u, tex_height / kThreadGroupY );
-    uint32_t const dispatch_z = std::max( 1u, 1 / kThreadGroupZ );
-
-    command_list->SetComputeRoot32BitConstants( 0, sizeof( MipMapRootSigInfo ) / 4, &mip_map_info, 0 );
-    command_list->Dispatch( dispatch_x, dispatch_y, dispatch_z );
-    command_list->ResourceBarrier( 1, &inter_mip_barrier );
+    command_list->SetComputeRootConstants( 0, mip_map_info );
+    command_list->Dispatch( {
+        .X = std::max( 1u, tex_width / kThreadGroupX ),
+        .Y = std::max( 1u, tex_height / kThreadGroupY ),
+        .Z = std::max( 1u, 1 / kThreadGroupZ ),
+    } );
+    command_list->ResourceBarrier( inter_mip_barrier );
   }
 
   {
@@ -213,7 +213,7 @@ bool Ember::TextureLoader::TryGenerateMipMaps(
       CD3DX12_RESOURCE_BARRIER::Transition(
           resource, D3D12_RESOURCE_STATE_COPY_SOURCE, D3D12_RESOURCE_STATE_COPY_DEST ),
     };
-    command_list->ResourceBarrier( CountOf( barriers ), DataOf( barriers ) );
+    command_list->ResourceBarrier( barriers );
   }
   command_list->CopyResource( resource, uav_capable.Get() );
 
@@ -221,7 +221,7 @@ bool Ember::TextureLoader::TryGenerateMipMaps(
   if ( is_aliased )
   {
     CD3DX12_RESOURCE_BARRIER reverse_aliasing = CD3DX12_RESOURCE_BARRIER::Aliasing( uav_capable.Get(), resource );
-    command_list->ResourceBarrier( 1, &reverse_aliasing );
+    command_list->ResourceBarrier( reverse_aliasing );
   }
 #endif
 
@@ -229,10 +229,10 @@ bool Ember::TextureLoader::TryGenerateMipMaps(
 }
 
 bool Ember::TextureLoader::TryGenerateMipMapCube(
-    ID3D12GraphicsCommandList* command_list,
-    Texture*                   texture,
-    ResourceTracker*           tracker,
-    D3D12_RESOURCE_STATES      texture_resource_state ) const
+    CommandList*          command_list,
+    Texture*              texture,
+    ResourceTracker*      tracker,
+    D3D12_RESOURCE_STATES texture_resource_state ) const
 {
   ComPtr<ID3D12Resource> uav_capable;
 
@@ -298,7 +298,7 @@ bool Ember::TextureLoader::TryGenerateMipMapCube(
   {
     CD3DX12_RESOURCE_BARRIER const transition =
         CD3DX12_RESOURCE_BARRIER::Transition( resource, texture_resource_state, D3D12_RESOURCE_STATE_COPY_SOURCE );
-    command_list->ResourceBarrier( 1, &transition );
+    command_list->ResourceBarrier( transition );
   }
 
 #if not defined( RENDERDOC_COMPAT )
@@ -306,7 +306,7 @@ bool Ember::TextureLoader::TryGenerateMipMapCube(
   {
     CD3DX12_RESOURCE_BARRIER aliasing_barrier =
         CD3DX12_RESOURCE_BARRIER::Aliasing( allocation->GetResource(), uav_capable.Get() );
-    command_list->ResourceBarrier( 1, &aliasing_barrier );
+    command_list->ResourceBarrier( aliasing_barrier );
   }
 #endif
 
@@ -340,13 +340,13 @@ bool Ember::TextureLoader::TryGenerateMipMapCube(
   CD3DX12_RESOURCE_BARRIER pre_compute_barrier = CD3DX12_RESOURCE_BARRIER::Transition(
       uav_capable.Get(), D3D12_RESOURCE_STATE_COPY_DEST, D3D12_RESOURCE_STATE_UNORDERED_ACCESS );
 
-  command_list->ResourceBarrier( 1, &pre_compute_barrier );
+  command_list->ResourceBarrier( pre_compute_barrier );
 
   auto bindless_desc_heaps = m_RenderDevice->GetBindlessDescriptorHeaps();
 
   command_list->SetPipelineState( m_MipmapCubePipeline.Get() );
   command_list->SetComputeRootSignature( m_MipMapRootSig.Get() );
-  command_list->SetDescriptorHeaps( CountOf( bindless_desc_heaps ), DataOf( bindless_desc_heaps ) );
+  command_list->SetDescriptorHeaps( bindless_desc_heaps );
 
   MipMapRootSigInfo mip_map_info;
   mip_map_info.Src                           = mip_src_handle;
@@ -355,20 +355,20 @@ bool Ember::TextureLoader::TryGenerateMipMapCube(
   CD3DX12_RESOURCE_BARRIER inter_mip_barrier = CD3DX12_RESOURCE_BARRIER::UAV( uav_capable.Get() );
   for ( int write_lvl = 1; write_lvl < desc.MipLevels; write_lvl++ )
   {
-    tex_width                 = std::max( tex_width / 2, 1u );
-    tex_height                = std::max( tex_height / 2, 1u );
+    tex_width                = std::max( tex_width / 2, 1u );
+    tex_height               = std::max( tex_height / 2, 1u );
 
-    mip_map_info.TexelSize    = { 1.0f / ( float )tex_width, 1.0f / ( float )tex_height };
-    mip_map_info.Dst          = mip_dst_handles[write_lvl];
-    mip_map_info.SrcMipLevel  = write_lvl - 1;
+    mip_map_info.TexelSize   = { 1.0f / ( float )tex_width, 1.0f / ( float )tex_height };
+    mip_map_info.Dst         = mip_dst_handles[write_lvl];
+    mip_map_info.SrcMipLevel = write_lvl - 1;
 
-    uint32_t const dispatch_x = std::max( 1u, tex_width / kThreadGroupX );
-    uint32_t const dispatch_y = std::max( 1u, tex_height / kThreadGroupY );
-    uint32_t const dispatch_z = std::max( 1u, 6 / kThreadGroupZ );
-
-    command_list->SetComputeRoot32BitConstants( 0, sizeof( MipMapRootSigInfo ) / 4, &mip_map_info, 0 );
-    command_list->Dispatch( dispatch_x, dispatch_y, dispatch_z );
-    command_list->ResourceBarrier( 1, &inter_mip_barrier );
+    command_list->SetComputeRootConstants( 0, mip_map_info );
+    command_list->Dispatch( {
+        .X = std::max( 1u, tex_width / kThreadGroupX ),
+        .Y = std::max( 1u, tex_height / kThreadGroupY ),
+        .Z = std::max( 1u, 6 / kThreadGroupZ ),
+    } );
+    command_list->ResourceBarrier( inter_mip_barrier );
   }
 
   {
@@ -378,7 +378,7 @@ bool Ember::TextureLoader::TryGenerateMipMapCube(
       CD3DX12_RESOURCE_BARRIER::Transition(
           resource, D3D12_RESOURCE_STATE_COPY_SOURCE, D3D12_RESOURCE_STATE_COPY_DEST ),
     };
-    command_list->ResourceBarrier( CountOf( barriers ), DataOf( barriers ) );
+    command_list->ResourceBarrier( barriers );
   }
   command_list->CopyResource( resource, uav_capable.Get() );
 
@@ -386,13 +386,13 @@ bool Ember::TextureLoader::TryGenerateMipMapCube(
   if ( is_aliased )
   {
     CD3DX12_RESOURCE_BARRIER reverse_aliasing = CD3DX12_RESOURCE_BARRIER::Aliasing( uav_capable.Get(), resource );
-    command_list->ResourceBarrier( 1, &reverse_aliasing );
+    command_list->ResourceBarrier( reverse_aliasing );
   }
 #endif
 
   CD3DX12_RESOURCE_BARRIER barrier =
       CD3DX12_RESOURCE_BARRIER::Transition( resource, D3D12_RESOURCE_STATE_COPY_DEST, texture_resource_state );
-  command_list->ResourceBarrier( 1, &barrier );
+  command_list->ResourceBarrier( barrier );
 
   return true;
 }
@@ -425,8 +425,7 @@ void Ember::TextureLoader::Create( TextureLoader* loader, RenderDevice* render_d
 
   // We need COMPUTE instead of COPY due to the mip-mapping.
   // Ideally, we want to kick the job to an async compute queue.
-  Context transfer_context;
-  Context::Create( &transfer_context, device, D3D12_COMMAND_LIST_TYPE_COMPUTE );
+  Context          transfer_context = render_device->CreateContext( D3D12_COMMAND_LIST_TYPE_COMPUTE );
 
   ComPtr<ID3DBlob> mipmap_shader;
   ERR_ABORT( D3DReadFileToBlob( L"MipMap.cso", &mipmap_shader ) );
@@ -606,7 +605,7 @@ bool Ember::TextureLoader::TryLoadImpl(
   m_UploadBatches[m_CurrentUploadBatch].PushUpload( texture->GetTexture(), staging_res, final_state );
 #endif
 
-  if ( not TryGenerateMipMaps( m_CurrentCommandList.Get(), texture, &m_UploadBatches[m_CurrentUploadBatch].Tracker ) )
+  if ( not TryGenerateMipMaps( &m_CurrentCommandList, texture, &m_UploadBatches[m_CurrentUploadBatch].Tracker ) )
   {
     return false;
   }

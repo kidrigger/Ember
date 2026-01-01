@@ -13,20 +13,43 @@ struct BufferImpl
   {
     BindlessManager* Bindless; // Not owned; To be used with the handles
     SRVHandle        AsSRV;
-    UAVHandle        AsUAV;
-    CBVHandle        AsCBV;
+    union
+    {
+      UAVHandle AsUAV;
+      CBVHandle AsCBV;
+    };
 
-    Handles() = default;
-    Handles( BindlessManager* const bindless, SRVHandle const srv, UAVHandle const uav = {} )
-      : Bindless{ bindless }, AsSRV{ srv }, AsUAV{ uav }, AsCBV{}
+    /*
+     * Note about book-keeping:
+     * A buffer can be used as:
+     * 1. constant buffer (CBV)
+     * 2. readonly storage buffer (SRV)
+     * 3. read-write storage buffer (SRV+UAV)
+     * Thus, if we have SRV then we are definitely not a constant buffer.
+     *
+     * So, we use validity of SRVHandle to determine if the buffer is a constant buffer or not.
+     * And union stores UAV or CBV.
+     */
+
+    bool IsConstantBuffer() const noexcept
+    {
+      return not AsSRV;
+    }
+
+    Handles() : Bindless{ nullptr }, AsSRV{}, AsUAV{}
     {}
 
-    Handles( BindlessManager* const bindless, CBVHandle const cbv )
-      : Bindless{ bindless }, AsSRV{}, AsUAV{}, AsCBV{ cbv }
+    Handles( BindlessManager* const bindless, SRVHandle const srv, UAVHandle const uav = {} )
+      : Bindless{ bindless }, AsSRV{ srv }, AsUAV{ uav }
+    {}
+
+    Handles( BindlessManager* const bindless, CBVHandle const cbv ) : Bindless{ bindless }, AsSRV{}, AsCBV{ cbv }
     {}
 
     Handles( Handles&& other ) noexcept
-      : Bindless{ other.Bindless }, AsSRV{ other.AsSRV }, AsUAV{ other.AsUAV }, AsCBV{ other.AsCBV }
+      : Bindless{ other.Bindless }
+      , AsSRV{ other.AsSRV }
+      , AsUAV{ other.AsUAV } // NOTE: this is semantically incorrect but works as CBV/UAV are plain indices.
     {
       other.Bindless = nullptr;
       other.AsSRV    = {};
@@ -39,8 +62,10 @@ struct BufferImpl
       if ( this == &other ) return *this;
       std::swap( Bindless, other.Bindless );
       std::swap( AsSRV, other.AsSRV );
+
+      // NOTE: this is semantically incorrect but works as CBV/UAV are plain indices.
       std::swap( AsUAV, other.AsUAV );
-      std::swap( AsCBV, other.AsCBV );
+
       return *this;
     }
 
@@ -50,9 +75,16 @@ struct BufferImpl
     ~Handles()
     {
       if ( not Bindless ) return;
-      if ( AsSRV ) Bindless->Free( AsSRV );
-      if ( AsUAV ) Bindless->Free( AsUAV );
-      if ( AsCBV ) Bindless->Free( AsCBV );
+
+      Bindless->Free( AsSRV );
+      if ( IsConstantBuffer() )
+      {
+        Bindless->Free( AsCBV );
+      }
+      else
+      {
+        Bindless->Free( AsUAV );
+      }
     }
   };
 
@@ -119,6 +151,7 @@ Ember::UAVHandle Ember::Buffer::GetUAVHandle() const
 {
   ASSERT( m_Impl );
   ASSERT( GetType() == Type::kStorageBuffer );
+  ASSERT( not m_Impl->Handles.IsConstantBuffer() );
 
   auto handle = m_Impl->Handles.AsUAV;
   ASSERT( handle );
@@ -130,6 +163,7 @@ Ember::CBVHandle Ember::Buffer::GetCBVHandle() const
 {
   ASSERT( m_Impl );
   ASSERT( GetType() == Type::kConstantBuffer );
+  ASSERT( m_Impl->Handles.IsConstantBuffer() );
 
   return m_Impl->Handles.AsCBV;
 }
@@ -142,6 +176,11 @@ void Ember::Buffer::SetName( LPCWSTR const name ) const
 D3D12_GPU_VIRTUAL_ADDRESS Ember::Buffer::GetGPUVirtualAddress() const
 {
   return m_Impl->GPUAddress;
+}
+
+uintptr_t Ember::Buffer::GetPtrID() const
+{
+  return ( uintptr_t )m_Impl.get();
 }
 
 Ember::BufferManager::BufferManager(

@@ -1,5 +1,6 @@
 #include "Context.hpp"
 
+#include "RenderTargetManager.hpp"
 #include "Util/HelperUtils.hpp"
 
 Ember::Context::Receipt::Receipt( ID3D12Fence* fence, uint64_t const value ) : m_Fence{ fence }, m_FenceValue{ value }
@@ -30,15 +31,18 @@ uint64_t Ember::Context::Receipt::GetFenceValue() const
 
 Ember::Context::Context(
     ComPtr<ID3D12Device2>         device,
+    BindlessManager*              bindless,
     ComPtr<ID3D12CommandQueue>    command_queue,
     ComPtr<ID3D12Fence>           fence,
     ScopedHandle                  fence_event,
     D3D12_COMMAND_LIST_TYPE const command_list_type )
   : m_Device{ std::move( device ) }
+  , m_Bindless{ bindless }
   , m_CommandQueue{ std::move( command_queue ) }
   , m_Fence{ std::move( fence ) }
   , m_FenceEvent{ std::move( fence_event ) }
   , m_CommandListType{ command_list_type }
+  , m_PoolAllocator{ std::make_unique<std::pmr::unsynchronized_pool_resource>() }
 {}
 
 ID3D12CommandQueue* Ember::Context::GetCommandQueue() const
@@ -58,40 +62,51 @@ Ember::Context::Receipt Ember::Context::CreateReceipt( uint64_t value ) const
 
 Ember::CommandList Ember::Context::GetCommandList()
 {
-  ComPtr<ID3D12CommandAllocator> command_allocator;
+  std::unique_ptr<ResourceBinder>      binder;
+  ComPtr<ID3D12CommandAllocator>       command_allocator;
+  std::unique_ptr<RenderTargetManager> rtm;
+  ComPtr<ID3D12GraphicsCommandList6>   command_list;
+
   if ( not m_CommandAllocators.empty() and IsFenceComplete( m_CommandAllocators.front().FenceValue ) )
   {
     // Available free command allocator.
-    command_allocator = m_CommandAllocators.front().Allocator;
+    command_allocator = std::move( m_CommandAllocators.front().Allocator );
+    binder            = std::move( m_CommandAllocators.front().Binder );
     m_CommandAllocators.pop();
     ERR_ABORT( command_allocator->Reset() );
+    binder->Clear();
   }
   else
   {
     ERR_ABORT( m_Device->CreateCommandAllocator( m_CommandListType, IID_PPV_ARGS( &command_allocator ) ) );
+    binder = std::make_unique<ResourceBinder>( m_Bindless, std::pmr::polymorphic_allocator<>{ m_PoolAllocator.get() } );
   }
 
-  ComPtr<ID3D12GraphicsCommandList6> command_list;
   if ( m_CommandLists.empty() )
   {
+    // D3D CommandList and RTM are added and removed in lock-step.
     ERR_ABORT( m_Device->CreateCommandList(
         0, m_CommandListType, command_allocator.Get(), nullptr, IID_PPV_ARGS( &command_list ) ) );
 
-    auto rtm = std::make_unique_for_overwrite<RenderTargetManager>();
+    rtm = std::make_unique_for_overwrite<RenderTargetManager>();
     RenderTargetManager::Create( rtm.get(), m_Device );
+  }
+  else
+  {
+    command_list = m_CommandLists.front();
+    m_CommandLists.pop();
+    ERR_ABORT( command_list->Reset( command_allocator.Get(), nullptr ) );
 
-    return CommandList{ std::move( command_list ), std::move( command_allocator ), std::move( rtm ) };
+    rtm = std::move( m_RenderTargetManagers.front() );
+    m_RenderTargetManagers.pop();
   }
 
-  command_list = m_CommandLists.front();
-  m_CommandLists.pop();
-
-  auto rtm = std::move( m_RenderTargetManagers.front() );
-  m_RenderTargetManagers.pop();
-
-  ERR_ABORT( command_list->Reset( command_allocator.Get(), nullptr ) );
-
-  return CommandList{ std::move( command_list ), std::move( command_allocator ), std::move( rtm ) };
+  return CommandList{
+    std::move( command_list ),
+    std::move( command_allocator ),
+    std::move( rtm ),
+    std::move( binder ),
+  };
 }
 
 Ember::Context::Receipt Ember::Context::Submit( CommandList&& command_list )
@@ -103,9 +118,9 @@ Ember::Context::Receipt Ember::Context::Submit( CommandList&& command_list )
   uint64_t const signal_value = ++m_FenceValue;
   ERR_ABORT( m_CommandQueue->Signal( m_Fence.Get(), signal_value ) );
 
-  auto [gfx_command_list, command_allocator, rtm] = command_list.Release();
+  auto [gfx_command_list, command_allocator, rtm, bindless] = command_list.Release();
   m_CommandLists.emplace( std::move( gfx_command_list ) );
-  m_CommandAllocators.emplace( std::move( command_allocator ), signal_value );
+  m_CommandAllocators.emplace( std::move( command_allocator ), signal_value, std::move( bindless ) );
   m_RenderTargetManagers.emplace( std::move( rtm ) );
 
   return { m_Fence.Get(), signal_value };
@@ -144,7 +159,8 @@ void Ember::Context::WaitIdle()
   WaitOn( Signal() );
 }
 
-void Ember::Context::Create( Context* context, ComPtr<ID3D12Device2> device, D3D12_COMMAND_LIST_TYPE const type )
+void Ember::Context::Create(
+    Context* context, ComPtr<ID3D12Device2> device, BindlessManager* bindless, D3D12_COMMAND_LIST_TYPE const type )
 {
   D3D12_COMMAND_QUEUE_DESC const desc = {
     .Type     = type,
@@ -164,7 +180,9 @@ void Ember::Context::Create( Context* context, ComPtr<ID3D12Device2> device, D3D
     ASSERT_M( fence_event, "Failed to create fence event" );
   }
 
-  new ( context ) Context{ std::move( device ), std::move( command_queue ), std::move( fence ), fence_event, type };
+  new ( context ) Context{
+    std::move( device ), bindless, std::move( command_queue ), std::move( fence ), fence_event, type,
+  };
 }
 
 Ember::Context::~Context()

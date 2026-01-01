@@ -105,12 +105,12 @@ public:
       ColorSpaceOverride color_space_override = ColorSpaceOverride::kNone,
       D3D12_RESOURCE_STATES final_state       = D3D12_RESOURCE_STATE_PIXEL_SHADER_RESOURCE );
 
-  bool TryGenerateMipMaps( ID3D12GraphicsCommandList* command_list, Texture* texture, ResourceTracker* tracker ) const;
+  bool TryGenerateMipMaps( CommandList* command_list, Texture* texture, ResourceTracker* tracker ) const;
   bool TryGenerateMipMapCube(
-      ID3D12GraphicsCommandList* command_list,
-      Texture*                   texture,
-      ResourceTracker*           tracker,
-      D3D12_RESOURCE_STATES      texture_resource_state ) const;
+      CommandList*          command_list,
+      Texture*              texture,
+      ResourceTracker*      tracker,
+      D3D12_RESOURCE_STATES texture_resource_state ) const;
   Context::Receipt EndBatch();
 
   void             Update();

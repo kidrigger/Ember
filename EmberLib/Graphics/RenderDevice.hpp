@@ -45,7 +45,7 @@ private:
   TextureManager                   m_TextureManager;
 
   // Commands and Sync
-  Context                       m_DirectContext;
+  Context                       m_DirectContext; // Context depends on device and bindless.
   std::vector<Context::Receipt> m_FrameReceipts;
 
 public:
@@ -104,6 +104,7 @@ public:
   void                                               FreeHandle( SamplerHandle handle ) const;
 
   // Wait until the all queues have finished all commands.
+  Context CreateContext( D3D12_COMMAND_LIST_TYPE type );
   void WaitOn( Context::Receipt receipt ) const;
   void QueueWaitOn( Context::Receipt receipt ) const;
   void WaitIdle();

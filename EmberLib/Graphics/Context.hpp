@@ -32,17 +32,21 @@ public:
 private:
   struct InFlightAllocators
   {
-    ComPtr<ID3D12CommandAllocator> Allocator;
-    uint64_t                       FenceValue;
+    ComPtr<ID3D12CommandAllocator>  Allocator;
+    uint64_t                        FenceValue;
+    std::unique_ptr<ResourceBinder> Binder;
   };
 
   using CommandListQueue      = std::queue<ComPtr<ID3D12GraphicsCommandList6>>;
   using RTMQueue              = std::queue<std::unique_ptr<RenderTargetManager>>;
   using CommandAllocatorQueue = std::queue<InFlightAllocators>;
+  using PoolAllocator         = std::unique_ptr<std::pmr::unsynchronized_pool_resource>;
 
+  PoolAllocator              m_PoolAllocator;
   ComPtr<ID3D12Device2>      m_Device;
   ComPtr<ID3D12CommandQueue> m_CommandQueue;
   ComPtr<ID3D12Fence>        m_Fence;
+  BindlessManager*           m_Bindless;
   CommandListQueue           m_CommandLists;
   RTMQueue                   m_RenderTargetManagers;
   CommandAllocatorQueue      m_CommandAllocators;
@@ -52,6 +56,7 @@ private:
 
   Context(
       ComPtr<ID3D12Device2>      device,
+      BindlessManager*           bindless,
       ComPtr<ID3D12CommandQueue> command_queue,
       ComPtr<ID3D12Fence>        fence,
       ScopedHandle               fence_event,
@@ -73,7 +78,8 @@ public:
   void                              QueueWaitOn( Receipt receipt ) const;
   void                              WaitIdle();
 
-  static void Create( Context* context, ComPtr<ID3D12Device2> device, D3D12_COMMAND_LIST_TYPE type );
+  static void                       Create(
+                            Context* context, ComPtr<ID3D12Device2> device, BindlessManager* bindless, D3D12_COMMAND_LIST_TYPE type );
 
   Context( Context const& other )                = delete;
   Context( Context&& other ) noexcept            = default;

@@ -2,6 +2,8 @@
 
 #include <algorithm>
 
+#include "RenderTargetManager.hpp"
+#include "ResourceBinder.hpp"
 #include "Util/HelperUtils.hpp"
 
 HRESULT Ember::CommandList::Reset( ComPtr<ID3D12CommandAllocator> allocator )
@@ -23,15 +25,26 @@ ID3D12GraphicsCommandList6* Ember::CommandList::Get() const noexcept
   return m_CommandList.Get();
 }
 
-// ID3D12GraphicsCommandList6* Ember::CommandList::operator->() const noexcept
-//{
-//   return m_CommandList.Get();
-// }
-
 Ember::CommandList::Content Ember::CommandList::Release() noexcept
 {
-  return { std::move( m_CommandList ), std::move( m_CommandAllocator ), std::move( m_RenderTargetManager ) };
+  return {
+    std::move( m_CommandList ),
+    std::move( m_CommandAllocator ),
+    std::move( m_RenderTargetManager ),
+    std::move( m_Binder ),
+  };
 }
+
+Ember::CommandList::CommandList(
+    ComPtr<ID3D12GraphicsCommandList6>   command_list,
+    ComPtr<ID3D12CommandAllocator>       command_allocator,
+    std::unique_ptr<RenderTargetManager> render_target_manager,
+    std::unique_ptr<ResourceBinder>      binder )
+  : m_CommandList{ std::move( command_list ) }
+  , m_CommandAllocator{ std::move( command_allocator ) }
+  , m_RenderTargetManager{ std::move( render_target_manager ) }
+  , m_Binder{ std::move( binder ) }
+{}
 
 void Ember::CommandList::CopyResource( ID3D12Resource* dest, ID3D12Resource* source )
 {

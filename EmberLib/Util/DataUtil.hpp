@@ -47,39 +47,130 @@ constexpr auto DataOf( std::ranges::contiguous_range auto& range )
   return std::ranges::data( range );
 }
 
-constexpr uint64_t HashFnv1A( size_t const size, byte const* data )
-{
-  if ( size == 0 ) return 0;
-
-  uint64_t hash = 0xcbf29ce484222325; /* Offset */
-
-  for ( size_t i = 0; i < size; ++i )
-  {
-    hash = hash ^ data[i];
-    hash = hash * 0x00000100000001b3; /* Prime */
-  }
-
-  return hash;
-}
-
 template <typename T>
 concept IsUnitObject = not std::ranges::range<T> and not std::is_pointer_v<T>;
 
-constexpr uint64_t HashFnv1A( IsUnitObject auto& data )
+class HashFnv1A
 {
-  byte const*  bytes = ( byte* )&data;
-  size_t const size  = sizeof( data );
+  uint64_t m_Value;
 
-  return HashFnv1A( size, bytes );
-}
+public:
+  constexpr HashFnv1A( size_t const size, byte const* data ) // Offset
+  {
+    if ( size == 0 )
+    {
+      m_Value = 0;
+      return;
+    }
 
-constexpr uint64_t HashFnv1A( std::string_view const& data )
-{
-  byte const*  bytes = ( byte const* )data.data();
-  size_t const size  = data.size() * sizeof( char );
+    uint64_t hash = 0xcbf29ce484222325; /* Offset */
 
-  return HashFnv1A( size, bytes );
-}
+    for ( size_t i = 0; i < size; ++i )
+    {
+      hash = hash ^ data[i];
+      hash = hash * 0x00000100000001b3; /* Prime */
+    }
+
+    m_Value = hash;
+  }
+
+  constexpr HashFnv1A( IsUnitObject auto const& data ) : HashFnv1A( sizeof( data ), ( byte const* )&data )
+  {}
+
+  constexpr HashFnv1A( std::ranges::contiguous_range auto& range )
+    : HashFnv1A( ByteSizeOf( range ), ( byte const* )DataOf( range ) )
+  {}
+
+  constexpr HashFnv1A& Combine( size_t const size, byte const* data )
+  {
+    for ( size_t i = 0; i < size; ++i )
+    {
+      m_Value = m_Value ^ data[i];
+      m_Value = m_Value * 0x00000100000001b3; // Prime
+    }
+    return *this;
+  }
+
+  constexpr HashFnv1A& Combine( IsUnitObject auto const& data )
+  {
+    return Combine( sizeof( data ), ( byte const* )&data );
+  }
+
+  constexpr HashFnv1A& Combine( std::ranges::contiguous_range auto const& data )
+  {
+    return Combine( ByteSizeOf( data ), ( byte const* )DataOf( data ) );
+  }
+
+  constexpr HashFnv1A& operator<<( auto const& value )
+    requires requires { Combine( value ); }
+  {
+    return Combine( value );
+  }
+
+  constexpr operator uint64_t() const
+  {
+    return m_Value;
+  }
+};
+//
+// constexpr uint64_t HashFnv1A( size_t const size, byte const* data )
+//{
+//  if ( size == 0 ) return 0;
+//
+//  uint64_t hash = 0xcbf29ce484222325; /* Offset */
+//
+//  for ( size_t i = 0; i < size; ++i )
+//  {
+//    hash = hash ^ data[i];
+//    hash = hash * 0x00000100000001b3; /* Prime */
+//  }
+//
+//  return hash;
+//}
+//
+// constexpr uint64_t HashFnv1A( std::ranges::contiguous_range auto& range )
+//{
+//  byte const*  bytes = ( byte const* )DataOf( range );
+//  size_t const size  = ByteSizeOf( range );
+//  return HashFnv1A( size, bytes );
+//}
+//
+// constexpr uint64_t HashFnv1A( IsUnitObject auto const& data )
+//{
+//  byte const*  bytes = ( byte const* )&data;
+//  size_t const size  = sizeof( data );
+//
+//  return HashFnv1A( size, bytes );
+//}
+//
+// constexpr uint64_t HashFnv1A( std::string_view const& data )
+//{
+//  byte const*  bytes = ( byte const* )data.data();
+//  size_t const size  = data.size() * sizeof( char );
+//
+//  return HashFnv1A( size, bytes );
+//}
+//
+// constexpr uint64_t HashFnv1ACombine( uint64_t hash, size_t const size, byte const* data )
+//{
+//  if ( size == 0 ) return hash;
+//
+//  for ( size_t i = 0; i < size; ++i )
+//  {
+//    hash = hash ^ data[i];
+//    hash = hash * 0x00000100000001b3; /* Prime */
+//  }
+//
+//  return hash;
+//}
+//
+// constexpr uint64_t HashFnv1ACombine( uint64_t hash, IsUnitObject auto const& data )
+//{
+//  byte const*  bytes = ( byte const* )&data;
+//  size_t const size  = sizeof( data );
+//
+//  return HashFnv1ACombine( hash, size, bytes );
+//}
 
 class StringID
 {

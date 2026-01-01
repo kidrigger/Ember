@@ -80,31 +80,86 @@ bool Ember::Environment::TryLoadFrom(
   brdf_lut.SetName( L"BRDF LUT" );
 
   {
-
-    struct EnvRootConstant
+    struct EnvParams
     {
-      SRVHandle InputTextureHandle;
-      UAVHandle OutputTextureHandle;
-      uint32_t  CubeSide;
+      struct BoundDataType
+      {
+        SRVHandle InputTextureHandle;
+        UAVHandle OutputTextureHandle;
+        uint32_t  CubeSide;
+      };
+
+      Texture       InputTexture;
+      Texture       OutputTexture;
+      uint32_t      CubeSide;
+
+      BoundDataType Bind( ResourceBinder* binder ) const
+      {
+        return {
+          .InputTextureHandle  = binder->BindSRV( InputTexture ),
+          .OutputTextureHandle = binder->BindUAV( OutputTexture ),
+          .CubeSide            = CubeSide,
+        };
+      }
+    };
+    static_assert( BindableStructure<EnvParams> );
+
+    struct PrefilterParams
+    {
+      struct BoundDataType
+      {
+        SRVHandle Skybox;
+        uint32_t  SkyboxSide;
+        UAVHandle OutputTexture;
+        uint32_t  OutputSide;
+        float     Roughness;
+      };
+
+      Texture       Skybox;
+      uint32_t      SkyboxSide;
+      Texture       OutputTexture;
+      uint32_t      OutputSide;
+      float         Roughness;
+      uint32_t      LoD;
+      DXGI_FORMAT   Format;
+
+      BoundDataType Bind( ResourceBinder* binder ) const
+      {
+        auto const desc = CD3DX12_UNORDERED_ACCESS_VIEW_DESC::Tex2DArray( Format, -1, 0, LoD );
+        return {
+          .Skybox        = binder->BindSRV( Skybox ),
+          .SkyboxSide    = SkyboxSide,
+          .OutputTexture = binder->BindTransient( OutputTexture, desc ),
+          .OutputSide    = OutputSide,
+          .Roughness     = Roughness,
+        };
+      }
     };
 
-    struct PrefilterConstant
+    struct BrdfLUTParams
     {
-      SRVHandle Skybox;
-      uint32_t  SkyboxSide;
-      UAVHandle OutputTextureHandle;
-      uint32_t  OutputSide;
-      float     Roughness;
+      struct BoundDataType
+      {
+        UAVHandle OutputTextureHandle;
+        uint32_t  Width;
+        uint32_t  Height;
+      };
+
+      Texture       OutputTexture;
+      uint32_t      Width;
+      uint32_t      Height;
+
+      BoundDataType Bind( ResourceBinder* binder ) const
+      {
+        return {
+          .OutputTextureHandle = binder->BindUAV( OutputTexture ),
+          .Width               = Width,
+          .Height              = Height,
+        };
+      }
     };
 
-    struct BrdfLUTConstant
-    {
-      UAVHandle OutputTextureHandle;
-      uint32_t  Width;
-      uint32_t  Height;
-    };
-
-    CD3DX12_ROOT_PARAMETER1 root_parameters[1];
+    CD3DX12_ROOT_PARAMETER1 root_parameters[1] = {};
     root_parameters[0].InitAsConstants( 5, 0 );
 
     CD3DX12_STATIC_SAMPLER_DESC static_sampler_desc[] = {
@@ -139,10 +194,8 @@ bool Ember::Environment::TryLoadFrom(
     ComPtr<ID3DBlob> brdf_lut_shader;
     ERR_FAIL_RET_F( D3DReadFileToBlob( L"BrdfLUT.cso", &brdf_lut_shader ) );
 
-    ComPtr<ID3D12Device2> device = render_device->GetDevice();
-
-    Context               context;
-    Context::Create( &context, device, D3D12_COMMAND_LIST_TYPE_COMPUTE );
+    ComPtr<ID3D12Device2>                 device  = render_device->GetDevice();
+    Context                               context = render_device->CreateContext( D3D12_COMMAND_LIST_TYPE_COMPUTE );
 
     CD3DX12_VERSIONED_ROOT_SIGNATURE_DESC versioned_root_signature_desc;
     versioned_root_signature_desc.Init_1_1(
@@ -204,59 +257,32 @@ bool Ember::Environment::TryLoadFrom(
     D3D12_RESOURCE_DESC prefilter_desc = prefilter.GetTexture()->GetDesc();
     ASSERT( prefilter_desc.MipLevels == kPrefilterMaxLoD + 1 /* Accounting for mip0 */ );
 
-    std::vector<UAVHandle> prefilter_write_handles;
-    for ( uint32_t i = 0; i <= kPrefilterMaxLoD; i++ )
-    {
-      auto      uav_desc   = CD3DX12_UNORDERED_ACCESS_VIEW_DESC::Tex2DArray( prefilter_desc.Format, ( UINT )-1, 0, i );
-      UAVHandle uav_handle = render_device->CreateBindlessHandle( prefilter.GetTexture(), uav_desc );
-      tracker.PushHandle( uav_handle );
-      prefilter_write_handles.push_back( uav_handle );
-    }
+    auto      desc_heaps = render_device->GetBindlessDescriptorHeaps();
 
-    auto      desc_heaps        = render_device->GetBindlessDescriptorHeaps();
-
-    UAVHandle skybox_uav_handle = render_device->CreateBindlessHandle(
-        skybox.GetTexture(), CD3DX12_UNORDERED_ACCESS_VIEW_DESC::Tex2DArray( skybox.GetTexture()->GetDesc().Format ) );
-    tracker.PushHandle( skybox_uav_handle );
-
-    EnvRootConstant env_cube_root_constant{
-      .InputTextureHandle  = environment.GetSRVHandle(),
-      .OutputTextureHandle = skybox_uav_handle,
-      .CubeSide            = kEnvCubeSide,
+    EnvParams env_cube_root_constant{
+      .InputTexture  = environment,
+      .OutputTexture = skybox,
+      .CubeSide      = kEnvCubeSide,
     };
 
-    UAVHandle diffuse_irradiance_uav_handle = render_device->CreateBindlessHandle(
-        diffuse_irradiance.GetTexture(),
-        CD3DX12_UNORDERED_ACCESS_VIEW_DESC::Tex2DArray( diffuse_irradiance.GetTexture()->GetDesc().Format ) );
-    tracker.PushHandle( diffuse_irradiance_uav_handle );
-
-    EnvRootConstant diffuse_irradiance_root_constant{
-      .InputTextureHandle  = skybox.GetSRVHandle(),
-      .OutputTextureHandle = diffuse_irradiance_uav_handle,
-      .CubeSide            = kDiffuseCubeSide,
+    EnvParams diffuse_irradiance_root_constant{
+      .InputTexture  = skybox,
+      .OutputTexture = diffuse_irradiance,
+      .CubeSide      = kDiffuseCubeSide,
     };
 
-    UAVHandle prefilter_uav_handle = render_device->CreateBindlessHandle(
-        prefilter.GetTexture(),
-        CD3DX12_UNORDERED_ACCESS_VIEW_DESC::Tex2DArray( prefilter.GetTexture()->GetDesc().Format ) );
-    tracker.PushHandle( prefilter_uav_handle );
-
-    PrefilterConstant prefilter_constant{
-      .Skybox              = skybox.GetSRVHandle(),
-      .SkyboxSide          = kEnvCubeSide,
-      .OutputTextureHandle = prefilter_uav_handle,
-      .OutputSide          = kPrefilterCubeSide,
-      .Roughness           = 0.0f,
+    PrefilterParams prefilter_constant{
+      .Skybox        = skybox,
+      .SkyboxSide    = kEnvCubeSide,
+      .OutputTexture = prefilter,
+      .OutputSide    = kPrefilterCubeSide,
+      .Roughness     = 0.0f,
     };
 
-    UAVHandle brdf_lut_uav_handle = render_device->CreateBindlessHandle(
-        brdf_lut.GetTexture(), CD3DX12_UNORDERED_ACCESS_VIEW_DESC::Tex2D( brdf_lut.GetTexture()->GetDesc().Format ) );
-    tracker.PushHandle( brdf_lut_uav_handle );
-    
-    BrdfLUTConstant brdf_lut_constant{
-      .OutputTextureHandle = brdf_lut_uav_handle,
-      .Width               = kBrdfLutSize,
-      .Height              = kBrdfLutSize,
+    BrdfLUTParams brdf_lut_constant{
+      .OutputTexture = brdf_lut,
+      .Width         = kBrdfLutSize,
+      .Height        = kBrdfLutSize,
     };
 
     auto command_list = context.GetCommandList();
@@ -265,7 +291,7 @@ bool Ember::Environment::TryLoadFrom(
     command_list.SetComputeRootSignature( root_signature.Get() );
 
     command_list.SetPipelineState( eqrect_to_cube_pipeline.Get() );
-    command_list.SetComputeRootConstants( 0, env_cube_root_constant );
+    command_list.BindComputeResources( 0, env_cube_root_constant );
     command_list.Dispatch( {
         .X = kEnvCubeSide / kThreadGroupX,
         .Y = kEnvCubeSide / kThreadGroupY,
@@ -275,14 +301,14 @@ bool Ember::Environment::TryLoadFrom(
     command_list.ResourceBarrier( CD3DX12_RESOURCE_BARRIER::UAV( skybox.GetTexture() ) );
 
     if ( not texture_loader->TryGenerateMipMapCube(
-             command_list.Get(), &skybox, &tracker, D3D12_RESOURCE_STATE_UNORDERED_ACCESS ) )
+             &command_list, &skybox, &tracker, D3D12_RESOURCE_STATE_UNORDERED_ACCESS ) )
       return false;
 
     command_list.ResourceBarrier( CD3DX12_RESOURCE_BARRIER::UAV( skybox.GetTexture() ) );
 
     command_list.SetComputeRootSignature( root_signature.Get() );
     command_list.SetPipelineState( diffuse_irradiance_pipeline.Get() );
-    command_list.SetComputeRootConstants( 0, diffuse_irradiance_root_constant );
+    command_list.BindComputeResources( 0, diffuse_irradiance_root_constant );
     command_list.Dispatch( {
         .X = kDiffuseCubeSide / kThreadGroupX,
         .Y = kDiffuseCubeSide / kThreadGroupY,
@@ -291,11 +317,11 @@ bool Ember::Environment::TryLoadFrom(
 
     for ( uint32_t i = 0; i <= kPrefilterMaxLoD; i++ )
     {
-      prefilter_constant.OutputTextureHandle = prefilter_write_handles[i];
-      prefilter_constant.Roughness           = ( float )i / ( float )kPrefilterMaxLoD;
+      prefilter_constant.LoD       = i;
+      prefilter_constant.Roughness = ( float )i / ( float )kPrefilterMaxLoD;
 
       command_list.SetPipelineState( prefilter_pipeline.Get() );
-      command_list.SetComputeRootConstants( 0, prefilter_constant );
+      command_list.BindComputeResources( 0, prefilter_constant );
       command_list.Dispatch( {
           .X = std::max<uint32_t>( prefilter_constant.OutputSide / kThreadGroupX, 1 ),
           .Y = std::max<uint32_t>( prefilter_constant.OutputSide / kThreadGroupY, 1 ),
@@ -306,7 +332,7 @@ bool Ember::Environment::TryLoadFrom(
     }
 
     command_list.SetPipelineState( brdf_lut_pipeline.Get() );
-    command_list.SetComputeRootConstants( 0, brdf_lut_constant );
+    command_list.BindComputeResources( 0, brdf_lut_constant );
     command_list.Dispatch( {
         .X = kBrdfLutSize / kThreadGroupX,
         .Y = kBrdfLutSize / kThreadGroupY,

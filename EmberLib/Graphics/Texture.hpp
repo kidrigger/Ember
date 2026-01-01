@@ -67,10 +67,13 @@ public:
   [[nodiscard]] D3D12MA::Allocation*  GetAllocation() const;
   [[nodiscard]] Type                  GetType() const noexcept;
   [[nodiscard]] D3D12_RESOURCE_STATES GetCurrentState() const noexcept;
+  void                                SetCurrentState( D3D12_RESOURCE_STATES state ) const noexcept;
   void                                SetName( LPCWSTR name ) const;
 
   [[nodiscard]] SRVHandle             GetSRVHandle() const;
   [[nodiscard]] UAVHandle             GetUAVHandle() const;
+
+  [[nodiscard]] uintptr_t             GetPtrID() const;
 };
 
 enum class TextureUsage
@@ -128,9 +131,10 @@ class TextureManager
       D3D12_CLEAR_VALUE const*     clear_value = nullptr,
       D3D12_RESOURCE_STATES initial_states     = D3D12_RESOURCE_STATE_COMMON ) const;
 
-  Texture                           CreateDepthTexture2D( Tex2DDesc const& create_info );
-  Texture                           CreateRenderTexture2D( Tex2DDesc const& create_info );
-  Texture                           CreateDepthTextureCube( TexCubeDesc const& create_info );
+  Texture CreateDepthTexture2D( Tex2DDesc const& create_info );
+  Texture CreateRenderTexture2D( Tex2DDesc const& create_info );
+  Texture CreateDepthTextureCube( TexCubeDesc const& create_info );
+
 public:
   TextureManager() = default;
   TextureManager(

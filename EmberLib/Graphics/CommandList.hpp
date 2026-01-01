@@ -2,6 +2,7 @@
 
 #include <span>
 #include "RenderTargetManager.hpp"
+#include "ResourceBinder.hpp"
 #include "Util/DataUtil.hpp"
 #include "Util/DirectXHeaders.hpp"
 #include "Util/HelperUtils.hpp"
@@ -10,22 +11,22 @@
 namespace Ember
 {
 
+class Texture;
+
 class CommandList
 {
   ComPtr<ID3D12GraphicsCommandList6>   m_CommandList;
   ComPtr<ID3D12CommandAllocator>       m_CommandAllocator;
   std::unique_ptr<RenderTargetManager> m_RenderTargetManager;
+  std::unique_ptr<ResourceBinder>      m_Binder;
 
 public:
   CommandList() = default;
   CommandList(
       ComPtr<ID3D12GraphicsCommandList6>   command_list,
       ComPtr<ID3D12CommandAllocator>       command_allocator,
-      std::unique_ptr<RenderTargetManager> render_target_manager )
-    : m_CommandList{ std::move( command_list ) }
-    , m_CommandAllocator{ std::move( command_allocator ) }
-    , m_RenderTargetManager{ std::move( render_target_manager ) }
-  {}
+      std::unique_ptr<RenderTargetManager> render_target_manager,
+      std::unique_ptr<ResourceBinder>      binder );
 
   struct ThreadGroupCount
   {
@@ -35,17 +36,24 @@ public:
   };
 
   void CopyResource( ID3D12Resource* dest, ID3D12Resource* source );
+
+  void ResourceBarrier( CD3DX12_RESOURCE_BARRIER const& barriers ) const;
+  void ResourceBarrier( std::span<CD3DX12_RESOURCE_BARRIER> const& barriers ) const;
+
   void SetDescriptorHeaps( std::span<ID3D12DescriptorHeap* const> heaps ) const;
   void SetComputeRootSignature( ID3D12RootSignature* root_signature ) const;
   void SetPipelineState( ID3D12PipelineState* pipeline_state ) const;
   void Dispatch( ThreadGroupCount tgc ) const;
-  void ResourceBarrier( CD3DX12_RESOURCE_BARRIER const& barriers ) const;
-  void ResourceBarrier( std::span<CD3DX12_RESOURCE_BARRIER> const& barriers ) const;
   void SetComputeRootConstants( uint32_t root_parameter_index, auto const& value, uint32_t byte_offset = 0 ) const
-  {
-    // TODO: Move to autocasting process.
+  { // TODO: Move to autocasting process.
     ASSERT( byte_offset % 4 == 0 );
     m_CommandList->SetComputeRoot32BitConstants( root_parameter_index, sizeof( value ) / 4, &value, byte_offset / 4 );
+  }
+
+  void BindComputeResources( uint32_t root_parameter_index, BindableStructure auto const& bindable_structure ) const
+  {
+    auto data = bindable_structure.Bind( m_Binder.get() );
+    m_CommandList->SetComputeRoot32BitConstants( root_parameter_index, sizeof( data ) / 4, &data, 0 );
   }
 
   void SetGraphicsRootSignature( ID3D12RootSignature* root_signature ) const;
@@ -80,12 +88,6 @@ public:
   void ClearRenderTargetView( Texture const& render_target, float const color[] ) const;
   void ClearRenderTargetViews( uint32_t count, ID3D12Resource** render_target, float const color[] ) const;
 
-  // void ClearRenderTargetViews(
-  //     ID3D12GraphicsCommandList* command_list,
-  //     uint32_t                   count,
-  //     Texture const*             render_target,
-  //     float const                color[] ) const;
-
   void ClearDepthStencilView(
       ID3D12Resource* depth_stencil, D3D12_CLEAR_FLAGS flags, float depth, uint8_t stencil ) const;
 
@@ -96,25 +98,20 @@ public:
       ID3D12Resource*                      depth_stencil,
       D3D12_DEPTH_STENCIL_VIEW_DESC const* dsv_desc ) const;
 
-  void OMSetRenderTargets( uint32_t count, Texture const* render_targets, Texture const* depth_stencil ) const;
-  void DiscardResource( ID3D12Resource* resource, D3D12_DISCARD_REGION const* discard_region = nullptr ) const;
+  void    OMSetRenderTargets( uint32_t count, Texture const* render_targets, Texture const* depth_stencil ) const;
+  void    DiscardResource( ID3D12Resource* resource, D3D12_DISCARD_REGION const* discard_region = nullptr ) const;
 
-  // void OMSetRenderTargets(
-  //     ID3D12GraphicsCommandList*           command_list,
-  //     uint32_t                             count,
-  //     Texture const*                       render_targets,
-  //     D3D12_RENDER_TARGET_VIEW_DESC const* rtv_desc,
-  //     Texture const*                       depth_stencil,
-  //     D3D12_DEPTH_STENCIL_VIEW_DESC const* dsv_desc ) const;
-
-  HRESULT                     Reset( ComPtr<ID3D12CommandAllocator> allocator );
-  HRESULT                     Close();
+  HRESULT Reset( ComPtr<ID3D12CommandAllocator> allocator );
+  HRESULT Close();
 
   ID3D12GraphicsCommandList6* Get() const noexcept;
 
-  using Content = std::
-      tuple<ComPtr<ID3D12GraphicsCommandList6>, ComPtr<ID3D12CommandAllocator>, std::unique_ptr<RenderTargetManager>>;
+  using Content = std::tuple<
+      ComPtr<ID3D12GraphicsCommandList6>,
+      ComPtr<ID3D12CommandAllocator>,
+      std::unique_ptr<RenderTargetManager>,
+      std::unique_ptr<ResourceBinder>>;
   [[nodiscard]] Content Release() noexcept;
-};
+}; // namespace Ember
 
 } // namespace Ember

@@ -85,6 +85,11 @@ D3D12_RESOURCE_STATES Ember::Texture::GetCurrentState() const noexcept
   return m_Impl->CurrentState;
 }
 
+void Ember::Texture::SetCurrentState( D3D12_RESOURCE_STATES const state ) const noexcept
+{
+  m_Impl->CurrentState = state;
+}
+
 Ember::SRVHandle Ember::Texture::GetSRVHandle() const
 {
   return m_Impl->Handles.GetSRV();
@@ -96,6 +101,11 @@ Ember::UAVHandle Ember::Texture::GetUAVHandle() const
   auto uav = m_Impl->Handles.GetUAV();
   ASSERT( uav );
   return uav;
+}
+
+uintptr_t Ember::Texture::GetPtrID() const
+{
+  return ( uintptr_t )m_Impl.get();
 }
 
 void Ember::Texture::SetName( LPCWSTR const name ) const
