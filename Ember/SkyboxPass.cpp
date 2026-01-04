@@ -134,7 +134,7 @@ FrameGraphResource Ember::RenderPass::Skybox::Execute(
         {
           FG::Texture const& sky_view = resources.get<FG::Texture>( data.SkyViewLUT );
           cmd->SetPipelineState( self->AtmospherePipeline.Get() );
-          cmd->SetGraphicsRootConstant( 0, ( UINT )sky_view.AsSRV, 1 );
+          cmd->SetGraphicsRootConstant( 0, ( UINT )sky_view.GetSRVHandle(), 1 );
         }
         else
         {

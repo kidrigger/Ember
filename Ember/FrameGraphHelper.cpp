@@ -60,63 +60,7 @@ public:
 
 Ember::FG::Texture Ember::FG::Context::CreateTextureImpl( Texture::Desc const& desc ) const
 {
-  auto [format, width, height, levels, array_size, init_state, flags] = desc;
-
-  ComPtr<ID3D12Resource>      texture;
-  ComPtr<D3D12MA::Allocation> allocation;
-
-  auto resource_desc = CD3DX12_RESOURCE_DESC::Tex2D( format, width, height, array_size, levels, 1, 0, flags );
-
-  std::optional<D3D12_CLEAR_VALUE> clear_value;
-  if ( flags & D3D12_RESOURCE_FLAG_ALLOW_DEPTH_STENCIL )
-  {
-    clear_value = {
-      .Format       = format,
-      .DepthStencil = { .Depth = 1.0f, .Stencil = 0 },
-    };
-  }
-  else if ( flags & D3D12_RESOURCE_FLAG_ALLOW_RENDER_TARGET )
-  {
-    clear_value = {
-      .Format = format,
-      .Color  = { 0.0f, 0.0f, 0.0f, 0.0f },
-    };
-  }
-
-#if not defined( RENDERDOC_COMPAT )
-  D3D12MA::ALLOCATION_DESC const allocation_desc = {
-    .Flags    = D3D12MA::ALLOCATION_FLAG_NONE,
-    .HeapType = D3D12_HEAP_TYPE_DEFAULT,
-  };
-
-  D3D12MA::Allocator* allocator = m_RenderDevice->GetAllocator();
-
-  ERR_ABORT( allocator->CreateResource(
-      &allocation_desc,
-      &resource_desc,
-      init_state,
-      clear_value.has_value() ? &clear_value.value() : nullptr,
-      &allocation,
-      IID_PPV_ARGS( &texture ) ) );
-#else
-  auto const     heap_properties = CD3DX12_HEAP_PROPERTIES{ D3D12_HEAP_TYPE_DEFAULT };
-
-  ID3D12Device2* device          = m_RenderDevice->GetDevice();
-
-  ERR_ABORT( device->CreateCommittedResource(
-      &heap_properties,
-      D3D12_HEAP_FLAG_NONE,
-      &resource_desc,
-      init_state,
-      clear_value.has_value() ? &clear_value.value() : nullptr,
-      IID_PPV_ARGS( &texture ) ) );
-#endif
-
-  return Texture{
-    .Resource     = std::move( texture ),
-    .Allocation   = std::move( allocation ),
-    .CurrentState = init_state,
-  };
+  return m_RenderDevice->CreateTexture( desc );
 }
 
 Ember::FG::Context::Context( RenderDevice* render_device )
@@ -175,7 +119,7 @@ void Ember::FG::Context::SetRenderTarget(
     m_CurrentRenderTargets.LoadOps.resize( index + 1 );
   }
 
-  m_CurrentRenderTargets.Resources[index] = render_target.Resource.Get();
+  m_CurrentRenderTargets.Resources[index] = render_target.GetTexture();
   m_CurrentRenderTargets.Descriptions[index] = {
     .Format        = as_srgb ? DirectX::MakeSRGB(desc.Format) : desc.Format,
     .ViewDimension = D3D12_RTV_DIMENSION_TEXTURE2D,
@@ -197,7 +141,7 @@ void Ember::FG::Context::SetDepthTarget(
       "Depth Target must have the same size as Render Targets." );
 
   m_CurrentDepthTarget = {
-    .Resource = depth_target.Resource.Get(),
+    .Resource = depth_target.GetTexture(),
     .Desc     = {
       .Format        = desc.Format,
       .ViewDimension = D3D12_DSV_DIMENSION_TEXTURE2D,
@@ -299,15 +243,6 @@ void Ember::FG::Context::DestroyTexture( Texture::Desc const& desc, Texture tex 
   auto           it   = m_TransientTextures.Find( hash );
   if ( it == m_TransientTextures.end() ) return;
 
-  auto& srv_cache = m_TextureSRVCache[tex.Resource.Get()];
-  for ( SRVHandle const& handle : srv_cache.Values() )
-  {
-    m_RenderDevice->FreeHandle( handle );
-  }
-  srv_cache.Clear();
-
-  tex.AsSRV = {};
-
   it->second.Push( std::move( tex ) );
 }
 
@@ -327,32 +262,6 @@ void Ember::FG::Context::Update()
         if ( marked_del ) m_TextureCount -= ( uint32_t )val.Queue.size();
         return marked_del;
       } );
-}
-
-Ember::SRVHandle Ember::FG::Context::GetOrCreateSRVHandle(
-    Texture const& texture, CD3DX12_SHADER_RESOURCE_VIEW_DESC const& srv_desc )
-{
-  auto&          cache = m_TextureSRVCache[texture.Resource.Get()];
-
-  uint64_t const hash  = HashFnv1A( srv_desc );
-  if ( auto it = cache.Find( hash ); it != cache.end() )
-  {
-    return it->second;
-  }
-
-  SRVHandle const handle = m_RenderDevice->CreateBindlessHandle( texture.Resource.Get(), srv_desc );
-  return cache.Put( hash, handle );
-}
-
-Ember::FG::Context::~Context()
-{
-  for ( auto const& cache : m_TextureSRVCache.Values() )
-  {
-    for ( auto const& handle : cache.Values() )
-    {
-      m_RenderDevice->FreeHandle( handle );
-    }
-  }
 }
 
 Ember::FG::DepthStencilRead::operator uint32_t() const
@@ -466,12 +375,36 @@ Ember::FG::Write Ember::FG::DecodeWriteFlags( uint32_t const v )
   UNREACHABLE;
 }
 
+Ember::FG::Texture::Texture( Super const& other ) : Super( other )
+{}
+
+Ember::FG::Texture::Texture( Super&& other ) noexcept : Super( std::forward<Super>( other ) )
+{}
+
+Ember::FG::Texture& Ember::FG::Texture::operator=( Super const& other )
+{
+  if ( this != &other )
+  {
+    Super::operator=( other );
+  }
+  return *this;
+}
+
+Ember::FG::Texture& Ember::FG::Texture::operator=( Super&& other ) noexcept
+{
+  if ( this != &other )
+  {
+    Super::operator=( std::forward<Super>( other ) );
+  }
+  return *this;
+}
+
 // ReSharper disable once CppInconsistentNaming
 void Ember::FG::Texture::create( Desc const& desc, void* alloc )
 {
   ASSERT( alloc );
-  Context* context = ( Context* )alloc;
-  *this            = context->CreateTexture( desc );
+  Context* rd = ( Context* )alloc;
+  *this       = rd->CreateTexture( desc );
 }
 
 // ReSharper disable once CppInconsistentNaming
@@ -486,22 +419,23 @@ void Ember::FG::Texture::destroy( Desc const& desc, void* alloc )
 void Ember::FG::Texture::preRead( Desc const& desc, uint32_t const flags, void* context )
 {
   ASSERT( context );
-  Context*   ctx     = ( Context* )context;
+  Context*   ctx           = ( Context* )context;
 
-  auto const decoded = DecodeReadFlags( flags );
+  auto const decoded       = DecodeReadFlags( flags );
+  auto const current_state = GetCurrentState();
 
   switch ( ( ReadType )decoded.index() )
   {
     case ReadType::kDSV:
     {
-      ASSERT( desc.Flags & D3D12_RESOURCE_FLAG_ALLOW_DEPTH_STENCIL );
+      ASSERT( desc.Usage == TextureUsage::kDepthStencil );
       auto const depth_stencil = std::get<DepthStencilRead>( decoded );
 
-      if ( CurrentState != D3D12_RESOURCE_STATE_DEPTH_READ )
+      if ( current_state != D3D12_RESOURCE_STATE_DEPTH_READ )
       {
         ctx->PushBarrier(
-            CD3DX12_RESOURCE_BARRIER::Transition( Resource.Get(), CurrentState, D3D12_RESOURCE_STATE_DEPTH_READ ) );
-        CurrentState = D3D12_RESOURCE_STATE_DEPTH_READ;
+            CD3DX12_RESOURCE_BARRIER::Transition( GetTexture(), current_state, D3D12_RESOURCE_STATE_DEPTH_READ ) );
+        SetCurrentState( D3D12_RESOURCE_STATE_DEPTH_READ );
       }
       ctx->SetDepthTarget( *this, desc, LoadOperation::kLoad );
     }
@@ -512,24 +446,20 @@ void Ember::FG::Texture::preRead( Desc const& desc, uint32_t const flags, void* 
       auto const required_state = srv.PixelShaderUse ? D3D12_RESOURCE_STATE_PIXEL_SHADER_RESOURCE
                                                      : D3D12_RESOURCE_STATE_NON_PIXEL_SHADER_RESOURCE;
 
-      auto       srv_desc       = CD3DX12_SHADER_RESOURCE_VIEW_DESC::Tex2D( desc.Format );
-
-      AsSRV                     = ctx->GetOrCreateSRVHandle( *this, srv_desc );
-
-      if ( CurrentState != required_state )
+      if ( current_state != required_state )
       {
-        ctx->PushBarrier( CD3DX12_RESOURCE_BARRIER::Transition( Resource.Get(), CurrentState, required_state ) );
-        CurrentState = required_state;
+        ctx->PushBarrier( CD3DX12_RESOURCE_BARRIER::Transition( GetTexture(), current_state, required_state ) );
+        SetCurrentState( required_state );
       }
     }
     break;
     case ReadType::kCopy:
     {
-      if ( CurrentState != D3D12_RESOURCE_STATE_COPY_SOURCE )
+      if ( current_state != D3D12_RESOURCE_STATE_COPY_SOURCE )
       {
         ctx->PushBarrier(
-            CD3DX12_RESOURCE_BARRIER::Transition( Resource.Get(), CurrentState, D3D12_RESOURCE_STATE_COPY_SOURCE ) );
-        CurrentState = D3D12_RESOURCE_STATE_COPY_SOURCE;
+            CD3DX12_RESOURCE_BARRIER::Transition( GetTexture(), current_state, D3D12_RESOURCE_STATE_COPY_SOURCE ) );
+        SetCurrentState( D3D12_RESOURCE_STATE_COPY_SOURCE );
       }
     }
     break;
@@ -542,47 +472,48 @@ void Ember::FG::Texture::preRead( Desc const& desc, uint32_t const flags, void* 
 void Ember::FG::Texture::preWrite( [[maybe_unused]] Desc const& desc, uint32_t const flags, void* context )
 {
   ASSERT( context );
-  Context* ctx     = ( Context* )context;
+  Context*   ctx           = ( Context* )context;
 
-  auto     decoded = DecodeWriteFlags( flags );
+  auto const decoded       = DecodeWriteFlags( flags );
+  auto const current_state = GetCurrentState();
 
   switch ( ( WriteType )decoded.index() )
   {
     case WriteType::kRTV:
     {
-      ASSERT( desc.Flags & D3D12_RESOURCE_FLAG_ALLOW_RENDER_TARGET );
+      ASSERT( desc.Usage == TextureUsage::kRenderTarget );
       auto const attachment = std::get<Attachment>( decoded );
 
-      if ( CurrentState != D3D12_RESOURCE_STATE_RENDER_TARGET )
+      if ( current_state != D3D12_RESOURCE_STATE_RENDER_TARGET )
       {
         ctx->PushBarrier(
-            CD3DX12_RESOURCE_BARRIER::Transition( Resource.Get(), CurrentState, D3D12_RESOURCE_STATE_RENDER_TARGET ) );
-        CurrentState = D3D12_RESOURCE_STATE_RENDER_TARGET;
+            CD3DX12_RESOURCE_BARRIER::Transition( GetTexture(), current_state, D3D12_RESOURCE_STATE_RENDER_TARGET ) );
+        SetCurrentState( D3D12_RESOURCE_STATE_RENDER_TARGET );
       }
       ctx->SetRenderTarget( attachment.Index, *this, desc, attachment.ForceSrgb, attachment.LoadOp );
     }
     break;
     case WriteType::kDSV:
     {
-      ASSERT( desc.Flags & D3D12_RESOURCE_FLAG_ALLOW_DEPTH_STENCIL );
+      ASSERT( desc.Usage == TextureUsage::kDepthStencil );
       auto const depth_stencil = std::get<DepthStencil>( decoded );
 
-      if ( CurrentState != D3D12_RESOURCE_STATE_DEPTH_WRITE )
+      if ( current_state != D3D12_RESOURCE_STATE_DEPTH_WRITE )
       {
         ctx->PushBarrier(
-            CD3DX12_RESOURCE_BARRIER::Transition( Resource.Get(), CurrentState, D3D12_RESOURCE_STATE_DEPTH_WRITE ) );
-        CurrentState = D3D12_RESOURCE_STATE_DEPTH_WRITE;
+            CD3DX12_RESOURCE_BARRIER::Transition( GetTexture(), current_state, D3D12_RESOURCE_STATE_DEPTH_WRITE ) );
+        SetCurrentState( D3D12_RESOURCE_STATE_DEPTH_WRITE );
       }
       ctx->SetDepthTarget( *this, desc, depth_stencil.LoadOp );
     }
     break;
     case WriteType::kCopy:
     {
-      if ( CurrentState != D3D12_RESOURCE_STATE_COPY_DEST )
+      if ( current_state != D3D12_RESOURCE_STATE_COPY_DEST )
       {
         ctx->PushBarrier(
-            CD3DX12_RESOURCE_BARRIER::Transition( Resource.Get(), CurrentState, D3D12_RESOURCE_STATE_COPY_DEST ) );
-        CurrentState = D3D12_RESOURCE_STATE_COPY_DEST;
+            CD3DX12_RESOURCE_BARRIER::Transition( GetTexture(), current_state, D3D12_RESOURCE_STATE_COPY_DEST ) );
+        SetCurrentState( D3D12_RESOURCE_STATE_COPY_DEST );
       }
     }
     break;

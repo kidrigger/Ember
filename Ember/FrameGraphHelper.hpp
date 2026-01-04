@@ -105,23 +105,18 @@ Read DecodeReadFlags( uint32_t v );
 using Write = std::variant<Attachment, DepthStencil, CopyDst>;
 Write DecodeWriteFlags( uint32_t v );
 
-struct Texture
+class Texture : public ::Ember::Texture
 {
-  ComPtr<ID3D12Resource>      Resource;
-  ComPtr<D3D12MA::Allocation> Allocation;
-  D3D12_RESOURCE_STATES       CurrentState;
-  SRVHandle                   AsSRV;
+  using Super = ::Ember::Texture;
 
-  struct Desc
-  {
-    DXGI_FORMAT           Format;
-    uint32_t              Width;
-    uint32_t              Height;
-    uint16_t              MipLevels{ 0 };
-    uint16_t              ArraySize{ 1 };
-    D3D12_RESOURCE_STATES InitState{ D3D12_RESOURCE_STATE_COMMON };
-    D3D12_RESOURCE_FLAGS  Flags{ D3D12_RESOURCE_FLAG_NONE };
-  };
+public:
+  using Desc = Super::Desc;
+
+  Texture()  = default;
+  Texture( Super const& other );
+  Texture( Super&& other ) noexcept;
+  Texture& operator=( Super const& other );
+  Texture& operator=( Super&& other ) noexcept;
 
   // ReSharper disable once CppInconsistentNaming
   void create( Desc const& desc, void* alloc );
@@ -189,23 +184,20 @@ private:
     LoadOperation                 LoadOp;
   };
 
-  using SRVCacheType = FlatMap<uint64_t, SRVHandle>;
+  RenderDevice*                         m_RenderDevice;
+  FrameData                             m_FrameData;
+  FlatMap<uint64_t, TexturePoolEntry>   m_TransientTextures;
 
-  RenderDevice*                          m_RenderDevice;
-  FrameData                              m_FrameData;
-  FlatMap<uint64_t, TexturePoolEntry>    m_TransientTextures;
-  FlatMap<ID3D12Resource*, SRVCacheType> m_TextureSRVCache;
+  std::vector<CD3DX12_RESOURCE_BARRIER> m_Barriers;
+  RenderTargets                         m_CurrentRenderTargets;
+  DepthTargetEntry                      m_CurrentDepthTarget;
+  DirectX::XMUINT2                      m_RenderTargetSize;
 
-  std::vector<CD3DX12_RESOURCE_BARRIER>  m_Barriers;
-  RenderTargets                          m_CurrentRenderTargets;
-  DepthTargetEntry                       m_CurrentDepthTarget;
-  DirectX::XMUINT2                       m_RenderTargetSize;
+  uint64_t                              m_TickCounter;
+  uint32_t                              m_TextureCount;
 
-  uint64_t                               m_TickCounter;
-  uint32_t                               m_TextureCount;
-
-  [[nodiscard]] Texture                  CreateTextureImpl( Texture::Desc const& desc ) const;
-  void                                   FlushBarriers();
+  [[nodiscard]] Texture                 CreateTextureImpl( Texture::Desc const& desc ) const;
+  void                                  FlushBarriers();
 
 public:
   Context() = default;
@@ -228,13 +220,6 @@ public:
 
   [[nodiscard]] uint32_t GetTextureCount() const;
   void                   Update();
-  SRVHandle GetOrCreateSRVHandle( Texture const& texture, CD3DX12_SHADER_RESOURCE_VIEW_DESC const& srv_desc );
-
-  Context( Context const& other )                = delete;
-  Context( Context&& other ) noexcept            = default;
-  Context& operator=( Context const& other )     = delete;
-  Context& operator=( Context&& other ) noexcept = default;
-  ~Context();
 };
 
 } // namespace FG

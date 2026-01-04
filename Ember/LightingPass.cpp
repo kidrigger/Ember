@@ -157,13 +157,13 @@ FrameGraphResource Ember::RenderPass::OmniLightDeferred::Execute(
         auto const&              backbuffer_info = bb.get<FG::BackbufferInfo>();
         FrameGraphResource const render_target   = builder.create<FG::Texture>(
             "Main Render Target",
-            FG::Texture::Desc{
+            {
                   .Format    = backbuffer_info.SwapchainFormat,
                   .Width     = backbuffer_info.Width,
                   .Height    = backbuffer_info.Height,
                   .MipLevels = MipLevels::kBase,
+                  .Usage     = TextureUsage::kRenderTarget,
                   .InitState = D3D12_RESOURCE_STATE_RENDER_TARGET,
-                  .Flags     = D3D12_RESOURCE_FLAG_ALLOW_RENDER_TARGET,
             } );
 
         data.RenderTarget = builder.write(
@@ -189,7 +189,7 @@ FrameGraphResource Ember::RenderPass::OmniLightDeferred::Execute(
         SRVHandle   gbuffer_handles[GBuffer::kGBufferCount];
         for ( uint32_t i = 0; i < GBuffer::kGBufferCount; i++ )
         {
-          gbuffer_handles[i] = resources.get<FG::Texture>( data.GBuffer[i] ).AsSRV;
+          gbuffer_handles[i] = resources.get<FG::Texture>( data.GBuffer[i] ).GetSRVHandle();
         }
 
         cmd->SetGraphicsRootSignature( self->RootSignature.Get() );
@@ -362,7 +362,7 @@ FrameGraphResource Ember::RenderPass::SpotLightDeferred::Execute(
         SRVHandle gbuffer_handles[GBuffer::kGBufferCount];
         for ( uint32_t i = 0; i < GBuffer::kGBufferCount; i++ )
         {
-          gbuffer_handles[i] = resources.get<FG::Texture>( data.GBuffer[i] ).AsSRV;
+          gbuffer_handles[i] = resources.get<FG::Texture>( data.GBuffer[i] ).GetSRVHandle();
         }
 
         auto const& constants = bb->get<PerFrameConstants>();
@@ -522,7 +522,7 @@ FrameGraphResource Ember::RenderPass::ScreenSpaceLightDeferred::Execute(
         SRVHandle gbuffer_handles[GBuffer::kGBufferCount];
         for ( uint32_t i = 0; i < GBuffer::kGBufferCount; i++ )
         {
-          gbuffer_handles[i] = resources.get<FG::Texture>( data.GBuffer[i] ).AsSRV;
+          gbuffer_handles[i] = resources.get<FG::Texture>( data.GBuffer[i] ).GetSRVHandle();
         }
 
         auto const& constants = bb->get<PerFrameConstants>();

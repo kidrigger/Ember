@@ -125,8 +125,8 @@ Ember::RenderPass::GBuffer::Data Ember::RenderPass::GBuffer::Execute(
           .Width     = backbuffer_info.Width,
           .Height    = backbuffer_info.Height,
           .MipLevels = MipLevels::kBase,
+          .Usage     = TextureUsage::kRenderTarget,
           .InitState = D3D12_RESOURCE_STATE_RENDER_TARGET,
-          .Flags     = D3D12_RESOURCE_FLAG_ALLOW_RENDER_TARGET,
         };
 
         for ( int i = 0; i < kGBufferCount; i++ )

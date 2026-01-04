@@ -63,21 +63,19 @@ class BasicApp final : public IApp
   RenderPass::TransparencyForward m_RenderTransparentMeshes;
 
   // Environment
-  RenderPass::Atmosphere               m_UpdateAtmosphericSky;
-  RenderPass::Skybox                   m_RenderBackground;
+  RenderPass::Atmosphere           m_UpdateAtmosphericSky;
+  RenderPass::Skybox               m_RenderBackground;
 
-  DXGI_FORMAT                          m_SwapchainFormat;
+  std::unique_ptr<Camera>          m_Camera;
+  DirectX::XMUINT2                 m_PrevMouse{};
+  Buffer                           m_ConfigurationBuffer;
 
-  std::unique_ptr<Camera>              m_Camera;
-  DirectX::XMUINT2                     m_PrevMouse{};
-  Buffer                               m_ConfigurationBuffer;
-
-  std::unique_ptr<Environment>         m_Environment;
-  std::unique_ptr<MaterialManager>     m_MaterialManager;
-  std::unique_ptr<GeometryManager>     m_GeometryManager;
-  std::unique_ptr<World>               m_World;
-  DrawList                             m_DrawList;
-  RenderQueryType                      m_RenderQuery;
+  std::unique_ptr<Environment>     m_Environment;
+  std::unique_ptr<MaterialManager> m_MaterialManager;
+  std::unique_ptr<GeometryManager> m_GeometryManager;
+  std::unique_ptr<World>           m_World;
+  DrawList                         m_DrawList;
+  RenderQueryType                  m_RenderQuery;
   // TODO: Organize init and destroy.
   std::unique_ptr<LightManager> m_LightManager;
 
@@ -89,16 +87,16 @@ class BasicApp final : public IApp
 
 public:
   BasicApp(
-      HWND                                 window_handle,
-      std::unique_ptr<RenderDevice>        render_device,
-      std::unique_ptr<PerfCounter>         perf_counter,
-      std::unique_ptr<Camera>              camera,
-      std::unique_ptr<Environment>         environment,
-      std::unique_ptr<MaterialManager>     material_manager,
-      std::unique_ptr<GeometryManager>     geometry_manager,
-      std::unique_ptr<World>               world,
-      std::unique_ptr<LightManager>        light_manager,
-      std::unique_ptr<TextureLoader>       texture_loader );
+      HWND                             window_handle,
+      std::unique_ptr<RenderDevice>    render_device,
+      std::unique_ptr<PerfCounter>     perf_counter,
+      std::unique_ptr<Camera>          camera,
+      std::unique_ptr<Environment>     environment,
+      std::unique_ptr<MaterialManager> material_manager,
+      std::unique_ptr<GeometryManager> geometry_manager,
+      std::unique_ptr<World>           world,
+      std::unique_ptr<LightManager>    light_manager,
+      std::unique_ptr<TextureLoader>   texture_loader );
 
   void        LoadContent() override;
   void        Update() override;

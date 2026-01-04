@@ -14,42 +14,57 @@
 #pragma comment( lib, "D3DCompiler.lib" )
 #pragma comment( lib, "dxgi.lib" )
 
-void UpdateRenderTargetViews(
-    ComPtr<ID3D12Device> const&              device,
-    ComPtr<IDXGISwapChain4> const&           swapchain,
-    ComPtr<ID3D12DescriptorHeap> const&      rtv_descriptor_heap,
-    UINT                                     rtv_descriptor_size,
-    std::span<ComPtr<ID3D12Resource>> const& backbuffers );
+namespace
+{
+
+Ember::TextureDesc GetBackbufferDesc( DXGI_FORMAT format, uint32_t width, uint32_t height )
+{
+  return {
+    .Format    = format,
+    .Width     = width,
+    .Height    = height,
+    .MipLevels = Ember::MipLevels::kBase,
+    .ArraySize = 1,
+    .Usage     = Ember::TextureUsage::kRenderTarget,
+    .Dim       = Ember::TextureDim::k2D,
+    .InitState = D3D12_RESOURCE_STATE_PRESENT,
+  };
+}
+} // namespace
 
 Ember::RenderDevice::RenderDevice(
-    ComPtr<ID3D12Device2>               device,
-    ComPtr<D3D12MA::Allocator>          allocator,
-    uint32_t const                      swapchain_width,
-    uint32_t const                      swapchain_height,
-    ComPtr<IDXGISwapChain4>             swapchain,
-    std::vector<ComPtr<ID3D12Resource>> backbuffers,
-    ComPtr<ID3D12DescriptorHeap>        rtv_descriptor_heap,
-    uint32_t const                      rtv_descriptor_size,
-    ComPtr<ID3D12DescriptorHeap>        dsv_descriptor_heap,
-    std::unique_ptr<BindlessManager>    bindless_manager,
-    Context                             direct_context,
-    bool const                          is_tearing_supported )
+    ComPtr<ID3D12Device2>            device,
+    ComPtr<D3D12MA::Allocator>       allocator,
+    uint32_t const                   swapchain_width,
+    uint32_t const                   swapchain_height,
+    DXGI_FORMAT const                swapchain_format,
+    ComPtr<IDXGISwapChain4>          swapchain,
+    std::unique_ptr<BindlessManager> bindless_manager,
+    Context                          direct_context,
+    bool const                       is_tearing_supported )
   : m_Device{ std::move( device ) }
   , m_Allocator{ std::move( allocator ) }
   , m_SwapchainWidth{ swapchain_width }
   , m_SwapchainHeight{ swapchain_height }
+  , m_SwapchainFormat{ swapchain_format }
   , m_Swapchain{ std::move( swapchain ) }
-  , m_Backbuffers{ std::move( backbuffers ) }
-  , m_RTVDescriptorHeap{ std::move( rtv_descriptor_heap ) }
-  , m_RTVDescriptorSize{ rtv_descriptor_size }
-  , m_DSVDescriptorHeap{ std::move( dsv_descriptor_heap ) }
   , m_Bindless{ std::move( bindless_manager ) }
   , m_BufferManager{ m_Device, m_Allocator, m_Bindless.get() }
   , m_TextureManager{ m_Device, m_Allocator, m_Bindless.get() }
   , m_DirectContext{ std::move( direct_context ) }
 {
   auto const always_true_receipt = m_DirectContext.CreateReceipt();
-  m_FrameReceipts.resize( m_Backbuffers.size(), always_true_receipt );
+  m_FrameReceipts.resize( kNumFrames, always_true_receipt );
+
+  m_Backbuffers.reserve( kNumFrames );
+  for ( size_t i = 0; i < kNumFrames; i++ )
+  {
+    ComPtr<ID3D12Resource> backbuffer_resource;
+    ERR_ABORT( m_Swapchain->GetBuffer( ( UINT )i, IID_PPV_ARGS( &backbuffer_resource ) ) );
+    m_Backbuffers.push_back( m_TextureManager.ImportTexture(
+        std::move( backbuffer_resource ),
+        GetBackbufferDesc( m_SwapchainFormat, m_SwapchainWidth, m_SwapchainHeight ) ) );
+  }
 
   if ( is_tearing_supported )
   {
@@ -72,11 +87,9 @@ ID3D12CommandQueue* Ember::RenderDevice::GetDirectQueue() const noexcept
   return m_DirectContext.GetCommandQueue();
 }
 
-DXGI_FORMAT Ember::RenderDevice::FetchSwapchainFormat() const
+DXGI_FORMAT Ember::RenderDevice::GetSwapchainFormat() const
 {
-  DXGI_SWAP_CHAIN_DESC desc;
-  ERR_ABORT( m_Swapchain->GetDesc( &desc ) );
-  return desc.BufferDesc.Format;
+  return m_SwapchainFormat;
 }
 
 D3D_ROOT_SIGNATURE_VERSION Ember::RenderDevice::FetchHighestRootSignatureVersion() const
@@ -253,11 +266,12 @@ void Ember::RenderDevice::Create( RenderDevice* render_device, HWND window_handl
 
   // Swapchain Creation
   ComPtr<IDXGISwapChain4> swapchain;
+  DXGI_FORMAT const       swapchain_format = DXGI_FORMAT_R8G8B8A8_UNORM;
   {
     DXGI_SWAP_CHAIN_DESC1 swapchain_desc = {
       .Width       = width,
       .Height      = height,
-      .Format      = DXGI_FORMAT_R8G8B8A8_UNORM,
+      .Format      = swapchain_format,
       .Stereo      = FALSE,
       .SampleDesc  = { 1, 0 },
       .BufferUsage = DXGI_USAGE_RENDER_TARGET_OUTPUT,
@@ -275,42 +289,13 @@ void Ember::RenderDevice::Create( RenderDevice* render_device, HWND window_handl
     ERR_ABORT( swapchain1.As( &swapchain ) );
   }
 
-  // Create DescriptorHeap
-  ComPtr<ID3D12DescriptorHeap>        rtv_descriptor_heap;
-  UINT                                rtv_descriptor_size;
-  std::vector<ComPtr<ID3D12Resource>> backbuffers( kNumFrames );
-  {
-    D3D12_DESCRIPTOR_HEAP_DESC desc = {
-      .Type           = D3D12_DESCRIPTOR_HEAP_TYPE_RTV,
-      .NumDescriptors = kNumFrames,
-    };
-
-    ERR_ABORT( device->CreateDescriptorHeap( &desc, IID_PPV_ARGS( &rtv_descriptor_heap ) ) );
-    rtv_descriptor_size = device->GetDescriptorHandleIncrementSize( D3D12_DESCRIPTOR_HEAP_TYPE_RTV );
-
-    UpdateRenderTargetViews( device, swapchain, rtv_descriptor_heap, rtv_descriptor_size, backbuffers );
-  }
-
-  ComPtr<ID3D12DescriptorHeap> dsv_descriptor_heap;
-  {
-    D3D12_DESCRIPTOR_HEAP_DESC desc = {
-      .Type           = D3D12_DESCRIPTOR_HEAP_TYPE_DSV,
-      .NumDescriptors = 1,
-    };
-
-    ERR_ABORT( device->CreateDescriptorHeap( &desc, IID_PPV_ARGS( &dsv_descriptor_heap ) ) );
-  }
-
   new ( render_device ) RenderDevice{
     std::move( device ),
     std::move( allocator ),
     width,
     height,
+    swapchain_format,
     std::move( swapchain ),
-    std::move( backbuffers ),
-    std::move( rtv_descriptor_heap ),
-    rtv_descriptor_size,
-    std::move( dsv_descriptor_heap ),
     std::move( bindless_manager ),
     std::move( direct_context ),
     is_tearing_supported,
@@ -326,10 +311,7 @@ void Ember::RenderDevice::ResizeSwapchain( uint32_t const width, uint32_t const 
 
     m_DirectContext.WaitIdle();
 
-    for ( int i = 0; i < kNumFrames; ++i )
-    {
-      m_Backbuffers[i].Reset();
-    }
+    m_Backbuffers.clear();
 
     DXGI_SWAP_CHAIN_DESC swapchain_desc = {};
     ERR_ABORT( m_Swapchain->GetDesc( &swapchain_desc ) );
@@ -339,7 +321,14 @@ void Ember::RenderDevice::ResizeSwapchain( uint32_t const width, uint32_t const 
 
     m_CurrentBackbufferIndex = m_Swapchain->GetCurrentBackBufferIndex();
 
-    UpdateRenderTargetViews( m_Device, m_Swapchain, m_RTVDescriptorHeap, m_RTVDescriptorSize, m_Backbuffers );
+    for ( size_t i = 0; i < kNumFrames; i++ )
+    {
+      ComPtr<ID3D12Resource> backbuffer_resource;
+      ERR_ABORT( m_Swapchain->GetBuffer( ( UINT )i, IID_PPV_ARGS( &backbuffer_resource ) ) );
+      m_Backbuffers.push_back( m_TextureManager.ImportTexture(
+          std::move( backbuffer_resource ),
+          GetBackbufferDesc( m_SwapchainFormat, m_SwapchainWidth, m_SwapchainHeight ) ) );
+    }
   }
 }
 
@@ -376,6 +365,11 @@ Ember::Texture Ember::RenderDevice::CreateTexture2D( Tex2DDesc const& create_inf
 Ember::Texture Ember::RenderDevice::CreateTextureCube( TexCubeDesc const& create_info )
 {
   return m_TextureManager.CreateTextureCube( create_info );
+}
+
+Ember::Texture Ember::RenderDevice::CreateTexture( TextureDesc const& desc )
+{
+  return m_TextureManager.CreateTexture( desc );
 }
 
 Ember::Sampler Ember::RenderDevice::CreateSampler( D3D12_SAMPLER_DESC const& sampler_desc )
@@ -458,9 +452,9 @@ void Ember::RenderDevice::WaitIdle()
   m_DirectContext.WaitIdle();
 }
 
-ID3D12Resource* Ember::RenderDevice::GetCurrentBackbuffer() const noexcept
+Ember::Texture Ember::RenderDevice::GetCurrentBackbuffer() const noexcept
 {
-  return m_Backbuffers[m_CurrentBackbufferIndex].Get();
+  return m_Backbuffers[m_CurrentBackbufferIndex];
 }
 
 Ember::CommandList Ember::RenderDevice::GetGraphicsCommandList() noexcept
@@ -471,17 +465,6 @@ Ember::CommandList Ember::RenderDevice::GetGraphicsCommandList() noexcept
 uint32_t Ember::RenderDevice::GetCurrentFrameIndex() const noexcept
 {
   return m_CurrentBackbufferIndex;
-}
-
-CD3DX12_CPU_DESCRIPTOR_HANDLE Ember::RenderDevice::GetCurrentRTVCpuDescriptorHandle() const noexcept
-{
-  return CD3DX12_CPU_DESCRIPTOR_HANDLE(
-      m_RTVDescriptorHeap->GetCPUDescriptorHandleForHeapStart(), m_CurrentBackbufferIndex, m_RTVDescriptorSize );
-}
-
-CD3DX12_CPU_DESCRIPTOR_HANDLE Ember::RenderDevice::GetCurrentDSVCpuDescriptorHandle() const noexcept
-{
-  return CD3DX12_CPU_DESCRIPTOR_HANDLE( m_DSVDescriptorHeap->GetCPUDescriptorHandleForHeapStart() );
 }
 
 void Ember::RenderDevice::ExecuteCommandList( CommandList&& command_list )
@@ -519,33 +502,4 @@ bool Ember::RenderDevice::IsVsyncEnabled() const
 bool Ember::RenderDevice::IsTearingSupported() const
 {
   return m_VsyncAndTearing & kSupportTearingBit;
-}
-
-Ember::RenderDevice::~RenderDevice()
-{
-  if ( m_Device ) WaitIdle();
-}
-
-void UpdateRenderTargetViews(
-    ComPtr<ID3D12Device> const&              device,
-    ComPtr<IDXGISwapChain4> const&           swapchain,
-    ComPtr<ID3D12DescriptorHeap> const&      rtv_descriptor_heap,
-    UINT const                               rtv_descriptor_size,
-    std::span<ComPtr<ID3D12Resource>> const& backbuffers )
-{
-  size_t const                  backbuffer_count = backbuffers.size();
-
-  CD3DX12_CPU_DESCRIPTOR_HANDLE rtv_handle{ rtv_descriptor_heap->GetCPUDescriptorHandleForHeapStart() };
-  // Fetch all backbuffers, create RTV and write them to the heap.
-  for ( int i = 0; i < backbuffer_count; ++i )
-  {
-    // Write the swapchain backbuffer into the array.
-    ERR_ABORT( swapchain->GetBuffer( i, IID_PPV_ARGS( &backbuffers[i] ) ) );
-
-    // Creates the view for the backbuffer and places it at the rtvHandle.
-    device->CreateRenderTargetView( backbuffers[i].Get(), nullptr, rtv_handle );
-
-    // Increment rtvHandle by the size of rtvDescriptor.
-    rtv_handle.Offset( ( INT )rtv_descriptor_size );
-  }
 }

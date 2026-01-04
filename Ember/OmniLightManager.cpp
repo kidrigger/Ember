@@ -166,7 +166,7 @@ Ember::SRVHandle Ember::Internal::OmniLightManager::AllocateOmniShadow()
     m_ActiveShadows.emplace_back( m_RenderDevice->CreateTextureCube( {
         .Format    = DXGI_FORMAT_D16_UNORM,
         .Side      = kOmniShadowResolution,
-        .Usage     = TextureUsage::kDepthSample,
+        .Usage     = TextureUsage::kDepthStencil,
         .MipLevels = MipLevels::kBase,
         .InitState = D3D12_RESOURCE_STATE_PIXEL_SHADER_RESOURCE,
     } ) );

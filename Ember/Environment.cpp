@@ -125,7 +125,7 @@ bool Ember::Environment::TryLoadFrom(
 
       BoundDataType Bind( ResourceBinder* binder ) const
       {
-        auto const desc = CD3DX12_UNORDERED_ACCESS_VIEW_DESC::Tex2DArray( Format, -1, 0, LoD );
+        auto const desc = CD3DX12_UNORDERED_ACCESS_VIEW_DESC::Tex2DArray( Format, UINT32_MAX, 0, LoD );
         return {
           .Skybox        = binder->BindSRV( Skybox ),
           .SkyboxSide    = SkyboxSide,

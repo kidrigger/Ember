@@ -28,7 +28,7 @@ Ember::SRVHandle Ember::Internal::DirectionLightManager::AllocateShadow()
         .Format    = DXGI_FORMAT_D16_UNORM,
         .Width     = kDirShadowResolution,
         .Height    = kDirShadowResolution,
-        .Usage     = TextureUsage::kDepthSample,
+        .Usage     = TextureUsage::kDepthStencil,
         .MipLevels = MipLevels::kBase,
         .ArraySize = kNumCascades,
         .InitState = D3D12_RESOURCE_STATE_PIXEL_SHADER_RESOURCE,

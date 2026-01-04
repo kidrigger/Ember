@@ -164,18 +164,15 @@ Ember::RenderPass::Atmosphere::Data Ember::RenderPass::Atmosphere::Execute(
   // Need to fix by supporting persistent resources in frame graph allocator.
   FrameGraphResource const transmittance_lut = frame_graph->import(
       "Transmittance LUT",
-      FG::Texture::Desc{
+      {
           .Format    = kTransmittanceLUTFormat,
           .Width     = kTransmittanceLUTSize.x,
           .Height    = kTransmittanceLUTSize.y,
           .MipLevels = MipLevels::kBase,
+          .Usage     = TextureUsage::kRenderTarget,
           .InitState = D3D12_RESOURCE_STATE_PIXEL_SHADER_RESOURCE,
-          .Flags     = D3D12_RESOURCE_FLAG_ALLOW_RENDER_TARGET,
       },
-      FG::Texture{
-          .Resource     = m_TransmittanceLUT.GetTexture(),
-          .CurrentState = D3D12_RESOURCE_STATE_PIXEL_SHADER_RESOURCE,
-      } );
+      FG::Texture{ m_TransmittanceLUT } );
 
   FrameGraphResource const param_buffer =
       frame_graph->import( "Param Buffer", FG::Buffer::Desc{}, FG::Buffer{ m_AtmosphereParamBuffers[frame_idx] } );
@@ -224,13 +221,13 @@ Ember::RenderPass::Atmosphere::Data Ember::RenderPass::Atmosphere::Execute(
       {
         FrameGraphResource const sky_view_lut = builder.create<FG::Texture>(
             "Sky View LUT",
-            FG::Texture::Desc{
+            {
                 .Format    = kSkyViewLUTFormat,
                 .Width     = kSkyViewLUTSize.x,
                 .Height    = kSkyViewLUTSize.y,
                 .MipLevels = MipLevels::kBase,
+                .Usage     = TextureUsage::kRenderTarget,
                 .InitState = D3D12_RESOURCE_STATE_PIXEL_SHADER_RESOURCE,
-                .Flags     = D3D12_RESOURCE_FLAG_ALLOW_RENDER_TARGET,
             } );
         data.TransmittanceLUT = builder.read( transmittance.TransmittanceLUT, FG::ShaderResource{} );
 
@@ -259,7 +256,7 @@ Ember::RenderPass::Atmosphere::Data Ember::RenderPass::Atmosphere::Execute(
         cmd->SetPipelineState( self->m_SkyViewLUTPipeline.Get() );
         cmd->SetGraphicsRootConstantBufferView( 0, params.InnerBuffer.GetGPUVirtualAddress() );
         cmd->SetGraphicsRootConstants( 1, constants );
-        cmd->SetGraphicsRootConstants( 2, transmittance_lut.AsSRV );
+        cmd->SetGraphicsRootConstants( 2, transmittance_lut.GetSRVHandle() );
         cmd->DrawInstanced( 3, 1, 0, 0 );
       } );
 

@@ -164,7 +164,6 @@ Ember::BasicApp::BasicApp(
   , m_RenderDevice{ std::move( render_device ) }
   , m_PerfCounter{ std::move( perf_counter ) }
   , m_FGContext{}
-  , m_SwapchainFormat{ m_RenderDevice->FetchSwapchainFormat() }
   , m_Camera{ std::move( camera ) }
   , m_Environment{ std::move( environment ) }
   , m_MaterialManager{ std::move( material_manager ) }
@@ -188,7 +187,8 @@ Ember::BasicApp::BasicApp(
 
   m_FGBlackboard.add<PerFrameConstants>();
   m_FGBlackboard.add<Environment::GpuRepr>();
-  m_FGBlackboard.add<FG::BackbufferInfo>( m_SwapchainFormat, kDepthFormat, m_WindowWidth, m_WindowHeight );
+  m_FGBlackboard.add<FG::BackbufferInfo>(
+      m_RenderDevice->GetSwapchainFormat(), kDepthFormat, m_WindowWidth, m_WindowHeight );
   m_FGBlackboard.add<DrawList::Batches>();
 }
 
@@ -257,30 +257,32 @@ Ember::BasicApp::~BasicApp() // NOLINT(modernize-use-equals-default)
 
 void Ember::BasicApp::SetupRenderPasses()
 {
+  auto const swapchain_format = m_RenderDevice->GetSwapchainFormat();
+
   ENSURE( RenderPass::DepthPrePass::Create( &m_DrawPrePass, m_RenderDevice.get(), kDepthFormat ) );
   ENSURE( RenderPass::OpaqueForward::Create(
       &m_RenderOpaqueMeshes,
       {
           .RenderDevice          = m_RenderDevice.get(),
-          .RenderTargetFormat    = DirectX::MakeSRGB( m_SwapchainFormat ),
+          .RenderTargetFormat    = DirectX::MakeSRGB( swapchain_format ),
           .DepthStencilFormat    = kDepthFormat,
           .DependsOnDepthPrePass = true,
       } ) );
 
   ENSURE( RenderPass::GBuffer::Create( &m_UpdateGBuffer, m_RenderDevice.get(), kDepthFormat ) );
   ENSURE( RenderPass::OmniLightDeferred::Create(
-      &m_RenderOmniLights, m_RenderDevice.get(), DirectX::MakeSRGB( m_SwapchainFormat ), kDepthFormat ) );
+      &m_RenderOmniLights, m_RenderDevice.get(), DirectX::MakeSRGB( swapchain_format ), kDepthFormat ) );
   ENSURE( RenderPass::SpotLightDeferred::Create(
-      &m_RenderSpotLights, m_RenderDevice.get(), DirectX::MakeSRGB( m_SwapchainFormat ), kDepthFormat ) );
+      &m_RenderSpotLights, m_RenderDevice.get(), DirectX::MakeSRGB( swapchain_format ), kDepthFormat ) );
   ENSURE( RenderPass::ScreenSpaceLightDeferred::Create(
-      &m_RenderScreenSpaceLighting, m_RenderDevice.get(), DirectX::MakeSRGB( m_SwapchainFormat ) ) );
+      &m_RenderScreenSpaceLighting, m_RenderDevice.get(), DirectX::MakeSRGB( swapchain_format ) ) );
 
   ENSURE( RenderPass::AlphaTestedForward::Create(
-      &m_RenderAlphaTestedMeshes, m_RenderDevice.get(), DirectX::MakeSRGB( m_SwapchainFormat ), kDepthFormat ) );
+      &m_RenderAlphaTestedMeshes, m_RenderDevice.get(), DirectX::MakeSRGB( swapchain_format ), kDepthFormat ) );
   ENSURE( RenderPass::TransparencyForward::Create(
-      &m_RenderTransparentMeshes, m_RenderDevice.get(), DirectX::MakeSRGB( m_SwapchainFormat ), kDepthFormat ) );
+      &m_RenderTransparentMeshes, m_RenderDevice.get(), DirectX::MakeSRGB( swapchain_format ), kDepthFormat ) );
   ENSURE( RenderPass::Skybox::Create(
-      &m_RenderBackground, m_RenderDevice.get(), DirectX::MakeSRGB( m_SwapchainFormat ), kDepthFormat ) );
+      &m_RenderBackground, m_RenderDevice.get(), DirectX::MakeSRGB( swapchain_format ), kDepthFormat ) );
 
   ENSURE( RenderPass::Atmosphere::Create( &m_UpdateAtmosphericSky, m_RenderDevice.get() ) );
 }
@@ -678,9 +680,9 @@ void Ember::BasicApp::Render()
 
   m_FGContext.Update();
 
-  ID3D12Resource* backbuffer   = m_RenderDevice->GetCurrentBackbuffer();
-  CommandList     command_list = m_RenderDevice->GetGraphicsCommandList();
-  uint32_t const  frame_idx    = m_RenderDevice->GetCurrentFrameIndex();
+  Texture        backbuffer   = m_RenderDevice->GetCurrentBackbuffer();
+  CommandList    command_list = m_RenderDevice->GetGraphicsCommandList();
+  uint32_t const frame_idx    = m_RenderDevice->GetCurrentFrameIndex();
 
   // All resources for this frame are guaranteed to be available for CPU modification at this time.
 
@@ -701,20 +703,7 @@ void Ember::BasicApp::Render()
                         { m_DrawList.PushDraw( wt, mesh, material ); } );
   }
 
-  FrameGraphResource bb_res = frame_graph.import(
-      "Backbuffer",
-      FG::Texture::Desc{
-          .Format    = m_SwapchainFormat,
-          .Width     = m_WindowWidth,
-          .Height    = m_WindowHeight,
-          .MipLevels = MipLevels::kBase,
-          .ArraySize = 1,
-          .InitState = D3D12_RESOURCE_STATE_PRESENT,
-      },
-      FG::Texture{
-          .Resource     = backbuffer,
-          .CurrentState = D3D12_RESOURCE_STATE_PRESENT,
-      } );
+  FrameGraphResource      bb_res = frame_graph.import( "Backbuffer", backbuffer.GetDesc(), FG::Texture{ backbuffer } );
 
   DrawList::Batches const draw_list_info = m_DrawList.PrepareFrame( frame_idx );
 
@@ -805,7 +794,7 @@ void Ember::BasicApp::Render()
         PIXScopedEvent( cmd->Get(), PIX_COLOR_DEFAULT, "Copy to Backbuffer" );
         FG::Texture const& render_target = resources.get<FG::Texture>( data.RenderTarget );
         FG::Texture const& backbuffer    = resources.get<FG::Texture>( data.BackBuffer );
-        cmd->CopyResource( backbuffer.Resource.Get(), render_target.Resource.Get() );
+        cmd->CopyResource( backbuffer.GetTexture(), render_target.GetTexture() );
       } );
 
   {
@@ -826,9 +815,11 @@ void Ember::BasicApp::Render()
   }
 
   CD3DX12_RESOURCE_BARRIER bottom_of_renderpass_barriers[] = {
-    CD3DX12_RESOURCE_BARRIER::Transition( backbuffer, D3D12_RESOURCE_STATE_COPY_DEST, D3D12_RESOURCE_STATE_PRESENT ),
+    CD3DX12_RESOURCE_BARRIER::Transition(
+        backbuffer.GetTexture(), backbuffer.GetCurrentState(), D3D12_RESOURCE_STATE_PRESENT ),
   };
   command_list.ResourceBarrier( bottom_of_renderpass_barriers );
+  backbuffer.SetCurrentState( D3D12_RESOURCE_STATE_PRESENT );
 
   m_PerfCounter->EndQuery( command_list.Get(), frame_idx );
 
@@ -854,7 +845,7 @@ void Ember::BasicApp::Resize()
   m_WindowHeight                           = rect.bottom - rect.top;
 
   m_FGBlackboard.get<FG::BackbufferInfo>() = FG::BackbufferInfo{
-    .SwapchainFormat    = m_SwapchainFormat,
+    .SwapchainFormat    = m_RenderDevice->GetSwapchainFormat(),
     .DepthStencilFormat = kDepthFormat,
     .Width              = m_WindowWidth,
     .Height             = m_WindowHeight,

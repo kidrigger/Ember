@@ -23,26 +23,24 @@ private:
   ComPtr<D3D12MA::Allocator> m_Allocator;
 
   // Swapchain and internal images.
-  uint32_t                            m_SwapchainWidth{ 640 };
-  uint32_t                            m_SwapchainHeight{ 480 };
-  ComPtr<IDXGISwapChain4>             m_Swapchain;
-  std::vector<ComPtr<ID3D12Resource>> m_Backbuffers;
+  uint32_t                  m_SwapchainWidth{ 640 };
+  uint32_t                  m_SwapchainHeight{ 480 };
+  DXGI_FORMAT               m_SwapchainFormat{ DXGI_FORMAT_UNKNOWN };
+  ComPtr<IDXGISwapChain4>   m_Swapchain;
 
-  constexpr static uint32_t           kUseVSyncBit       = 1 << 0;
-  constexpr static uint32_t           kSupportTearingBit = 1 << 1;
+  constexpr static uint32_t kUseVSyncBit       = 1 << 0;
+  constexpr static uint32_t kSupportTearingBit = 1 << 1;
 
-  uint32_t                            m_VsyncAndTearing{ 0 };
-
-  // Views to swapchain images.
-  ComPtr<ID3D12DescriptorHeap> m_RTVDescriptorHeap;
-  uint32_t                     m_RTVDescriptorSize{ 0 };
-  uint32_t                     m_CurrentBackbufferIndex{ 0 };
+  uint32_t                  m_VsyncAndTearing{ 0 };
 
   // Descriptor Heaps
-  ComPtr<ID3D12DescriptorHeap>     m_DSVDescriptorHeap;
   std::unique_ptr<BindlessManager> m_Bindless;
   BufferManager                    m_BufferManager;
   TextureManager                   m_TextureManager;
+
+  // Swapchain images.
+  std::vector<Texture> m_Backbuffers; // Must release before texture manager.
+  uint32_t             m_CurrentBackbufferIndex{ 0 };
 
   // Commands and Sync
   Context                       m_DirectContext; // Context depends on device and bindless.
@@ -51,24 +49,21 @@ private:
 public:
   RenderDevice() = default;
   RenderDevice(
-      ComPtr<ID3D12Device2>               device,
-      ComPtr<D3D12MA::Allocator>          allocator,
-      uint32_t                            swapchain_width,
-      uint32_t                            swapchain_height,
-      ComPtr<IDXGISwapChain4>             swapchain,
-      std::vector<ComPtr<ID3D12Resource>> backbuffers,
-      ComPtr<ID3D12DescriptorHeap>        rtv_descriptor_heap,
-      uint32_t                            rtv_descriptor_size,
-      ComPtr<ID3D12DescriptorHeap>        dsv_descriptor_heap,
-      std::unique_ptr<BindlessManager>    bindless_manager,
-      Context                             direct_context,
-      bool                                is_tearing_supported );
+      ComPtr<ID3D12Device2>            device,
+      ComPtr<D3D12MA::Allocator>       allocator,
+      uint32_t                         swapchain_width,
+      uint32_t                         swapchain_height,
+      DXGI_FORMAT                      swapchain_format,
+      ComPtr<IDXGISwapChain4>          swapchain,
+      std::unique_ptr<BindlessManager> bindless_manager,
+      Context                          direct_context,
+      bool                             is_tearing_supported );
 
   [[nodiscard]] ID3D12Device2*             GetDevice() const noexcept;
   [[nodiscard]] D3D12MA::Allocator*        GetAllocator() const noexcept;
   [[nodiscard]] ID3D12CommandQueue*        GetDirectQueue() const noexcept;
 
-  [[nodiscard]] DXGI_FORMAT                FetchSwapchainFormat() const;
+  [[nodiscard]] DXGI_FORMAT                GetSwapchainFormat() const;
   [[nodiscard]] D3D_ROOT_SIGNATURE_VERSION FetchHighestRootSignatureVersion() const;
 
   static void                              Create( RenderDevice* render_device, HWND window_handle, bool use_warp );
@@ -84,6 +79,7 @@ public:
 
   [[nodiscard]] Texture CreateTexture2D( Tex2DDesc const& create_info );
   [[nodiscard]] Texture CreateTextureCube( TexCubeDesc const& create_info );
+  [[nodiscard]] Texture CreateTexture( Texture::Desc const& desc );
 
   [[nodiscard]] Sampler CreateSampler( D3D12_SAMPLER_DESC const& sampler_desc );
 
@@ -105,27 +101,24 @@ public:
 
   // Wait until the all queues have finished all commands.
   Context CreateContext( D3D12_COMMAND_LIST_TYPE type );
-  void WaitOn( Context::Receipt receipt ) const;
-  void QueueWaitOn( Context::Receipt receipt ) const;
-  void WaitIdle();
+  void    WaitOn( Context::Receipt receipt ) const;
+  void    QueueWaitOn( Context::Receipt receipt ) const;
+  void    WaitIdle();
 
   // Per Frame getters.
-  [[nodiscard]] ID3D12Resource*               GetCurrentBackbuffer() const noexcept;
-  [[nodiscard]] CommandList                   GetGraphicsCommandList() noexcept;
-  [[nodiscard]] uint32_t                      GetCurrentFrameIndex() const noexcept;
-  [[nodiscard]] CD3DX12_CPU_DESCRIPTOR_HANDLE GetCurrentRTVCpuDescriptorHandle() const noexcept;
-  [[nodiscard]] CD3DX12_CPU_DESCRIPTOR_HANDLE GetCurrentDSVCpuDescriptorHandle() const noexcept;
-  void                                        ExecuteCommandList( CommandList&& command_list );
-  void                                        Present();
+  [[nodiscard]] Texture     GetCurrentBackbuffer() const noexcept;
+  [[nodiscard]] CommandList GetGraphicsCommandList() noexcept;
+  [[nodiscard]] uint32_t    GetCurrentFrameIndex() const noexcept;
+  void                      ExecuteCommandList( CommandList&& command_list );
+  void                      Present();
 
-  [[nodiscard]] bool                          IsVsyncEnabled() const;
-  [[nodiscard]] bool                          IsTearingSupported() const;
+  [[nodiscard]] bool        IsVsyncEnabled() const;
+  [[nodiscard]] bool        IsTearingSupported() const;
 
   RenderDevice( RenderDevice const& other )                = delete;
   RenderDevice( RenderDevice&& other ) noexcept            = delete;
   RenderDevice& operator=( RenderDevice const& other )     = delete;
   RenderDevice& operator=( RenderDevice&& other ) noexcept = delete;
-  ~RenderDevice();
 };
 
 } // namespace Ember

@@ -27,13 +27,13 @@ FrameGraphResource Ember::RenderPass::DepthPrePass::Execute(
         auto const& backbuffer_info = blackboard.get<FG::BackbufferInfo>();
         auto const  depth_texture   = builder.create<FG::Texture>(
             "Main Depth Target",
-            FG::Texture::Desc{
+            {
                    .Format    = backbuffer_info.DepthStencilFormat,
                    .Width     = backbuffer_info.Width,
                    .Height    = backbuffer_info.Height,
                    .MipLevels = MipLevels::kBase,
+                   .Usage     = TextureUsage::kDepthStencil,
                    .InitState = D3D12_RESOURCE_STATE_DEPTH_WRITE,
-                   .Flags     = D3D12_RESOURCE_FLAG_ALLOW_DEPTH_STENCIL,
             } );
 
         out_depth_texture = builder.write(
