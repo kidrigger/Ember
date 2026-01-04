@@ -318,8 +318,10 @@ void Ember::Internal::DirectionLightManager::RenderAllShadows(
       barriers.begin(),
       []( Texture const& tex )
       {
-        return CD3DX12_RESOURCE_BARRIER::Transition(
-            tex.GetTexture(), D3D12_RESOURCE_STATE_PIXEL_SHADER_RESOURCE, D3D12_RESOURCE_STATE_DEPTH_WRITE );
+        auto current_state = tex.GetCurrentState();
+        auto next_state    = D3D12_RESOURCE_STATE_DEPTH_WRITE;
+        tex.SetCurrentState( next_state );
+        return CD3DX12_RESOURCE_BARRIER::Transition( tex.GetTexture(), current_state, next_state );
       } );
   if ( not barriers.empty() ) command_list->ResourceBarrier( barriers );
 
@@ -334,8 +336,10 @@ void Ember::Internal::DirectionLightManager::RenderAllShadows(
       barriers.begin(),
       []( Texture const& tex )
       {
-        return CD3DX12_RESOURCE_BARRIER::Transition(
-            tex.GetTexture(), D3D12_RESOURCE_STATE_DEPTH_WRITE, D3D12_RESOURCE_STATE_PIXEL_SHADER_RESOURCE );
+        auto current_state = tex.GetCurrentState();
+        auto next_state    = D3D12_RESOURCE_STATE_PIXEL_SHADER_RESOURCE;
+        tex.SetCurrentState( next_state );
+        return CD3DX12_RESOURCE_BARRIER::Transition( tex.GetTexture(), current_state, next_state );
       } );
 
   if ( not barriers.empty() ) command_list->ResourceBarrier( barriers );
