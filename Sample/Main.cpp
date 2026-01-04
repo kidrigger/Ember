@@ -5,7 +5,7 @@
 #include "BasicApp.hpp"
 
 #pragma comment( lib, "dxguid.lib" )
-#pragma comment( lib, "emberlib.lib" )
+#pragma comment( lib, "ember.lib" )
 
 using AppType = Ember::BasicApp;
 

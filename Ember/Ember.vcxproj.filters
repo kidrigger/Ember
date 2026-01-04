@@ -13,551 +13,131 @@
       <UniqueIdentifier>{67DA6AB6-F800-4c08-8B7A-83BB121AAD01}</UniqueIdentifier>
       <Extensions>rc;ico;cur;bmp;dlg;rc2;rct;bin;rgs;gif;jpg;jpeg;jpe;resx;tiff;tif;png;wav;mfcribbon-ms</Extensions>
     </Filter>
-    <Filter Include="Resource Files\Config">
-      <UniqueIdentifier>{52131402-d9ee-4ad9-89cf-f0e76e13d180}</UniqueIdentifier>
-    </Filter>
-    <Filter Include="Shaders">
-      <UniqueIdentifier>{6ebb7bb3-b9d2-4732-9069-cc6c9c511227}</UniqueIdentifier>
+    <Filter Include="Header Files\Util">
+      <UniqueIdentifier>{55205a6a-8531-4d46-9992-c124e0384f43}</UniqueIdentifier>
     </Filter>
     <Filter Include="Source Files\Util">
-      <UniqueIdentifier>{fc249c3a-6ef3-43b0-908c-1daea7dce634}</UniqueIdentifier>
+      <UniqueIdentifier>{7b456772-a050-4c5e-bfb9-d04ae5c929e2}</UniqueIdentifier>
     </Filter>
-    <Filter Include="Header Files\Scene">
-      <UniqueIdentifier>{b7e96d19-cd0a-4446-9eb4-16303b95372c}</UniqueIdentifier>
-    </Filter>
-    <Filter Include="Source Files\Scene">
-      <UniqueIdentifier>{78e396d5-b0be-4305-b5ae-075ea9209dcb}</UniqueIdentifier>
-    </Filter>
-    <Filter Include="Resource Files\Assets">
-      <UniqueIdentifier>{a9146c61-c173-4d21-a1a4-d106e9edc83c}</UniqueIdentifier>
+    <Filter Include="Resource Files\Config">
+      <UniqueIdentifier>{e23b0b47-c02c-4fbf-8be5-a38d10ddf864}</UniqueIdentifier>
     </Filter>
     <Filter Include="Header Files\Graphics">
-      <UniqueIdentifier>{8f5eb4cc-9c27-44e1-be6e-07b3e799b195}</UniqueIdentifier>
+      <UniqueIdentifier>{7e9f86fb-1a01-489e-b8c7-87867fe4b76f}</UniqueIdentifier>
     </Filter>
     <Filter Include="Source Files\Graphics">
-      <UniqueIdentifier>{85ce07da-36fa-4e71-8747-84a6579a74ac}</UniqueIdentifier>
-    </Filter>
-    <Filter Include="Source Files\Resources">
-      <UniqueIdentifier>{f75ef165-5c2d-4b1b-ba6e-fcba641e1d15}</UniqueIdentifier>
-    </Filter>
-    <Filter Include="Header Files\Resources">
-      <UniqueIdentifier>{703a95d3-f874-457e-8d9a-08207f4f1b83}</UniqueIdentifier>
-    </Filter>
-    <Filter Include="Shaders\IBL">
-      <UniqueIdentifier>{0cf9a7d1-17b5-47ca-a7bf-1487b3801c13}</UniqueIdentifier>
-    </Filter>
-    <Filter Include="Resource Files\Assets\Environment">
-      <UniqueIdentifier>{80e73104-2be7-41de-aa80-443053321e2d}</UniqueIdentifier>
-    </Filter>
-    <Filter Include="Resource Files\Assets\Scenes">
-      <UniqueIdentifier>{3f1b6069-d8a4-48b7-a470-d65aa5217a43}</UniqueIdentifier>
-    </Filter>
-    <Filter Include="Shaders\Shadows">
-      <UniqueIdentifier>{19b95aa5-3537-429c-84f2-4fd0eea82243}</UniqueIdentifier>
-    </Filter>
-    <Filter Include="Shaders\Utils">
-      <UniqueIdentifier>{e5054b06-327b-4e25-86de-082460938480}</UniqueIdentifier>
-    </Filter>
-    <Filter Include="Shaders\Meshes">
-      <UniqueIdentifier>{adc7aab0-8972-4e53-b006-c56043c1d5ec}</UniqueIdentifier>
-    </Filter>
-    <Filter Include="Shaders\Meshes\Forward">
-      <UniqueIdentifier>{3c704815-4fdd-45a7-9c2c-b6334a96518c}</UniqueIdentifier>
-    </Filter>
-    <Filter Include="Shaders\Meshes\Deferred">
-      <UniqueIdentifier>{6aa6fc91-b2cc-472e-a463-77c6f342fcd3}</UniqueIdentifier>
-    </Filter>
-    <Filter Include="Header Files\Passes">
-      <UniqueIdentifier>{ef966d89-19fe-4754-85bb-4d79dcb8d79e}</UniqueIdentifier>
-    </Filter>
-    <Filter Include="Source Files\Passes">
-      <UniqueIdentifier>{9cb2a318-b3ee-466f-808f-379c472bf996}</UniqueIdentifier>
-    </Filter>
-    <Filter Include="Shaders\Atmosphere">
-      <UniqueIdentifier>{1a829239-b011-4709-9d4e-8c5ad3903102}</UniqueIdentifier>
-    </Filter>
-    <Filter Include="Header Files\Editor">
-      <UniqueIdentifier>{b57f4924-8a57-47ca-9c68-89f0a51be1f8}</UniqueIdentifier>
-    </Filter>
-    <Filter Include="Source Files\Editor">
-      <UniqueIdentifier>{488073bf-8185-47bd-a2c7-8fb9162097da}</UniqueIdentifier>
-    </Filter>
-    <Filter Include="Shaders\DepthPrePass">
-      <UniqueIdentifier>{393f6fa7-7e17-49b5-b98e-34d9dbbfc157}</UniqueIdentifier>
+      <UniqueIdentifier>{b4601767-e92c-49be-9226-bb2a69b00ee3}</UniqueIdentifier>
     </Filter>
   </ItemGroup>
   <ItemGroup>
-    <ClCompile Include="Main.cpp">
-      <Filter>Source Files</Filter>
-    </ClCompile>
-    <ClCompile Include="BasicApp.cpp">
-      <Filter>Source Files</Filter>
-    </ClCompile>
-    <ClCompile Include="IApp.cpp">
-      <Filter>Source Files</Filter>
-    </ClCompile>
-    <ClCompile Include="ObjectPool.cpp">
-      <Filter>Source Files\Scene</Filter>
-    </ClCompile>
-    <ClCompile Include="Scene.cpp">
-      <Filter>Source Files\Scene</Filter>
-    </ClCompile>
-    <ClCompile Include="TextureLoader.cpp">
-      <Filter>Source Files\Resources</Filter>
-    </ClCompile>
-    <ClCompile Include="ModelLoader.cpp">
-      <Filter>Source Files\Resources</Filter>
-    </ClCompile>
-    <ClCompile Include="CgltfImpl.cpp">
+    <ClCompile Include="Util\FreeList.cpp">
       <Filter>Source Files\Util</Filter>
     </ClCompile>
-    <ClCompile Include="ResourceTracker.cpp">
+    <ClCompile Include="Util\HelperUtils.cpp">
+      <Filter>Source Files\Util</Filter>
+    </ClCompile>
+    <ClCompile Include="Util\PerfCounter.cpp">
+      <Filter>Source Files\Util</Filter>
+    </ClCompile>
+    <ClCompile Include="Util\RabbitPullingFreeList.cpp">
+      <Filter>Source Files\Util</Filter>
+    </ClCompile>
+    <ClCompile Include="Util\ScopedHandle.cpp">
+      <Filter>Source Files\Util</Filter>
+    </ClCompile>
+    <ClCompile Include="Graphics\RenderDevice.cpp">
       <Filter>Source Files\Graphics</Filter>
     </ClCompile>
-    <ClCompile Include="Environment.cpp">
-      <Filter>Source Files\Scene</Filter>
-    </ClCompile>
-    <ClCompile Include="Camera.cpp">
-      <Filter>Source Files\Scene</Filter>
-    </ClCompile>
-    <ClCompile Include="OmniLightManager.cpp">
-      <Filter>Source Files\Scene</Filter>
-    </ClCompile>
-    <ClCompile Include="LightHandle.cpp">
-      <Filter>Source Files\Scene</Filter>
-    </ClCompile>
-    <ClCompile Include="LightManager.cpp">
-      <Filter>Source Files\Scene</Filter>
-    </ClCompile>
-    <ClCompile Include="DirectionLightManager.cpp">
-      <Filter>Source Files\Scene</Filter>
-    </ClCompile>
-    <ClCompile Include="MaterialManager.cpp">
+    <ClCompile Include="Graphics\BindlessManager.cpp">
       <Filter>Source Files\Graphics</Filter>
     </ClCompile>
-    <ClCompile Include="Material.cpp">
+    <ClCompile Include="Graphics\Context.cpp">
       <Filter>Source Files\Graphics</Filter>
     </ClCompile>
-    <ClCompile Include="GeometryManager.cpp">
+    <ClCompile Include="Graphics\Buffer.cpp">
       <Filter>Source Files\Graphics</Filter>
     </ClCompile>
-    <ClCompile Include="Input.cpp">
-      <Filter>Source Files</Filter>
-    </ClCompile>
-    <ClCompile Include="SpotLightManager.cpp">
-      <Filter>Source Files\Scene</Filter>
-    </ClCompile>
-    <ClCompile Include="FrameGraphHelper.cpp">
+    <ClCompile Include="Graphics\Texture.cpp">
       <Filter>Source Files\Graphics</Filter>
     </ClCompile>
-    <ClCompile Include="SkyboxPass.cpp">
-      <Filter>Source Files\Passes</Filter>
+    <ClCompile Include="Graphics\CommandList.cpp">
+      <Filter>Source Files\Graphics</Filter>
     </ClCompile>
-    <ClCompile Include="ForwardPass.cpp">
-      <Filter>Source Files\Passes</Filter>
+    <ClCompile Include="Graphics\ScopedDeviceHandle.cpp">
+      <Filter>Source Files\Graphics</Filter>
     </ClCompile>
-    <ClCompile Include="TransparencyPass.cpp">
-      <Filter>Source Files\Passes</Filter>
+    <ClCompile Include="Graphics\RenderTargetManager.cpp">
+      <Filter>Source Files\Graphics</Filter>
     </ClCompile>
-    <ClCompile Include="GBufferPass.cpp">
-      <Filter>Source Files\Passes</Filter>
-    </ClCompile>
-    <ClCompile Include="LightingPass.cpp">
-      <Filter>Source Files\Passes</Filter>
-    </ClCompile>
-    <ClCompile Include="Atmosphere.cpp">
-      <Filter>Source Files\Passes</Filter>
-    </ClCompile>
-    <ClCompile Include="Inspector.cpp">
-      <Filter>Source Files\Editor</Filter>
-    </ClCompile>
-    <ClCompile Include="SceneTree.cpp">
-      <Filter>Source Files\Editor</Filter>
-    </ClCompile>
-    <ClCompile Include="PickingGizmo.cpp">
-      <Filter>Source Files\Editor</Filter>
-    </ClCompile>
-    <ClCompile Include="DepthPrePass.cpp">
-      <Filter>Source Files\Passes</Filter>
+    <ClCompile Include="Graphics\ResourceBinder.cpp">
+      <Filter>Source Files\Graphics</Filter>
     </ClCompile>
   </ItemGroup>
   <ItemGroup>
-    <ClInclude Include="BasicApp.hpp">
-      <Filter>Header Files</Filter>
+    <ClInclude Include="Util\DataUtil.hpp">
+      <Filter>Header Files\Util</Filter>
     </ClInclude>
-    <ClInclude Include="IApp.hpp">
-      <Filter>Header Files</Filter>
+    <ClInclude Include="Util\DirectXHeaders.hpp">
+      <Filter>Header Files\Util</Filter>
     </ClInclude>
-    <ClInclude Include="Scene.hpp">
-      <Filter>Header Files\Scene</Filter>
+    <ClInclude Include="Util\FlatMap.hpp">
+      <Filter>Header Files\Util</Filter>
     </ClInclude>
-    <ClInclude Include="ObjectPool.hpp">
-      <Filter>Header Files\Scene</Filter>
+    <ClInclude Include="Util\FreeList.hpp">
+      <Filter>Header Files\Util</Filter>
     </ClInclude>
-    <ClInclude Include="TextureLoader.hpp">
-      <Filter>Header Files\Resources</Filter>
+    <ClInclude Include="Util\HelperUtils.hpp">
+      <Filter>Header Files\Util</Filter>
     </ClInclude>
-    <ClInclude Include="ModelLoader.hpp">
-      <Filter>Header Files\Resources</Filter>
+    <ClInclude Include="Util\PerfCounter.hpp">
+      <Filter>Header Files\Util</Filter>
     </ClInclude>
-    <ClInclude Include="Color.hpp">
+    <ClInclude Include="Util\Profiling.hpp">
+      <Filter>Header Files\Util</Filter>
+    </ClInclude>
+    <ClInclude Include="Util\RabbitPullingFreeList.hpp">
+      <Filter>Header Files\Util</Filter>
+    </ClInclude>
+    <ClInclude Include="Util\Runtime.hpp">
+      <Filter>Header Files\Util</Filter>
+    </ClInclude>
+    <ClInclude Include="Util\ScopedHandle.hpp">
+      <Filter>Header Files\Util</Filter>
+    </ClInclude>
+    <ClInclude Include="Graphics\RenderDevice.hpp">
       <Filter>Header Files\Graphics</Filter>
     </ClInclude>
-    <ClInclude Include="ResourceTracker.hpp">
+    <ClInclude Include="Graphics\DeviceHandle.hpp">
       <Filter>Header Files\Graphics</Filter>
     </ClInclude>
-    <ClInclude Include="Environment.hpp">
-      <Filter>Header Files\Scene</Filter>
-    </ClInclude>
-    <ClInclude Include="OmniLightManager.hpp">
-      <Filter>Header Files\Scene</Filter>
-    </ClInclude>
-    <ClInclude Include="Camera.hpp">
-      <Filter>Header Files\Scene</Filter>
-    </ClInclude>
-    <ClInclude Include="LightHandle.hpp">
-      <Filter>Header Files\Scene</Filter>
-    </ClInclude>
-    <ClInclude Include="LightManager.hpp">
-      <Filter>Header Files\Scene</Filter>
-    </ClInclude>
-    <ClInclude Include="DirectionLightManager.hpp">
-      <Filter>Header Files\Scene</Filter>
-    </ClInclude>
-    <ClInclude Include="MaterialManager.hpp">
+    <ClInclude Include="Graphics\BindlessManager.hpp">
       <Filter>Header Files\Graphics</Filter>
     </ClInclude>
-    <ClInclude Include="Material.hpp">
+    <ClInclude Include="Graphics\Buffer.hpp">
       <Filter>Header Files\Graphics</Filter>
     </ClInclude>
-    <ClInclude Include="GeometryManager.hpp">
+    <ClInclude Include="Graphics\Context.hpp">
       <Filter>Header Files\Graphics</Filter>
     </ClInclude>
-    <ClInclude Include="Input.hpp">
-      <Filter>Header Files</Filter>
-    </ClInclude>
-    <ClInclude Include="SpotLightManager.hpp">
-      <Filter>Header Files\Scene</Filter>
-    </ClInclude>
-    <ClInclude Include="FrameGraphHelper.hpp">
+    <ClInclude Include="Graphics\Texture.hpp">
       <Filter>Header Files\Graphics</Filter>
     </ClInclude>
-    <ClInclude Include="SkyboxPass.hpp">
-      <Filter>Header Files\Passes</Filter>
+    <ClInclude Include="Graphics\CommandList.hpp">
+      <Filter>Header Files\Graphics</Filter>
     </ClInclude>
-    <ClInclude Include="ForwardPass.hpp">
-      <Filter>Header Files\Passes</Filter>
+    <ClInclude Include="Graphics\ScopedDeviceHandle.hpp">
+      <Filter>Header Files\Graphics</Filter>
     </ClInclude>
-    <ClInclude Include="TransparencyPass.hpp">
-      <Filter>Header Files\Passes</Filter>
+    <ClInclude Include="Graphics\RenderTargetManager.hpp">
+      <Filter>Header Files\Graphics</Filter>
     </ClInclude>
-    <ClInclude Include="RenderPassCommon.hpp">
-      <Filter>Header Files\Passes</Filter>
-    </ClInclude>
-    <ClInclude Include="GBufferPass.hpp">
-      <Filter>Header Files\Passes</Filter>
-    </ClInclude>
-    <ClInclude Include="LightingPass.hpp">
-      <Filter>Header Files\Passes</Filter>
-    </ClInclude>
-    <ClInclude Include="Atmosphere.hpp">
-      <Filter>Header Files\Passes</Filter>
-    </ClInclude>
-    <ClInclude Include="Inspector.hpp">
-      <Filter>Header Files\Editor</Filter>
-    </ClInclude>
-    <ClInclude Include="SceneTree.hpp">
-      <Filter>Header Files\Editor</Filter>
-    </ClInclude>
-    <ClInclude Include="PickingGizmo.hpp">
-      <Filter>Header Files\Editor</Filter>
-    </ClInclude>
-    <ClInclude Include="DepthPrePass.hpp">
-      <Filter>Header Files\Passes</Filter>
+    <ClInclude Include="Graphics\ResourceBinder.hpp">
+      <Filter>Header Files\Graphics</Filter>
     </ClInclude>
   </ItemGroup>
   <ItemGroup>
-    <None Include="..\.clang-format">
+    <None Include="vcpkg.json">
       <Filter>Resource Files\Config</Filter>
     </None>
-    <None Include="..\vcpkg.json">
-      <Filter>Resource Files\Config</Filter>
-    </None>
-    <None Include="..\.gitignore">
-      <Filter>Resource Files\Config</Filter>
-    </None>
-    <None Include="PLAN.md">
-      <Filter>Resource Files</Filter>
-    </None>
-    <None Include="IBLCommon.hlsli">
-      <Filter>Shaders\IBL</Filter>
-    </None>
-    <None Include="OmniShadow.hlsli">
-      <Filter>Shaders\Shadows</Filter>
-    </None>
-    <None Include="Bindless.hlsli">
-      <Filter>Shaders\Utils</Filter>
-    </None>
-    <None Include="Colors.hlsli">
-      <Filter>Shaders\Utils</Filter>
-    </None>
-    <None Include="Utility.hlsli">
-      <Filter>Shaders\Utils</Filter>
-    </None>
-    <None Include="LightData.hlsli">
-      <Filter>Shaders\Shadows</Filter>
-    </None>
-    <None Include="Quantization.hlsli">
-      <Filter>Shaders\Utils</Filter>
-    </None>
-    <None Include="Triangle.hlsli">
-      <Filter>Shaders\Meshes</Filter>
-    </None>
-    <None Include="PBR.hlsli">
-      <Filter>Shaders\Meshes</Filter>
-    </None>
-    <None Include="Geometry.hlsli">
-      <Filter>Shaders</Filter>
-    </None>
-    <None Include="Camera.hlsli">
-      <Filter>Shaders\Utils</Filter>
-    </None>
-    <None Include="DirShadow.hlsli">
-      <Filter>Shaders\Shadows</Filter>
-    </None>
-    <None Include="Math.hlsli">
-      <Filter>Shaders\Utils</Filter>
-    </None>
-    <None Include="DebugConfig.hlsli">
-      <Filter>Shaders\Utils</Filter>
-    </None>
-    <None Include="Environment.hlsli">
-      <Filter>Shaders\Utils</Filter>
-    </None>
-    <None Include="Material.hlsli">
-      <Filter>Shaders\Utils</Filter>
-    </None>
-    <None Include="TrianglePSCommon.hlsli">
-      <Filter>Shaders\Meshes\Forward</Filter>
-    </None>
-    <None Include="OmniLightCommon.hlsli">
-      <Filter>Shaders\Meshes\Deferred</Filter>
-    </None>
-    <None Include="SpotShadow.hlsli">
-      <Filter>Shaders\Shadows</Filter>
-    </None>
-    <None Include="SpotLightCommon.hlsli">
-      <Filter>Shaders\Meshes\Deferred</Filter>
-    </None>
-    <None Include="AtmosphereCommon.hlsli">
-      <Filter>Shaders\Atmosphere</Filter>
-    </None>
-    <None Include="Constants.hlsli">
-      <Filter>Shaders\Utils</Filter>
-    </None>
-    <None Include="DepthPrePass.hlsli">
-      <Filter>Shaders\DepthPrePass</Filter>
-    </None>
-  </ItemGroup>
-  <ItemGroup>
-    <FxCompile Include="EqrectToCube.hlsl">
-      <Filter>Shaders\IBL</Filter>
-    </FxCompile>
-    <FxCompile Include="DiffuseIrradiance.hlsl">
-      <Filter>Shaders\IBL</Filter>
-    </FxCompile>
-    <FxCompile Include="Prefilter.hlsl">
-      <Filter>Shaders\IBL</Filter>
-    </FxCompile>
-    <FxCompile Include="BrdfLUT.hlsl">
-      <Filter>Shaders\IBL</Filter>
-    </FxCompile>
-    <FxCompile Include="BackgroundPS.hlsl">
-      <Filter>Shaders</Filter>
-    </FxCompile>
-    <FxCompile Include="BackgroundVS.hlsl">
-      <Filter>Shaders</Filter>
-    </FxCompile>
-    <FxCompile Include="OmniShadowVS.hlsl">
-      <Filter>Shaders\Shadows</Filter>
-    </FxCompile>
-    <FxCompile Include="OmniShadowPS.hlsl">
-      <Filter>Shaders\Shadows</Filter>
-    </FxCompile>
-    <FxCompile Include="DirShadowVS.hlsl">
-      <Filter>Shaders\Shadows</Filter>
-    </FxCompile>
-    <FxCompile Include="TriangleVS.hlsl">
-      <Filter>Shaders\Meshes</Filter>
-    </FxCompile>
-    <FxCompile Include="TriangleMS.hlsl">
-      <Filter>Shaders\Meshes</Filter>
-    </FxCompile>
-    <FxCompile Include="MipMapCube.hlsl">
-      <Filter>Shaders\Utils</Filter>
-    </FxCompile>
-    <FxCompile Include="MipMap.hlsl">
-      <Filter>Shaders\Utils</Filter>
-    </FxCompile>
-    <FxCompile Include="TriangleAS.hlsl">
-      <Filter>Shaders\Meshes</Filter>
-    </FxCompile>
-    <FxCompile Include="DirShadowAS.hlsl">
-      <Filter>Shaders\Shadows</Filter>
-    </FxCompile>
-    <FxCompile Include="DirShadowMS.hlsl">
-      <Filter>Shaders\Shadows</Filter>
-    </FxCompile>
-    <FxCompile Include="OmniShadowAS.hlsl">
-      <Filter>Shaders\Shadows</Filter>
-    </FxCompile>
-    <FxCompile Include="OmniShadowMS.hlsl">
-      <Filter>Shaders\Shadows</Filter>
-    </FxCompile>
-    <FxCompile Include="BackgroundMS.hlsl">
-      <Filter>Shaders</Filter>
-    </FxCompile>
-    <FxCompile Include="TriangleAlphaBlendPS.hlsl">
-      <Filter>Shaders\Meshes\Forward</Filter>
-    </FxCompile>
-    <FxCompile Include="TriangleAlphaTestPS.hlsl">
-      <Filter>Shaders\Meshes\Forward</Filter>
-    </FxCompile>
-    <FxCompile Include="TrianglePS.hlsl">
-      <Filter>Shaders\Meshes\Forward</Filter>
-    </FxCompile>
-    <FxCompile Include="GBufferAlphaTestPS.hlsl">
-      <Filter>Shaders\Meshes\Deferred</Filter>
-    </FxCompile>
-    <FxCompile Include="GBufferPS.hlsl">
-      <Filter>Shaders\Meshes\Deferred</Filter>
-    </FxCompile>
-    <FxCompile Include="LightingPS.hlsl">
-      <Filter>Shaders\Meshes\Deferred</Filter>
-    </FxCompile>
-    <FxCompile Include="LightingMS.hlsl">
-      <Filter>Shaders\Meshes\Deferred</Filter>
-    </FxCompile>
-    <FxCompile Include="OmniLightingAS.hlsl">
-      <Filter>Shaders\Meshes\Deferred</Filter>
-    </FxCompile>
-    <FxCompile Include="OmniLightingMS.hlsl">
-      <Filter>Shaders\Meshes\Deferred</Filter>
-    </FxCompile>
-    <FxCompile Include="OmniLightingPS.hlsl">
-      <Filter>Shaders\Meshes\Deferred</Filter>
-    </FxCompile>
-    <FxCompile Include="SpotShadowAS.hlsl">
-      <Filter>Shaders\Shadows</Filter>
-    </FxCompile>
-    <FxCompile Include="SpotShadowMS.hlsl">
-      <Filter>Shaders\Shadows</Filter>
-    </FxCompile>
-    <FxCompile Include="SpotShadowPS.hlsl">
-      <Filter>Shaders\Shadows</Filter>
-    </FxCompile>
-    <FxCompile Include="SpotLightingAS.hlsl">
-      <Filter>Shaders\Meshes\Deferred</Filter>
-    </FxCompile>
-    <FxCompile Include="SpotLightingMS.hlsl">
-      <Filter>Shaders\Meshes\Deferred</Filter>
-    </FxCompile>
-    <FxCompile Include="SpotLightingPS.hlsl">
-      <Filter>Shaders\Meshes\Deferred</Filter>
-    </FxCompile>
-    <FxCompile Include="ScreenSpaceTriangleVS.hlsl">
-      <Filter>Shaders\Utils</Filter>
-    </FxCompile>
-    <FxCompile Include="TransmittanceLUTPS.hlsl">
-      <Filter>Shaders\Atmosphere</Filter>
-    </FxCompile>
-    <FxCompile Include="SkyViewLUTPS.hlsl">
-      <Filter>Shaders\Atmosphere</Filter>
-    </FxCompile>
-    <FxCompile Include="AtmosphereBackgroundPS.hlsl">
-      <Filter>Shaders</Filter>
-    </FxCompile>
-    <FxCompile Include="EmptyPS.hlsl">
-      <Filter>Shaders</Filter>
-    </FxCompile>
-    <FxCompile Include="DepthPrePassAS.hlsl">
-      <Filter>Shaders\DepthPrePass</Filter>
-    </FxCompile>
-    <FxCompile Include="DepthPrePassMS.hlsl">
-      <Filter>Shaders\DepthPrePass</Filter>
-    </FxCompile>
-    <FxCompile Include="DepthPrePassAlphaTestedPS.hlsl">
-      <Filter>Shaders\DepthPrePass</Filter>
-    </FxCompile>
-  </ItemGroup>
-  <ItemGroup>
-    <CopyFileToFolders Include="Assets\container2.png">
-      <Filter>Resource Files\Assets</Filter>
-    </CopyFileToFolders>
-    <CopyFileToFolders Include="Assets\PhotoStudioLoft.hdr">
-      <Filter>Resource Files\Assets\Environment</Filter>
-    </CopyFileToFolders>
-    <CopyFileToFolders Include="Assets\DresdenStationNight.hdr">
-      <Filter>Resource Files\Assets\Environment</Filter>
-    </CopyFileToFolders>
-    <CopyFileToFolders Include="Assets\OvercastSoil.hdr">
-      <Filter>Resource Files\Assets\Environment</Filter>
-    </CopyFileToFolders>
-    <CopyFileToFolders Include="Assets\PrellerDrive.hdr">
-      <Filter>Resource Files\Assets\Environment</Filter>
-    </CopyFileToFolders>
-    <CopyFileToFolders Include="Assets\ShanghaiBund.hdr">
-      <Filter>Resource Files\Assets\Environment</Filter>
-    </CopyFileToFolders>
-    <CopyFileToFolders Include="Assets\BoomBoxWithAxes.glb">
-      <Filter>Resource Files\Assets\Scenes</Filter>
-    </CopyFileToFolders>
-    <CopyFileToFolders Include="Assets\Box.glb">
-      <Filter>Resource Files\Assets\Scenes</Filter>
-    </CopyFileToFolders>
-    <CopyFileToFolders Include="Assets\BoxTextured.glb">
-      <Filter>Resource Files\Assets\Scenes</Filter>
-    </CopyFileToFolders>
-    <CopyFileToFolders Include="Assets\CompareRoughness.glb">
-      <Filter>Resource Files\Assets\Scenes</Filter>
-    </CopyFileToFolders>
-    <CopyFileToFolders Include="Assets\DamagedHelmet.glb">
-      <Filter>Resource Files\Assets\Scenes</Filter>
-    </CopyFileToFolders>
-    <CopyFileToFolders Include="Assets\MetalRoughSpheres.glb">
-      <Filter>Resource Files\Assets\Scenes</Filter>
-    </CopyFileToFolders>
-    <CopyFileToFolders Include="Assets\OrientationTest.glb">
-      <Filter>Resource Files\Assets\Scenes</Filter>
-    </CopyFileToFolders>
-    <CopyFileToFolders Include="Assets\Sponza.glb">
-      <Filter>Resource Files\Assets\Scenes</Filter>
-    </CopyFileToFolders>
-    <CopyFileToFolders Include="Assets\Bistro.glb">
-      <Filter>Resource Files\Assets\Scenes</Filter>
-    </CopyFileToFolders>
-    <CopyFileToFolders Include="Assets\VirtualCity.glb">
-      <Filter>Resource Files\Assets\Scenes</Filter>
-    </CopyFileToFolders>
-    <CopyFileToFolders Include="Assets\NormalTangentTest.glb">
-      <Filter>Resource Files\Assets\Scenes</Filter>
-    </CopyFileToFolders>
-    <CopyFileToFolders Include="Assets\NormalTangentMirrorTest.glb">
-      <Filter>Resource Files\Assets\Scenes</Filter>
-    </CopyFileToFolders>
-    <CopyFileToFolders Include="Assets\ModdedCompareRoughness.glb">
-      <Filter>Resource Files\Assets\Scenes</Filter>
-    </CopyFileToFolders>
-    <CopyFileToFolders Include="Assets\AlphaBlendModeTest.glb">
-      <Filter>Resource Files\Assets\Scenes</Filter>
-    </CopyFileToFolders>
-    <CopyFileToFolders Include="Assets\BoxAnimated.glb">
-      <Filter>Resource Files\Assets\Scenes</Filter>
-    </CopyFileToFolders>
-  </ItemGroup>
-  <ItemGroup>
-    <Image Include="Assets\checkerboard.png">
-      <Filter>Resource Files</Filter>
-    </Image>
   </ItemGroup>
 </Project>
