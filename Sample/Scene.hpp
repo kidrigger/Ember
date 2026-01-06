@@ -9,6 +9,7 @@
 #include <flecs.h>
 
 #include "GeometryManager.hpp"
+#include "MaterialManager.hpp"
 
 #include <cmath>
 

@@ -8,6 +8,8 @@
 namespace Ember
 {
 
+TYPED_HANDLE( Geometry, GeometryManager );
+
 class GeometryAllocation
 {
   Buffer                        m_Buffer;

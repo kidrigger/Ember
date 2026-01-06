@@ -9,6 +9,8 @@ namespace Ember
 {
 class MaterialManager;
 
+TYPED_HANDLE( Material, MaterialManager );
+
 enum class AlphaMode
 {
   kOpaque,

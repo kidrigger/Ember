@@ -2,12 +2,12 @@
 
 #include "Util/HelperUtils.hpp"
 
-bool Ember::DeviceHandle::IsNull() const noexcept
+bool Ember::IndexHandle::IsNull() const noexcept
 {
   return m_Handle == kInvalid;
 }
 
-Ember::DeviceHandle::DeviceHandle( uint32_t const index ) : m_Handle{ index }
+Ember::IndexHandle::IndexHandle( uint32_t const index ) : m_Handle{ index }
 {}
 
 Ember::BindlessManager::BindlessManager(

@@ -1,6 +1,7 @@
 #pragma once
 
 #include <Graphics/Buffer.hpp>
+#include <Graphics/DeviceHandle.hpp>
 #include "Material.hpp"
 
 namespace Ember
