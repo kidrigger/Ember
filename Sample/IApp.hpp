@@ -32,7 +32,7 @@ public:
 } // namespace Ember
 
 
-void RegisterWindowClass( HINSTANCE instance_handle, const wchar_t* window_class_name );
+void RegisterWindowClass( HINSTANCE instance_handle, wchar_t const* window_class_name );
 
 HWND CreateWindow(
     wchar_t const* window_class_name,

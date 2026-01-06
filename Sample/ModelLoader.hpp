@@ -9,6 +9,8 @@
 #include "Scene.hpp"
 #include "TextureLoader.hpp"
 
+#include <expected>
+
 namespace Ember
 {
 class RenderDevice;
@@ -90,6 +92,16 @@ class ModelLoader
     std::vector<VertexLite>                        VertexPositions;
     std::vector<VertexData>                        VertexData;
     std::vector<uint32_t>                          Indices;
+
+    struct
+    {
+      uint32_t VertexPositions;
+      uint32_t VertexData;
+      uint32_t Meshlets;
+      uint32_t MeshletTriangles;
+      uint32_t MeshletVertices;
+      uint32_t Indices;
+    } Offsets;
   };
 
   RenderDevice*    m_RenderDevice;
@@ -98,15 +110,24 @@ class ModelLoader
   MaterialManager* m_MaterialManager;
   GeometryManager* m_GeometryManager;
 
-  flecs::entity    ProcessNode( LoadingContext* context, flecs::entity parent, cgltf_node const& node );
+  flecs::entity    ProcessNode( LoadingContext* context, flecs::entity parent, cgltf_node const& node ) const;
   void ProcessPrimitive( LoadingContext* context, flecs::entity owning, cgltf_primitive const& primitive ) const;
   void ProcessMesh( LoadingContext* context, flecs::entity owning, cgltf_mesh const& mesh ) const;
   bool TryLoadTexture( Texture* texture, cgltf_image const& image, ColorSpaceOverride color_space_override ) const;
   MaterialImpl* TryProcessMaterial( LoadingContext* context, cgltf_material const* material ) const;
   MaterialImpl* GetDefaultMaterial( LoadingContext* context ) const;
+  void          ProcessAnimation( LoadingContext* context, cgltf_animation const& animation ) const;
+  void          FinalizeGeometry( LoadingContext* context, flecs::entity& entity ) const;
 
 public:
-  std::optional<flecs::entity> TryLoadModel( char const* filename );
+  enum class Error
+  {
+    kCannotOpenFile,
+    kInvalidFile,
+    kCannotLoadMemory,
+  };
+
+  std::expected<flecs::entity, Error> TryLoadModel( char const* filename );
 
   ModelLoader(
       RenderDevice*    render_device,

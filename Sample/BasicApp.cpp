@@ -201,7 +201,7 @@ void Ember::BasicApp::Create( BasicApp* app, HINSTANCE const instance_handle )
   SetThreadDpiAwarenessContext( DPI_AWARENESS_CONTEXT_PER_MONITOR_AWARE_V2 );
 
   // Window class name. Used for registering / creating the window.
-  const wchar_t* window_class_name = L"DX12WindowClass";
+  wchar_t const* window_class_name = L"DX12WindowClass";
 
   // Config
   bool     use_warp      = false;

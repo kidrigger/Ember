@@ -171,7 +171,8 @@ bool Ember::ModelLoader::TryLoadTexture(
   return texture;
 }
 
-flecs::entity Ember::ModelLoader::ProcessNode( LoadingContext* context, flecs::entity parent, cgltf_node const& node )
+flecs::entity Ember::ModelLoader::ProcessNode(
+    LoadingContext* context, flecs::entity parent, cgltf_node const& node ) const
 {
   DirectX::XMVECTOR translation{ DirectX::XMVectorSet( 0.0f, 0.0f, 0.0f, 1.0f ) };
   DirectX::XMVECTOR rotation{ DirectX::XMQuaternionIdentity() };
@@ -433,7 +434,7 @@ void Ember::ModelLoader::ProcessPrimitive(
         kMaxVertices,
         kMaxTriangles,
         kConeWeight );
-    const meshopt_Meshlet& last = meshlets[meshlet_count - 1];
+    meshopt_Meshlet const& last = meshlets[meshlet_count - 1];
 
     meshlet_vertices.resize( last.vertex_offset + last.vertex_count );
     meshlet_triangles.resize( last.triangle_offset + ( ( last.triangle_count * 3 + 3 ) & ~3 ) );
@@ -700,61 +701,10 @@ Ember::ModelLoader::ModelLoader(
   , m_GeometryManager{ geometry_manager }
 {}
 
-std::optional<flecs::entity> Ember::ModelLoader::TryLoadModel( char const* filename )
+void Ember::ModelLoader::ProcessAnimation( LoadingContext* context, cgltf_animation const& animation ) const
 {
-  cgltf_data*   gltf_model = nullptr;
-  cgltf_options options    = {};
-  cgltf_result  result     = cgltf_parse_file( &options, filename, &gltf_model );
-
-  if ( result != cgltf_result_success )
-  {
-    char buf[512];
-    sprintf_s( buf, "%s failed to load", filename );
-    OutputDebugStringA( buf );
-    cgltf_free( gltf_model );
-
-    return {};
-  }
-
-  result = cgltf_validate( gltf_model );
-
-  if ( result != cgltf_result_success )
-  {
-    char buf[512];
-    OutputDebugStringA( buf );
-    cgltf_free( gltf_model );
-
-    return {};
-  }
-
-  result = cgltf_load_buffers( &options, gltf_model, filename );
-
-  if ( result != cgltf_result_success )
-  {
-    char buf[512];
-    sprintf_s( buf, "%s buffers failed to load.", filename );
-    OutputDebugStringA( buf );
-    cgltf_free( gltf_model );
-
-    return {};
-  }
-
-  auto               entity        = m_World->GetECS().entity().insert( [&]( WorldTransform&, WorldBoundingBox& ) {} );
-
-  LoadingContext     context       = { .Geometry = World::GeometryManager().Construct() };
-
-  cgltf_scene const* current_scene = gltf_model->scene;
-  for ( uint32_t node_idx = 0; node_idx < current_scene->nodes_count; ++node_idx )
-  {
-    ProcessNode( &context, entity, *current_scene->nodes[node_idx] );
-  }
-
-  for ( uint32_t anim_idx = 0; anim_idx < gltf_model->animations_count; ++anim_idx )
-  {
-    cgltf_animation const& animation    = gltf_model->animations[anim_idx];
-
-    float                  track_length = 0.0f;
-    std::vector<float>     timeline;
+  float              track_length = 0.0f;
+  std::vector<float> timeline;
     for ( uint32_t channel_idx = 0; channel_idx < animation.channels_count; ++channel_idx )
     {
       cgltf_animation_sampler const& sampler     = *animation.channels[channel_idx].sampler;
@@ -778,7 +728,7 @@ std::optional<flecs::entity> Ember::ModelLoader::TryLoadModel( char const* filen
         cgltf_accessor_unpack_floats( sampler.input, timeline.data(), float_count );
       }
 
-      flecs::entity target_entity = context.NodeCache[channel.target_node];
+    flecs::entity target_entity = context->NodeCache[channel.target_node];
 
       switch ( channel.target_path )
       {
@@ -844,24 +794,29 @@ std::optional<flecs::entity> Ember::ModelLoader::TryLoadModel( char const* filen
     }
   }
 
+void Ember::ModelLoader::FinalizeGeometry( LoadingContext* context, flecs::entity& entity ) const
+{
   GeometryAllocation geom;
   uint32_t           vertex_position_offset;
   uint32_t           vertex_data_offset;
   uint32_t           meshlet_offset;
   uint32_t           meshlet_triangle_offset;
   uint32_t           meshlet_vertices_offset;
+  uint32_t           indices_offset;
   {
-    uint32_t vertex_position_size       = ByteSizeOf( context.VertexPositions );
-    uint32_t vertex_data_size           = ByteSizeOf( context.VertexData );
-    uint32_t meshlet_size               = ByteSizeOf( context.Meshlets );
-    uint32_t meshlet_triangle_size      = ByteSizeOf( context.MeshletTriangles );
-    uint32_t meshlet_vertices_size      = ByteSizeOf( context.MeshletVertices );
+    uint32_t vertex_position_size       = ByteSizeOf( context->VertexPositions );
+    uint32_t vertex_data_size           = ByteSizeOf( context->VertexData );
+    uint32_t meshlet_size               = ByteSizeOf( context->Meshlets );
+    uint32_t meshlet_triangle_size      = ByteSizeOf( context->MeshletTriangles );
+    uint32_t meshlet_vertices_size      = ByteSizeOf( context->MeshletVertices );
+    uint32_t indices_size               = ByteSizeOf( context->Indices );
 
-    uint32_t vertex_position_alignment  = StrideOf( context.VertexPositions );
-    uint32_t vertex_data_alignment      = StrideOf( context.VertexData );
-    uint32_t meshlet_alignment          = StrideOf( context.Meshlets );
+    uint32_t vertex_position_alignment  = StrideOf( context->VertexPositions );
+    uint32_t vertex_data_alignment      = StrideOf( context->VertexData );
+    uint32_t meshlet_alignment          = StrideOf( context->Meshlets );
     uint32_t meshlet_triangle_alignment = 4;
-    uint32_t meshlet_vertices_alignment = StrideOf( context.MeshletVertices );
+    uint32_t meshlet_vertices_alignment = StrideOf( context->MeshletVertices );
+    uint32_t indices_alignment          = 4;
 
     uint32_t largest_alignment          = 4;
     largest_alignment                   = std::max( largest_alignment, vertex_position_alignment );
@@ -869,9 +824,10 @@ std::optional<flecs::entity> Ember::ModelLoader::TryLoadModel( char const* filen
     largest_alignment                   = std::max( largest_alignment, meshlet_alignment );
     largest_alignment                   = std::max( largest_alignment, meshlet_triangle_alignment );
     largest_alignment                   = std::max( largest_alignment, meshlet_vertices_alignment );
+    largest_alignment                   = std::max( largest_alignment, indices_alignment );
 
     uint32_t const total_size = vertex_position_size + vertex_data_size + meshlet_size + meshlet_triangle_size +
-                                meshlet_vertices_size + largest_alignment * 5;
+                                meshlet_vertices_size + indices_size + largest_alignment * 6;
 
     geom                             = m_GeometryManager->CreateGeometry( total_size, largest_alignment );
 
@@ -900,11 +856,15 @@ std::optional<flecs::entity> Ember::ModelLoader::TryLoadModel( char const* filen
     offset                  = meshlet_vertices_offset + meshlet_vertices_size;
     ASSERT( offset <= base_offset_end );
 
+    indices_offset = offset + ( indices_alignment - ( offset % indices_alignment ) );
+    offset         = indices_offset + indices_size;
+    ASSERT( offset <= base_offset_end );
+
     ASSERT( meshlet_offset % meshlet_alignment == 0 );
     ASSERT( meshlet_triangle_offset % meshlet_triangle_alignment == 0 );
     ASSERT( meshlet_vertices_offset % meshlet_vertices_alignment == 0 );
 
-    for ( auto& meshlet : context.Meshlets )
+    for ( auto& meshlet : context->Meshlets )
     {
       meshlet.TriangleOffset += meshlet_triangle_offset;
       meshlet.VertexOffset   += meshlet_vertices_offset / 4;
@@ -912,19 +872,20 @@ std::optional<flecs::entity> Ember::ModelLoader::TryLoadModel( char const* filen
 
     geom.Write(
         vertex_position_offset - base_offset_begin,
-        ByteSizeOf( context.VertexPositions ),
-        DataOf( context.VertexPositions ) );
+        ByteSizeOf( context->VertexPositions ),
+        DataOf( context->VertexPositions ) );
     geom.Write(
-        vertex_data_offset - base_offset_begin, ByteSizeOf( context.VertexData ), DataOf( context.VertexData ) );
-    geom.Write( meshlet_offset - base_offset_begin, ByteSizeOf( context.Meshlets ), DataOf( context.Meshlets ) );
+        vertex_data_offset - base_offset_begin, ByteSizeOf( context->VertexData ), DataOf( context->VertexData ) );
+    geom.Write( meshlet_offset - base_offset_begin, ByteSizeOf( context->Meshlets ), DataOf( context->Meshlets ) );
     geom.Write(
         meshlet_triangle_offset - base_offset_begin,
-        ByteSizeOf( context.MeshletTriangles ),
-        DataOf( context.MeshletTriangles ) );
+        ByteSizeOf( context->MeshletTriangles ),
+        DataOf( context->MeshletTriangles ) );
     geom.Write(
         meshlet_vertices_offset - base_offset_begin,
-        ByteSizeOf( context.MeshletVertices ),
-        DataOf( context.MeshletVertices ) );
+        ByteSizeOf( context->MeshletVertices ),
+        DataOf( context->MeshletVertices ) );
+    geom.Write( indices_offset - base_offset_begin, ByteSizeOf( context->Indices ), DataOf( context->Indices ) );
   }
 
   std::queue<flecs::entity> bfs_subtree;
@@ -945,9 +906,80 @@ std::optional<flecs::entity> Ember::ModelLoader::TryLoadModel( char const* filen
     ent.children( [&]( flecs::entity child ) { bfs_subtree.push( child ); } );
   }
 
-  context.Geometry->GeometryAlloc = std::move( geom );
+  context->Geometry->GeometryAlloc = std::move( geom );
+
+  // Store offsets for acceleration structure building.
+  context->Offsets = {
+    .VertexPositions  = vertex_position_offset,
+    .VertexData       = vertex_data_offset,
+    .Meshlets         = meshlet_offset,
+    .MeshletTriangles = meshlet_triangle_offset,
+    .MeshletVertices  = meshlet_vertices_offset,
+    .Indices          = indices_offset,
+  };
+}
+
+std::expected<flecs::entity, Ember::ModelLoader::Error> Ember::ModelLoader::TryLoadModel( char const* filename )
+{
+  cgltf_data*   gltf_model = nullptr;
+  cgltf_options options    = {};
+  cgltf_result  result     = cgltf_parse_file( &options, filename, &gltf_model );
+
+  if ( result != cgltf_result_success )
+  {
+    char buf[512];
+    sprintf_s( buf, "%s failed to load", filename );
+    OutputDebugStringA( buf );
+    cgltf_free( gltf_model );
+
+    return std::unexpected{ Error::kCannotOpenFile };
+  }
+
+  result = cgltf_validate( gltf_model );
+
+  if ( result != cgltf_result_success )
+  {
+    char buf[512];
+    sprintf_s( buf, "%s is invalid", filename );
+    OutputDebugStringA( buf );
+    cgltf_free( gltf_model );
+
+    return std::unexpected{ Error::kInvalidFile };
+  }
+
+  result = cgltf_load_buffers( &options, gltf_model, filename );
+
+  if ( result != cgltf_result_success )
+  {
+    char buf[512];
+    sprintf_s( buf, "%s buffers failed to load.", filename );
+    OutputDebugStringA( buf );
+    cgltf_free( gltf_model );
+
+    return std::unexpected{ Error::kCannotLoadMemory };
+  }
+
+  auto               entity        = m_World->GetECS().entity().insert( [&]( WorldTransform&, WorldBoundingBox& ) {} );
+
+  LoadingContext     context       = { .Geometry = World::GeometryManager().Construct() };
+
+  cgltf_scene const* current_scene = gltf_model->scene;
+  for ( uint32_t node_idx = 0; node_idx < current_scene->nodes_count; ++node_idx )
+  {
+    ProcessNode( &context, entity, *current_scene->nodes[node_idx] );
+  }
+
+  for ( uint32_t anim_idx = 0; anim_idx < gltf_model->animations_count; ++anim_idx )
+  {
+    ProcessAnimation( &context, gltf_model->animations[anim_idx] );
+  }
+
+  FinalizeGeometry( &context, entity );
 
   cgltf_free( gltf_model );
+
+  // One spare reference to GeometryImpl needs to be cleaned up.
+  // GeometryImpl now owned solely by the Mesh components.
   World::GeometryManager().Destroy( context.Geometry );
 
   Context::Receipt receipt = m_TextureLoader->EndBatch();

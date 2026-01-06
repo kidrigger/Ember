@@ -111,7 +111,7 @@ LRESULT CALLBACK WndProc( HWND const window_handle, UINT const message, WPARAM c
   return 0;
 }
 
-void RegisterWindowClass( HINSTANCE const instance_handle, const wchar_t* window_class_name )
+void RegisterWindowClass( HINSTANCE const instance_handle, wchar_t const* window_class_name )
 {
   // Register a window class for creating our render window with.
   WNDCLASSEXW window_class;
