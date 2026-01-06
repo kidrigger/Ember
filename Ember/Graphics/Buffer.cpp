@@ -177,6 +177,12 @@ uintptr_t Ember::Buffer::GetPtrID() const
   return ( uintptr_t )m_Impl.get();
 }
 
+Ember::Buffer Ember::BufferManager::Wrap( BufferImpl&& impl )
+{
+  return Buffer{ std::allocate_shared<BufferImpl>(
+      std::pmr::polymorphic_allocator<>( &m_MemoryPool ), std::forward<BufferImpl>( impl ) ) };
+}
+
 Ember::BufferManager::BufferManager(
     ComPtr<ID3D12Device2> device, ComPtr<D3D12MA::Allocator> gpu_allocator, BindlessManager* bindless_manager )
   : m_Bindless{ bindless_manager }, m_Device{ std::move( device ) }, m_GpuAllocator{ std::move( gpu_allocator ) }
@@ -227,15 +233,14 @@ Ember::Buffer Ember::BufferManager::CreateVertexBuffer( uint32_t const size, uin
   AllocateBufferImpl( m_Device.Get(), m_GpuAllocator.Get(), size, &allocation, &buffer );
 
   auto const virtual_address = buffer->GetGPUVirtualAddress();
-  return Buffer{ std::allocate_shared<BufferImpl>(
-      GetAllocator(),
-      BufferImpl{
-          .Resource   = std::move( buffer ),
-          .Allocation = std::move( allocation ),
-          .GPUAddress = virtual_address,
-          .Size       = size,
-          .Type       = Buffer::Type::kVertexBuffer,
-      } ) };
+
+  return Wrap( {
+      .Resource   = std::move( buffer ),
+      .Allocation = std::move( allocation ),
+      .GPUAddress = virtual_address,
+      .Size       = size,
+      .Type       = Buffer::Type::kVertexBuffer,
+  } );
 }
 
 Ember::Buffer Ember::BufferManager::CreateIndexBuffer( uint32_t const size, DXGI_FORMAT const format )
@@ -245,15 +250,13 @@ Ember::Buffer Ember::BufferManager::CreateIndexBuffer( uint32_t const size, DXGI
   AllocateBufferImpl( m_Device.Get(), m_GpuAllocator.Get(), size, &allocation, &buffer );
 
   auto const virtual_address = buffer->GetGPUVirtualAddress();
-  return Buffer{ std::allocate_shared<BufferImpl>(
-      GetAllocator(),
-      BufferImpl{
-          .Resource   = std::move( buffer ),
-          .Allocation = std::move( allocation ),
-          .GPUAddress = virtual_address,
-          .Size       = size,
-          .Type       = Buffer::Type::kIndexBuffer,
-      } ) };
+  return Wrap( {
+      .Resource   = std::move( buffer ),
+      .Allocation = std::move( allocation ),
+      .GPUAddress = virtual_address,
+      .Size       = size,
+      .Type       = Buffer::Type::kIndexBuffer,
+  } );
 }
 
 Ember::Buffer Ember::BufferManager::CreateStorageBuffer( uint32_t const size, uint32_t const stride )
@@ -269,24 +272,19 @@ Ember::Buffer Ember::BufferManager::CreateStorageBuffer( uint32_t const size, ui
   auto const srv_handle      = m_Bindless->CreateDescriptorHandle( buffer.Get(), srv_desc );
   auto const virtual_address = buffer->GetGPUVirtualAddress();
 
-  return Buffer{
-    std::allocate_shared<BufferImpl>(
-        GetAllocator(),
-        BufferImpl{
-                   .Resource   = std::move( buffer ),
-                   .Allocation = std::move( allocation ),
-                   .GPUAddress = virtual_address,
-                   .Size       = size,
-                   .Type       = Buffer::Type::kStorageBuffer,
-                   .Handles    = { m_Bindless, srv_handle },
-                   }
-        )
-  };
+  return Wrap( {
+      .Resource   = std::move( buffer ),
+      .Allocation = std::move( allocation ),
+      .GPUAddress = virtual_address,
+      .Size       = size,
+      .Type       = Buffer::Type::kStorageBuffer,
+      .Handles    = { m_Bindless, srv_handle },
+  } );
 }
 
-Ember::Buffer Ember::BufferManager::CreateRawStorageBuffer( uint32_t size )
+Ember::Buffer Ember::BufferManager::CreateRawStorageBuffer( uint64_t size )
 {
-  uint32_t constexpr static kStride = 4;
+  uint64_t constexpr static kStride = 4;
 
   //
   size = ( size % kStride == 0 ) ? size : size + ( kStride - ( size % kStride ) );
@@ -295,25 +293,20 @@ Ember::Buffer Ember::BufferManager::CreateRawStorageBuffer( uint32_t size )
   ComPtr<D3D12MA::Allocation> allocation;
   AllocateBufferImpl( m_Device.Get(), m_GpuAllocator.Get(), size, &allocation, &buffer );
 
-  auto srv_desc              = CD3DX12_SHADER_RESOURCE_VIEW_DESC::RawBuffer( size / kStride, 0 );
+  auto srv_desc              = CD3DX12_SHADER_RESOURCE_VIEW_DESC::RawBuffer( ( UINT )( size / kStride ), 0 );
   srv_desc.Format            = DXGI_FORMAT_R32_TYPELESS;
 
   auto const srv_handle      = m_Bindless->CreateDescriptorHandle( buffer.Get(), srv_desc );
   auto const virtual_address = buffer->GetGPUVirtualAddress();
 
-  return Buffer{
-    std::allocate_shared<BufferImpl>(
-        GetAllocator(),
-        BufferImpl{
-                   .Resource   = std::move( buffer ),
-                   .Allocation = std::move( allocation ),
-                   .GPUAddress = virtual_address,
-                   .Size       = size,
-                   .Type       = Buffer::Type::kStorageBuffer,
-                   .Handles    = { m_Bindless, srv_handle },
-                   }
-        )
-  };
+  return Wrap( {
+      .Resource   = std::move( buffer ),
+      .Allocation = std::move( allocation ),
+      .GPUAddress = virtual_address,
+      .Size       = size,
+      .Type       = Buffer::Type::kStorageBuffer,
+      .Handles    = { m_Bindless, srv_handle },
+  } );
 }
 
 Ember::Buffer Ember::BufferManager::CreateReadWriteBuffer( uint32_t size, uint32_t stride )
@@ -332,19 +325,14 @@ Ember::Buffer Ember::BufferManager::CreateReadWriteBuffer( uint32_t size, uint32
   auto const uav_handle      = m_Bindless->CreateDescriptorHandle( buffer.Get(), uav_desc );
   auto const virtual_address = buffer->GetGPUVirtualAddress();
 
-  return Buffer{
-    std::allocate_shared<BufferImpl>(
-        GetAllocator(),
-        BufferImpl{
-                   .Resource   = std::move( buffer ),
-                   .Allocation = std::move( allocation ),
-                   .GPUAddress = virtual_address,
-                   .Size       = size,
-                   .Type       = Buffer::Type::kStorageBuffer,
-                   .Handles    = { m_Bindless, srv_handle, uav_handle },
-                   }
-        )
-  };
+  return Wrap( {
+      .Resource   = std::move( buffer ),
+      .Allocation = std::move( allocation ),
+      .GPUAddress = virtual_address,
+      .Size       = size,
+      .Type       = Buffer::Type::kStorageBuffer,
+      .Handles    = { m_Bindless, srv_handle, uav_handle },
+  } );
 }
 
 Ember::Buffer Ember::BufferManager::CreateConstantBuffer( uint32_t const size )
@@ -362,19 +350,14 @@ Ember::Buffer Ember::BufferManager::CreateConstantBuffer( uint32_t const size )
 
   auto const cbv_handle = m_Bindless->CreateDescriptorHandle( desc );
 
-  return Buffer{
-    std::allocate_shared<BufferImpl>(
-        GetAllocator(),
-        BufferImpl{
-                   .Resource   = std::move( buffer ),
-                   .Allocation = std::move( allocation ),
-                   .GPUAddress = desc.BufferLocation,
-                   .Size       = size,
-                   .Type       = Buffer::Type::kConstantBuffer,
-                   .Handles    = { m_Bindless, cbv_handle },
-                   }
-        )
-  };
+  return Wrap( {
+      .Resource   = std::move( buffer ),
+      .Allocation = std::move( allocation ),
+      .GPUAddress = desc.BufferLocation,
+      .Size       = size,
+      .Type       = Buffer::Type::kConstantBuffer,
+      .Handles    = { m_Bindless, cbv_handle },
+  } );
 }
 
 Ember::Buffer Ember::BufferManager::CreateASBuffer( uint64_t const size )
@@ -391,20 +374,16 @@ Ember::Buffer Ember::BufferManager::CreateASBuffer( uint64_t const size )
       D3D12_RESOURCE_STATE_RAYTRACING_ACCELERATION_STRUCTURE,
       false );
 
-  auto addr = buffer->GetGPUVirtualAddress();
+  auto const addr       = buffer->GetGPUVirtualAddress();
+  auto const srv_desc   = CD3DX12_SHADER_RESOURCE_VIEW_DESC::RaytracingAccelStruct( addr );
+  auto const srv_handle = m_Bindless->CreateDescriptorHandle( nullptr, srv_desc );
 
-  return Buffer{ std::allocate_shared<BufferImpl>(
-      GetAllocator(),
-      BufferImpl{
-          .Resource   = std::move( buffer ),
-          .Allocation = std::move( allocation ),
-          .GPUAddress = addr,
-          .Size       = size,
-          .Type       = Buffer::Type::kAccelerationStructure,
-      } ) };
-}
-
-std::pmr::polymorphic_allocator<> Ember::BufferManager::GetAllocator()
-{
-  return std::pmr::polymorphic_allocator<>( &m_MemoryPool );
+  return Wrap( {
+      .Resource   = std::move( buffer ),
+      .Allocation = std::move( allocation ),
+      .GPUAddress = addr,
+      .Size       = size,
+      .Type       = Buffer::Type::kAccelerationStructure,
+      .Handles    = { m_Bindless, srv_handle },
+  } );
 }

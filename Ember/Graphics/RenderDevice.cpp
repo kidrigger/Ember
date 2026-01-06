@@ -33,7 +33,7 @@ Ember::TextureDesc GetBackbufferDesc( DXGI_FORMAT format, uint32_t width, uint32
 } // namespace
 
 Ember::RenderDevice::RenderDevice(
-    ComPtr<ID3D12Device2>            device,
+    ComPtr<ID3D12Device5>            device,
     ComPtr<D3D12MA::Allocator>       allocator,
     uint32_t const                   swapchain_width,
     uint32_t const                   swapchain_height,
@@ -72,7 +72,7 @@ Ember::RenderDevice::RenderDevice(
   }
 }
 
-ID3D12Device2* Ember::RenderDevice::GetDevice() const noexcept
+ID3D12Device5* Ember::RenderDevice::GetDevice() const noexcept
 {
   return m_Device.Get();
 }
@@ -179,7 +179,7 @@ void Ember::RenderDevice::Create( RenderDevice* render_device, HWND window_handl
     }
   }
 
-  ComPtr<ID3D12Device2> device;
+  ComPtr<ID3D12Device5> device;
   // Fetch device.
   {
     ERR_ABORT( D3D12CreateDevice( adapter.Get(), D3D_FEATURE_LEVEL_12_2, IID_PPV_ARGS( &device ) ) );
@@ -231,6 +231,14 @@ void Ember::RenderDevice::Create( RenderDevice* render_device, HWND window_handl
     ERR_ABORT( device->CheckFeatureSupport( D3D12_FEATURE_FORMAT_SUPPORT, &format_support, sizeof( format_support ) ) );
     ENSURE(
         format_support.Support2 & ( D3D12_FORMAT_SUPPORT2_UAV_TYPED_LOAD | D3D12_FORMAT_SUPPORT2_UAV_TYPED_STORE ) );
+  }
+
+  // Verify Raytracing support
+  {
+    D3D12_FEATURE_DATA_D3D12_OPTIONS5 feature_data;
+    ZeroMemory( &feature_data, sizeof( feature_data ) );
+    ERR_ABORT( device->CheckFeatureSupport( D3D12_FEATURE_D3D12_OPTIONS5, &feature_data, sizeof( feature_data ) ) );
+    ENSURE( feature_data.RaytracingTier >= D3D12_RAYTRACING_TIER_1_1 );
   }
 
   // Verify Mesh Shader and stats support
@@ -347,7 +355,7 @@ Ember::Buffer Ember::RenderDevice::CreateStorageBuffer( uint32_t const size, uin
   return m_BufferManager.CreateStorageBuffer( size, stride );
 }
 
-Ember::Buffer Ember::RenderDevice::CreateRawStorageBuffer( uint32_t const size )
+Ember::Buffer Ember::RenderDevice::CreateRawStorageBuffer( uint64_t const size )
 {
   return m_BufferManager.CreateRawStorageBuffer( size );
 }

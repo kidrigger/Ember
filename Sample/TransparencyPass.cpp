@@ -46,10 +46,11 @@ bool Ember::RenderPass::TransparencyForward::Create(
                                                           D3D12_ROOT_SIGNATURE_FLAG_DENY_DOMAIN_SHADER_ROOT_ACCESS |
                                                           D3D12_ROOT_SIGNATURE_FLAG_DENY_HULL_SHADER_ROOT_ACCESS;
 
-  CD3DX12_ROOT_PARAMETER1 root_parameters[3];
+  CD3DX12_ROOT_PARAMETER1 root_parameters[4];
   root_parameters[0].InitAsConstants( sizeof( DrawList::Info ) / 4, 0 );
   root_parameters[1].InitAsConstants( sizeof( PerFrameConstants ) / 4, 1 );
   root_parameters[2].InitAsConstants( sizeof( Environment::GpuRepr ) / 4, 2 );
+  root_parameters[3].InitAsConstants( 1, 3 );
 
   CD3DX12_VERSIONED_ROOT_SIGNATURE_DESC root_signature_desc;
   root_signature_desc.Init_1_1(
@@ -130,7 +131,10 @@ bool Ember::RenderPass::TransparencyForward::Create(
 }
 
 Ember::RenderPass::RenderDepthData Ember::RenderPass::TransparencyForward::Execute(
-    FrameGraph* frame_graph, FrameGraphBlackboard const& bb, RenderDepthData const& render_depth ) const
+    FrameGraph*                       frame_graph,
+    FrameGraphBlackboard const&       bb,
+    RenderDepthData const&            render_depth,
+    std::optional<FrameGraphResource> tlas = {} ) const
 {
   return frame_graph->addCallbackPass(
       "Transparency Pass",
@@ -138,8 +142,12 @@ Ember::RenderPass::RenderDepthData Ember::RenderPass::TransparencyForward::Execu
       {
         data.RenderTarget = builder.write( render_depth.RenderTarget, FG::Attachment{ .Index = 0, .ForceSrgb = true } );
         data.DepthStencil = builder.write( render_depth.DepthStencil, FG::DepthStencil{} );
+        if ( tlas.has_value() )
+        {
+          builder.read( tlas.value() );
+        }
       },
-      [self = this, bb = &bb]( RenderDepthData const&, FrameGraphPassResources&, FG::Context* context )
+      [self = this, bb = &bb, tlas]( RenderDepthData const&, FrameGraphPassResources& res, FG::Context* context )
       {
         ZoneScopedN( "Transparency Pass" );
 
@@ -151,20 +159,30 @@ Ember::RenderPass::RenderDepthData Ember::RenderPass::TransparencyForward::Execu
         auto const& env       = bb->get<Environment::GpuRepr>();
         auto const& draw_list = bb->get<DrawList::Batches>().AlphaBlended;
 
+        SRVHandle   tlas_srv{};
+        if ( tlas.has_value() )
+        {
+          tlas_srv = res.get<FG::Buffer>( tlas.value() ).InnerBuffer.GetSRVHandle();
+        }
+
         cmd->SetGraphicsRootSignature( self->RootSignature.Get() );
         // TODO: Sort transparent objects back to front
         cmd->SetPipelineState( self->Pipeline.Get() );
         cmd->SetGraphicsRootConstants( 0, draw_list );
         cmd->SetGraphicsRootConstants( 1, constants );
         cmd->SetGraphicsRootConstants( 2, env );
+        cmd->SetGraphicsRootConstant( 3, ( UINT )tlas_srv );
         cmd->DispatchMesh( { .X = draw_list.DrawCount } );
       } );
 }
 
 Ember::RenderPass::RenderDepthData Ember::RenderPass::TransparencyForward::operator()(
-    FrameGraph* frame_graph, FrameGraphBlackboard const& bb, RenderDepthData const& render_depth ) const
+    FrameGraph*                       frame_graph,
+    FrameGraphBlackboard const&       bb,
+    RenderDepthData const&            render_depth,
+    std::optional<FrameGraphResource> tlas ) const
 {
-  return Execute( frame_graph, bb, render_depth );
+  return Execute( frame_graph, bb, render_depth, tlas );
 }
 
 bool Ember::RenderPass::AlphaTestedForward::Create(
@@ -202,10 +220,11 @@ bool Ember::RenderPass::AlphaTestedForward::Create(
                                                           D3D12_ROOT_SIGNATURE_FLAG_DENY_DOMAIN_SHADER_ROOT_ACCESS |
                                                           D3D12_ROOT_SIGNATURE_FLAG_DENY_HULL_SHADER_ROOT_ACCESS;
 
-  CD3DX12_ROOT_PARAMETER1 root_parameters[3];
+  CD3DX12_ROOT_PARAMETER1 root_parameters[4];
   root_parameters[0].InitAsConstants( sizeof( DrawList::Info ) / 4, 0 );
   root_parameters[1].InitAsConstants( sizeof( PerFrameConstants ) / 4, 1 );
   root_parameters[2].InitAsConstants( sizeof( Environment::GpuRepr ) / 4, 2 );
+  root_parameters[3].InitAsConstants( 1, 3 );
 
   CD3DX12_VERSIONED_ROOT_SIGNATURE_DESC root_signature_desc;
   root_signature_desc.Init_1_1(
@@ -276,7 +295,10 @@ bool Ember::RenderPass::AlphaTestedForward::Create(
 }
 
 Ember::RenderPass::RenderDepthData Ember::RenderPass::AlphaTestedForward::Execute(
-    FrameGraph* frame_graph, FrameGraphBlackboard const& bb, RenderDepthData const& render_depth_data ) const
+    FrameGraph*                       frame_graph,
+    FrameGraphBlackboard const&       bb,
+    RenderDepthData const&            render_depth_data,
+    std::optional<FrameGraphResource> tlas ) const
 {
   return frame_graph->addCallbackPass(
       "Alpha Tested Pass",
@@ -285,8 +307,13 @@ Ember::RenderPass::RenderDepthData Ember::RenderPass::AlphaTestedForward::Execut
         data.RenderTarget =
             builder.write( render_depth_data.RenderTarget, FG::Attachment{ .Index = 0, .ForceSrgb = true } );
         data.DepthStencil = builder.write( render_depth_data.DepthStencil, FG::DepthStencil{} );
+
+        if ( tlas.has_value() )
+        {
+          builder.read( tlas.value() );
+        }
       },
-      [self = this, bb = &bb]( RenderDepthData const&, FrameGraphPassResources&, FG::Context const* context )
+      [self = this, bb = &bb, tlas]( RenderDepthData const&, FrameGraphPassResources& res, FG::Context const* context )
       {
         ZoneScopedN( "Alpha Tested Pass" );
 
@@ -298,18 +325,28 @@ Ember::RenderPass::RenderDepthData Ember::RenderPass::AlphaTestedForward::Execut
         auto const& env       = bb->get<Environment::GpuRepr>();
         auto const& draw_list = bb->get<DrawList::Batches>().AlphaTested;
 
+        SRVHandle   tlas_srv{};
+        if ( tlas.has_value() )
+        {
+          tlas_srv = res.get<FG::Buffer>( tlas.value() ).InnerBuffer.GetSRVHandle();
+        }
+
         cmd->SetGraphicsRootSignature( self->RootSignature.Get() );
         // TODO: Sort transparent objects back to front
         cmd->SetPipelineState( self->Pipeline.Get() );
         cmd->SetGraphicsRootConstants( 0, draw_list );
         cmd->SetGraphicsRootConstants( 1, constants );
         cmd->SetGraphicsRootConstants( 2, env );
+        cmd->SetGraphicsRootConstant( 3, ( UINT )tlas_srv );
         cmd->DispatchMesh( { .X = draw_list.DrawCount } );
       } );
 }
 
 Ember::RenderPass::RenderDepthData Ember::RenderPass::AlphaTestedForward::operator()(
-    FrameGraph* frame_graph, FrameGraphBlackboard const& bb, RenderDepthData const& render_depth ) const
+    FrameGraph*                       frame_graph,
+    FrameGraphBlackboard const&       bb,
+    RenderDepthData const&            render_depth,
+    std::optional<FrameGraphResource> tlas ) const
 {
-  return Execute( frame_graph, bb, render_depth );
+  return Execute( frame_graph, bb, render_depth, tlas );
 }

@@ -46,7 +46,8 @@ class BasicApp final : public IApp
   FG::Context          m_FGContext;
   FrameGraphBlackboard m_FGBlackboard;
 
-  // PBR Pipeline
+  // ==== Raster Pipeline ====
+  //
   RenderPass::DepthPrePass m_DrawPrePass;
 
   // Forward Only
@@ -63,8 +64,22 @@ class BasicApp final : public IApp
   RenderPass::TransparencyForward m_RenderTransparentMeshes;
 
   // Environment
-  RenderPass::Atmosphere           m_UpdateAtmosphericSky;
-  RenderPass::Skybox               m_RenderBackground;
+  RenderPass::Atmosphere m_UpdateAtmosphericSky;
+  RenderPass::Skybox     m_RenderBackground;
+
+  // ==========================
+
+  // ==== Raytracing Pipeline ====
+  //
+  struct RTX
+  {
+    std::vector<D3D12_RAYTRACING_INSTANCE_DESC> InstanceVec;
+    Buffer                                      InstanceDesc[RenderDevice::kNumFrames];
+    Buffer                                      TLAS[RenderDevice::kNumFrames];
+    Buffer                                      Scratch[RenderDevice::kNumFrames];
+  };
+
+  RTX                              m_RTX;
 
   std::unique_ptr<Camera>          m_Camera;
   DirectX::XMUINT2                 m_PrevMouse{};
@@ -82,6 +97,7 @@ class BasicApp final : public IApp
   flecs::entity                 m_SceneRoot;
 
   void                          SetupRenderPasses();
+  void                          PrepareTLAS( CommandList* cmd, uint32_t frame_idx );
 
   static void                   InitImGui( HWND const window_handle, RenderDevice* render_device );
 

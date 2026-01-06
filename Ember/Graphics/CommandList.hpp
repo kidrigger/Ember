@@ -15,7 +15,7 @@ class Texture;
 
 class CommandList
 {
-  ComPtr<ID3D12GraphicsCommandList6>   m_CommandList;
+  ComPtr<ID3D12GraphicsCommandList7>   m_CommandList;
   ComPtr<ID3D12CommandAllocator>       m_CommandAllocator;
   std::unique_ptr<RenderTargetManager> m_RenderTargetManager;
   std::unique_ptr<ResourceBinder>      m_Binder;
@@ -23,7 +23,7 @@ class CommandList
 public:
   CommandList() = default;
   CommandList(
-      ComPtr<ID3D12GraphicsCommandList6>   command_list,
+      ComPtr<ID3D12GraphicsCommandList7>   command_list,
       ComPtr<ID3D12CommandAllocator>       command_allocator,
       std::unique_ptr<RenderTargetManager> render_target_manager,
       std::unique_ptr<ResourceBinder>      binder );
@@ -111,10 +111,10 @@ public:
   HRESULT Reset( ComPtr<ID3D12CommandAllocator> allocator );
   HRESULT Close();
 
-  ID3D12GraphicsCommandList6* Get() const noexcept;
+  ID3D12GraphicsCommandList7* Get() const noexcept;
 
   using Content = std::tuple<
-      ComPtr<ID3D12GraphicsCommandList6>,
+      ComPtr<ID3D12GraphicsCommandList7>,
       ComPtr<ID3D12CommandAllocator>,
       std::unique_ptr<RenderTargetManager>,
       std::unique_ptr<ResourceBinder>>;

@@ -44,10 +44,11 @@ bool Ember::RenderPass::OpaqueForward::Create( OpaqueForward* out, Desc const& d
                                                           D3D12_ROOT_SIGNATURE_FLAG_DENY_DOMAIN_SHADER_ROOT_ACCESS |
                                                           D3D12_ROOT_SIGNATURE_FLAG_DENY_HULL_SHADER_ROOT_ACCESS;
 
-  CD3DX12_ROOT_PARAMETER1 root_parameters[3];
+  CD3DX12_ROOT_PARAMETER1 root_parameters[4];
   root_parameters[0].InitAsConstants( sizeof( DrawList::Info ) / 4, 0 );
   root_parameters[1].InitAsConstants( sizeof( PerFrameConstants ) / 4, 1 );
   root_parameters[2].InitAsConstants( sizeof( Environment::GpuRepr ) / 4, 2 );
+  root_parameters[3].InitAsConstants( 1, 3 );
 
   CD3DX12_VERSIONED_ROOT_SIGNATURE_DESC root_signature_desc;
   root_signature_desc.Init_1_1(
@@ -126,7 +127,10 @@ bool Ember::RenderPass::OpaqueForward::Create( OpaqueForward* out, Desc const& d
 }
 
 FrameGraphResource Ember::RenderPass::OpaqueForward::Execute(
-    FrameGraph* frame_graph, FrameGraphBlackboard const& bb, FrameGraphResource const depth ) const
+    FrameGraph*                             frame_graph,
+    FrameGraphBlackboard const&             bb,
+    FrameGraphResource const                depth,
+    std::optional<FrameGraphResource> const tlas ) const
 {
   return frame_graph->addCallbackPass(
       "Opaque Forward",
@@ -152,8 +156,14 @@ FrameGraphResource Ember::RenderPass::OpaqueForward::Execute(
                 .LoadOp    = FG::LoadOperation::kClear,
             } );
         builder.read( depth, FG::DepthStencilRead{} );
+
+        if ( tlas.has_value() )
+        {
+          builder.read( *tlas, FG::ShaderResource{} );
+        }
       },
-      [self = this, bb = &bb]( FrameGraphResource const&, FrameGraphPassResources&, FG::Context const* context )
+      [self = this, bb = &bb, tlas](
+          FrameGraphResource const&, FrameGraphPassResources& res, FG::Context const* context )
       {
         ZoneScopedN( "Opaque Forward" );
 
@@ -165,18 +175,27 @@ FrameGraphResource Ember::RenderPass::OpaqueForward::Execute(
         auto const& env       = bb->get<Environment::GpuRepr>();
         auto const& draw_list = bb->get<DrawList::Batches>().Opaque;
 
-        cmd->SetGraphicsRootSignature( self->RootSignature.Get() );
-        cmd->SetGraphicsRootConstants( 1, constants );
-        cmd->SetGraphicsRootConstants( 2, env );
+        SRVHandle   tlas_srv{};
+        if ( tlas.has_value() )
+        {
+          tlas_srv = res.get<FG::Buffer>( tlas.value() ).InnerBuffer.GetSRVHandle();
+        }
 
+        cmd->SetGraphicsRootSignature( self->RootSignature.Get() );
         cmd->SetPipelineState( self->Pipeline.Get() );
         cmd->SetGraphicsRootConstants( 0, draw_list );
+        cmd->SetGraphicsRootConstants( 1, constants );
+        cmd->SetGraphicsRootConstants( 2, env );
+        cmd->SetGraphicsRootConstant( 3, ( UINT )tlas_srv );
         cmd->DispatchMesh( { .X = draw_list.DrawCount } );
       } );
 }
 
 FrameGraphResource Ember::RenderPass::OpaqueForward::operator()(
-    FrameGraph* frame_graph, FrameGraphBlackboard const& bb, FrameGraphResource const depth ) const
+    FrameGraph*                             frame_graph,
+    FrameGraphBlackboard const&             bb,
+    FrameGraphResource const                depth,
+    std::optional<FrameGraphResource> const tlas ) const
 {
-  return Execute( frame_graph, bb, depth );
+  return Execute( frame_graph, bb, depth, tlas );
 }

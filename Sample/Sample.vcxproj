@@ -212,10 +212,10 @@
       <AdditionalLibraryDirectories>$(TargetDir);%(AdditionalLibraryDirectories)</AdditionalLibraryDirectories>
     </Link>
     <FxCompile>
-      <ShaderModel>6.6</ShaderModel>
+      <ShaderModel>6.8</ShaderModel>
       <EntryPointName>%(Filename)</EntryPointName>
       <ShaderType>Library</ShaderType>
-      <AdditionalOptions>-enable-16bit-types</AdditionalOptions>
+      <AdditionalOptions>-enable-16bit-types -HV 2021</AdditionalOptions>
     </FxCompile>
   </ItemDefinitionGroup>
   <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='RenderDoc_Compat|x64'">
@@ -241,10 +241,10 @@
       <AdditionalLibraryDirectories>$(TargetDir);%(AdditionalLibraryDirectories)</AdditionalLibraryDirectories>
     </Link>
     <FxCompile>
-      <ShaderModel>6.6</ShaderModel>
+      <ShaderModel>6.8</ShaderModel>
       <EntryPointName>%(Filename)</EntryPointName>
       <ShaderType>Library</ShaderType>
-      <AdditionalOptions>-enable-16bit-types</AdditionalOptions>
+      <AdditionalOptions>-enable-16bit-types -HV 2021</AdditionalOptions>
     </FxCompile>
   </ItemDefinitionGroup>
   <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='Release|x64'">
@@ -274,11 +274,11 @@
       <AdditionalLibraryDirectories>$(TargetDir);%(AdditionalLibraryDirectories)</AdditionalLibraryDirectories>
     </Link>
     <FxCompile>
-      <ShaderModel>6.6</ShaderModel>
+      <ShaderModel>6.8</ShaderModel>
       <SuppressStartupBanner>false</SuppressStartupBanner>
       <EntryPointName>%(Filename)</EntryPointName>
       <ShaderType>Library</ShaderType>
-      <AdditionalOptions>-enable-16bit-types</AdditionalOptions>
+      <AdditionalOptions>-enable-16bit-types -HV 2021</AdditionalOptions>
     </FxCompile>
   </ItemDefinitionGroup>
   <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='ReleaseWithDebug|x64'">
@@ -308,11 +308,11 @@
       <AdditionalLibraryDirectories>$(TargetDir);%(AdditionalLibraryDirectories)</AdditionalLibraryDirectories>
     </Link>
     <FxCompile>
-      <ShaderModel>6.6</ShaderModel>
+      <ShaderModel>6.8</ShaderModel>
       <SuppressStartupBanner>false</SuppressStartupBanner>
       <EntryPointName>%(Filename)</EntryPointName>
       <ShaderType>Library</ShaderType>
-      <AdditionalOptions>-enable-16bit-types</AdditionalOptions>
+      <AdditionalOptions>-enable-16bit-types -HV 2021</AdditionalOptions>
       <EnableDebuggingInformation>true</EnableDebuggingInformation>
     </FxCompile>
   </ItemDefinitionGroup>
@@ -1132,10 +1132,10 @@
       <ShaderType Condition="'$(Configuration)|$(Platform)'=='ReleaseWithDebug|Win32'">Pixel</ShaderType>
       <ShaderType Condition="'$(Configuration)|$(Platform)'=='Release|x64'">Pixel</ShaderType>
       <ShaderType Condition="'$(Configuration)|$(Platform)'=='ReleaseWithDebug|x64'">Pixel</ShaderType>
-      <AdditionalOptions Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">-enable-16bit-types</AdditionalOptions>
-      <AdditionalOptions Condition="'$(Configuration)|$(Platform)'=='RenderDoc_Compat|x64'">-enable-16bit-types</AdditionalOptions>
-      <AdditionalOptions Condition="'$(Configuration)|$(Platform)'=='Release|x64'">-enable-16bit-types</AdditionalOptions>
-      <AdditionalOptions Condition="'$(Configuration)|$(Platform)'=='ReleaseWithDebug|x64'">-enable-16bit-types</AdditionalOptions>
+      <AdditionalOptions Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">-enable-16bit-types %(AdditionalOptions)</AdditionalOptions>
+      <AdditionalOptions Condition="'$(Configuration)|$(Platform)'=='RenderDoc_Compat|x64'">-enable-16bit-types %(AdditionalOptions)</AdditionalOptions>
+      <AdditionalOptions Condition="'$(Configuration)|$(Platform)'=='Release|x64'">-enable-16bit-types %(AdditionalOptions)</AdditionalOptions>
+      <AdditionalOptions Condition="'$(Configuration)|$(Platform)'=='ReleaseWithDebug|x64'">-enable-16bit-types %(AdditionalOptions)</AdditionalOptions>
     </FxCompile>
     <FxCompile Include="TriangleVS.hlsl">
       <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='ReleaseWithDebug|x64'">true</ExcludedFromBuild>

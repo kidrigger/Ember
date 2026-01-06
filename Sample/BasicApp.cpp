@@ -64,6 +64,7 @@ struct DebugConfig
   SkyMode  SkyMode                      = kAtmosphere;
   uint32_t RemoveDiffuseContrib         = false;
   uint32_t RemoveSpecularContrib        = false;
+  uint32_t RaytracedShadows             = false;
 
   uint32_t DisableMeshletFrustumCulling = false;
 } g_Debug;
@@ -286,6 +287,84 @@ void Ember::BasicApp::SetupRenderPasses()
   ENSURE( RenderPass::Atmosphere::Create( &m_UpdateAtmosphericSky, m_RenderDevice.get() ) );
 }
 
+void Ember::BasicApp::PrepareTLAS( CommandList* cmd, uint32_t frame_idx )
+{
+  auto*                p_cmd   = cmd->Get();
+
+  D3D12_GLOBAL_BARRIER barrier = {
+    .SyncBefore   = D3D12_BARRIER_SYNC_BUILD_RAYTRACING_ACCELERATION_STRUCTURE,
+    .SyncAfter    = D3D12_BARRIER_SYNC_BUILD_RAYTRACING_ACCELERATION_STRUCTURE,
+    .AccessBefore = D3D12_BARRIER_ACCESS_RAYTRACING_ACCELERATION_STRUCTURE_READ,
+    .AccessAfter  = D3D12_BARRIER_ACCESS_RAYTRACING_ACCELERATION_STRUCTURE_WRITE,
+  };
+  auto barrier_group = CD3DX12_BARRIER_GROUP{ 1, &barrier };
+  p_cmd->Barrier( 1, &barrier_group );
+
+  // TODO: Use bump allocator for this.
+
+  m_RTX.InstanceVec.clear();
+  int i = 0;
+  m_World->GetECS().each(
+      [&]( WorldTransform const& wt, BLAS const& blas )
+      {
+        auto& desc                 = m_RTX.InstanceVec.emplace_back();
+        desc.AccelerationStructure = blas.ASBuffer.GetGPUVirtualAddress();
+        desc.Flags                 = D3D12_RAYTRACING_INSTANCE_FLAG_NONE;
+        auto* ptr                  = ( DirectX::XMFLOAT3X4* )&desc.Transform;
+        XMStoreFloat3x4( ptr, wt.Transform );
+        desc.InstanceMask                        = 0xFF;
+        desc.Flags                               = D3D12_RAYTRACING_INSTANCE_FLAG_NONE;
+        desc.InstanceID                          = ( i++ & 0xFFFFFF );
+        desc.InstanceContributionToHitGroupIndex = 0xFFFFFF;
+      } );
+
+  Buffer* desc_buf = &m_RTX.InstanceDesc[frame_idx];
+  if ( desc_buf->GetSize() < ByteSizeOf( m_RTX.InstanceVec ) )
+  {
+    *desc_buf = m_RenderDevice->CreateStorageBuffer( ByteSizeOf( m_RTX.InstanceVec ), StrideOf( m_RTX.InstanceVec ) );
+    wchar_t name[32];
+    swprintf_s( name, 32, L"TLAS Instance Desc Buffer %d", frame_idx );
+    desc_buf->SetName( name );
+  }
+  desc_buf->Write( 0, ByteSizeOf( m_RTX.InstanceVec ), DataOf( m_RTX.InstanceVec ) );
+
+  D3D12_BUILD_RAYTRACING_ACCELERATION_STRUCTURE_INPUTS inputs = {
+    .Type          = D3D12_RAYTRACING_ACCELERATION_STRUCTURE_TYPE_TOP_LEVEL,
+    .Flags         = D3D12_RAYTRACING_ACCELERATION_STRUCTURE_BUILD_FLAG_PREFER_FAST_BUILD,
+    .NumDescs      = CountOf( m_RTX.InstanceVec ),
+    .DescsLayout   = D3D12_ELEMENTS_LAYOUT_ARRAY,
+    .InstanceDescs = desc_buf->GetGPUVirtualAddress(),
+  };
+
+  D3D12_RAYTRACING_ACCELERATION_STRUCTURE_PREBUILD_INFO prebuild;
+  m_RenderDevice->GetDevice()->GetRaytracingAccelerationStructurePrebuildInfo( &inputs, &prebuild );
+
+  Buffer* scratch_buf = &m_RTX.Scratch[frame_idx];
+  if ( scratch_buf->GetSize() < prebuild.ScratchDataSizeInBytes )
+  {
+    *scratch_buf = m_RenderDevice->CreateRawStorageBuffer( prebuild.ScratchDataSizeInBytes );
+    wchar_t name[32];
+    swprintf_s( name, 32, L"TLAS Scratch Buffer %d", frame_idx );
+    scratch_buf->SetName( name );
+  }
+
+  Buffer* tlas_buf = &m_RTX.TLAS[frame_idx];
+  if ( tlas_buf->GetSize() < prebuild.ResultDataMaxSizeInBytes )
+  {
+    *tlas_buf = m_RenderDevice->CreateASBuffer( prebuild.ResultDataMaxSizeInBytes );
+    wchar_t name[32];
+    swprintf_s( name, 32, L"TLAS %d", frame_idx );
+    tlas_buf->SetName( name );
+  }
+
+  D3D12_BUILD_RAYTRACING_ACCELERATION_STRUCTURE_DESC const desc = {
+    .DestAccelerationStructureData    = tlas_buf->GetGPUVirtualAddress(),
+    .Inputs                           = inputs,
+    .ScratchAccelerationStructureData = scratch_buf->GetGPUVirtualAddress(),
+  };
+  p_cmd->BuildRaytracingAccelerationStructure( &desc, 0, nullptr );
+}
+
 void Ember::BasicApp::LoadContent()
 {
   ERR_ABORT( ::ShowWindow( m_WindowHandle, SW_SHOW ) );
@@ -504,7 +583,11 @@ void Ember::BasicApp::Update()
         ImGui::Checkbox( "Remove Specular Contribution", &scratch );
         g_Debug.RemoveSpecularContrib = ( uint32_t )scratch;
 
-        scratch                       = ( bool )g_Debug.DisableMeshletFrustumCulling;
+        scratch                       = ( bool )g_Debug.RaytracedShadows;
+        ImGui::Checkbox( "Raytrace Shadows", &scratch );
+        g_Debug.RaytracedShadows = ( uint32_t )scratch;
+
+        scratch                  = ( bool )g_Debug.DisableMeshletFrustumCulling;
         ImGui::Checkbox( "Disable Meshlet Frustum Culling", &scratch );
         g_Debug.DisableMeshletFrustumCulling = ( uint32_t )scratch;
 
@@ -715,7 +798,10 @@ void Ember::BasicApp::Render()
 
   LightManager::GpuInfo light_info = m_LightManager->PrepareFrame( *m_Camera, frame_idx );
 
-  m_LightManager->RenderAllShadows( &command_list, draw_list_info, *m_Camera, frame_idx );
+  if ( not g_Debug.RaytracedShadows or g_UseDeferredRendering )
+  {
+    m_LightManager->RenderAllShadows( &command_list, draw_list_info, *m_Camera, frame_idx );
+  }
 
   SRVHandle const materials_srv           = m_MaterialManager->PrepareFrame();
 
@@ -729,15 +815,25 @@ void Ember::BasicApp::Render()
 
   m_FGBlackboard.get<Environment::GpuRepr>() = m_Environment->Repr();
 
-  auto const               atmosphere        = m_UpdateAtmosphericSky( &frame_graph, &m_FGBlackboard, frame_idx );
+  if ( g_Debug.RaytracedShadows )
+  {
+    PrepareTLAS( &command_list, frame_idx );
+  }
 
-  FrameGraphResource       depth_buffer      = m_DrawPrePass( &frame_graph, m_FGBlackboard );
+  auto const                        atmosphere   = m_UpdateAtmosphericSky( &frame_graph, &m_FGBlackboard, frame_idx );
 
-  FrameGraphResource       opaque_pass_fwd   = m_RenderOpaqueMeshes( &frame_graph, m_FGBlackboard, depth_buffer );
+  FrameGraphResource                depth_buffer = m_DrawPrePass( &frame_graph, m_FGBlackboard );
 
-  auto const               gbuffer           = m_UpdateGBuffer( &frame_graph, m_FGBlackboard, depth_buffer );
-  FrameGraphResource const omni_pass_rt      = m_RenderOmniLights( &frame_graph, m_FGBlackboard, gbuffer );
-  FrameGraphResource const spot_pass_rt = m_RenderSpotLights( &frame_graph, m_FGBlackboard, gbuffer, omni_pass_rt );
+  std::optional<FrameGraphResource> tlas;
+  if ( g_Debug.RaytracedShadows )
+  {
+    tlas = frame_graph.import( "TLAS", {}, FG::Buffer{ m_RTX.TLAS[frame_idx] } );
+  }
+  FrameGraphResource       opaque_pass_fwd = m_RenderOpaqueMeshes( &frame_graph, m_FGBlackboard, depth_buffer, tlas );
+
+  auto const               gbuffer         = m_UpdateGBuffer( &frame_graph, m_FGBlackboard, depth_buffer );
+  FrameGraphResource const omni_pass_rt    = m_RenderOmniLights( &frame_graph, m_FGBlackboard, gbuffer );
+  FrameGraphResource const spot_pass_rt    = m_RenderSpotLights( &frame_graph, m_FGBlackboard, gbuffer, omni_pass_rt );
   FrameGraphResource const opaque_pass_dfr =
       m_RenderScreenSpaceLighting( &frame_graph, m_FGBlackboard, gbuffer, spot_pass_rt );
 
@@ -746,8 +842,8 @@ void Ember::BasicApp::Render()
     .DepthStencil = depth_buffer,
   };
 
-  auto const alpha_tested      = m_RenderAlphaTestedMeshes( &frame_graph, m_FGBlackboard, opaque_pass );
-  auto const transparency_pass = m_RenderTransparentMeshes( &frame_graph, m_FGBlackboard, alpha_tested );
+  auto const alpha_tested      = m_RenderAlphaTestedMeshes( &frame_graph, m_FGBlackboard, opaque_pass, tlas );
+  auto const transparency_pass = m_RenderTransparentMeshes( &frame_graph, m_FGBlackboard, alpha_tested, tlas );
 
   m_RenderBackground.UseProceduralAtmosphericSky = g_Debug.SkyMode == DebugConfig::kAtmosphere;
   auto const skybox_pass = m_RenderBackground( &frame_graph, m_FGBlackboard, transparency_pass, atmosphere.SkyViewLUT );

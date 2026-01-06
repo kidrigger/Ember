@@ -65,7 +65,7 @@ Ember::CommandList Ember::Context::GetCommandList()
   std::unique_ptr<ResourceBinder>      binder;
   ComPtr<ID3D12CommandAllocator>       command_allocator;
   std::unique_ptr<RenderTargetManager> rtm;
-  ComPtr<ID3D12GraphicsCommandList6>   command_list;
+  ComPtr<ID3D12GraphicsCommandList7>   command_list;
 
   if ( not m_CommandAllocators.empty() and IsFenceComplete( m_CommandAllocators.front().FenceValue ) )
   {

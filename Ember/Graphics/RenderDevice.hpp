@@ -19,7 +19,7 @@ public:
 
 private:
   // Device and queues.
-  ComPtr<ID3D12Device2>      m_Device;
+  ComPtr<ID3D12Device5>      m_Device;
   ComPtr<D3D12MA::Allocator> m_Allocator;
 
   // Swapchain and internal images.
@@ -49,7 +49,7 @@ private:
 public:
   RenderDevice() = default;
   RenderDevice(
-      ComPtr<ID3D12Device2>            device,
+      ComPtr<ID3D12Device5>            device,
       ComPtr<D3D12MA::Allocator>       allocator,
       uint32_t                         swapchain_width,
       uint32_t                         swapchain_height,
@@ -59,7 +59,7 @@ public:
       Context                          direct_context,
       bool                             is_tearing_supported );
 
-  [[nodiscard]] ID3D12Device2*             GetDevice() const noexcept;
+  [[nodiscard]] ID3D12Device5*             GetDevice() const noexcept;
   [[nodiscard]] D3D12MA::Allocator*        GetAllocator() const noexcept;
   [[nodiscard]] ID3D12CommandQueue*        GetDirectQueue() const noexcept;
 
@@ -74,7 +74,7 @@ public:
   [[nodiscard]] Buffer  CreateVertexBuffer( uint32_t size, uint32_t stride );
   [[nodiscard]] Buffer  CreateIndexBuffer( uint32_t size, DXGI_FORMAT format );
   [[nodiscard]] Buffer  CreateStorageBuffer( uint32_t size, uint32_t stride );
-  [[nodiscard]] Buffer  CreateRawStorageBuffer( uint32_t size );
+  [[nodiscard]] Buffer  CreateRawStorageBuffer( uint64_t size );
   [[nodiscard]] Buffer  CreateConstantBuffer( uint32_t size );
   [[nodiscard]] Buffer  CreateASBuffer( uint64_t size );
 

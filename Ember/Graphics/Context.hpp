@@ -37,7 +37,7 @@ private:
     std::unique_ptr<ResourceBinder> Binder;
   };
 
-  using CommandListQueue      = std::queue<ComPtr<ID3D12GraphicsCommandList6>>;
+  using CommandListQueue      = std::queue<ComPtr<ID3D12GraphicsCommandList7>>;
   using RTMQueue              = std::queue<std::unique_ptr<RenderTargetManager>>;
   using CommandAllocatorQueue = std::queue<InFlightAllocators>;
   using PoolAllocator         = std::unique_ptr<std::pmr::unsynchronized_pool_resource>;

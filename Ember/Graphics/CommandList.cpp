@@ -20,7 +20,7 @@ HRESULT Ember::CommandList::Close()
   return m_CommandList->Close();
 }
 
-ID3D12GraphicsCommandList6* Ember::CommandList::Get() const noexcept
+ID3D12GraphicsCommandList7* Ember::CommandList::Get() const noexcept
 {
   return m_CommandList.Get();
 }
@@ -36,7 +36,7 @@ Ember::CommandList::Content Ember::CommandList::Release() noexcept
 }
 
 Ember::CommandList::CommandList(
-    ComPtr<ID3D12GraphicsCommandList6>   command_list,
+    ComPtr<ID3D12GraphicsCommandList7>   command_list,
     ComPtr<ID3D12CommandAllocator>       command_allocator,
     std::unique_ptr<RenderTargetManager> render_target_manager,
     std::unique_ptr<ResourceBinder>      binder )
