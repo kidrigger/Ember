@@ -18,10 +18,11 @@ class Buffer
 public:
   enum class Type : uint8_t
   {
-    kVertexBuffer   = 0,
-    kIndexBuffer    = 1,
-    kStorageBuffer  = 2,
-    kConstantBuffer = 3,
+    kVertexBuffer          = 0,
+    kIndexBuffer           = 1,
+    kStorageBuffer         = 2,
+    kConstantBuffer        = 3,
+    kAccelerationStructure = 4,
   };
 
 private:
@@ -34,8 +35,7 @@ public:
 
   void                                    Write( uint32_t offset, uint32_t size, void const* data ) const;
   [[nodiscard]] ID3D12Resource*           GetBuffer() const noexcept;
-  [[nodiscard]] uint32_t                  GetSize() const noexcept;
-  [[nodiscard]] uint32_t                  GetOffset() const noexcept;
+  [[nodiscard]] uint64_t                  GetSize() const noexcept;
   [[nodiscard]] Type                      GetType() const noexcept;
 
   [[nodiscard]] SRVHandle                 GetSRVHandle() const;
@@ -65,6 +65,7 @@ public:
   Buffer                            CreateRawStorageBuffer( uint32_t size );
   Buffer                            CreateReadWriteBuffer( uint32_t size, uint32_t stride );
   Buffer                            CreateConstantBuffer( uint32_t size );
+  Buffer                            CreateASBuffer( uint64_t size );
 
   std::pmr::polymorphic_allocator<> GetAllocator();
 };

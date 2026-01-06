@@ -109,6 +109,11 @@ Ember::CommandList Ember::Context::GetCommandList()
   };
 }
 
+[[nodiscard]] D3D12_COMMAND_LIST_TYPE Ember::Context::GetCommandListType() const noexcept
+{
+  return m_CommandListType;
+}
+
 Ember::Context::Receipt Ember::Context::Submit( CommandList&& command_list )
 {
   ERR_ABORT( command_list.Close() );

@@ -22,8 +22,10 @@ public:
   GeometryAllocation(
       Buffer buffer, ComPtr<D3D12MA::VirtualBlock> block, D3D12MA::VirtualAllocation allocation, uint32_t offset );
 
-  void     Write( uint32_t offset, uint32_t size, void const* data ) const;
-  uint32_t GetOffsetInBytes() const;
+  void                      Write( uint32_t offset, uint32_t size, void const* data ) const;
+  uint32_t                  GetOffsetInBytes() const;
+  D3D12_GPU_VIRTUAL_ADDRESS GetGPUVirtualAddress() const;     //< Local GPU virtual address.
+  D3D12_GPU_VIRTUAL_ADDRESS GetBaseGPUVirtualAddress() const; //< Global GPU virtual address.
 
   GeometryAllocation( GeometryAllocation const& other ) = delete;
   GeometryAllocation( GeometryAllocation&& other ) noexcept;

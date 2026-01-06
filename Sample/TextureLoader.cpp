@@ -361,7 +361,7 @@ Ember::TextureLoader::TextureLoader(
     ComPtr<ID3D12RootSignature> mipmap_root_signature,
     ComPtr<ID3D12PipelineState> mipmap_pipeline,
     ComPtr<ID3D12PipelineState> mipmap_cube_pipeline,
-    Context                     copy_context,
+    std::shared_ptr<Context>    copy_context,
     uint32_t const              upload_frame_count )
   : m_RenderDevice{ render_device }
   , m_CopyContext{ std::move( copy_context ) }
@@ -370,17 +370,27 @@ Ember::TextureLoader::TextureLoader(
   , m_MipmapCubePipeline{ std::move( mipmap_cube_pipeline ) }
 {
   m_UploadBatches.reserve( upload_frame_count );
-  Context::Receipt initial = m_CopyContext.CreateReceipt();
+  Context::Receipt initial = m_CopyContext->CreateReceipt();
   for ( int i = 0; i < ( int )upload_frame_count; ++i )
   {
     m_UploadBatches.emplace_back( initial, &m_InFlightPool );
   }
-  m_CurrentCommandList = m_CopyContext.GetCommandList();
+  m_CurrentCommandList = m_CopyContext->GetCommandList();
 }
 
-void Ember::TextureLoader::Create( TextureLoader* loader, RenderDevice* render_device, uint32_t upload_frame_count )
+bool Ember::TextureLoader::Create(
+    TextureLoader*           loader,
+    RenderDevice*            render_device,
+    std::shared_ptr<Context> compute_context,
+    uint32_t                 upload_frame_count )
 {
   ComPtr<ID3D12Device2> device = render_device->GetDevice();
+
+  if ( compute_context->GetCommandListType() != D3D12_COMMAND_LIST_TYPE_COMPUTE )
+  {
+    OutputDebugStringA( "TextureLoader requires a compute context for mip-map generation. " );
+    return false;
+  }
 
   // We need COMPUTE instead of COPY due to the mip-mapping.
   // Ideally, we want to kick the job to an async compute queue.
@@ -458,9 +468,11 @@ void Ember::TextureLoader::Create( TextureLoader* loader, RenderDevice* render_d
     std::move( root_signature ),
     std::move( mipmap_pipeline ),
     std::move( mipmap_cube_pipeline ),
-    std::move( transfer_context ),
+    std::move( compute_context ),
     upload_frame_count,
   };
+
+  return true;
 }
 
 bool Ember::TextureLoader::TryLoadImpl(
@@ -641,20 +653,20 @@ bool Ember::TextureLoader::TryLoadTextureFromData(
 
 Ember::Context::Receipt Ember::TextureLoader::EndBatch()
 {
-  m_UploadBatches[m_CurrentUploadBatch].Receipt = m_CopyContext.Submit( std::move( m_CurrentCommandList ) );
+  m_UploadBatches[m_CurrentUploadBatch].Receipt = m_CopyContext->Submit( std::move( m_CurrentCommandList ) );
 
   Context::Receipt const batch_receipt          = m_UploadBatches[m_CurrentUploadBatch].Receipt;
 
   m_CurrentUploadBatch++;
   m_CurrentUploadBatch %= m_UploadBatches.size();
 
-  m_CopyContext.WaitOn( m_UploadBatches[m_CurrentUploadBatch].Receipt );
+  m_CopyContext->WaitOn( m_UploadBatches[m_CurrentUploadBatch].Receipt );
 
   auto lock_guard = std::lock_guard( m_LoadLock );
 
   m_UploadBatches[m_CurrentUploadBatch].FlushPendingBarriers( &m_PendingBarriers );
 
-  m_CurrentCommandList     = m_CopyContext.GetCommandList();
+  m_CurrentCommandList     = m_CopyContext->GetCommandList();
   m_CurrentUploadBatchSize = 0;
 
   return batch_receipt;

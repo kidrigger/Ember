@@ -171,8 +171,7 @@ bool Ember::ModelLoader::TryLoadTexture(
   return texture;
 }
 
-flecs::entity Ember::ModelLoader::ProcessNode(
-    LoadingContext* context, flecs::entity parent, cgltf_node const& node ) const
+void Ember::ModelLoader::ProcessNode( LoadingContext* context, flecs::entity parent, cgltf_node const& node ) const
 {
   DirectX::XMVECTOR translation{ DirectX::XMVectorSet( 0.0f, 0.0f, 0.0f, 1.0f ) };
   DirectX::XMVECTOR rotation{ DirectX::XMQuaternionIdentity() };
@@ -211,8 +210,6 @@ flecs::entity Ember::ModelLoader::ProcessNode(
   {
     ProcessNode( context, my_node, *node.children[child_idx] );
   }
-
-  return my_node;
 }
 
 cgltf_accessor* FindAccessor(
@@ -472,8 +469,6 @@ void Ember::ModelLoader::ProcessPrimitive(
   }
   context->Indices.insert( context->Indices.end(), loaded_indices.begin(), loaded_indices.end() );
 
-  context->VertexPositions.reserve( context->VertexData.size() );
-
   uint32_t meshlet_vert_start = ( uint32_t )context->MeshletVertices.size();
   uint32_t triangle_start     = ( uint32_t )context->MeshletTriangles.size();
   std::ranges::transform(
@@ -537,6 +532,7 @@ void Ember::ModelLoader::ProcessPrimitive(
               .IndexCount      = ( uint32_t )index_count,
               .VertexDataStart = ( uint32_t )vertex_start,
               .VertexLiteStart = vertex_lite_start,
+              .VertexCount     = ( uint32_t )vertex_count,
               .MeshletCount    = ( uint32_t )meshlets.size(),
               .FirstMeshlet    = meshlet_start,
             };
@@ -689,13 +685,15 @@ Ember::MaterialImpl* Ember::ModelLoader::GetDefaultMaterial( LoadingContext* con
 }
 
 Ember::ModelLoader::ModelLoader(
-    RenderDevice*    render_device,
-    World*           world,
-    TextureLoader*   texture_loader,
-    MaterialManager* material_manager,
-    GeometryManager* geometry_manager )
+    RenderDevice*            render_device,
+    World*                   world,
+    std::shared_ptr<Context> compute_context,
+    TextureLoader*           texture_loader,
+    MaterialManager*         material_manager,
+    GeometryManager*         geometry_manager )
   : m_RenderDevice{ render_device }
   , m_World{ world }
+  , m_ComputeContext{ std::move( compute_context ) }
   , m_TextureLoader{ texture_loader }
   , m_MaterialManager{ material_manager }
   , m_GeometryManager{ geometry_manager }
@@ -705,96 +703,96 @@ void Ember::ModelLoader::ProcessAnimation( LoadingContext* context, cgltf_animat
 {
   float              track_length = 0.0f;
   std::vector<float> timeline;
-    for ( uint32_t channel_idx = 0; channel_idx < animation.channels_count; ++channel_idx )
-    {
-      cgltf_animation_sampler const& sampler     = *animation.channels[channel_idx].sampler;
+  for ( uint32_t channel_idx = 0; channel_idx < animation.channels_count; ++channel_idx )
+  {
+    cgltf_animation_sampler const& sampler     = *animation.channels[channel_idx].sampler;
 
-      size_t const                   float_count = cgltf_accessor_unpack_floats( sampler.input, nullptr, 0 );
+    size_t const                   float_count = cgltf_accessor_unpack_floats( sampler.input, nullptr, 0 );
+    timeline.resize( float_count );
+    cgltf_accessor_unpack_floats( sampler.input, timeline.data(), float_count );
+
+    track_length = std::max( track_length, timeline.back() );
+  }
+
+  for ( uint32_t channel_idx = 0; channel_idx < animation.channels_count; ++channel_idx )
+  {
+    cgltf_animation_channel const& channel = animation.channels[channel_idx];
+
+    timeline.clear();
+    cgltf_animation_sampler const& sampler = *channel.sampler;
+    {
+      size_t const float_count = cgltf_accessor_unpack_floats( sampler.input, nullptr, 0 );
       timeline.resize( float_count );
       cgltf_accessor_unpack_floats( sampler.input, timeline.data(), float_count );
-
-      track_length = std::max( track_length, timeline.back() );
     }
-
-    for ( uint32_t channel_idx = 0; channel_idx < animation.channels_count; ++channel_idx )
-    {
-      cgltf_animation_channel const& channel = animation.channels[channel_idx];
-
-      timeline.clear();
-      cgltf_animation_sampler const& sampler = *channel.sampler;
-      {
-        size_t const float_count = cgltf_accessor_unpack_floats( sampler.input, nullptr, 0 );
-        timeline.resize( float_count );
-        cgltf_accessor_unpack_floats( sampler.input, timeline.data(), float_count );
-      }
 
     flecs::entity target_entity = context->NodeCache[channel.target_node];
 
-      switch ( channel.target_path )
+    switch ( channel.target_path )
+    {
+      case cgltf_animation_path_type_translation:
       {
-        case cgltf_animation_path_type_translation:
-        {
-          std::vector<DirectX::XMFLOAT3> translations;
-          size_t const                   float_count = cgltf_accessor_unpack_floats( sampler.output, nullptr, 0 );
-          ASSERT( float_count % 3 == 0 );
-          size_t const float3_count = float_count / 3;
-          translations.resize( float3_count );
-          cgltf_accessor_unpack_floats( sampler.output, ( float* )translations.data(), float_count );
+        std::vector<DirectX::XMFLOAT3> translations;
+        size_t const                   float_count = cgltf_accessor_unpack_floats( sampler.output, nullptr, 0 );
+        ASSERT( float_count % 3 == 0 );
+        size_t const float3_count = float_count / 3;
+        translations.resize( float3_count );
+        cgltf_accessor_unpack_floats( sampler.output, ( float* )translations.data(), float_count );
 
-          target_entity.ensure<TranslatingAnimation>().Animations[animation.name] = {
+        target_entity.ensure<TranslatingAnimation>().Animations[animation.name] = {
             .Keyframes={
               std::move( timeline ),
               std::move( translations ),
             },
             .Length = track_length,
           };
-        }
-        break;
-        case cgltf_animation_path_type_rotation:
-        {
-          std::vector<DirectX::XMFLOAT4> rotations;
-          size_t const                   float_count = cgltf_accessor_unpack_floats( sampler.output, nullptr, 0 );
-          ASSERT( float_count % 4 == 0 );
-          size_t const float4_count = float_count / 4;
-          rotations.resize( float4_count );
-          cgltf_accessor_unpack_floats( sampler.output, ( float* )rotations.data(), float_count );
+      }
+      break;
+      case cgltf_animation_path_type_rotation:
+      {
+        std::vector<DirectX::XMFLOAT4> rotations;
+        size_t const                   float_count = cgltf_accessor_unpack_floats( sampler.output, nullptr, 0 );
+        ASSERT( float_count % 4 == 0 );
+        size_t const float4_count = float_count / 4;
+        rotations.resize( float4_count );
+        cgltf_accessor_unpack_floats( sampler.output, ( float* )rotations.data(), float_count );
 
-          target_entity.ensure<RotatingAnimation>().Animations[animation.name] = {
+        target_entity.ensure<RotatingAnimation>().Animations[animation.name] = {
             .Keyframes= {
               std::move( timeline ),
               std::move( rotations ),
             },
             .Length = track_length,
           };
-        }
-        break;
-        case cgltf_animation_path_type_scale:
-        {
-          std::vector<DirectX::XMFLOAT3> scales;
-          size_t const                   float_count = cgltf_accessor_unpack_floats( sampler.output, nullptr, 0 );
-          ASSERT( float_count % 3 == 0 );
-          size_t const float3_count = float_count / 3;
-          scales.resize( float3_count );
-          cgltf_accessor_unpack_floats( sampler.output, ( float* )scales.data(), float_count );
+      }
+      break;
+      case cgltf_animation_path_type_scale:
+      {
+        std::vector<DirectX::XMFLOAT3> scales;
+        size_t const                   float_count = cgltf_accessor_unpack_floats( sampler.output, nullptr, 0 );
+        ASSERT( float_count % 3 == 0 );
+        size_t const float3_count = float_count / 3;
+        scales.resize( float3_count );
+        cgltf_accessor_unpack_floats( sampler.output, ( float* )scales.data(), float_count );
 
-          target_entity.ensure<ScalingAnimation>().Animations[animation.name] = {
+        target_entity.ensure<ScalingAnimation>().Animations[animation.name] = {
             .Keyframes = {
               std::move( timeline ),
               std::move( scales ),
             },
             .Length = track_length,
           };
-        }
-        break;
-        case cgltf_animation_path_type_weights:
-          UNIMPLEMENTED;
-        default:
-          UNREACHABLE;
       }
+      break;
+      case cgltf_animation_path_type_weights:
+        UNIMPLEMENTED;
+      default:
+        UNREACHABLE;
     }
   }
+}
 
-void Ember::ModelLoader::FinalizeGeometry( LoadingContext* context, flecs::entity& entity ) const
+void Ember::ModelLoader::FinalizeGeometry( LoadingContext* context, flecs::entity entity ) const
 {
   GeometryAllocation geom;
   uint32_t           vertex_position_offset;
@@ -898,6 +896,7 @@ void Ember::ModelLoader::FinalizeGeometry( LoadingContext* context, flecs::entit
     ent.get(
         [&]( Mesh& mesh )
         {
+          mesh.FirstIndex      += indices_offset / sizeof( uint32_t );
           mesh.VertexDataStart += vertex_data_offset / sizeof( VertexData );
           mesh.VertexLiteStart += vertex_position_offset / sizeof( VertexLite );
           mesh.FirstMeshlet    += meshlet_offset / sizeof( Meshlet );
@@ -917,6 +916,136 @@ void Ember::ModelLoader::FinalizeGeometry( LoadingContext* context, flecs::entit
     .MeshletVertices  = meshlet_vertices_offset,
     .Indices          = indices_offset,
   };
+}
+
+void Ember::ModelLoader::CreateAccelerationStructure( LoadingContext* context, flecs::entity root ) const
+{
+  auto const                 base_addr = context->Geometry->GeometryAlloc.GetBaseGPUVirtualAddress();
+
+  std::vector<flecs::entity> meshes;
+  std::queue<flecs::entity>  bfs_subtree;
+  bfs_subtree.push( root );
+  while ( not bfs_subtree.empty() )
+  {
+    flecs::entity ent = bfs_subtree.front();
+    bfs_subtree.pop();
+
+    if ( ent.has<Mesh>() ) meshes.push_back( ent );
+
+    ent.children( [&]( flecs::entity child ) { bfs_subtree.push( child ); } );
+  }
+
+  ENSURE( not meshes.empty() );
+  for ( flecs::entity entity : meshes )
+  {
+    auto mesh          = entity.get<Mesh>();
+
+    auto index_offset  = mesh.FirstIndex * sizeof( uint32_t );
+    auto vertex_offset = mesh.VertexLiteStart * sizeof( VertexLite );
+    auto index_end     = index_offset + mesh.IndexCount * sizeof( uint32_t );
+    auto vertex_end    = vertex_offset + mesh.VertexCount * sizeof( VertexLite );
+    ASSERT( index_offset > vertex_end or index_end < vertex_offset );
+    entity.set( CreateBLAS(
+        context,
+        base_addr + mesh.FirstIndex * sizeof( uint32_t ),
+        base_addr + mesh.VertexLiteStart * sizeof( VertexLite ),
+        mesh.IndexCount,
+        mesh.VertexCount ) );
+  }
+}
+
+Ember::BLAS Ember::ModelLoader::CreateBLAS(
+    LoadingContext*                 context,
+    D3D12_GPU_VIRTUAL_ADDRESS const index_addr,
+    D3D12_GPU_VIRTUAL_ADDRESS const vert_addr,
+    uint32_t const                  index_count,
+    uint32_t const                  vertex_count ) const
+{
+  auto* cmd = &context->CommandList;
+
+  D3D12_RAYTRACING_GEOMETRY_TRIANGLES_DESC const triangles_desc{
+        .Transform3x4 = NULL,
+        .IndexFormat  = DXGI_FORMAT_R32_UINT,
+        .VertexFormat = DXGI_FORMAT_R16G16B16A16_FLOAT,
+        .IndexCount   = index_count,
+        .VertexCount  = vertex_count,
+        .IndexBuffer  = index_addr,
+        .VertexBuffer = {
+          .StartAddress = vert_addr,
+          .StrideInBytes = sizeof( VertexLite ),
+        },
+  };
+
+  D3D12_RAYTRACING_GEOMETRY_DESC const blas_geometry{
+    .Type      = D3D12_RAYTRACING_GEOMETRY_TYPE_TRIANGLES,
+    .Flags     = D3D12_RAYTRACING_GEOMETRY_FLAG_OPAQUE,
+    .Triangles = triangles_desc,
+  };
+
+  D3D12_BUILD_RAYTRACING_ACCELERATION_STRUCTURE_INPUTS const blas_inputs{
+    .Type           = D3D12_RAYTRACING_ACCELERATION_STRUCTURE_TYPE_BOTTOM_LEVEL,
+    .Flags          = D3D12_RAYTRACING_ACCELERATION_STRUCTURE_BUILD_FLAG_PREFER_FAST_TRACE,
+    .NumDescs       = 1,
+    .DescsLayout    = D3D12_ELEMENTS_LAYOUT_ARRAY,
+    .pGeometryDescs = &blas_geometry,
+  };
+
+  ComPtr<ID3D12Device5> device;
+  {
+    ComPtr<ID3D12Device2> device2 = m_RenderDevice->GetDevice();
+    ERR_ABORT( device2.As( &device ) );
+  }
+
+  D3D12_RAYTRACING_ACCELERATION_STRUCTURE_PREBUILD_INFO blas_prebuild_info;
+  device->GetRaytracingAccelerationStructurePrebuildInfo( &blas_inputs, &blas_prebuild_info );
+
+  ComPtr<ID3D12Resource>      staging_res;
+  ComPtr<D3D12MA::Allocation> staging_alloc;
+  {
+    auto const resource_desc = CD3DX12_RESOURCE_DESC::Buffer(
+        blas_prebuild_info.ScratchDataSizeInBytes, D3D12_RESOURCE_FLAG_ALLOW_UNORDERED_ACCESS );
+
+#if not defined( RENDERDOC_COMPAT )
+    D3D12MA::ALLOCATION_DESC const allocation_desc = {
+      .Flags    = D3D12MA::ALLOCATION_FLAG_NONE,
+      .HeapType = D3D12_HEAP_TYPE_DEFAULT,
+    };
+
+    ERR_ABORT( m_RenderDevice->GetAllocator()->CreateResource(
+        &allocation_desc,
+        &resource_desc,
+        D3D12_RESOURCE_STATE_COMMON,
+        nullptr,
+        staging_alloc.GetAddressOf(),
+        IID_PPV_ARGS( &staging_res ) ) );
+
+    cmd->Track( std::move( staging_alloc ) );
+#else
+    auto heap_property = CD3DX12_HEAP_PROPERTIES{ D3D12_HEAP_TYPE_DEFAULT };
+    ERR_ABORT( m_RenderDevice->GetDevice()->CreateCommittedResource(
+        &heap_property,
+        D3D12_HEAP_FLAG_NONE,
+        &resource_desc,
+        D3D12_RESOURCE_STATE_COMMON,
+        nullptr,
+        IID_PPV_ARGS( &staging_res ) ) );
+#endif
+  }
+  cmd->Track( staging_res );
+
+  auto blas = m_RenderDevice->CreateASBuffer( blas_prebuild_info.ResultDataMaxSizeInBytes );
+
+  D3D12_BUILD_RAYTRACING_ACCELERATION_STRUCTURE_DESC const desc{
+    .DestAccelerationStructureData    = blas.GetGPUVirtualAddress(),
+    .Inputs                           = blas_inputs,
+    .ScratchAccelerationStructureData = staging_res->GetGPUVirtualAddress(),
+  };
+
+  cmd->Get()->BuildRaytracingAccelerationStructure( &desc, 0, nullptr );
+  cmd->Track( blas.GetBuffer() );
+
+  // TODO: BLAS Compression
+  return { std::move( blas ) };
 }
 
 std::expected<flecs::entity, Ember::ModelLoader::Error> Ember::ModelLoader::TryLoadModel( char const* filename )
@@ -959,15 +1088,21 @@ std::expected<flecs::entity, Ember::ModelLoader::Error> Ember::ModelLoader::TryL
     return std::unexpected{ Error::kCannotLoadMemory };
   }
 
-  auto               entity        = m_World->GetECS().entity().insert( [&]( WorldTransform&, WorldBoundingBox& ) {} );
+  auto           entity  = m_World->GetECS().entity().insert( [&]( WorldTransform&, WorldBoundingBox& ) {} );
 
-  LoadingContext     context       = { .Geometry = World::GeometryManager().Construct() };
+  LoadingContext context = {
+    .Geometry    = World::GeometryManager().Construct(),
+    .CommandList = m_ComputeContext->GetCommandList(),
+  };
 
   cgltf_scene const* current_scene = gltf_model->scene;
   for ( uint32_t node_idx = 0; node_idx < current_scene->nodes_count; ++node_idx )
   {
     ProcessNode( &context, entity, *current_scene->nodes[node_idx] );
   }
+
+  // Textures should all be loaded by this point.
+  auto const tex_receipt = m_TextureLoader->EndBatch();
 
   for ( uint32_t anim_idx = 0; anim_idx < gltf_model->animations_count; ++anim_idx )
   {
@@ -976,14 +1111,18 @@ std::expected<flecs::entity, Ember::ModelLoader::Error> Ember::ModelLoader::TryL
 
   FinalizeGeometry( &context, entity );
 
+  CreateAccelerationStructure( &context, entity );
+
+  auto const self_receipt = m_ComputeContext->Submit( std::move( context.CommandList ) );
+
   cgltf_free( gltf_model );
 
   // One spare reference to GeometryImpl needs to be cleaned up.
   // GeometryImpl now owned solely by the Mesh components.
   World::GeometryManager().Destroy( context.Geometry );
 
-  Context::Receipt receipt = m_TextureLoader->EndBatch();
-  m_RenderDevice->WaitOn( receipt );
+  m_RenderDevice->WaitOn( self_receipt );
+  m_RenderDevice->WaitOn( tex_receipt );
 
   return entity;
 }

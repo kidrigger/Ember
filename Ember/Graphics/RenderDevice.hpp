@@ -76,6 +76,7 @@ public:
   [[nodiscard]] Buffer  CreateStorageBuffer( uint32_t size, uint32_t stride );
   [[nodiscard]] Buffer  CreateRawStorageBuffer( uint32_t size );
   [[nodiscard]] Buffer  CreateConstantBuffer( uint32_t size );
+  [[nodiscard]] Buffer  CreateASBuffer( uint64_t size );
 
   [[nodiscard]] Texture CreateTexture2D( Tex2DDesc const& create_info );
   [[nodiscard]] Texture CreateTextureCube( TexCubeDesc const& create_info );

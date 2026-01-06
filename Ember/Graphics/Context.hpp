@@ -65,21 +65,22 @@ private:
 public:
   Context() = default;
 
-  [[nodiscard]] ID3D12CommandQueue* GetCommandQueue() const;
-  [[nodiscard]] bool                IsFenceComplete( uint64_t fence_value ) const;
+  [[nodiscard]] ID3D12CommandQueue*     GetCommandQueue() const;
+  [[nodiscard]] bool                    IsFenceComplete( uint64_t fence_value ) const;
 
-  [[nodiscard]] Receipt             CreateReceipt( uint64_t value = 0 ) const;
-  CommandList                       GetCommandList();
+  [[nodiscard]] Receipt                 CreateReceipt( uint64_t value = 0 ) const;
+  [[nodiscard]] CommandList             GetCommandList();
+  [[nodiscard]] D3D12_COMMAND_LIST_TYPE GetCommandListType() const noexcept;
 
-  Receipt                           Submit( CommandList&& command_list );
-  [[nodiscard]] Receipt             Signal();
+  [[nodiscard]] Receipt                 Submit( CommandList&& command_list );
+  [[nodiscard]] Receipt                 Signal();
 
-  void                              WaitOn( Receipt const& receipt ) const;
-  void                              QueueWaitOn( Receipt receipt ) const;
-  void                              WaitIdle();
+  void                                  WaitOn( Receipt const& receipt ) const;
+  void                                  QueueWaitOn( Receipt receipt ) const;
+  void                                  WaitIdle();
 
-  static void                       Create(
-                            Context* context, ComPtr<ID3D12Device2> device, BindlessManager* bindless, D3D12_COMMAND_LIST_TYPE type );
+  static void                           Create(
+                                Context* context, ComPtr<ID3D12Device2> device, BindlessManager* bindless, D3D12_COMMAND_LIST_TYPE type );
 
   Context( Context const& other )                = delete;
   Context( Context&& other ) noexcept            = default;

@@ -96,7 +96,8 @@ public:
       std::unique_ptr<GeometryManager> geometry_manager,
       std::unique_ptr<World>           world,
       std::unique_ptr<LightManager>    light_manager,
-      std::unique_ptr<TextureLoader>   texture_loader );
+      std::unique_ptr<TextureLoader>   texture_loader,
+      std::unique_ptr<ModelLoader>     model_loader );
 
   void        LoadContent() override;
   void        Update() override;

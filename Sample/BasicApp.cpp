@@ -83,18 +83,6 @@ struct RotatingModel
   float Speed;
 };
 
-struct PerMeshConstants
-{
-  Ember::MaterialHandle MaterialIdx;
-  Ember::SRVHandle      VertexBuffer;
-  uint32_t              FirstVertex;
-  Ember::SRVHandle      MeshletBuffer;
-  Ember::SRVHandle      MeshletTriangles;
-  Ember::SRVHandle      MeshletVertices;
-  uint32_t              FirstMeshlet;
-  uint32_t              FirstIndex;
-};
-
 void Ember::BasicApp::InitImGui( HWND const window_handle, RenderDevice* render_device )
 {
   ImGui_ImplWin32_EnableDpiAwareness();
@@ -158,7 +146,8 @@ Ember::BasicApp::BasicApp(
     std::unique_ptr<GeometryManager> geometry_manager,
     std::unique_ptr<World>           world,
     std::unique_ptr<LightManager>    light_manager,
-    std::unique_ptr<TextureLoader>   texture_loader )
+    std::unique_ptr<TextureLoader>   texture_loader,
+    std::unique_ptr<ModelLoader>     model_loader )
   : IApp{ nullptr }
   , m_WindowHandle{ window_handle }
   , m_RenderDevice{ std::move( render_device ) }
@@ -172,13 +161,11 @@ Ember::BasicApp::BasicApp(
   , m_World{ std::move( world ) }
   , m_LightManager{ std::move( light_manager ) }
   , m_TextureLoader{ std::move( texture_loader ) }
+  , m_ModelLoader{ std::move( model_loader ) }
 {
   m_RenderQuery = m_World->GetECS().query<WorldTransform const, Mesh const, Geometry const, Material const>();
 
-  m_ModelLoader = std::make_unique<ModelLoader>(
-      m_RenderDevice.get(), m_World.get(), m_TextureLoader.get(), m_MaterialManager.get(), m_GeometryManager.get() );
-
-  _ = m_World->GetECS()
+  _             = m_World->GetECS()
           .component<RotatingModel>()
           .member<float>( "Speed", 0, offsetof( RotatingModel, Speed ) )
           .add( flecs::With, m_World->GetECS().component<Rotation>() );
@@ -233,8 +220,19 @@ void Ember::BasicApp::Create( BasicApp* app, HINSTANCE const instance_handle )
   auto light_manager = std::make_unique_for_overwrite<LightManager>();
   LightManager::Create( light_manager.get(), render_device.get(), world.get(), RenderDevice::kNumFrames );
 
+  auto async_compute_context =
+      std::make_shared<Context>( render_device->CreateContext( D3D12_COMMAND_LIST_TYPE_COMPUTE ) );
+
   auto texture_loader = std::make_unique_for_overwrite<TextureLoader>();
-  TextureLoader::Create( texture_loader.get(), render_device.get(), RenderDevice::kNumFrames );
+  TextureLoader::Create( texture_loader.get(), render_device.get(), async_compute_context, RenderDevice::kNumFrames );
+
+  auto model_loader = std::make_unique<ModelLoader>(
+      render_device.get(),
+      world.get(),
+      async_compute_context, // I could move this, but leaving as copy just in case it is required later.
+      texture_loader.get(),
+      material_manager.get(),
+      geometry_manager.get() );
 
   new ( app ) BasicApp{
     window_handle,
@@ -247,6 +245,7 @@ void Ember::BasicApp::Create( BasicApp* app, HINSTANCE const instance_handle )
     std::move( world ),
     std::move( light_manager ),
     std::move( texture_loader ),
+    std::move( model_loader ),
   };
 }
 

@@ -287,20 +287,26 @@ struct Mesh
   uint32_t IndexCount;
   uint32_t VertexDataStart;
   uint32_t VertexLiteStart;
+  uint32_t VertexCount;
   uint32_t MeshletCount;
   uint32_t FirstMeshlet;
 };
 
+struct BLAS
+{
+  Buffer ASBuffer;
+};
+
 struct alignas( 16 ) MeshDraw
 {
-  uint32_t       FirstTransform;
-  uint32_t       TransformCount;
-  uint32_t       VertexDataStart;
-  uint32_t       VertexLiteStart;
-  uint32_t       FirstMeshlet;
-  uint32_t       MeshletCount;
-  MaterialHandle Material;
-  uint32_t       Padding;
+  uint32_t       FirstTransform;  // 4 4
+  uint32_t       TransformCount;  // 4 8
+  uint32_t       VertexDataStart; // 4 12
+  uint32_t       VertexLiteStart; // 4 16
+  uint32_t       FirstMeshlet;    // 4 20
+  uint32_t       MeshletCount;    // 4 24
+  MaterialHandle Material;        // 4 28
+  uint32_t       Padding;         // 4 32
 };
 
 class DrawList

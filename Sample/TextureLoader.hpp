@@ -43,7 +43,7 @@ class TextureLoader
 
   // Upload
   std::pmr::unsynchronized_pool_resource m_InFlightPool;
-  Context                                m_CopyContext;
+  std::shared_ptr<Context>               m_CopyContext;
   std::vector<UploadBatch>               m_UploadBatches;
   uint32_t                               m_CurrentUploadBatch{ 0 };
   CommandList                            m_CurrentCommandList;
@@ -73,16 +73,20 @@ public:
       ComPtr<ID3D12RootSignature> mipmap_root_signature,
       ComPtr<ID3D12PipelineState> mipmap_pipeline,
       ComPtr<ID3D12PipelineState> mipmap_cube_pipeline,
-      Context                     copy_context,
+      std::shared_ptr<Context>    copy_context,
       uint32_t                    upload_frame_count );
 
-  static void Create( TextureLoader* loader, RenderDevice* render_device, uint32_t upload_frame_count );
+  static bool Create(
+      TextureLoader*           loader,
+      RenderDevice*            render_device,
+      std::shared_ptr<Context> compute_context,
+      uint32_t                 upload_frame_count );
 
-  bool        TryLoadTexture(
-             Texture*           texture,
-             char const*        filename,
-             ColorSpaceOverride color_space_override = ColorSpaceOverride::kNone,
-             D3D12_RESOURCE_STATES final_state       = D3D12_RESOURCE_STATE_PIXEL_SHADER_RESOURCE );
+  bool TryLoadTexture(
+      Texture*           texture,
+      char const*        filename,
+      ColorSpaceOverride color_space_override = ColorSpaceOverride::kNone,
+      D3D12_RESOURCE_STATES final_state       = D3D12_RESOURCE_STATE_PIXEL_SHADER_RESOURCE );
 
   bool TryLoadTextureFromData(
       Texture*           texture,

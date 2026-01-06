@@ -357,6 +357,12 @@ Ember::Buffer Ember::RenderDevice::CreateConstantBuffer( uint32_t const size )
   return m_BufferManager.CreateConstantBuffer( size );
 }
 
+Ember::Buffer Ember::RenderDevice::CreateASBuffer( uint64_t const size )
+{
+  return m_BufferManager.CreateASBuffer( size );
+}
+
+
 Ember::Texture Ember::RenderDevice::CreateTexture2D( Tex2DDesc const& create_info )
 {
   return m_TextureManager.CreateTexture2D( create_info );
@@ -470,7 +476,7 @@ uint32_t Ember::RenderDevice::GetCurrentFrameIndex() const noexcept
 void Ember::RenderDevice::ExecuteCommandList( CommandList&& command_list )
 {
   ZoneScoped;
-  m_DirectContext.Submit( std::move( command_list ) );
+  _ = m_DirectContext.Submit( std::move( command_list ) );
 }
 
 void Ember::RenderDevice::Present()

@@ -83,6 +83,15 @@ class ModelLoader
 
   struct LoadingContext
   {
+    struct Offsets
+    {
+      uint32_t VertexPositions;
+      uint32_t VertexData;
+      uint32_t Meshlets;
+      uint32_t MeshletTriangles;
+      uint32_t MeshletVertices;
+      uint32_t Indices;
+    };
     std::map<cgltf_material const*, MaterialImpl*> MaterialCache;
     std::map<cgltf_node const*, flecs::entity>     NodeCache;
     GeometryImpl*                                  Geometry;
@@ -92,32 +101,33 @@ class ModelLoader
     std::vector<VertexLite>                        VertexPositions;
     std::vector<VertexData>                        VertexData;
     std::vector<uint32_t>                          Indices;
-
-    struct
-    {
-      uint32_t VertexPositions;
-      uint32_t VertexData;
-      uint32_t Meshlets;
-      uint32_t MeshletTriangles;
-      uint32_t MeshletVertices;
-      uint32_t Indices;
-    } Offsets;
+    Offsets                                        Offsets;
+    CommandList                                    CommandList;
   };
 
-  RenderDevice*    m_RenderDevice;
-  World*           m_World;
-  TextureLoader*   m_TextureLoader;
-  MaterialManager* m_MaterialManager;
-  GeometryManager* m_GeometryManager;
+  RenderDevice*            m_RenderDevice;
+  World*                   m_World;
+  std::shared_ptr<Context> m_ComputeContext;
+  TextureLoader*           m_TextureLoader;
+  MaterialManager*         m_MaterialManager;
+  GeometryManager*         m_GeometryManager;
 
-  flecs::entity    ProcessNode( LoadingContext* context, flecs::entity parent, cgltf_node const& node ) const;
+  void                     ProcessNode( LoadingContext* context, flecs::entity parent, cgltf_node const& node ) const;
   void ProcessPrimitive( LoadingContext* context, flecs::entity owning, cgltf_primitive const& primitive ) const;
   void ProcessMesh( LoadingContext* context, flecs::entity owning, cgltf_mesh const& mesh ) const;
   bool TryLoadTexture( Texture* texture, cgltf_image const& image, ColorSpaceOverride color_space_override ) const;
-  MaterialImpl* TryProcessMaterial( LoadingContext* context, cgltf_material const* material ) const;
-  MaterialImpl* GetDefaultMaterial( LoadingContext* context ) const;
-  void          ProcessAnimation( LoadingContext* context, cgltf_animation const& animation ) const;
-  void          FinalizeGeometry( LoadingContext* context, flecs::entity& entity ) const;
+  [[nodiscard]] MaterialImpl* TryProcessMaterial( LoadingContext* context, cgltf_material const* material ) const;
+  [[nodiscard]] MaterialImpl* GetDefaultMaterial( LoadingContext* context ) const;
+  void                        ProcessAnimation( LoadingContext* context, cgltf_animation const& animation ) const;
+  void                        FinalizeGeometry( LoadingContext* context, flecs::entity entity ) const;
+  void                        CreateAccelerationStructure( LoadingContext* context, flecs::entity root ) const;
+
+  [[nodiscard]] BLAS          CreateBLAS(
+               Ember::ModelLoader::LoadingContext* context,
+               D3D12_GPU_VIRTUAL_ADDRESS           index_addr,
+               D3D12_GPU_VIRTUAL_ADDRESS           vert_addr,
+               uint32_t                            index_count,
+               uint32_t                            vertex_count ) const;
 
 public:
   enum class Error
@@ -130,11 +140,12 @@ public:
   std::expected<flecs::entity, Error> TryLoadModel( char const* filename );
 
   ModelLoader(
-      RenderDevice*    render_device,
-      World*           world,
-      TextureLoader*   texture_loader,
-      MaterialManager* material_manager,
-      GeometryManager* geometry_manager );
+      RenderDevice*            render_device,
+      World*                   world,
+      std::shared_ptr<Context> compute_context,
+      TextureLoader*           texture_loader,
+      MaterialManager*         material_manager,
+      GeometryManager*         geometry_manager );
 };
 
 } // namespace Ember
