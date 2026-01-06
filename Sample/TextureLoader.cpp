@@ -24,50 +24,33 @@ struct MipMapRootSigInfo
 };
 
 Ember::TextureLoader::UploadBatch::UploadBatch(
-    RenderDevice* render_device, Context::Receipt receipt, std::pmr::polymorphic_allocator<> const& pool_allocator )
-  : Tracker{ render_device, pool_allocator }, Receipt{ std::move( receipt ) }
+    Context::Receipt receipt, std::pmr::polymorphic_allocator<> const& pool_allocator )
+  : Barriers{ pool_allocator }, Receipt{ std::move( receipt ) }
 {}
 
-void Ember::TextureLoader::UploadBatch::PushUpload(
-    ComPtr<ID3D12Resource> dest, ComPtr<IUnknown> intermediate, D3D12_RESOURCE_STATES const final_state )
+void Ember::TextureLoader::UploadBatch::PushTextureStateChange( Texture dest, D3D12_RESOURCE_STATES const final_state )
 {
-  Tracker.PushBarrier(
-      CD3DX12_RESOURCE_BARRIER::Transition( dest.Get(), D3D12_RESOURCE_STATE_COPY_DEST, final_state ) );
-  Tracker.PushResource( std::move( dest ) );
-  Tracker.PushResource( std::move( intermediate ) );
+  Barriers.emplace_back( dest, final_state );
 }
 
-void Ember::TextureLoader::UploadBatch::PushAllocation( ComPtr<D3D12MA::Allocation> intermediate )
+void Ember::TextureLoader::UploadBatch::FlushPendingBarriers( std::vector<D3D12_RESOURCE_BARRIER>* barriers )
 {
-  Tracker.PushResource( std::move( intermediate ) );
-}
+  std::ranges::transform(
+      Barriers,
+      std::back_inserter( *barriers ),
+      []( auto const& pair )
+      {
+        D3D12_RESOURCE_BARRIER const transition =
+            CD3DX12_RESOURCE_BARRIER::Transition( pair.first.GetTexture(), pair.first.GetCurrentState(), pair.second );
+        pair.first.SetCurrentState( pair.second );
+        return transition;
+      } );
 
-void Ember::TextureLoader::UploadBatch::PushAlias( ComPtr<ID3D12Resource> alias )
-{
-  Tracker.PushResource( std::move( alias ) );
-}
-
-void Ember::TextureLoader::UploadBatch::PushHandle( SRVHandle const handle )
-{
-  Tracker.PushHandle( handle );
-}
-
-void Ember::TextureLoader::UploadBatch::PushHandles( std::span<UAVHandle> const& handles )
-{
-  for ( auto const handle : handles )
-  {
-    Tracker.PushHandle( handle );
-  }
-}
-
-void Ember::TextureLoader::UploadBatch::ClearResources( std::vector<D3D12_RESOURCE_BARRIER>* barriers )
-{
-  Tracker.Clear( barriers );
+  Barriers.clear();
 }
 
 // Thread unsafe
-bool Ember::TextureLoader::TryGenerateMipMaps(
-    CommandList* command_list, Texture* texture, ResourceTracker* tracker ) const
+bool Ember::TextureLoader::TryGenerateMipMaps( CommandList* command_list, Texture* texture ) const
 {
   ComPtr<ID3D12Resource> uav_capable;
 
@@ -112,7 +95,7 @@ bool Ember::TextureLoader::TryGenerateMipMaps(
             &copy_alloc,
             IID_PPV_ARGS( &uav_capable ) ),
         false );
-    tracker->PushResource( std::move( copy_alloc ) );
+    command_list->Track( std::move( copy_alloc ) );
   }
 #else
   CD3DX12_HEAP_PROPERTIES properties{ D3D12_HEAP_TYPE_DEFAULT };
@@ -126,8 +109,6 @@ bool Ember::TextureLoader::TryGenerateMipMaps(
           IID_PPV_ARGS( &uav_capable ) ),
       false );
 #endif
-
-  tracker->PushResource( uav_capable );
 
   ERR_FAIL_RET_V( uav_capable->SetName( L"UAV Alias" ), false );
   {
@@ -147,22 +128,14 @@ bool Ember::TextureLoader::TryGenerateMipMaps(
 
   command_list->CopyResource( uav_capable.Get(), resource );
 
-  SRVHandle mip_src_handle;
+  SRVHandle mip_src_handle =
+      command_list->Bind( BindTransient( uav_capable, CD3DX12_SHADER_RESOURCE_VIEW_DESC::Tex2D( in_format ) ) );
   UAVHandle mip_dst_handles[kMaxMipCount];
-
-  {
-    CD3DX12_SHADER_RESOURCE_VIEW_DESC srv_desc = CD3DX12_SHADER_RESOURCE_VIEW_DESC::Tex2D( in_format );
-    mip_src_handle                             = m_RenderDevice->CreateBindlessHandle( uav_capable.Get(), srv_desc );
-  }
-
-  tracker->PushHandle( mip_src_handle );
 
   for ( int level = 0; level < desc.MipLevels; level++ )
   {
-    CD3DX12_UNORDERED_ACCESS_VIEW_DESC uav_desc = CD3DX12_UNORDERED_ACCESS_VIEW_DESC::Tex2D( desc.Format, level );
-    UAVHandle                          handle   = m_RenderDevice->CreateBindlessHandle( uav_capable.Get(), uav_desc );
-    mip_dst_handles[level]                      = handle;
-    tracker->PushHandle( handle );
+    mip_dst_handles[level] = command_list->Bind(
+        BindTransient( uav_capable, CD3DX12_UNORDERED_ACCESS_VIEW_DESC::Tex2D( desc.Format, level ) ) );
   }
 
   uint32_t constexpr static kThreadGroupX      = 8;
@@ -207,7 +180,7 @@ bool Ember::TextureLoader::TryGenerateMipMaps(
   }
 
   {
-    CD3DX12_RESOURCE_BARRIER barriers[] = {
+    D3D12_RESOURCE_BARRIER barriers[] = {
       CD3DX12_RESOURCE_BARRIER::Transition(
           uav_capable.Get(), D3D12_RESOURCE_STATE_UNORDERED_ACCESS, D3D12_RESOURCE_STATE_COPY_SOURCE ),
       CD3DX12_RESOURCE_BARRIER::Transition(
@@ -220,21 +193,17 @@ bool Ember::TextureLoader::TryGenerateMipMaps(
 #if not defined( RENDERDOC_COMPAT )
   if ( is_aliased )
   {
-    CD3DX12_RESOURCE_BARRIER reverse_aliasing = CD3DX12_RESOURCE_BARRIER::Aliasing( uav_capable.Get(), resource );
-    command_list->ResourceBarrier( reverse_aliasing );
+    command_list->ResourceBarrier( CD3DX12_RESOURCE_BARRIER::Aliasing( uav_capable.Get(), resource ) );
   }
 #endif
 
   return true;
 }
 
-bool Ember::TextureLoader::TryGenerateMipMapCube(
-    CommandList*          command_list,
-    Texture*              texture,
-    ResourceTracker*      tracker,
-    D3D12_RESOURCE_STATES texture_resource_state ) const
+bool Ember::TextureLoader::TryGenerateMipMapCube( CommandList* command_list, Texture* texture ) const
 {
   ComPtr<ID3D12Resource> uav_capable;
+  auto const             texture_resource_state = texture->GetCurrentState();
 
   // Grab the 'necessary' info from texture, and copy it to the 'alias' resource.
 #if not defined( RENDERDOC_COMPAT )
@@ -245,7 +214,7 @@ bool Ember::TextureLoader::TryGenerateMipMapCube(
 #endif
 
   D3D12_RESOURCE_DESC desc      = resource->GetDesc();
-  DXGI_FORMAT         in_format = desc.Format;
+  DXGI_FORMAT const   in_format = desc.Format;
 
   desc.Flags  &= ~( D3D12_RESOURCE_FLAG_ALLOW_RENDER_TARGET | D3D12_RESOURCE_FLAG_ALLOW_DEPTH_STENCIL );
   desc.Flags  |= D3D12_RESOURCE_FLAG_ALLOW_UNORDERED_ACCESS;
@@ -277,7 +246,7 @@ bool Ember::TextureLoader::TryGenerateMipMapCube(
             &copy_alloc,
             IID_PPV_ARGS( &uav_capable ) ),
         false );
-    tracker->PushResource( std::move( copy_alloc ) );
+    command_list->Track( std::move( copy_alloc ) );
   }
 #else
   CD3DX12_HEAP_PROPERTIES properties{ D3D12_HEAP_TYPE_DEFAULT };
@@ -291,8 +260,6 @@ bool Ember::TextureLoader::TryGenerateMipMapCube(
           IID_PPV_ARGS( &uav_capable ) ),
       false );
 #endif
-
-  tracker->PushResource( uav_capable );
 
   ERR_FAIL_RET_V( uav_capable->SetName( L"UAV Alias" ), false );
   {
@@ -312,32 +279,24 @@ bool Ember::TextureLoader::TryGenerateMipMapCube(
 
   command_list->CopyResource( uav_capable.Get(), resource );
 
-  SRVHandle mip_src_handle;
+  SRVHandle mip_src_handle =
+      command_list->Bind( BindTransient( uav_capable, CD3DX12_SHADER_RESOURCE_VIEW_DESC::TexCube( in_format ) ) );
   UAVHandle mip_dst_handles[kMaxMipCount];
-
-  {
-    auto srv_desc  = CD3DX12_SHADER_RESOURCE_VIEW_DESC::TexCube( in_format );
-    mip_src_handle = m_RenderDevice->CreateBindlessHandle( uav_capable.Get(), srv_desc );
-  }
-
-  tracker->PushHandle( mip_src_handle );
 
   for ( int level = 0; level < desc.MipLevels; level++ )
   {
-    auto      uav_desc     = CD3DX12_UNORDERED_ACCESS_VIEW_DESC::Tex2DArray( desc.Format, 6, 0, level );
-    UAVHandle handle       = m_RenderDevice->CreateBindlessHandle( uav_capable.Get(), uav_desc );
-    mip_dst_handles[level] = handle;
-    tracker->PushHandle( handle );
+    mip_dst_handles[level] = command_list->Bind(
+        BindTransient( uav_capable, CD3DX12_UNORDERED_ACCESS_VIEW_DESC::Tex2DArray( desc.Format, 6, 0, level ) ) );
   }
 
-  uint32_t constexpr static kThreadGroupX      = 8;
-  uint32_t constexpr static kThreadGroupY      = 8;
-  uint32_t constexpr static kThreadGroupZ      = 1;
+  uint32_t constexpr static kThreadGroupX = 8;
+  uint32_t constexpr static kThreadGroupY = 8;
+  uint32_t constexpr static kThreadGroupZ = 1;
 
-  uint32_t                 tex_width           = ( UINT )desc.Width;
-  uint32_t                 tex_height          = desc.Height;
+  uint32_t tex_width                      = ( UINT )desc.Width;
+  uint32_t tex_height                     = desc.Height;
 
-  CD3DX12_RESOURCE_BARRIER pre_compute_barrier = CD3DX12_RESOURCE_BARRIER::Transition(
+  auto     pre_compute_barrier            = CD3DX12_RESOURCE_BARRIER::Transition(
       uav_capable.Get(), D3D12_RESOURCE_STATE_COPY_DEST, D3D12_RESOURCE_STATE_UNORDERED_ACCESS );
 
   command_list->ResourceBarrier( pre_compute_barrier );
@@ -349,10 +308,10 @@ bool Ember::TextureLoader::TryGenerateMipMapCube(
   command_list->SetDescriptorHeaps( bindless_desc_heaps );
 
   MipMapRootSigInfo mip_map_info;
-  mip_map_info.Src                           = mip_src_handle;
-  mip_map_info.IsSrgb                        = DirectX::IsSRGB( in_format );
+  mip_map_info.Src       = mip_src_handle;
+  mip_map_info.IsSrgb    = DirectX::IsSRGB( in_format );
 
-  CD3DX12_RESOURCE_BARRIER inter_mip_barrier = CD3DX12_RESOURCE_BARRIER::UAV( uav_capable.Get() );
+  auto inter_mip_barrier = CD3DX12_RESOURCE_BARRIER::UAV( uav_capable.Get() );
   for ( int write_lvl = 1; write_lvl < desc.MipLevels; write_lvl++ )
   {
     tex_width                = std::max( tex_width / 2, 1u );
@@ -372,7 +331,7 @@ bool Ember::TextureLoader::TryGenerateMipMapCube(
   }
 
   {
-    CD3DX12_RESOURCE_BARRIER barriers[] = {
+    D3D12_RESOURCE_BARRIER barriers[] = {
       CD3DX12_RESOURCE_BARRIER::Transition(
           uav_capable.Get(), D3D12_RESOURCE_STATE_UNORDERED_ACCESS, D3D12_RESOURCE_STATE_COPY_SOURCE ),
       CD3DX12_RESOURCE_BARRIER::Transition(
@@ -414,7 +373,7 @@ Ember::TextureLoader::TextureLoader(
   Context::Receipt initial = m_CopyContext.CreateReceipt();
   for ( int i = 0; i < ( int )upload_frame_count; ++i )
   {
-    m_UploadBatches.emplace_back( m_RenderDevice, initial, &m_InFlightPool );
+    m_UploadBatches.emplace_back( initial, &m_InFlightPool );
   }
   m_CurrentCommandList = m_CopyContext.GetCommandList();
 }
@@ -453,6 +412,7 @@ void Ember::TextureLoader::Create( TextureLoader* loader, RenderDevice* render_d
       D3D12_ROOT_SIGNATURE_FLAG_DENY_DOMAIN_SHADER_ROOT_ACCESS | D3D12_ROOT_SIGNATURE_FLAG_DENY_HULL_SHADER_ROOT_ACCESS;
 
   CD3DX12_ROOT_PARAMETER1 root_parameters[1];
+  ZeroMemory( root_parameters, sizeof( root_parameters ) );
   root_parameters[0].InitAsConstants( sizeof( MipMapRootSigInfo ) / 4, 0 );
 
   CD3DX12_VERSIONED_ROOT_SIGNATURE_DESC root_signature_desc;
@@ -528,8 +488,12 @@ bool Ember::TextureLoader::TryLoadImpl(
       break;
   }
 
-  new ( texture )
-      Texture{ m_RenderDevice->CreateTexture2D( { format, ( uint32_t )metadata.width, ( uint32_t )metadata.height } ) };
+  new ( texture ) Texture{ m_RenderDevice->CreateTexture2D( {
+      .Format    = format,
+      .Width     = ( uint32_t )metadata.width,
+      .Height    = ( uint32_t )metadata.height,
+      .InitState = D3D12_RESOURCE_STATE_COPY_DEST,
+  } ) };
 
   wchar_t wide_id[512];
   MultiByteToWideChar( CP_UTF8, MB_ERR_INVALID_CHARS, id, -1, wide_id, 512 );
@@ -557,6 +521,8 @@ bool Ember::TextureLoader::TryLoadImpl(
             staging_alloc.GetAddressOf(),
             IID_PPV_ARGS( &staging_res ) ),
         false );
+
+    m_CurrentCommandList.Track( std::move( staging_alloc ) );
 #else
     auto heap_property = CD3DX12_HEAP_PROPERTIES{ D3D12_HEAP_TYPE_UPLOAD };
     ERR_FAIL_RET_V(
@@ -570,6 +536,9 @@ bool Ember::TextureLoader::TryLoadImpl(
         false );
 #endif
   }
+
+  m_CurrentCommandList.Track( staging_res );
+
   wchar_t staging_name[512];
   swprintf_s( staging_name, L"Staging: %s", wide_id );
   ERR_FAIL_RET_V( staging_res->SetName( staging_name ), false );
@@ -599,13 +568,9 @@ bool Ember::TextureLoader::TryLoadImpl(
       CountOf( subresources ),
       DataOf( subresources ) );
 
-#if not defined( RENDERDOC_COMPAT )
-  m_UploadBatches[m_CurrentUploadBatch].PushUpload( texture->GetTexture(), staging_alloc, final_state );
-#else
-  m_UploadBatches[m_CurrentUploadBatch].PushUpload( texture->GetTexture(), staging_res, final_state );
-#endif
+  m_UploadBatches[m_CurrentUploadBatch].PushTextureStateChange( *texture, final_state );
 
-  if ( not TryGenerateMipMaps( &m_CurrentCommandList, texture, &m_UploadBatches[m_CurrentUploadBatch].Tracker ) )
+  if ( not TryGenerateMipMaps( &m_CurrentCommandList, texture ) )
   {
     return false;
   }
@@ -687,7 +652,7 @@ Ember::Context::Receipt Ember::TextureLoader::EndBatch()
 
   auto lock_guard = std::lock_guard( m_LoadLock );
 
-  m_UploadBatches[m_CurrentUploadBatch].ClearResources( &m_PendingBarriers );
+  m_UploadBatches[m_CurrentUploadBatch].FlushPendingBarriers( &m_PendingBarriers );
 
   m_CurrentCommandList     = m_CopyContext.GetCommandList();
   m_CurrentUploadBatchSize = 0;
@@ -701,23 +666,23 @@ void Ember::TextureLoader::Update()
   for ( auto& batch : m_UploadBatches )
   {
     ASSERT_M(
-        batch.Tracker.IsEmpty() or batch.Receipt.IsValid(), "Either no textures in the batch, or the batch is ended." );
-    if ( not batch.Tracker.IsEmpty() and batch.Receipt.IsComplete() )
+        batch.Barriers.empty() or batch.Receipt.IsValid(), "Either no textures in the batch, or the batch is ended." );
+    if ( not batch.Barriers.empty() and batch.Receipt.IsComplete() )
     {
       auto lock_guard = std::lock_guard( m_LoadLock );
 
-      batch.ClearResources( &m_PendingBarriers );
+      batch.FlushPendingBarriers( &m_PendingBarriers );
     }
   }
 }
 
-void Ember::TextureLoader::FlushBarriers( ID3D12GraphicsCommandList* command_list )
+void Ember::TextureLoader::FlushBarriers( CommandList* command_list )
 {
   if ( m_PendingBarriers.empty() ) return;
 
   auto lock_guard = std::lock_guard( m_LoadLock );
 
-  command_list->ResourceBarrier( CountOf( m_PendingBarriers ), DataOf( m_PendingBarriers ) );
+  command_list->ResourceBarrier( m_PendingBarriers );
 
   m_PendingBarriers.clear();
 }

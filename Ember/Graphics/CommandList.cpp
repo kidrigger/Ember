@@ -46,9 +46,16 @@ Ember::CommandList::CommandList(
   , m_Binder{ std::move( binder ) }
 {}
 
+void Ember::CommandList::Track( ComPtr<IUnknown> resource ) const
+{
+  m_Binder->Track( std::move( resource ) );
+}
+
 void Ember::CommandList::CopyResource( ID3D12Resource* dest, ID3D12Resource* source )
 {
   m_CommandList->CopyResource( dest, source );
+  m_Binder->Track( dest );
+  m_Binder->Track( source );
 }
 
 void Ember::CommandList::SetDescriptorHeaps( std::span<ID3D12DescriptorHeap* const> heaps ) const
@@ -72,12 +79,12 @@ void Ember::CommandList::Dispatch( ThreadGroupCount tgc ) const
   m_CommandList->Dispatch( tgc.X, tgc.Y, tgc.Z );
 }
 
-void Ember::CommandList::ResourceBarrier( CD3DX12_RESOURCE_BARRIER const& barrier ) const
+void Ember::CommandList::ResourceBarrier( D3D12_RESOURCE_BARRIER const& barrier ) const
 {
   m_CommandList->ResourceBarrier( 1u, &barrier );
 }
 
-void Ember::CommandList::ResourceBarrier( std::span<CD3DX12_RESOURCE_BARRIER> const& barriers ) const
+void Ember::CommandList::ResourceBarrier( std::span<D3D12_RESOURCE_BARRIER> const& barriers ) const
 {
   ASSERT( not barriers.empty() );
   m_CommandList->ResourceBarrier( ( UINT )barriers.size(), barriers.data() );

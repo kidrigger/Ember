@@ -4,51 +4,51 @@
 #include "RenderDevice.hpp"
 
 Ember::ResourceBinder::ResourceBinder( BindlessManager* bindless, std::pmr::polymorphic_allocator<> const& allocator )
-  : m_Bindless{ bindless }, m_UsedTextures{ allocator }
+  : m_Bindless{ bindless }, m_UsedResources{ allocator }
 {}
 
-Ember::CBVHandle Ember::ResourceBinder::BindCBV( Buffer buffer ) noexcept
+Ember::CBVHandle Ember::ResourceBinder::BindCBV( Buffer const& buffer ) noexcept
 {
   auto handle = buffer.GetCBVHandle();
-  m_UsedBuffers.push_front( std::move( buffer ) );
+  Track( buffer.GetBuffer() );
 
   return handle;
 }
 
-Ember::SRVHandle Ember::ResourceBinder::BindSRV( Buffer buffer ) noexcept
+Ember::SRVHandle Ember::ResourceBinder::BindSRV( Buffer const& buffer ) noexcept
 {
   auto handle = buffer.GetSRVHandle();
-  m_UsedBuffers.push_front( std::move( buffer ) );
+  Track( buffer.GetBuffer() );
 
   return handle;
 }
 
-Ember::UAVHandle Ember::ResourceBinder::BindUAV( Buffer buffer ) noexcept
+Ember::UAVHandle Ember::ResourceBinder::BindUAV( Buffer const& buffer ) noexcept
 {
   auto handle = buffer.GetUAVHandle();
-  m_UsedBuffers.push_front( std::move( buffer ) );
+  Track( buffer.GetBuffer() );
 
   return handle;
 }
 
-Ember::SRVHandle Ember::ResourceBinder::BindSRV( Texture texture ) noexcept
+Ember::SRVHandle Ember::ResourceBinder::BindSRV( Texture const& texture ) noexcept
 {
   auto handle = texture.GetSRVHandle();
-  m_UsedTextures.push_front( std::move( texture ) );
+  Track( texture.GetTexture() );
 
   return handle;
 }
 
-Ember::UAVHandle Ember::ResourceBinder::BindUAV( Texture texture ) noexcept
+Ember::UAVHandle Ember::ResourceBinder::BindUAV( Texture const& texture ) noexcept
 {
   auto handle = texture.GetUAVHandle();
-  m_UsedTextures.push_front( std::move( texture ) );
+  Track( texture.GetTexture() );
 
   return handle;
 }
 
 Ember::SRVHandle Ember::ResourceBinder::BindTransient(
-    Texture texture, CD3DX12_SHADER_RESOURCE_VIEW_DESC const& desc ) noexcept
+    Texture const& texture, CD3DX12_SHADER_RESOURCE_VIEW_DESC const& desc ) noexcept
 {
   uint64_t hash = HashFnv1A( desc ) << DeviceHandleType::kSRV << texture.GetPtrID();
 
@@ -57,13 +57,14 @@ Ember::SRVHandle Ember::ResourceBinder::BindTransient(
     return std::get<SRVHandle>( it->second );
   }
 
+  Track( texture.GetTexture() );
   auto handle = m_Bindless->CreateDescriptorHandle( texture.GetTexture(), desc );
   m_TempHandles.Put( hash, handle );
   return handle;
 }
 
 Ember::UAVHandle Ember::ResourceBinder::BindTransient(
-    Texture texture, CD3DX12_UNORDERED_ACCESS_VIEW_DESC const& desc ) noexcept
+    Texture const& texture, CD3DX12_UNORDERED_ACCESS_VIEW_DESC const& desc ) noexcept
 {
   uint64_t hash = HashFnv1A( desc ) << DeviceHandleType::kUAV << texture.GetPtrID();
 
@@ -72,17 +73,54 @@ Ember::UAVHandle Ember::ResourceBinder::BindTransient(
     return std::get<UAVHandle>( it->second );
   }
 
+  Track( texture.GetTexture() );
   auto handle = m_Bindless->CreateDescriptorHandle( texture.GetTexture(), desc );
   m_TempHandles.Put( hash, handle );
   return handle;
+}
+
+Ember::SRVHandle Ember::ResourceBinder::BindTransient(
+    ComPtr<ID3D12Resource> resource, CD3DX12_SHADER_RESOURCE_VIEW_DESC const& desc ) noexcept
+{
+  uint64_t hash = HashFnv1A( desc ) << DeviceHandleType::kSRV << ( uintptr_t )resource.Get();
+
+  if ( auto it = m_TempHandles.Find( hash ); it != m_TempHandles.end() )
+  {
+    return std::get<SRVHandle>( it->second );
+  }
+
+  Track( resource );
+  auto handle = m_Bindless->CreateDescriptorHandle( resource.Get(), desc );
+  m_TempHandles.Put( hash, handle );
+  return handle;
+}
+
+Ember::UAVHandle Ember::ResourceBinder::BindTransient(
+    ComPtr<ID3D12Resource> resource, CD3DX12_UNORDERED_ACCESS_VIEW_DESC const& desc ) noexcept
+{
+  uint64_t hash = HashFnv1A( desc ) << DeviceHandleType::kUAV << ( uintptr_t )resource.Get();
+
+  if ( auto it = m_TempHandles.Find( hash ); it != m_TempHandles.end() )
+  {
+    return std::get<UAVHandle>( it->second );
+  }
+
+  Track( resource );
+  auto handle = m_Bindless->CreateDescriptorHandle( resource.Get(), desc );
+  m_TempHandles.Put( hash, handle );
+  return handle;
+}
+
+void Ember::ResourceBinder::Track( ComPtr<IUnknown> resource ) noexcept
+{
+  m_UsedResources.insert( std::move( resource ) );
 }
 
 void Ember::ResourceBinder::Clear()
 {
   if ( not m_Bindless ) return;
 
-  m_UsedBuffers.clear();
-  m_UsedTextures.clear();
+  m_UsedResources.clear();
 
   for ( auto const& handle : m_TempHandles.Values() )
   {

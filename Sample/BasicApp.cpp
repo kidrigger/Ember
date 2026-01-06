@@ -710,7 +710,7 @@ void Ember::BasicApp::Render()
   m_PerfCounter->UpdatePipelineStats( frame_idx );
   m_PerfCounter->BeginQuery( command_list.Get(), frame_idx );
 
-  m_TextureLoader->FlushBarriers( command_list.Get() );
+  m_TextureLoader->FlushBarriers( &command_list );
 
   command_list.SetDescriptorHeaps( m_RenderDevice->GetBindlessDescriptorHeaps() );
 
@@ -814,7 +814,7 @@ void Ember::BasicApp::Render()
     frame_graph.execute( &m_FGContext, &m_FGContext );
   }
 
-  CD3DX12_RESOURCE_BARRIER bottom_of_renderpass_barriers[] = {
+  D3D12_RESOURCE_BARRIER bottom_of_renderpass_barriers[] = {
     CD3DX12_RESOURCE_BARRIER::Transition(
         backbuffer.GetTexture(), backbuffer.GetCurrentState(), D3D12_RESOURCE_STATE_PRESENT ),
   };

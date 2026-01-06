@@ -309,7 +309,7 @@ void Ember::Internal::DirectionLightManager::RenderAllShadows(
 
   command_list->RSSetScissorViewport( kDirShadowResolution, kDirShadowResolution );
 
-  static std::vector<CD3DX12_RESOURCE_BARRIER> barriers;
+  static std::vector<D3D12_RESOURCE_BARRIER> barriers;
   barriers.resize( m_AllocatedShadows );
 
   std::transform(

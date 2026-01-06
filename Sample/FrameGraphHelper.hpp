@@ -184,20 +184,20 @@ private:
     LoadOperation                 LoadOp;
   };
 
-  RenderDevice*                         m_RenderDevice;
-  FrameData                             m_FrameData;
-  FlatMap<uint64_t, TexturePoolEntry>   m_TransientTextures;
+  RenderDevice*                       m_RenderDevice;
+  FrameData                           m_FrameData;
+  FlatMap<uint64_t, TexturePoolEntry> m_TransientTextures;
 
-  std::vector<CD3DX12_RESOURCE_BARRIER> m_Barriers;
-  RenderTargets                         m_CurrentRenderTargets;
-  DepthTargetEntry                      m_CurrentDepthTarget;
-  DirectX::XMUINT2                      m_RenderTargetSize;
+  std::vector<D3D12_RESOURCE_BARRIER> m_Barriers;
+  RenderTargets                       m_CurrentRenderTargets;
+  DepthTargetEntry                    m_CurrentDepthTarget;
+  DirectX::XMUINT2                    m_RenderTargetSize;
 
-  uint64_t                              m_TickCounter;
-  uint32_t                              m_TextureCount;
+  uint64_t                            m_TickCounter;
+  uint32_t                            m_TextureCount;
 
-  [[nodiscard]] Texture                 CreateTextureImpl( Texture::Desc const& desc ) const;
-  void                                  FlushBarriers();
+  [[nodiscard]] Texture               CreateTextureImpl( Texture::Desc const& desc ) const;
+  void                                FlushBarriers();
 
 public:
   Context() = default;

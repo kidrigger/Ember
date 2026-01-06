@@ -250,7 +250,7 @@ void Ember::Internal::OmniLightManager::RenderAllShadows(
 
   command_list->RSSetScissorViewport( kOmniShadowResolution, kOmniShadowResolution );
 
-  static std::vector<CD3DX12_RESOURCE_BARRIER> barriers;
+  static std::vector<D3D12_RESOURCE_BARRIER> barriers;
   barriers.resize( m_AllocatedShadows );
 
   std::transform(

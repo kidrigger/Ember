@@ -8,7 +8,6 @@
 #include <Graphics/CommandList.hpp>
 #include <Graphics/Context.hpp>
 #include <Graphics/Texture.hpp>
-#include "ResourceTracker.hpp"
 
 namespace Ember
 {
@@ -23,28 +22,16 @@ enum class ColorSpaceOverride
 
 class TextureLoader
 {
-  using UploadIntermediateList = std::pmr::forward_list<ComPtr<IUnknown>>;
-  using UploadTextureList      = std::pmr::forward_list<ComPtr<ID3D12Resource>>;
-  using UploadAliasList        = std::pmr::forward_list<ComPtr<ID3D12Resource>>;
-  using UploadHandleList       = std::vector<std::variant<SRVHandle, UAVHandle>>;
-
   struct UploadBatch
   {
-    ResourceTracker  Tracker;
+    using BarrierList = std::pmr::deque<std::pair<Texture, D3D12_RESOURCE_STATES>>;
+    BarrierList      Barriers;
     Context::Receipt Receipt;
 
     UploadBatch() = default;
-    explicit UploadBatch(
-        RenderDevice*                            render_device,
-        Context::Receipt                         receipt,
-        std::pmr::polymorphic_allocator<> const& pool_allocator );
-    void PushUpload(
-        ComPtr<ID3D12Resource> dest, ComPtr<IUnknown> intermediate, D3D12_RESOURCE_STATES const final_state );
-    void PushAllocation( ComPtr<D3D12MA::Allocation> intermediate );
-    void PushAlias( ComPtr<ID3D12Resource> alias );
-    void PushHandle( SRVHandle handle );
-    void PushHandles( std::span<UAVHandle> const& handles );
-    void ClearResources( std::vector<D3D12_RESOURCE_BARRIER>* barriers );
+    explicit UploadBatch( Context::Receipt receipt, std::pmr::polymorphic_allocator<> const& pool_allocator );
+    void PushTextureStateChange( Texture dest, D3D12_RESOURCE_STATES const final_state );
+    void FlushPendingBarriers( std::vector<D3D12_RESOURCE_BARRIER>* barriers );
   };
 
   using TextureCache = std::pmr::unordered_map<std::pmr::string, Texture>;
@@ -105,16 +92,12 @@ public:
       ColorSpaceOverride color_space_override = ColorSpaceOverride::kNone,
       D3D12_RESOURCE_STATES final_state       = D3D12_RESOURCE_STATE_PIXEL_SHADER_RESOURCE );
 
-  bool TryGenerateMipMaps( CommandList* command_list, Texture* texture, ResourceTracker* tracker ) const;
-  bool TryGenerateMipMapCube(
-      CommandList*          command_list,
-      Texture*              texture,
-      ResourceTracker*      tracker,
-      D3D12_RESOURCE_STATES texture_resource_state ) const;
+  bool             TryGenerateMipMaps( CommandList* command_list, Texture* texture ) const;
+  bool             TryGenerateMipMapCube( CommandList* command_list, Texture* texture ) const;
   Context::Receipt EndBatch();
 
   void             Update();
-  void             FlushBarriers( ID3D12GraphicsCommandList* command_list );
+  void             FlushBarriers( CommandList* command_list );
 };
 
 } // namespace Ember

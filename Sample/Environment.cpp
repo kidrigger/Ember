@@ -40,7 +40,6 @@ bool Ember::Environment::TryLoadFrom(
 
   byte                                buffer[2048];
   std::pmr::monotonic_buffer_resource mbr{ DataOf( buffer ), ByteSizeOf( buffer ), std::pmr::null_memory_resource() };
-  ResourceTracker                     tracker{ render_device, &mbr };
   //
   auto skybox = render_device->CreateTextureCube( {
       .Format    = DXGI_FORMAT_R11G11B10_FLOAT,
@@ -300,9 +299,7 @@ bool Ember::Environment::TryLoadFrom(
 
     command_list.ResourceBarrier( CD3DX12_RESOURCE_BARRIER::UAV( skybox.GetTexture() ) );
 
-    if ( not texture_loader->TryGenerateMipMapCube(
-             &command_list, &skybox, &tracker, D3D12_RESOURCE_STATE_UNORDERED_ACCESS ) )
-      return false;
+    if ( not texture_loader->TryGenerateMipMapCube( &command_list, &skybox ) ) return false;
 
     command_list.ResourceBarrier( CD3DX12_RESOURCE_BARRIER::UAV( skybox.GetTexture() ) );
 
@@ -340,8 +337,6 @@ bool Ember::Environment::TryLoadFrom(
 
     Context::Receipt receipt = context.Submit( std::move( command_list ) );
     context.WaitOn( receipt );
-
-    tracker.Clear( nullptr );
   }
 
   new ( env ) Environment{

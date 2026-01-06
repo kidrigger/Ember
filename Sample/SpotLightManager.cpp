@@ -251,7 +251,7 @@ void Ember::Internal::SpotLightManager::RenderAllShadows(
 
   command_list->RSSetScissorViewport( kSpotShadowResolution, kSpotShadowResolution );
 
-  static std::vector<CD3DX12_RESOURCE_BARRIER> barriers;
+  static std::vector<D3D12_RESOURCE_BARRIER> barriers;
   barriers.resize( m_ShadowingLightCount );
 
   std::transform(

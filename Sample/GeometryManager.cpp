@@ -18,6 +18,11 @@ uint32_t Ember::GeometryAllocation::GetOffsetInBytes() const
   return m_Offset;
 }
 
+D3D12_GPU_VIRTUAL_ADDRESS Ember::GeometryAllocation::GetGPUVirtualAddress() const
+{
+  return m_Buffer.GetGPUVirtualAddress() + m_Offset;
+}
+
 Ember::GeometryAllocation::GeometryAllocation( GeometryAllocation&& other ) noexcept
   : m_Buffer{ std::move( other.m_Buffer ) }
   , m_Block{ std::move( other.m_Block ) }

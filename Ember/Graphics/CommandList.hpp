@@ -35,10 +35,12 @@ public:
     uint32_t Z = 1;
   };
 
+  void Track( ComPtr<IUnknown> resource ) const;
+
   void CopyResource( ID3D12Resource* dest, ID3D12Resource* source );
 
-  void ResourceBarrier( CD3DX12_RESOURCE_BARRIER const& barriers ) const;
-  void ResourceBarrier( std::span<CD3DX12_RESOURCE_BARRIER> const& barriers ) const;
+  void ResourceBarrier( D3D12_RESOURCE_BARRIER const& barriers ) const;
+  void ResourceBarrier( std::span<D3D12_RESOURCE_BARRIER> const& barriers ) const;
 
   void SetDescriptorHeaps( std::span<ID3D12DescriptorHeap* const> heaps ) const;
   void SetComputeRootSignature( ID3D12RootSignature* root_signature ) const;
@@ -48,6 +50,11 @@ public:
   { // TODO: Move to autocasting process.
     ASSERT( byte_offset % 4 == 0 );
     m_CommandList->SetComputeRoot32BitConstants( root_parameter_index, sizeof( value ) / 4, &value, byte_offset / 4 );
+  }
+
+  auto Bind( BindableStructure auto const& bindable_structure ) const
+  {
+    return bindable_structure.Bind( m_Binder.get() );
   }
 
   void BindComputeResources( uint32_t root_parameter_index, BindableStructure auto const& bindable_structure ) const

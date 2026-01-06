@@ -344,7 +344,6 @@
     <ClCompile Include="ModelLoader.cpp" />
     <ClCompile Include="ObjectPool.cpp" />
     <ClCompile Include="Main.cpp" />
-    <ClCompile Include="ResourceTracker.cpp" />
     <ClCompile Include="Scene.cpp" />
     <ClCompile Include="SpotLightManager.cpp" />
     <ClCompile Include="TextureLoader.cpp" />
@@ -377,7 +376,6 @@
     <ClInclude Include="ModelLoader.hpp" />
     <ClInclude Include="ObjectPool.hpp" />
     <ClInclude Include="RenderPassCommon.hpp" />
-    <ClInclude Include="ResourceTracker.hpp" />
     <ClInclude Include="Scene.hpp" />
     <ClInclude Include="SpotLightManager.hpp" />
     <ClInclude Include="TextureLoader.hpp" />
