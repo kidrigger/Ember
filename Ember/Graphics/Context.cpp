@@ -45,6 +45,17 @@ Ember::Context::Context(
   , m_PoolAllocator{ std::make_unique<std::pmr::unsynchronized_pool_resource>() }
 {}
 
+void Ember::Context::ClearCompletedBinders() const
+{
+  auto const current_value = m_Fence->GetCompletedValue();
+  for ( auto& bind : m_CommandAllocators )
+  {
+    if ( current_value < bind.FenceValue ) continue;
+
+    bind.Binder->Clear();
+  }
+}
+
 ID3D12CommandQueue* Ember::Context::GetCommandQueue() const
 {
   return m_CommandQueue.Get();
@@ -72,7 +83,7 @@ Ember::CommandList Ember::Context::GetCommandList()
     // Available free command allocator.
     command_allocator = std::move( m_CommandAllocators.front().Allocator );
     binder            = std::move( m_CommandAllocators.front().Binder );
-    m_CommandAllocators.pop();
+    m_CommandAllocators.pop_front();
     ERR_ABORT( command_allocator->Reset() );
     binder->Clear();
   }
@@ -125,7 +136,7 @@ Ember::Context::Receipt Ember::Context::Submit( CommandList&& command_list )
 
   auto [gfx_command_list, command_allocator, rtm, bindless] = command_list.Release();
   m_CommandLists.emplace( std::move( gfx_command_list ) );
-  m_CommandAllocators.emplace( std::move( command_allocator ), signal_value, std::move( bindless ) );
+  m_CommandAllocators.emplace_back( std::move( command_allocator ), signal_value, std::move( bindless ) );
   m_RenderTargetManagers.emplace( std::move( rtm ) );
 
   return { m_Fence.Get(), signal_value };
@@ -143,13 +154,19 @@ Ember::Context::Receipt Ember::Context::Signal()
 
 void Ember::Context::WaitOn( Receipt const& receipt ) const
 {
-  if ( not receipt.IsValid() or receipt.IsComplete() ) return;
+  if ( not receipt.IsValid() or receipt.IsComplete() )
+  {
+    ClearCompletedBinders();
+    return;
+  }
 
   // Set the event on fence.
   ERR_ABORT( receipt.GetFence()->SetEventOnCompletion( receipt.GetFenceValue(), m_FenceEvent ) );
 
   // Wait for the event (with max timeout).
   ::WaitForSingleObject( m_FenceEvent, INFINITE );
+
+  ClearCompletedBinders();
 }
 
 void Ember::Context::QueueWaitOn( Receipt const receipt ) const

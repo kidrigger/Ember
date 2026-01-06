@@ -118,9 +118,7 @@ void Ember::ResourceBinder::Track( ComPtr<IUnknown> resource ) noexcept
 
 void Ember::ResourceBinder::Clear()
 {
-  if ( not m_Bindless ) return;
-
-  m_UsedResources.clear();
+  ASSERT( m_Bindless );
 
   for ( auto const& handle : m_TempHandles.Values() )
   {
@@ -128,6 +126,7 @@ void Ember::ResourceBinder::Clear()
   }
 
   m_TempHandles.Clear();
+  m_UsedResources.clear();
 }
 
 Ember::ResourceBinder::~ResourceBinder()

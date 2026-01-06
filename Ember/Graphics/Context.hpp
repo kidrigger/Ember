@@ -39,7 +39,7 @@ private:
 
   using CommandListQueue      = std::queue<ComPtr<ID3D12GraphicsCommandList7>>;
   using RTMQueue              = std::queue<std::unique_ptr<RenderTargetManager>>;
-  using CommandAllocatorQueue = std::queue<InFlightAllocators>;
+  using CommandAllocatorQueue = std::deque<InFlightAllocators>;
   using PoolAllocator         = std::unique_ptr<std::pmr::unsynchronized_pool_resource>;
 
   PoolAllocator              m_PoolAllocator;
@@ -61,6 +61,8 @@ private:
       ComPtr<ID3D12Fence>        fence,
       ScopedHandle               fence_event,
       D3D12_COMMAND_LIST_TYPE    command_list_type );
+
+  void ClearCompletedBinders() const;
 
 public:
   Context() = default;

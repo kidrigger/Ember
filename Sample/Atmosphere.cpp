@@ -252,6 +252,7 @@ Ember::RenderPass::Atmosphere::Data Ember::RenderPass::Atmosphere::Execute(
 
         PerFrameConstants const& constants         = blackboard->get<PerFrameConstants>();
 
+        cmd->IASetPrimitiveTopology( D3D_PRIMITIVE_TOPOLOGY_TRIANGLELIST );
         cmd->SetGraphicsRootSignature( self->m_RootSignature.Get() );
         cmd->SetPipelineState( self->m_SkyViewLUTPipeline.Get() );
         cmd->SetGraphicsRootConstantBufferView( 0, params.InnerBuffer.GetGPUVirtualAddress() );
