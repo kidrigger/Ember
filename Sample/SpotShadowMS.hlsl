@@ -34,29 +34,25 @@ void SpotShadowMS(
     out vertices MSVertexOut     verts[MAX_VERTS],
     out indices uint3            tris[MAX_TRIANGLES] )
 {
-  StructuredBuffer<Transform> transforms        = ResourceDescriptorHeap[g_DrawList.Transforms];
+  StructuredBuffer<Transform> transforms   = ResourceDescriptorHeap[g_DrawList.Transforms];
 
-  ByteAddressBuffer           meshlets          = ResourceDescriptorHeap[g_DrawList.Geometry];
-  ByteAddressBuffer           meshlet_indices   = ResourceDescriptorHeap[g_DrawList.Geometry];
-  ByteAddressBuffer           meshlet_triangles = ResourceDescriptorHeap[g_DrawList.Geometry];
-  ByteAddressBuffer           vertex_buffer     = ResourceDescriptorHeap[g_DrawList.Geometry];
+  ByteAddressBuffer           ugb          = ResourceDescriptorHeap[g_DrawList.Geometry];
 
-  StructuredBuffer<SpotLight> light_data        = ResourceDescriptorHeap[g_SpotLightBuffer];
+  StructuredBuffer<SpotLight> light_data   = ResourceDescriptorHeap[g_SpotLightBuffer];
 
-  uint                        meshlet_idx       = amp_payload.MeshletID[IN.GroupID.x] + amp_payload.FirstMeshlet;
+  uint                        meshlet_idx  = amp_payload.MeshletID[IN.GroupID.x] + amp_payload.FirstMeshlet;
 
-  uint                        meshlet_addr      = sizeof( Meshlet ) * meshlet_idx;
+  uint                        meshlet_addr = sizeof( Meshlet ) * meshlet_idx;
 
-  Meshlet                     meshlet           = meshlets.Load<Meshlet>( meshlet_addr );
-  Transform                   transform         = transforms[amp_payload.FirstTransform];
+  Meshlet                     meshlet      = ugb.Load<Meshlet>( meshlet_addr );
+  Transform                   transform    = transforms[amp_payload.FirstTransform];
 
   SetMeshOutputCounts( meshlet.VertexCount, meshlet.TriangleCount );
 
   for ( int i = IN.LocalID.x; i < meshlet.VertexCount; i += GROUP_SIZE )
   {
-    uint       index = meshlet_indices.Load<uint>( sizeof( uint ) * ( meshlet.VertexOffset + i ) );
-    VertexLite vertex =
-        vertex_buffer.Load<VertexLite>( sizeof( VertexLite ) * ( index + amp_payload.VertexLiteStart ) );
+    uint       index        = ugb.Load( 4 * ( meshlet.VertexOffset + i ) );
+    VertexLite vertex       = ugb.Load<VertexLite>( sizeof( VertexLite ) * ( index + amp_payload.VertexLiteStart ) );
 
     float4 world_position   = mul( transform.Model, vertex.Position );
     verts[i].ScreenPosition = mul( light_data[g_LightID].LightSpaceMat, world_position );
@@ -67,7 +63,7 @@ void SpotShadowMS(
     uint  offset     = meshlet.TriangleOffset + i * 3;
     uint  buf_offset = ( offset & ~3 );
     uint  sub_offset = ( offset & 3 );
-    uint2 data       = meshlet_triangles.Load2( buf_offset );
+    uint2 data       = ugb.Load2( buf_offset );
 
     // TODO: Increase gap to reduce LGSB stalls
     tris[i] = GetBytes( data, sub_offset );
