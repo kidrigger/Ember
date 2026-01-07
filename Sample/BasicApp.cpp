@@ -277,8 +277,8 @@ void Ember::BasicApp::SetupRenderPasses()
   ENSURE( RenderPass::ScreenSpaceLightDeferred::Create(
       &m_RenderScreenSpaceLighting, m_RenderDevice.get(), DirectX::MakeSRGB( swapchain_format ) ) );
 
-  ENSURE( RenderPass::AlphaTestedForward::Create(
-      &m_RenderAlphaTestedMeshes, m_RenderDevice.get(), DirectX::MakeSRGB( swapchain_format ), kDepthFormat ) );
+  ENSURE( RenderPass::MaskedForward::Create(
+      &m_RenderMaskedMeshes, m_RenderDevice.get(), DirectX::MakeSRGB( swapchain_format ), kDepthFormat ) );
   ENSURE( RenderPass::TransparencyForward::Create(
       &m_RenderTransparentMeshes, m_RenderDevice.get(), DirectX::MakeSRGB( swapchain_format ), kDepthFormat ) );
   ENSURE( RenderPass::Skybox::Create(
@@ -542,8 +542,8 @@ void Ember::BasicApp::Update()
       {
         ImGui::Text( "Total: %llu", m_DrawList.GetTotalCount() );
         ImGui::Text( "Opaque: %llu", m_DrawList.GetOpaqueCount() );
-        ImGui::Text( "Alpha Tested: %llu", m_DrawList.GetAlphaTestedCount() );
-        ImGui::Text( "Alpha Blended: %llu", m_DrawList.GetAlphaBlendedCount() );
+        ImGui::Text( "Alpha Tested: %llu", m_DrawList.GetMaskedCount() );
+        ImGui::Text( "Alpha Blended: %llu", m_DrawList.GetTransparentCount() );
       }
 
       if ( ImGui::CollapsingHeader( "Pipeline Stats" ) )
@@ -853,7 +853,7 @@ void Ember::BasicApp::Render()
     .DepthStencil = depth_buffer,
   };
 
-  auto const alpha_tested      = m_RenderAlphaTestedMeshes( &frame_graph, m_FGBlackboard, opaque_pass, tlas );
+  auto const alpha_tested      = m_RenderMaskedMeshes( &frame_graph, m_FGBlackboard, opaque_pass, tlas );
   auto const transparency_pass = m_RenderTransparentMeshes( &frame_graph, m_FGBlackboard, alpha_tested, tlas );
 
   m_RenderBackground.UseProceduralAtmosphericSky = g_Debug.SkyMode == DebugConfig::kAtmosphere;

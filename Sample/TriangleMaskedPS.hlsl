@@ -1,19 +1,20 @@
 #include "DebugConfig.hlsli"
 #include "TrianglePSCommon.hlsli"
 
-float4 TriangleAlphaBlendPS( PSIn IN ) : SV_TARGET0
+float4 TriangleMaskedPS( PSIn IN ) : SV_TARGET0
 {
   ConstantBuffer<Camera>     camera    = ResourceDescriptorHeap[g_Camera];
   StructuredBuffer<Material> materials = ResourceDescriptorHeap[g_Materials];
 
-  //
-  Material mat         = materials[NonUniformResourceIndex( IN.Material )];
+  Material                   mat       = materials[NonUniformResourceIndex( IN.Material )];
 
-  float4   albedo      = IN.Color * mat.GetAlbedo( IN.TexCoord, g_DefaultSampler );
+  float4                     albedo    = IN.Color * mat.GetAlbedo( IN.TexCoord, g_DefaultSampler );
 
-  float3   normal      = mat.GetNormal( IN.Normal, IN.Tangent, IN.Position.xyz, IN.TexCoord, g_DefaultSampler );
-  float2   metal_rough = mat.GetMetalRough( IN.TexCoord, g_DefaultSampler );
-  float3   emissive    = mat.GetEmissive( IN.TexCoord, g_DefaultSampler );
+  if ( albedo.a < mat.AlphaCutoff ) discard;
+
+  float3 normal      = mat.GetNormal( IN.Normal, IN.Tangent, IN.Position.xyz, IN.TexCoord, g_DefaultSampler );
+  float2 metal_rough = mat.GetMetalRough( IN.TexCoord, g_DefaultSampler );
+  float3 emissive    = mat.GetEmissive( IN.TexCoord, g_DefaultSampler );
 
 #ifndef STRIP_DEBUG_CONFIG
   ConstantBuffer<DebugConfig> config = ResourceDescriptorHeap[g_ConfigID];
@@ -67,5 +68,5 @@ float4 TriangleAlphaBlendPS( PSIn IN ) : SV_TARGET0
 
   float3 total_contrib = emissive + point_contrib + dir_contrib + ambient_contrib;
 
-  return float4( total_contrib, albedo.a );
+  return float4( total_contrib, 1.0f );
 }

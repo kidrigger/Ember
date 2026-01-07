@@ -60,7 +60,7 @@ class BasicApp final : public IApp
   RenderPass::ScreenSpaceLightDeferred m_RenderScreenSpaceLighting;
 
   // Forward + Deferred
-  RenderPass::AlphaTestedForward  m_RenderAlphaTestedMeshes;
+  RenderPass::MaskedForward       m_RenderMaskedMeshes;
   RenderPass::TransparencyForward m_RenderTransparentMeshes;
 
   // Environment

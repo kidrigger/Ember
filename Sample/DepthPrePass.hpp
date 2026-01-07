@@ -19,7 +19,7 @@ class DepthPrePass
 {
   ComPtr<ID3D12RootSignature> m_RootSignature;
   ComPtr<ID3D12PipelineState> m_OpaquePipeline;
-  ComPtr<ID3D12PipelineState> m_AlphaTestedPipeline;
+  ComPtr<ID3D12PipelineState> m_MaskedPipeline;
 
 public:
   DepthPrePass() = default;

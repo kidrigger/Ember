@@ -411,16 +411,16 @@
     <FxCompile Include="BackgroundMS.hlsl">
       <Filter>Shaders</Filter>
     </FxCompile>
-    <FxCompile Include="TriangleAlphaBlendPS.hlsl">
+    <FxCompile Include="TriangleTransparentPS.hlsl">
       <Filter>Shaders\Meshes\Forward</Filter>
     </FxCompile>
-    <FxCompile Include="TriangleAlphaTestPS.hlsl">
+    <FxCompile Include="TriangleMaskedPS.hlsl">
       <Filter>Shaders\Meshes\Forward</Filter>
     </FxCompile>
     <FxCompile Include="TrianglePS.hlsl">
       <Filter>Shaders\Meshes\Forward</Filter>
     </FxCompile>
-    <FxCompile Include="GBufferAlphaTestPS.hlsl">
+    <FxCompile Include="GBufferMaskedPS.hlsl">
       <Filter>Shaders\Meshes\Deferred</Filter>
     </FxCompile>
     <FxCompile Include="GBufferPS.hlsl">
@@ -480,7 +480,7 @@
     <FxCompile Include="DepthPrePassMS.hlsl">
       <Filter>Shaders\DepthPrePass</Filter>
     </FxCompile>
-    <FxCompile Include="DepthPrePassAlphaTestedPS.hlsl">
+    <FxCompile Include="DepthPrePassMaskedPS.hlsl">
       <Filter>Shaders\DepthPrePass</Filter>
     </FxCompile>
   </ItemGroup>

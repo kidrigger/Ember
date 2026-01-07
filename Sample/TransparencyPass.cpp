@@ -21,7 +21,7 @@ bool Ember::RenderPass::TransparencyForward::Create(
   ComPtr<ID3DBlob> mesh_shader_blob;
   ERR_FAIL_RET_F( D3DReadFileToBlob( L"TriangleMS.cso", &mesh_shader_blob ) );
   ComPtr<ID3DBlob> alpha_blended_pixel_shader_blob;
-  ERR_FAIL_RET_F( D3DReadFileToBlob( L"TriangleAlphaBlendPS.cso", &alpha_blended_pixel_shader_blob ) );
+  ERR_FAIL_RET_F( D3DReadFileToBlob( L"TriangleTransparentPS.cso", &alpha_blended_pixel_shader_blob ) );
 
   ComPtr<ID3D12Device2>       device                 = render_device->GetDevice();
 
@@ -157,7 +157,7 @@ Ember::RenderPass::RenderDepthData Ember::RenderPass::TransparencyForward::Execu
 
         auto const& constants = bb->get<PerFrameConstants>();
         auto const& env       = bb->get<Environment::GpuRepr>();
-        auto const& draw_list = bb->get<DrawList::Batches>().AlphaBlended;
+        auto const& draw_list = bb->get<DrawList::Batches>().Transparent;
 
         SRVHandle   tlas_srv{};
         if ( tlas.has_value() )
@@ -185,8 +185,8 @@ Ember::RenderPass::RenderDepthData Ember::RenderPass::TransparencyForward::opera
   return Execute( frame_graph, bb, render_depth, tlas );
 }
 
-bool Ember::RenderPass::AlphaTestedForward::Create(
-    AlphaTestedForward* out, RenderDevice* render_device, DXGI_FORMAT const rt_format, DXGI_FORMAT const depth_format )
+bool Ember::RenderPass::MaskedForward::Create(
+    MaskedForward* out, RenderDevice* render_device, DXGI_FORMAT const rt_format, DXGI_FORMAT const depth_format )
 {
   out->RenderTargetFormat = rt_format;
 
@@ -294,7 +294,7 @@ bool Ember::RenderPass::AlphaTestedForward::Create(
   return true;
 }
 
-Ember::RenderPass::RenderDepthData Ember::RenderPass::AlphaTestedForward::Execute(
+Ember::RenderPass::RenderDepthData Ember::RenderPass::MaskedForward::Execute(
     FrameGraph*                       frame_graph,
     FrameGraphBlackboard const&       bb,
     RenderDepthData const&            render_depth_data,
@@ -323,7 +323,7 @@ Ember::RenderPass::RenderDepthData Ember::RenderPass::AlphaTestedForward::Execut
 
         auto const& constants = bb->get<PerFrameConstants>();
         auto const& env       = bb->get<Environment::GpuRepr>();
-        auto const& draw_list = bb->get<DrawList::Batches>().AlphaTested;
+        auto const& draw_list = bb->get<DrawList::Batches>().Masked;
 
         SRVHandle   tlas_srv{};
         if ( tlas.has_value() )
@@ -342,7 +342,7 @@ Ember::RenderPass::RenderDepthData Ember::RenderPass::AlphaTestedForward::Execut
       } );
 }
 
-Ember::RenderPass::RenderDepthData Ember::RenderPass::AlphaTestedForward::operator()(
+Ember::RenderPass::RenderDepthData Ember::RenderPass::MaskedForward::operator()(
     FrameGraph*                       frame_graph,
     FrameGraphBlackboard const&       bb,
     RenderDepthData const&            render_depth,

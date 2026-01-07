@@ -11,7 +11,7 @@ struct PSOutput
   float4 Emissive : SV_TARGET4;
 };
 
-PSOutput GBufferAlphaTestPS( PSIn IN )
+PSOutput GBufferMaskedPS( PSIn IN )
 {
   ConstantBuffer<Camera>     camera    = ResourceDescriptorHeap[g_Camera];
   StructuredBuffer<Material> materials = ResourceDescriptorHeap[g_Materials];
@@ -30,8 +30,7 @@ PSOutput GBufferAlphaTestPS( PSIn IN )
 
   OUT.Position = float4( IN.Position.xyz, mat.EmissiveStrength );
   OUT.Albedo   = IN.Color * albedo;
-  OUT.Normal =
-      OctahedralEncode( mat.GetNormal( IN.Normal, IN.Tangent, IN.Position.xyz, IN.TexCoord, g_DefaultSampler ) );
+  OUT.Normal   = OctahedralEncode( mat.GetNormal( IN.Normal, IN.Tangent, IN.Position.xyz, IN.TexCoord, g_DefaultSampler ) );
   OUT.ORM      = float4( 1.0f, mat.GetMetalRough( IN.TexCoord, g_DefaultSampler ).yx, 0.0f );
   OUT.Emissive = float4( mat.GetRawEmissive( IN.TexCoord, g_DefaultSampler ), 0.0f );
 

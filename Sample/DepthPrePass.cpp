@@ -14,7 +14,7 @@ Ember::RenderPass::DepthPrePass::DepthPrePass(
     ComPtr<ID3D12PipelineState> alpha_tested_pipeline )
   : m_RootSignature{ std::move( root_signature ) }
   , m_OpaquePipeline{ std::move( opaque_pipeline ) }
-  , m_AlphaTestedPipeline{ std::move( alpha_tested_pipeline ) }
+  , m_MaskedPipeline{ std::move( alpha_tested_pipeline ) }
 {}
 
 FrameGraphResource Ember::RenderPass::DepthPrePass::Execute(
@@ -60,9 +60,9 @@ FrameGraphResource Ember::RenderPass::DepthPrePass::Execute(
         cmd->SetGraphicsRootConstants( 0, draw_list_info_list.Opaque );
         cmd->DispatchMesh( { .X = draw_list_info_list.Opaque.DrawCount } );
 
-        cmd->SetPipelineState( this->m_AlphaTestedPipeline.Get() );
-        cmd->SetGraphicsRootConstants( 0, draw_list_info_list.AlphaTested );
-        cmd->DispatchMesh( { .X = draw_list_info_list.AlphaTested.DrawCount } );
+        cmd->SetPipelineState( this->m_MaskedPipeline.Get() );
+        cmd->SetGraphicsRootConstants( 0, draw_list_info_list.Masked );
+        cmd->DispatchMesh( { .X = draw_list_info_list.Masked.DrawCount } );
       } );
 }
 
@@ -85,7 +85,7 @@ bool Ember::RenderPass::DepthPrePass::Create(
   ERR_FAIL_RET_F( D3DReadFileToBlob( L"EmptyPS.cso", &opaque_pixel_shader ) );
 
   ComPtr<ID3DBlob> alpha_tested_pixel_shader;
-  ERR_FAIL_RET_F( D3DReadFileToBlob( L"DepthPrePassAlphaTestedPS.cso", &alpha_tested_pixel_shader ) );
+  ERR_FAIL_RET_F( D3DReadFileToBlob( L"DepthPrePassMaskedPS.cso", &alpha_tested_pixel_shader ) );
 
   D3D12_ROOT_SIGNATURE_FLAGS const root_signature_flags = D3D12_ROOT_SIGNATURE_FLAG_ALLOW_INPUT_ASSEMBLER_INPUT_LAYOUT |
                                                           D3D12_ROOT_SIGNATURE_FLAG_CBV_SRV_UAV_HEAP_DIRECTLY_INDEXED |

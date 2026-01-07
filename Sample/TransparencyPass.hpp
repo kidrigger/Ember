@@ -34,14 +34,14 @@ struct TransparencyForward
       std::optional<FrameGraphResource> tlas = {} ) const;
 };
 
-struct AlphaTestedForward
+struct MaskedForward
 {
   ComPtr<ID3D12RootSignature> RootSignature;
   ComPtr<ID3D12PipelineState> Pipeline;
   DXGI_FORMAT                 RenderTargetFormat{ DXGI_FORMAT_UNKNOWN };
 
   static bool                 Create(
-                      AlphaTestedForward* out, RenderDevice* render_device, DXGI_FORMAT rt_format, DXGI_FORMAT depth_format );
+                      MaskedForward* out, RenderDevice* render_device, DXGI_FORMAT rt_format, DXGI_FORMAT depth_format );
 
   RenderDepthData Execute(
       FrameGraph*                       frame_graph,

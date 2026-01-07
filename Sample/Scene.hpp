@@ -317,8 +317,8 @@ class DrawList
   {
     Buffer TransformBuffer;
     Buffer OpaqueDrawBuffer;
-    Buffer AlphaTestedDrawBuffer;
-    Buffer AlphaBlendedDrawBuffer;
+    Buffer MaskedDrawBuffer;
+    Buffer TransparentDrawBuffer;
   };
 
   RenderDevice*               m_RenderDevice;
@@ -326,8 +326,8 @@ class DrawList
 
   std::vector<WorldTransform> m_Transforms;
   std::vector<MeshDraw>       m_OpaqueDrawInfos;
-  std::vector<MeshDraw>       m_AlphaTestedDrawInfos;
-  std::vector<MeshDraw>       m_AlphaBlendedDrawInfos;
+  std::vector<MeshDraw>       m_MaskedDrawInfos;
+  std::vector<MeshDraw>       m_TransparentDrawInfos;
   std::vector<FrameResources> m_FrameResources;
 
 public:
@@ -342,8 +342,8 @@ public:
   struct Batches
   {
     Info Opaque;
-    Info AlphaTested;
-    Info AlphaBlended;
+    Info Masked;
+    Info Transparent;
   };
 
   DrawList( RenderDevice* render_device, GeometryManager* geometry_manager, uint32_t frame_count );
@@ -352,8 +352,8 @@ public:
   [[nodiscard]] Batches PrepareFrame( uint32_t frame_idx );
   void                  Clear();
   [[nodiscard]] size_t  GetOpaqueCount() const;
-  [[nodiscard]] size_t  GetAlphaTestedCount() const;
-  [[nodiscard]] size_t  GetAlphaBlendedCount() const;
+  [[nodiscard]] size_t  GetMaskedCount() const;
+  [[nodiscard]] size_t  GetTransparentCount() const;
   [[nodiscard]] size_t  GetTotalCount() const;
 };
 

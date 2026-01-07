@@ -161,10 +161,10 @@ void Ember::DrawList::PushDraw( WorldTransform const& transform, Mesh const& mes
       draw_infos = &m_OpaqueDrawInfos;
       break;
     case AlphaMode::kMask:
-      draw_infos = &m_AlphaTestedDrawInfos;
+      draw_infos = &m_MaskedDrawInfos;
       break;
     case AlphaMode::kBlend:
-      draw_infos = &m_AlphaBlendedDrawInfos;
+      draw_infos = &m_TransparentDrawInfos;
       break;
     default:
       UNREACHABLE;
@@ -214,8 +214,8 @@ Ember::DrawList::Batches Ember::DrawList::PrepareFrame( uint32_t const frame_idx
 
   ResizedWrite( m_RenderDevice, &resources.TransformBuffer, m_Transforms );
   ResizedWrite( m_RenderDevice, &resources.OpaqueDrawBuffer, m_OpaqueDrawInfos );
-  ResizedWrite( m_RenderDevice, &resources.AlphaTestedDrawBuffer, m_AlphaTestedDrawInfos );
-  ResizedWrite( m_RenderDevice, &resources.AlphaBlendedDrawBuffer, m_AlphaBlendedDrawInfos );
+  ResizedWrite( m_RenderDevice, &resources.MaskedDrawBuffer, m_MaskedDrawInfos );
+  ResizedWrite( m_RenderDevice, &resources.TransparentDrawBuffer, m_TransparentDrawInfos );
 
   return {
     .Opaque = {
@@ -224,16 +224,16 @@ Ember::DrawList::Batches Ember::DrawList::PrepareFrame( uint32_t const frame_idx
       CountOf( m_OpaqueDrawInfos ),
       m_GeometryManager->GetSRVHandle(),
     },
-    .AlphaTested = {
+    .Masked = {
       resources.TransformBuffer.GetSRVHandle(),
-      resources.AlphaTestedDrawBuffer.GetSRVHandle(),
-      CountOf( m_AlphaTestedDrawInfos ),
+      resources.MaskedDrawBuffer.GetSRVHandle(),
+      CountOf( m_MaskedDrawInfos ),
       m_GeometryManager->GetSRVHandle(),
     },
-    .AlphaBlended = {
+    .Transparent = {
       resources.TransformBuffer.GetSRVHandle(),
-      resources.AlphaBlendedDrawBuffer.GetSRVHandle(),
-      CountOf( m_AlphaBlendedDrawInfos ),
+      resources.TransparentDrawBuffer.GetSRVHandle(),
+      CountOf( m_TransparentDrawInfos ),
       m_GeometryManager->GetSRVHandle(),
     }
   };
@@ -243,8 +243,8 @@ void Ember::DrawList::Clear()
 {
   m_Transforms.clear();
   m_OpaqueDrawInfos.clear();
-  m_AlphaTestedDrawInfos.clear();
-  m_AlphaBlendedDrawInfos.clear();
+  m_MaskedDrawInfos.clear();
+  m_TransparentDrawInfos.clear();
 }
 
 size_t Ember::DrawList::GetOpaqueCount() const
@@ -252,19 +252,19 @@ size_t Ember::DrawList::GetOpaqueCount() const
   return m_OpaqueDrawInfos.size();
 }
 
-size_t Ember::DrawList::GetAlphaTestedCount() const
+size_t Ember::DrawList::GetMaskedCount() const
 {
-  return m_AlphaTestedDrawInfos.size();
+  return m_MaskedDrawInfos.size();
 }
 
-size_t Ember::DrawList::GetAlphaBlendedCount() const
+size_t Ember::DrawList::GetTransparentCount() const
 {
-  return m_AlphaBlendedDrawInfos.size();
+  return m_TransparentDrawInfos.size();
 }
 
 size_t Ember::DrawList::GetTotalCount() const
 {
-  return m_OpaqueDrawInfos.size() + m_AlphaBlendedDrawInfos.size() + m_AlphaTestedDrawInfos.size();
+  return m_OpaqueDrawInfos.size() + m_TransparentDrawInfos.size() + m_MaskedDrawInfos.size();
 }
 
 Ember::World::World()

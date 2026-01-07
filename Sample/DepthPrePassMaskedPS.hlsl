@@ -1,7 +1,7 @@
 #include "DebugConfig.hlsli"
 #include "DepthPrePass.hlsli"
 
-void DepthPrePassAlphaTestedPS( PSIn IN )
+void DepthPrePassMaskedPS( PSIn IN )
 {
   StructuredBuffer<Material> materials = ResourceDescriptorHeap[g_Materials];
 
