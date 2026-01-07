@@ -22,7 +22,7 @@ struct MeshletPayload
 struct MSVertexOut
 {
   float4 ScreenPosition : SV_POSITION;
-  float2 TexCoord0 : TEXCOORD0;
+  float2 TexCoord[2]    : TEXCOORD;
 };
 
 struct MSPrimitiveOut
@@ -32,8 +32,8 @@ struct MSPrimitiveOut
 
 struct PSIn
 {
-  float2 TexCoord0 : TEXCOORD0;
-  MatID  Material : MATERIAL;
+  float2 TexCoord[2] : TEXCOORD;
+  MatID  Material    : MATERIAL;
 };
 
 cbuffer DrawListBlock : register( b0, space0 )

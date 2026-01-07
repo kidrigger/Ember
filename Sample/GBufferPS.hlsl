@@ -25,11 +25,11 @@ PSOutput GBufferPS( PSIn IN )
   PSOutput OUT;
 
   OUT.Position = float4( IN.Position.xyz, mat.EmissiveStrength );
-  OUT.Albedo   = IN.Color * mat.GetAlbedo( IN.TexCoord[0], g_DefaultSampler );
+  OUT.Albedo   = IN.Color * mat.GetAlbedo( IN.TexCoord, g_DefaultSampler );
   OUT.Normal =
-      OctahedralEncode( mat.GetNormal( IN.Normal, IN.Tangent, IN.Position.xyz, IN.TexCoord[0], g_DefaultSampler ) );
-  OUT.ORM      = float4( 1.0f, mat.GetMetalRough( IN.TexCoord[0], g_DefaultSampler ).yx, 0.0f );
-  OUT.Emissive = float4( mat.GetRawEmissive( IN.TexCoord[0], g_DefaultSampler ), 0.0f );
+      OctahedralEncode( mat.GetNormal( IN.Normal, IN.Tangent, IN.Position.xyz, IN.TexCoord, g_DefaultSampler ) );
+  OUT.ORM      = float4( 1.0f, mat.GetMetalRough( IN.TexCoord, g_DefaultSampler ).yx, 0.0f );
+  OUT.Emissive = float4( mat.GetRawEmissive( IN.TexCoord, g_DefaultSampler ), 0.0f );
 
 #ifndef STRIP_DEBUG_CONFIG
   if ( config.VisualizationMode == kMeshlet )

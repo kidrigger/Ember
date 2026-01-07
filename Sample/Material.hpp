@@ -28,7 +28,7 @@ public:
     SRVHandle MetalRoughTexture; // 12
     SRVHandle EmissiveTexture;   // 16
     Color32   BaseColorFactor;   // 20
-    Color32   EmissiveFactor;    // 24
+    Color32   EmissiveFactor;    // 24 // Alpha component used for TexCoord
     Float16   EmissiveStrength;  // 26
     Float16   Metal;             // 28
     Float16   Rough;             // 30

@@ -458,24 +458,35 @@ void Ember::BasicApp::LoadContent()
   // Setup Scene Geometry
   _ = m_ModelLoader->TryLoadModel( "Sponza.glb" )->child_of( m_SceneRoot ).set_name( "Scene" );
   _ = m_ModelLoader->TryLoadModel( "BoxAnimated.glb" )->child_of( m_SceneRoot ).set_name( "AnimTest" );
+  _ = m_ModelLoader->TryLoadModel( "MultiUVTest.glb" )
+          ->child_of( m_SceneRoot )
+          .set_name( "MultiUV" )
+          .insert(
+              []( Translation& t, Scale& s )
+              {
+                t = { 2.0f, 0.5f, 0.0 };
+                s = 0.3f;
+              } );
 
-  flecs::entity const rm = m_World->GetECS()
-                               .entity( "HelmetRotator" )
-                               .child_of( m_SceneRoot )
-                               .insert(
-                                   []( Translation& translation, RotatingModel& rot_model, WorldBoundingBox& )
-                                   {
-                                     rot_model.Speed = 20.0f;
-                                     translation     = { 0.0f, 1.0f, 0.0f };
-                                   } );
+  auto const rm = m_World->GetECS()
+                      .entity( "HelmetRotator" )
+                      .child_of( m_SceneRoot )
+                      .insert(
+                          []( Translation& translation, RotatingModel& rot_model, WorldBoundingBox& )
+                          {
+                            rot_model   = { 20.0f };
+                            translation = { 0.0f, 1.0f, 0.0f };
+                          } );
 
   _ = m_ModelLoader->TryLoadModel( "DamagedHelmet.glb" )
-          ->child_of( rm )
+          .value()
+          .child_of( rm )
           .set_name( "DamagedHelmet" )
           .set<Scale>( { 0.3f, 0.3f, 0.3f } );
 
   _ = m_ModelLoader->TryLoadModel( "AlphaBlendModeTest.glb" )
-          ->child_of( m_SceneRoot )
+          .value()
+          .child_of( m_SceneRoot )
           .set_name( "AlphaBlendTest" )
           .set<Translation>( { 5.0f, 2.0f, 7.0f } );
 

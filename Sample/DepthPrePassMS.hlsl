@@ -54,7 +54,8 @@ void DepthPrePassMS(
     float4     screen_pos   = mul( camera.Projection, clip_pos );
 
     verts[i].ScreenPosition = screen_pos;
-    verts[i].TexCoord0      = vertex.TexCoord[0];
+    verts[i].TexCoord[0]    = vertex.TexCoord[0];
+    verts[i].TexCoord[1]    = vertex.TexCoord[1];
   }
 
   for ( int i = IN.LocalID.x; i < meshlet.TriangleCount; i += 32 )

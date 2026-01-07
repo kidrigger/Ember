@@ -107,6 +107,8 @@ struct Scale
   Scale() = default;
   Scale( float const x, float const y, float const z ) : Value{ x, y, z }
   {}
+  Scale( float const scalar ) : Value{ scalar, scalar, scalar }
+  {}
   explicit Scale( DirectX::XMFLOAT3 const& vec ) : Value{ vec }
   {}
   explicit Scale( DirectX::FXMVECTOR vec )

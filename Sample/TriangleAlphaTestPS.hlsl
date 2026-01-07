@@ -8,13 +8,13 @@ float4 TriangleAlphaTestPS( PSIn IN ) : SV_TARGET0
 
   Material                   mat       = materials[NonUniformResourceIndex( IN.Material )];
 
-  float4                     albedo    = IN.Color * mat.GetAlbedo( IN.TexCoord[0], g_DefaultSampler );
+  float4                     albedo    = IN.Color * mat.GetAlbedo( IN.TexCoord, g_DefaultSampler );
 
   if ( albedo.a < mat.AlphaCutoff ) discard;
 
-  float3 normal      = mat.GetNormal( IN.Normal, IN.Tangent, IN.Position.xyz, IN.TexCoord[0], g_DefaultSampler );
-  float2 metal_rough = mat.GetMetalRough( IN.TexCoord[0], g_DefaultSampler );
-  float3 emissive    = mat.GetEmissive( IN.TexCoord[0], g_DefaultSampler );
+  float3 normal      = mat.GetNormal( IN.Normal, IN.Tangent, IN.Position.xyz, IN.TexCoord, g_DefaultSampler );
+  float2 metal_rough = mat.GetMetalRough( IN.TexCoord, g_DefaultSampler );
+  float3 emissive    = mat.GetEmissive( IN.TexCoord, g_DefaultSampler );
 
 #ifndef STRIP_DEBUG_CONFIG
   ConstantBuffer<DebugConfig> config = ResourceDescriptorHeap[g_ConfigID];

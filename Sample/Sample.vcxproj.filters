@@ -548,6 +548,9 @@
     <CopyFileToFolders Include="Assets\BoxAnimated.glb">
       <Filter>Resource Files\Assets\Scenes</Filter>
     </CopyFileToFolders>
+    <CopyFileToFolders Include="Assets\MultiUVTest.glb">
+      <Filter>Resource Files\Assets\Scenes</Filter>
+    </CopyFileToFolders>
   </ItemGroup>
   <ItemGroup>
     <Image Include="Assets\checkerboard.png">

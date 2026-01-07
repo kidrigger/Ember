@@ -571,9 +571,15 @@ Ember::MaterialImpl* Ember::ModelLoader::TryProcessMaterial(
   Texture       metal_rough_texture;
   Texture       emissive_texture;
 
-  if ( material->pbr_metallic_roughness.base_color_texture.texture )
+  uint32_t      base_color_texture_idx  = 0;
+  uint32_t      normal_texture_idx      = 0;
+  uint32_t      metal_rough_texture_idx = 0;
+  uint32_t      emissive_texture_idx    = 0;
+
+  if ( auto const& tex_view = material->pbr_metallic_roughness.base_color_texture; tex_view.texture )
   {
-    cgltf_image const* base_color_image = material->pbr_metallic_roughness.base_color_texture.texture->image;
+    cgltf_image const* base_color_image = tex_view.texture->image;
+    base_color_texture_idx              = tex_view.texcoord;
 
     if ( not TryLoadTexture( &base_color_texture, *base_color_image, ColorSpaceOverride::kSrgb ) )
     {
@@ -581,9 +587,10 @@ Ember::MaterialImpl* Ember::ModelLoader::TryProcessMaterial(
     }
   }
 
-  if ( material->pbr_metallic_roughness.metallic_roughness_texture.texture )
+  if ( auto const& tex_view = material->pbr_metallic_roughness.metallic_roughness_texture; tex_view.texture )
   {
-    cgltf_image const* metal_rough_image = material->pbr_metallic_roughness.metallic_roughness_texture.texture->image;
+    cgltf_image const* metal_rough_image = tex_view.texture->image;
+    metal_rough_texture_idx              = tex_view.texcoord;
 
     if ( not TryLoadTexture( &metal_rough_texture, *metal_rough_image, ColorSpaceOverride::kLinear ) )
     {
@@ -591,9 +598,10 @@ Ember::MaterialImpl* Ember::ModelLoader::TryProcessMaterial(
     }
   }
 
-  if ( material->normal_texture.texture )
+  if ( auto const& tex_view = material->normal_texture; tex_view.texture )
   {
-    cgltf_image const* normal_image = material->normal_texture.texture->image;
+    cgltf_image const* normal_image = tex_view.texture->image;
+    normal_texture_idx              = tex_view.texcoord;
 
     if ( not TryLoadTexture( &normal_texture, *normal_image, ColorSpaceOverride::kLinear ) )
     {
@@ -601,9 +609,10 @@ Ember::MaterialImpl* Ember::ModelLoader::TryProcessMaterial(
     }
   }
 
-  if ( material->emissive_texture.texture )
+  if ( auto const& tex_view = material->emissive_texture; tex_view.texture )
   {
-    cgltf_image const* emissive_image = material->emissive_texture.texture->image;
+    cgltf_image const* emissive_image = tex_view.texture->image;
+    emissive_texture_idx              = tex_view.texcoord;
 
     if ( not TryLoadTexture( &emissive_texture, *emissive_image, ColorSpaceOverride::kSrgb ) )
     {
@@ -631,13 +640,23 @@ Ember::MaterialImpl* Ember::ModelLoader::TryProcessMaterial(
       UNREACHABLE;
   }
 
+  Color32 packed_emissive_factor = emissive_factor;
+
+  ASSERT( base_color_texture_idx < 4 );
+  ASSERT( normal_texture_idx < 4 );
+  ASSERT( metal_rough_texture_idx < 4 );
+  ASSERT( emissive_texture_idx < 4 );
+  // Pack texture coordinate indices into emissive_factor.A
+  packed_emissive_factor.A       = ( byte )( base_color_texture_idx | ( normal_texture_idx << 2 ) |
+                                       ( metal_rough_texture_idx << 4 ) | ( emissive_texture_idx << 6 ) );
+
   MaterialHandle material_handle = m_MaterialManager->CreateMaterialHandle( {
       .BaseColorTexture  = base_color_texture ? base_color_texture.GetSRVHandle() : SRVHandle{},
       .NormalTexture     = normal_texture ? normal_texture.GetSRVHandle() : SRVHandle{},
       .MetalRoughTexture = metal_rough_texture ? metal_rough_texture.GetSRVHandle() : SRVHandle{},
       .EmissiveTexture   = emissive_texture ? emissive_texture.GetSRVHandle() : SRVHandle{},
       .BaseColorFactor   = base_color_factor,
-      .EmissiveFactor    = emissive_factor,
+      .EmissiveFactor    = packed_emissive_factor,
       .EmissiveStrength  = emissive_strength,
       .Metal             = metallic,
       .Rough             = roughness,
