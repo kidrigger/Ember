@@ -69,8 +69,8 @@ Global
 		{356B0B12-44EA-401C-97F7-C02BA5486559}.ReleaseWithDebug|x64.Build.0 = ReleaseWithDebug|x64
 		{356B0B12-44EA-401C-97F7-C02BA5486559}.ReleaseWithDebug|x86.ActiveCfg = ReleaseWithDebug|Win32
 		{356B0B12-44EA-401C-97F7-C02BA5486559}.ReleaseWithDebug|x86.Build.0 = ReleaseWithDebug|Win32
-		{356B0B12-44EA-401C-97F7-C02BA5486559}.RenderDoc_Compat|x64.ActiveCfg = Debug|x64
-		{356B0B12-44EA-401C-97F7-C02BA5486559}.RenderDoc_Compat|x64.Build.0 = Debug|x64
+		{356B0B12-44EA-401C-97F7-C02BA5486559}.RenderDoc_Compat|x64.ActiveCfg = RenderDoc_Compat|x64
+		{356B0B12-44EA-401C-97F7-C02BA5486559}.RenderDoc_Compat|x64.Build.0 = RenderDoc_Compat|x64
 		{356B0B12-44EA-401C-97F7-C02BA5486559}.RenderDoc_Compat|x86.ActiveCfg = Debug|Win32
 		{356B0B12-44EA-401C-97F7-C02BA5486559}.RenderDoc_Compat|x86.Build.0 = Debug|Win32
 	EndGlobalSection

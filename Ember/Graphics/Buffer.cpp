@@ -135,7 +135,7 @@ Ember::Buffer::Type Ember::Buffer::GetType() const noexcept
 
 Ember::SRVHandle Ember::Buffer::GetSRVHandle() const
 {
-  ASSERT( m_Impl );
+  if ( not m_Impl ) return {};
   ASSERT( GetType() == Type::kStorageBuffer or GetType() == Type::kAccelerationStructure );
 
   return m_Impl->Handles.AsSRV;
@@ -143,7 +143,7 @@ Ember::SRVHandle Ember::Buffer::GetSRVHandle() const
 
 Ember::UAVHandle Ember::Buffer::GetUAVHandle() const
 {
-  ASSERT( m_Impl );
+  if ( not m_Impl ) return {};
   ASSERT( GetType() == Type::kStorageBuffer );
   ASSERT( not m_Impl->Handles.IsConstantBuffer() );
 

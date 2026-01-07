@@ -102,7 +102,8 @@ void Ember::CommandList::IASetPrimitiveTopology( D3D12_PRIMITIVE_TOPOLOGY topolo
 
 void Ember::CommandList::DispatchMesh( ThreadGroupCount tgc ) const
 {
-  ASSERT( tgc.X > 0 and tgc.Y > 0 and tgc.Z > 0 );
+  if ( tgc.X == 0 or tgc.Y == 0 or tgc.Z == 0 ) return;
+
   m_CommandList->DispatchMesh( tgc.X, tgc.Y, tgc.Z );
 }
 
