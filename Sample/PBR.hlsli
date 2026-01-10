@@ -7,18 +7,19 @@
 #include "Utility.hlsli"
 
 template <typename RayQueryType>
-float CastShadowRay(in RayQueryType query, in RaytracingAccelerationStructure tlas, float3 origin, float3 direction, float max_dist)
+float CastShadowRay(
+    in RayQueryType query, in RaytracingAccelerationStructure tlas, float3 origin, float3 direction, float max_dist )
 {
   RayDesc desc;
-  desc.Origin = origin;
+  desc.Origin    = origin;
   desc.Direction = direction;
-  desc.TMin = 0.0001f;
-  desc.TMax = max_dist;
-  
-  query.TraceRayInline(tlas, RAY_FLAG_ACCEPT_FIRST_HIT_AND_END_SEARCH, ~0, desc);
+  desc.TMin      = 0.0001f;
+  desc.TMax      = max_dist;
+
+  query.TraceRayInline( tlas, RAY_FLAG_ACCEPT_FIRST_HIT_AND_END_SEARCH, ~0, desc );
   query.Proceed();
-  
-  return float((query.CommittedStatus() == COMMITTED_TRIANGLE_HIT) ? 0.0f : 1.0f);
+
+  return float( ( query.CommittedStatus() == COMMITTED_TRIANGLE_HIT ) ? 0.0f : 1.0f );
 }
 
 float TrowbridgeReitzGGX( float n_dot_h, float roughness )
@@ -191,43 +192,47 @@ float3 GetAmbientInfluence(
 
 template <typename TBrdf>
 float3 CalcShadowingLightContrib(
-    in DirLight dir_light, in TBrdf brdf, float4 ws_position, float3 view_dir, SamplerComparisonState shadow_sampler)
+    in DirLight dir_light, in TBrdf brdf, float4 ws_position, float3 view_dir, SamplerComparisonState shadow_sampler )
 {
   Texture2DArray<float> shadow_map = ResourceDescriptorHeap[dir_light.ShadowIdx];
 
-  int cascade = 0;
-  [unroll]
-  for (int i = 0; i < NUM_CASCADES; i++)
+  int                   cascade    = 0;
+  for ( int i = 0; i < NUM_CASCADES; i++ )
   {
-    if (PointInsideSphere(ws_position.xyz, dir_light.CascadesSph[i]))
+    if ( PointInsideSphere( ws_position.xyz, dir_light.CascadesSph[i] ) )
     {
       cascade = i;
     }
   }
 
-  float4 ls_position = mul(dir_light.LightSpaceMat[cascade], ws_position);
-  ls_position /= ls_position.w;
+  float4 ls_position  = mul( dir_light.LightSpaceMat[cascade], ws_position );
+  ls_position        /= ls_position.w;
 
-  ls_position.xy = float2(0.5f, -0.5f) * ls_position.xy + 0.5f; // must invert y
+  ls_position.xy      = float2( 0.5f, -0.5f ) * ls_position.xy + 0.5f; // must invert y
 
   // Shadow test
   float shadowing = ls_position.z > dir_light.FarPlane
                         ? 1.0f
-                        : shadow_map.SampleCmp(shadow_sampler, float3(ls_position.xy, cascade), ls_position.z);
+                        : shadow_map.SampleCmp( shadow_sampler, float3( ls_position.xy, cascade ), ls_position.z );
 
   // Expects direction *to* light.
-  return shadowing * brdf.Evaluate(dir_light.GetRadiance(), view_dir, -dir_light.Direction);
+  return shadowing * brdf.Evaluate( dir_light.GetRadiance(), view_dir, -dir_light.Direction );
 }
 
 template <typename TBrdf, typename TRayQuery>
 float3 CalcShadowingLightContrib(
-    in DirLight dir_light, in TBrdf brdf, float4 ws_position, float3 view_dir, in TRayQuery query, in RaytracingAccelerationStructure tlas)
+    in DirLight                        dir_light,
+    in TBrdf                           brdf,
+    float4                             ws_position,
+    float3                             view_dir,
+    in TRayQuery                       query,
+    in RaytracingAccelerationStructure tlas )
 {
   // Shadow test
-  float shadowing = CastShadowRay(query, tlas, ws_position.xyz, -dir_light.Direction, 10000.0f);
+  float shadowing = CastShadowRay( query, tlas, ws_position.xyz, -dir_light.Direction, 10000.0f );
 
   // Expects direction *to* light.
-  return shadowing * brdf.Evaluate(dir_light.GetRadiance(), view_dir, -dir_light.Direction);
+  return shadowing * brdf.Evaluate( dir_light.GetRadiance(), view_dir, -dir_light.Direction );
 }
 
 template <typename TBrdf>
@@ -265,29 +270,28 @@ float3 CalcShadowingLightContrib(
 
 template <typename TBrdf, typename TRayQuery>
 float3 CalcShadowingLightContrib(
-    in PointLight point_light,
-    in TBrdf brdf,
-    float4 ws_position,
-    float3 view_dir,
-    in TRayQuery query,
-    in RaytracingAccelerationStructure tlas)
+    in PointLight                      point_light,
+    in TBrdf                           brdf,
+    float4                             ws_position,
+    float3                             view_dir,
+    in TRayQuery                       query,
+    in RaytracingAccelerationStructure tlas )
 {
-  float3 light_dir = float3(point_light.Position) - ws_position.xyz;
-  float light_dist = length(light_dir);
+  float3 light_dir  = float3( point_light.Position ) - ws_position.xyz;
+  float  light_dist = length( light_dir );
 
-  if (light_dist > point_light.Range)
-    return 0.0f;
+  if ( light_dist > point_light.Range ) return 0.0f;
 
   // Shadow test
-  float shadowing = CastShadowRay(query, tlas, ws_position.xyz, normalize(light_dir), light_dist);
+  float shadowing = CastShadowRay( query, tlas, ws_position.xyz, normalize( light_dir ), light_dist );
 
   // Smooth attenuation from [karis13]
   float attenuation =
-      pow(saturate(1 - pow(light_dist / point_light.Range, 4.0f)), 2.0f) / (light_dist * light_dist + 1.0f);
-  float3 radiance = attenuation * point_light.GetRadiance();
+      pow( saturate( 1 - pow( light_dist / point_light.Range, 4.0f ) ), 2.0f ) / ( light_dist * light_dist + 1.0f );
+  float3 radiance  = attenuation * point_light.GetRadiance();
 
-  light_dir /= light_dist; // Normalization
-  return shadowing * brdf.Evaluate(radiance, view_dir, light_dir);
+  light_dir       /= light_dist; // Normalization
+  return shadowing * brdf.Evaluate( radiance, view_dir, light_dir );
 }
 
 template <typename TBrdf>
@@ -339,30 +343,33 @@ float3 CalcShadowingLightContrib(
 
 template <typename TBrdf, typename TRayQuery>
 float3 CalcShadowingLightContrib(
-    in SpotLight spot_light, in TBrdf brdf, float4 ws_position, float3 view_dir, in TRayQuery query, in RaytracingAccelerationStructure tlas)
+    in SpotLight                       spot_light,
+    in TBrdf                           brdf,
+    float4                             ws_position,
+    float3                             view_dir,
+    in TRayQuery                       query,
+    in RaytracingAccelerationStructure tlas )
 {
-  float3 light_dir = float3(spot_light.Position) - ws_position.xyz;
-  float3 spot_fwd = -normalize(spot_light.Direction);
-  float light_dist = length(light_dir);
+  float3 light_dir   = float3( spot_light.Position ) - ws_position.xyz;
+  float3 spot_fwd    = -normalize( spot_light.Direction );
+  float  light_dist  = length( light_dir );
 
-  light_dir /= light_dist; // Normalization
+  light_dir         /= light_dist; // Normalization
 
-  float angle_dot = dot(spot_fwd, light_dir);
-  if (angle_dot < spot_light.ConeOuterCutoff)
-    return 0.0f;
-  if (light_dist > spot_light.Range)
-    return 0.0f;
+  float angle_dot    = dot( spot_fwd, light_dir );
+  if ( angle_dot < spot_light.ConeOuterCutoff ) return 0.0f;
+  if ( light_dist > spot_light.Range ) return 0.0f;
 
   // Shadow test
-  float shadowing = CastShadowRay(query, tlas, ws_position.xyz, light_dir, light_dist);
+  float shadowing = CastShadowRay( query, tlas, ws_position.xyz, light_dir, light_dist );
 
   // Smooth attenuation from [karis13]
-  float angle_propo = smoothstep(spot_light.ConeOuterCutoff, spot_light.ConeInnerCutoff, angle_dot);
-  float attenuation = angle_propo * pow(saturate(1 - pow(light_dist / spot_light.Range, 4.0f)), 2.0f) /
-                      (light_dist * light_dist + 1.0f);
+  float angle_propo = smoothstep( spot_light.ConeOuterCutoff, spot_light.ConeInnerCutoff, angle_dot );
+  float attenuation = angle_propo * pow( saturate( 1 - pow( light_dist / spot_light.Range, 4.0f ) ), 2.0f ) /
+                      ( light_dist * light_dist + 1.0f );
   float3 radiance = attenuation * spot_light.GetRadiance();
 
-  return shadowing * brdf.Evaluate(radiance, view_dir, light_dir);
+  return shadowing * brdf.Evaluate( radiance, view_dir, light_dir );
 }
 
 template <typename TBrdf>

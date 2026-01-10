@@ -51,11 +51,11 @@ void SpotShadowMS(
 
   for ( int i = IN.LocalID.x; i < meshlet.VertexCount; i += GROUP_SIZE )
   {
-    uint       index        = ugb.Load( 4 * ( meshlet.VertexOffset + i ) );
-    VertexLite vertex       = ugb.Load<VertexLite>( sizeof( VertexLite ) * ( index + amp_payload.VertexLiteStart ) );
+    uint       index          = ugb.Load( 4 * ( meshlet.VertexOffset + i ) );
+    VertexLite vertex         = ugb.Load<VertexLite>( sizeof( VertexLite ) * ( index + amp_payload.VertexLiteStart ) );
 
-    float4 world_position   = mul( transform.Model, vertex.Position );
-    verts[i].ScreenPosition = mul( light_data[g_LightID].LightSpaceMat, world_position );
+    float4     world_position = mul( transform.Model, vertex.Position );
+    verts[i].ScreenPosition   = mul( light_data[g_LightID].LightSpaceMat, world_position );
   }
 
   for ( int i = IN.LocalID.x; i < meshlet.TriangleCount; i += GROUP_SIZE )

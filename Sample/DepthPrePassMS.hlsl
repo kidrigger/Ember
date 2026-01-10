@@ -28,23 +28,23 @@ void DepthPrePassMS(
     out indices uint3             tris[MAX_TRIANGLES],
     out primitives MSPrimitiveOut prims[MAX_TRIANGLES] )
 {
-  StructuredBuffer<Transform> transforms        = ResourceDescriptorHeap[g_DrawList.Transforms];
-  ByteAddressBuffer           ugb               = ResourceDescriptorHeap[g_DrawList.Geometry];
-  ConstantBuffer<Camera>      camera            = ResourceDescriptorHeap[g_Camera];
+  StructuredBuffer<Transform> transforms   = ResourceDescriptorHeap[g_DrawList.Transforms];
+  ByteAddressBuffer           ugb          = ResourceDescriptorHeap[g_DrawList.Geometry];
+  ConstantBuffer<Camera>      camera       = ResourceDescriptorHeap[g_Camera];
 
-  uint                        meshlet_idx       = meshlet_draw.MeshletID[IN.GroupID.x] + meshlet_draw.FirstMeshlet;
-  uint                        meshlet_addr      = sizeof( Meshlet ) * meshlet_idx;
+  uint                        meshlet_idx  = meshlet_draw.MeshletID[IN.GroupID.x] + meshlet_draw.FirstMeshlet;
+  uint                        meshlet_addr = sizeof( Meshlet ) * meshlet_idx;
 
-  Meshlet                     meshlet           = ugb.Load<Meshlet>( meshlet_addr );
-  Transform                   transform         = transforms[NonUniformResourceIndex( meshlet_draw.Transform )];
+  Meshlet                     meshlet      = ugb.Load<Meshlet>( meshlet_addr );
+  Transform                   transform    = transforms[NonUniformResourceIndex( meshlet_draw.Transform )];
 
   SetMeshOutputCounts( meshlet.VertexCount, meshlet.TriangleCount );
 
   for ( int i = IN.LocalID.x; i < meshlet.VertexCount; i += 32 )
   {
-    uint       index  = ugb.Load( sizeof( uint ) * ( meshlet.VertexOffset + i ) );
+    uint       index        = ugb.Load( sizeof( uint ) * ( meshlet.VertexOffset + i ) );
 
-    VertexLite vertex = ugb.Load<VertexLite>( sizeof( VertexLite ) * ( index + meshlet_draw.FirstVertex ) );
+    VertexLite vertex       = ugb.Load<VertexLite>( sizeof( VertexLite ) * ( index + meshlet_draw.FirstVertex ) );
 
     float4     world_pos    = mul( transform.Model, vertex.Position );
     float4     clip_pos     = mul( camera.View, world_pos );

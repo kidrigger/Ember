@@ -42,18 +42,18 @@ void TriangleMS(
 
   for ( int i = IN.LocalID.x; i < meshlet.VertexCount; i += 32 )
   {
-    uint       index        = ugb.Load( 4 * ( meshlet.VertexOffset + i ) );
+    uint       index      = ugb.Load( 4 * ( meshlet.VertexOffset + i ) );
 
-    VertexLite vertex_pos   = ugb.Load<VertexLite>( sizeof( VertexLite ) * ( index + amp_payload.VertexLiteStart ) );
-    VertexData vertex       = ugb.Load<VertexData>( sizeof( VertexData ) * ( index + amp_payload.FirstVertex ) );
+    VertexLite vertex_pos = ugb.Load<VertexLite>( sizeof( VertexLite ) * ( index + amp_payload.VertexLiteStart ) );
+    VertexData vertex     = ugb.Load<VertexData>( sizeof( VertexData ) * ( index + amp_payload.FirstVertex ) );
 
-    float4     world_pos    = mul( transform.Model, vertex_pos.Position );
-    float4     clip_pos     = mul( camera.View, world_pos );
-    float4     screen_pos   = mul( camera.Projection, clip_pos );
+    float4     world_pos  = mul( transform.Model, vertex_pos.Position );
+    float4     clip_pos   = mul( camera.View, world_pos );
+    float4     screen_pos = mul( camera.Projection, clip_pos );
 
-    float3     normal       = normalize( mul( vertex.GetNormal(), transform.InvModel ).xyz );
-    float4     tangent      = vertex.GetTangent();
-    tangent                 = float4( normalize( mul( float4( tangent.xyz, 0.0f ), transform.InvModel ).xyz ), tangent.w );
+    float3     normal     = normalize( mul( vertex.GetNormal(), transform.InvModel ).xyz );
+    float4     tangent    = vertex.GetTangent();
+    tangent = float4( normalize( mul( float4( tangent.xyz, 0.0f ), transform.InvModel ).xyz ), tangent.w );
 
     verts[i].ScreenPosition = screen_pos;
     verts[i].Position       = world_pos;

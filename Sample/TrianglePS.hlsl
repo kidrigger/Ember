@@ -5,7 +5,8 @@ float4 TrianglePS( PSIn IN ) : SV_TARGET0
 {
   ConstantBuffer<Camera>     camera    = ResourceDescriptorHeap[g_Camera];
   StructuredBuffer<Material> materials = ResourceDescriptorHeap[g_Materials];
-  
+
+  //
   float3   view_dir    = normalize( camera.Position.xyz - IN.Position.xyz );
 
   Material mat         = materials[NonUniformResourceIndex( IN.Material )];
@@ -46,7 +47,7 @@ float4 TrianglePS( PSIn IN ) : SV_TARGET0
   brdf.Roughness = metal_rough.g;
   brdf.F0        = lerp( 0.04f, albedo.rgb, metal_rough.x );
   brdf.Occlusion = 1.0f;
-  
+
   float3 point_contrib;
   float3 spot_contrib;
   float3 dir_contrib;
@@ -74,10 +75,10 @@ float4 TrianglePS( PSIn IN ) : SV_TARGET0
       g_DefaultSampler,
       g_ClampedSampler,
       !config.RemoveDiffuseContrib,
-      !config.RemoveSpecularContrib);
+      !config.RemoveSpecularContrib );
 #endif
 
   float3 total_contrib = emissive + point_contrib + dir_contrib + spot_contrib + ambient_contrib;
-  
+
   return float4( total_contrib, 1.0f );
 }

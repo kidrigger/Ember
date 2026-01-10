@@ -70,15 +70,9 @@ public:
   LightInfo   PrepareFrame( uint32_t frame_index );
 
   //
-  void RenderAllShadows(
-      CommandList* command_list,
-      DrawList::Batches const&    draw_list,
-      Camera const&               camera );
+  void RenderAllShadows( CommandList* command_list, DrawList::Batches const& draw_list, Camera const& camera );
 
-  void RenderOmniShadow(
-      CommandList* command_list,
-      DrawList::Batches const&    draw_list,
-      uint32_t                    light_index ) const;
+  void RenderOmniShadow( CommandList* command_list, DrawList::Batches const& draw_list, uint32_t light_index ) const;
 };
 } // namespace Internal
 

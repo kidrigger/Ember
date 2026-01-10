@@ -1,7 +1,6 @@
 #pragma once
 
 
-
 #include "DirectXHeaders.hpp"
 #include "Runtime.hpp"
 

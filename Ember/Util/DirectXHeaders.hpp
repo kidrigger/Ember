@@ -10,8 +10,8 @@
 
 #include <DirectXCollision.h>
 #include <DirectXMath.h>
-#include <d3dcompiler.h>
 #include <DirectXTex.h>
+#include <d3dcompiler.h>
 
 // D3D12 extension lib
 #include <directx/d3dx12.h>

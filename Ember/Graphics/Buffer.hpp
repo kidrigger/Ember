@@ -61,13 +61,13 @@ public:
   explicit BufferManager(
       ComPtr<ID3D12Device2> device, ComPtr<D3D12MA::Allocator> gpu_allocator, BindlessManager* bindless_manager );
 
-  Buffer                            CreateVertexBuffer( uint32_t size, uint32_t stride );
-  Buffer                            CreateIndexBuffer( uint32_t size, DXGI_FORMAT format );
-  Buffer                            CreateStorageBuffer( uint32_t size, uint32_t stride );
-  Buffer                            CreateRawStorageBuffer( uint64_t size );
-  Buffer                            CreateReadWriteBuffer( uint32_t size, uint32_t stride );
-  Buffer                            CreateConstantBuffer( uint32_t size );
-  Buffer                            CreateASBuffer( uint64_t size );
+  Buffer CreateVertexBuffer( uint32_t size, uint32_t stride );
+  Buffer CreateIndexBuffer( uint32_t size, DXGI_FORMAT format );
+  Buffer CreateStorageBuffer( uint32_t size, uint32_t stride );
+  Buffer CreateRawStorageBuffer( uint64_t size );
+  Buffer CreateReadWriteBuffer( uint32_t size, uint32_t stride );
+  Buffer CreateConstantBuffer( uint32_t size );
+  Buffer CreateASBuffer( uint64_t size );
 };
 
 } // namespace Ember

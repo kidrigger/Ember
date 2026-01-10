@@ -30,7 +30,8 @@ PSOutput GBufferMaskedPS( PSIn IN )
 
   OUT.Position = float4( IN.Position.xyz, mat.EmissiveStrength );
   OUT.Albedo   = IN.Color * albedo;
-  OUT.Normal   = OctahedralEncode( mat.GetNormal( IN.Normal, IN.Tangent, IN.Position.xyz, IN.TexCoord, g_DefaultSampler ) );
+  OUT.Normal =
+      OctahedralEncode( mat.GetNormal( IN.Normal, IN.Tangent, IN.Position.xyz, IN.TexCoord, g_DefaultSampler ) );
   OUT.ORM      = float4( 1.0f, mat.GetMetalRough( IN.TexCoord, g_DefaultSampler ).yx, 0.0f );
   OUT.Emissive = float4( mat.GetRawEmissive( IN.TexCoord, g_DefaultSampler ), 0.0f );
 
