@@ -203,7 +203,7 @@ struct ScalingAnimation
 
 struct AnimationPlayer
 {
-  enum State
+  enum State : uint8_t
   {
     kStopped,
     kPaused,
@@ -294,7 +294,7 @@ struct Mesh
   uint32_t FirstMeshlet;
 };
 
-struct BLAS
+struct BottomLevelAS
 {
   Buffer ASBuffer;
 };

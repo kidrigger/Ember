@@ -63,16 +63,16 @@ struct alignas( 16 ) VertexData
 
 struct Meshlet
 {
-  uint32_t VertexOffset;
-  uint32_t TriangleOffset;
-  uint32_t VertexCount;
-  uint32_t TriangleCount;
-  Float16  CenterX;
-  Float16  CenterY;
-  Float16  CenterZ;
-  Float16  Radius;
-  uint32_t ConeInfo;
-  uint32_t ConeApexOffset;
+  uint32_t VertexOffset;   // 04 04
+  uint32_t TriangleOffset; // 04 08
+  uint32_t VertexCount;    // 04 12
+  uint32_t TriangleCount;  // 04 16
+  Float16  CenterX;        // 02 18
+  Float16  CenterY;        // 02 20
+  Float16  CenterZ;        // 02 22
+  Float16  Radius;         // 02 24
+  uint32_t ConeInfo;       // 04 28
+  uint32_t ConeApexOffset; // 04 32
 };
 
 class ModelLoader
@@ -122,15 +122,15 @@ class ModelLoader
   void                        FinalizeGeometry( LoadingContext* context, flecs::entity entity ) const;
   void                        CreateAccelerationStructure( LoadingContext* context, flecs::entity root ) const;
 
-  [[nodiscard]] BLAS          CreateBLAS(
-               Ember::ModelLoader::LoadingContext* context,
-               D3D12_GPU_VIRTUAL_ADDRESS           index_addr,
-               D3D12_GPU_VIRTUAL_ADDRESS           vert_addr,
-               uint32_t                            index_count,
-               uint32_t                            vertex_count ) const;
+  [[nodiscard]] BottomLevelAS CreateBottomLevelAS(
+      LoadingContext*           context,
+      D3D12_GPU_VIRTUAL_ADDRESS index_addr,
+      D3D12_GPU_VIRTUAL_ADDRESS vert_addr,
+      uint32_t                  index_count,
+      uint32_t                  vertex_count ) const;
 
 public:
-  enum class Error
+  enum class Error : uint8_t
   {
     kCannotOpenFile,
     kInvalidFile,

@@ -305,7 +305,7 @@ void Ember::BasicApp::PrepareTLAS( CommandList* cmd, uint32_t frame_idx )
   m_RTX.InstanceVec.clear();
   int i = 0;
   m_World->GetECS().each(
-      [&]( WorldTransform const& wt, BLAS const& blas )
+      [&]( WorldTransform const& wt, BottomLevelAS const& blas )
       {
         auto& desc                 = m_RTX.InstanceVec.emplace_back();
         desc.AccelerationStructure = blas.ASBuffer.GetGPUVirtualAddress();

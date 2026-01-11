@@ -476,7 +476,7 @@ void Ember::ModelLoader::ProcessPrimitive(
       std::back_inserter( context->Meshlets ),
       [&]( meshopt_Meshlet const& m )
       {
-        meshopt_Bounds bounds = meshopt_computeMeshletBounds(
+        meshopt_Bounds const bounds = meshopt_computeMeshletBounds(
             meshlet_vertices.data() + m.vertex_offset,
             meshlet_triangles.data() + m.triangle_offset,
             m.triangle_count,
@@ -957,14 +957,14 @@ void Ember::ModelLoader::CreateAccelerationStructure( LoadingContext* context, f
   ENSURE( not meshes.empty() );
   for ( flecs::entity entity : meshes )
   {
-    auto mesh          = entity.get<Mesh>();
+    auto const mesh          = entity.get<Mesh>();
 
-    auto index_offset  = mesh.FirstIndex * sizeof( uint32_t );
-    auto vertex_offset = mesh.VertexLiteStart * sizeof( VertexLite );
-    auto index_end     = index_offset + mesh.IndexCount * sizeof( uint32_t );
-    auto vertex_end    = vertex_offset + mesh.VertexCount * sizeof( VertexLite );
+    auto const index_offset  = mesh.FirstIndex * sizeof( uint32_t );
+    auto const vertex_offset = mesh.VertexLiteStart * sizeof( VertexLite );
+    auto const index_end     = index_offset + mesh.IndexCount * sizeof( uint32_t );
+    auto const vertex_end    = vertex_offset + mesh.VertexCount * sizeof( VertexLite );
     ASSERT( index_offset > vertex_end or index_end < vertex_offset );
-    entity.set( CreateBLAS(
+    entity.set( CreateBottomLevelAS(
         context,
         base_addr + mesh.FirstIndex * sizeof( uint32_t ),
         base_addr + mesh.VertexLiteStart * sizeof( VertexLite ),
@@ -973,7 +973,7 @@ void Ember::ModelLoader::CreateAccelerationStructure( LoadingContext* context, f
   }
 }
 
-Ember::BLAS Ember::ModelLoader::CreateBLAS(
+Ember::BottomLevelAS Ember::ModelLoader::CreateBottomLevelAS(
     LoadingContext*                 context,
     D3D12_GPU_VIRTUAL_ADDRESS const index_addr,
     D3D12_GPU_VIRTUAL_ADDRESS const vert_addr,

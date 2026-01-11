@@ -11,9 +11,9 @@ namespace Ember
 template <std::totally_ordered TKey, typename TValue>
 class FlatMap
 {
-  using KeyIter        = typename std::vector<TKey>::const_iterator;
-  using ValueIter      = typename std::vector<TValue>::iterator;
-  using ValueConstIter = typename std::vector<TValue>::const_iterator;
+  using KeyIter        = std::vector<TKey>::const_iterator;
+  using ValueIter      = std::vector<TValue>::iterator;
+  using ValueConstIter = std::vector<TValue>::const_iterator;
 
   std::vector<TKey>   m_Keys;
   std::vector<TValue> m_Values;

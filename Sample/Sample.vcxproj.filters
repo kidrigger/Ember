@@ -85,6 +85,15 @@
     <Filter Include="Shaders\DepthPrePass">
       <UniqueIdentifier>{393f6fa7-7e17-49b5-b98e-34d9dbbfc157}</UniqueIdentifier>
     </Filter>
+    <Filter Include="Shaders\Shadows\Directional">
+      <UniqueIdentifier>{1534ca4f-9c75-47a5-a9e7-ab3a134bde01}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="Shaders\Shadows\OmniDirectional">
+      <UniqueIdentifier>{1df1e871-7caf-40de-994d-466ae28c2a2e}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="Shaders\Shadows\SpotLight">
+      <UniqueIdentifier>{982cb2d3-9a43-4d4e-96ae-235c850078af}</UniqueIdentifier>
+    </Filter>
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="Main.cpp">
@@ -286,9 +295,6 @@
     <None Include="IBLCommon.hlsli">
       <Filter>Shaders\IBL</Filter>
     </None>
-    <None Include="OmniShadow.hlsli">
-      <Filter>Shaders\Shadows</Filter>
-    </None>
     <None Include="Bindless.hlsli">
       <Filter>Shaders\Utils</Filter>
     </None>
@@ -316,9 +322,6 @@
     <None Include="Camera.hlsli">
       <Filter>Shaders\Utils</Filter>
     </None>
-    <None Include="DirShadow.hlsli">
-      <Filter>Shaders\Shadows</Filter>
-    </None>
     <None Include="Math.hlsli">
       <Filter>Shaders\Utils</Filter>
     </None>
@@ -337,9 +340,6 @@
     <None Include="OmniLightCommon.hlsli">
       <Filter>Shaders\Meshes\Deferred</Filter>
     </None>
-    <None Include="SpotShadow.hlsli">
-      <Filter>Shaders\Shadows</Filter>
-    </None>
     <None Include="SpotLightCommon.hlsli">
       <Filter>Shaders\Meshes\Deferred</Filter>
     </None>
@@ -351,6 +351,15 @@
     </None>
     <None Include="DepthPrePass.hlsli">
       <Filter>Shaders\DepthPrePass</Filter>
+    </None>
+    <None Include="DirShadow.hlsli">
+      <Filter>Shaders\Shadows\Directional</Filter>
+    </None>
+    <None Include="OmniShadow.hlsli">
+      <Filter>Shaders\Shadows\OmniDirectional</Filter>
+    </None>
+    <None Include="SpotShadow.hlsli">
+      <Filter>Shaders\Shadows\SpotLight</Filter>
     </None>
   </ItemGroup>
   <ItemGroup>
@@ -372,15 +381,6 @@
     <FxCompile Include="BackgroundVS.hlsl">
       <Filter>Shaders</Filter>
     </FxCompile>
-    <FxCompile Include="OmniShadowVS.hlsl">
-      <Filter>Shaders\Shadows</Filter>
-    </FxCompile>
-    <FxCompile Include="OmniShadowPS.hlsl">
-      <Filter>Shaders\Shadows</Filter>
-    </FxCompile>
-    <FxCompile Include="DirShadowVS.hlsl">
-      <Filter>Shaders\Shadows</Filter>
-    </FxCompile>
     <FxCompile Include="TriangleVS.hlsl">
       <Filter>Shaders\Meshes</Filter>
     </FxCompile>
@@ -395,18 +395,6 @@
     </FxCompile>
     <FxCompile Include="TriangleAS.hlsl">
       <Filter>Shaders\Meshes</Filter>
-    </FxCompile>
-    <FxCompile Include="DirShadowAS.hlsl">
-      <Filter>Shaders\Shadows</Filter>
-    </FxCompile>
-    <FxCompile Include="DirShadowMS.hlsl">
-      <Filter>Shaders\Shadows</Filter>
-    </FxCompile>
-    <FxCompile Include="OmniShadowAS.hlsl">
-      <Filter>Shaders\Shadows</Filter>
-    </FxCompile>
-    <FxCompile Include="OmniShadowMS.hlsl">
-      <Filter>Shaders\Shadows</Filter>
     </FxCompile>
     <FxCompile Include="BackgroundMS.hlsl">
       <Filter>Shaders</Filter>
@@ -441,15 +429,6 @@
     <FxCompile Include="OmniLightingPS.hlsl">
       <Filter>Shaders\Meshes\Deferred</Filter>
     </FxCompile>
-    <FxCompile Include="SpotShadowAS.hlsl">
-      <Filter>Shaders\Shadows</Filter>
-    </FxCompile>
-    <FxCompile Include="SpotShadowMS.hlsl">
-      <Filter>Shaders\Shadows</Filter>
-    </FxCompile>
-    <FxCompile Include="SpotShadowPS.hlsl">
-      <Filter>Shaders\Shadows</Filter>
-    </FxCompile>
     <FxCompile Include="SpotLightingAS.hlsl">
       <Filter>Shaders\Meshes\Deferred</Filter>
     </FxCompile>
@@ -482,6 +461,36 @@
     </FxCompile>
     <FxCompile Include="DepthPrePassMaskedPS.hlsl">
       <Filter>Shaders\DepthPrePass</Filter>
+    </FxCompile>
+    <FxCompile Include="DirShadowAS.hlsl">
+      <Filter>Shaders\Shadows\Directional</Filter>
+    </FxCompile>
+    <FxCompile Include="DirShadowMS.hlsl">
+      <Filter>Shaders\Shadows\Directional</Filter>
+    </FxCompile>
+    <FxCompile Include="DirShadowVS.hlsl">
+      <Filter>Shaders\Shadows\Directional</Filter>
+    </FxCompile>
+    <FxCompile Include="OmniShadowAS.hlsl">
+      <Filter>Shaders\Shadows\OmniDirectional</Filter>
+    </FxCompile>
+    <FxCompile Include="OmniShadowMS.hlsl">
+      <Filter>Shaders\Shadows\OmniDirectional</Filter>
+    </FxCompile>
+    <FxCompile Include="OmniShadowPS.hlsl">
+      <Filter>Shaders\Shadows\OmniDirectional</Filter>
+    </FxCompile>
+    <FxCompile Include="OmniShadowVS.hlsl">
+      <Filter>Shaders\Shadows\OmniDirectional</Filter>
+    </FxCompile>
+    <FxCompile Include="SpotShadowAS.hlsl">
+      <Filter>Shaders\Shadows\SpotLight</Filter>
+    </FxCompile>
+    <FxCompile Include="SpotShadowMS.hlsl">
+      <Filter>Shaders\Shadows\SpotLight</Filter>
+    </FxCompile>
+    <FxCompile Include="SpotShadowPS.hlsl">
+      <Filter>Shaders\Shadows\SpotLight</Filter>
     </FxCompile>
   </ItemGroup>
   <ItemGroup>
