@@ -1,19 +1,19 @@
 #include "GeometryManager.hpp"
 
 Ember::GeometryAllocation::GeometryAllocation(
-    Buffer buffer, ComPtr<D3D12MA::VirtualBlock> block, D3D12MA::VirtualAllocation allocation, uint32_t const offset )
+    Buffer buffer, ComPtr<D3D12MA::VirtualBlock> block, D3D12MA::VirtualAllocation allocation, size_t const offset )
   : m_Buffer{ std::move( buffer ) }
   , m_Block{ std::move( block ) }
   , m_Allocation{ std::move( allocation ) }
   , m_Offset{ offset }
 {}
 
-void Ember::GeometryAllocation::Write( uint32_t const offset, uint32_t const size, void const* data ) const
+void Ember::GeometryAllocation::Write( size_t const offset, size_t const size, void const* data ) const
 {
   m_Buffer.Write( m_Offset + offset, size, data );
 }
 
-uint32_t Ember::GeometryAllocation::GetOffsetInBytes() const
+size_t Ember::GeometryAllocation::GetOffsetInBytes() const
 {
   return m_Offset;
 }
@@ -63,7 +63,7 @@ Ember::GeometryManager::GeometryManager(
 {}
 
 bool Ember::GeometryManager::Create(
-    GeometryManager* geometry_manager, RenderDevice* render_device, uint32_t const total_ugb_size )
+    GeometryManager* geometry_manager, RenderDevice* render_device, size_t const total_ugb_size )
 {
   Buffer                            ugb = render_device->CreateRawStorageBuffer( total_ugb_size );
 
@@ -80,7 +80,7 @@ bool Ember::GeometryManager::Create(
 }
 
 Ember::GeometryAllocation Ember::GeometryManager::CreateGeometry(
-    uint32_t const geometry_size, uint32_t const geometry_alignment )
+    size_t const geometry_size, size_t const geometry_alignment )
 {
   D3D12MA::VIRTUAL_ALLOCATION_DESC const desc{
     .Flags     = D3D12MA::VIRTUAL_ALLOCATION_FLAG_NONE,

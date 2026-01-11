@@ -15,17 +15,17 @@ class GeometryAllocation
   Buffer                        m_Buffer;
   ComPtr<D3D12MA::VirtualBlock> m_Block;
   D3D12MA::VirtualAllocation    m_Allocation;
-  uint32_t                      m_Offset;
+  size_t                        m_Offset;
 
 public:
   GeometryAllocation() = default;
   GeometryAllocation(
-      Buffer buffer, ComPtr<D3D12MA::VirtualBlock> block, D3D12MA::VirtualAllocation allocation, uint32_t offset );
+      Buffer buffer, ComPtr<D3D12MA::VirtualBlock> block, D3D12MA::VirtualAllocation allocation, size_t offset );
 
-  void                      Write( uint32_t offset, uint32_t size, void const* data ) const;
-  uint32_t                  GetOffsetInBytes() const;
-  D3D12_GPU_VIRTUAL_ADDRESS GetGPUVirtualAddress() const;     //< Local GPU virtual address.
-  D3D12_GPU_VIRTUAL_ADDRESS GetBaseGPUVirtualAddress() const; //< Global GPU virtual address.
+  void                                    Write( size_t offset, size_t size, void const* data ) const;
+  [[nodiscard]] size_t                    GetOffsetInBytes() const;
+  [[nodiscard]] D3D12_GPU_VIRTUAL_ADDRESS GetGPUVirtualAddress() const;     //< Local GPU virtual address.
+  [[nodiscard]] D3D12_GPU_VIRTUAL_ADDRESS GetBaseGPUVirtualAddress() const; //< Global GPU virtual address.
 
   GeometryAllocation( GeometryAllocation const& other ) = delete;
   GeometryAllocation( GeometryAllocation&& other ) noexcept;
@@ -45,11 +45,11 @@ public:
   GeometryManager( Buffer unified_geometry_buffer, ComPtr<D3D12MA::VirtualBlock> geometry_buffer_allocator );
 
   [[nodiscard]] static bool Create(
-      GeometryManager* geometry_manager, RenderDevice* render_device, uint32_t const total_ugb_size );
+      GeometryManager* geometry_manager, RenderDevice* render_device, size_t total_ugb_size );
 
-  GeometryAllocation      CreateGeometry( uint32_t const geometry_size, uint32_t const geometry_alignment );
+  [[nodiscard]] GeometryAllocation CreateGeometry( size_t geometry_size, size_t geometry_alignment );
 
-  [[nodiscard]] SRVHandle GetSRVHandle() const;
+  [[nodiscard]] SRVHandle          GetSRVHandle() const;
 };
 
 } // namespace Ember

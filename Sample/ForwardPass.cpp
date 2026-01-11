@@ -11,13 +11,12 @@
 #include "fg/Blackboard.hpp"
 #include "fg/FrameGraph.hpp"
 
-
 bool Ember::RenderPass::OpaqueForward::Create( OpaqueForward* out, Desc const& desc )
 {
   ComPtr<ID3DBlob> amp_shader_blob;
-  ERR_FAIL_RET_F( D3DReadFileToBlob( L"TriangleAS.cso", &amp_shader_blob ) );
+  ERR_FAIL_RET_F( D3DReadFileToBlob( L"TriangleAS2.cso", &amp_shader_blob ) );
   ComPtr<ID3DBlob> mesh_shader_blob;
-  ERR_FAIL_RET_F( D3DReadFileToBlob( L"TriangleMS.cso", &mesh_shader_blob ) );
+  ERR_FAIL_RET_F( D3DReadFileToBlob( L"TriangleMS2.cso", &mesh_shader_blob ) );
   ComPtr<ID3DBlob> pixel_shader_blob;
   ERR_FAIL_RET_F( D3DReadFileToBlob( L"TrianglePS.cso", &pixel_shader_blob ) );
 
@@ -45,7 +44,7 @@ bool Ember::RenderPass::OpaqueForward::Create( OpaqueForward* out, Desc const& d
                                                           D3D12_ROOT_SIGNATURE_FLAG_DENY_HULL_SHADER_ROOT_ACCESS;
 
   CD3DX12_ROOT_PARAMETER1 root_parameters[4];
-  root_parameters[0].InitAsConstants( sizeof( DrawList::Info ) / 4, 0 );
+  root_parameters[0].InitAsConstants( sizeof( DrawList::PerBatch ) / 4, 0 );
   root_parameters[1].InitAsConstants( sizeof( PerFrameConstants ) / 4, 1 );
   root_parameters[2].InitAsConstants( sizeof( Environment::GpuRepr ) / 4, 2 );
   root_parameters[3].InitAsConstants( 1, 3 );
@@ -173,7 +172,7 @@ FrameGraphResource Ember::RenderPass::OpaqueForward::Execute(
 
         auto const& constants = bb->get<PerFrameConstants>();
         auto const& env       = bb->get<Environment::GpuRepr>();
-        auto const& draw_list = bb->get<DrawList::Batches>().Opaque;
+        auto const& draw_list = bb->get<DrawList::Batches>();
 
         SRVHandle   tlas_srv{};
         if ( tlas.has_value() )
@@ -181,13 +180,16 @@ FrameGraphResource Ember::RenderPass::OpaqueForward::Execute(
           tlas_srv = res.get<FG::Buffer>( tlas.value() ).InnerBuffer.GetSRVHandle();
         }
 
+        auto const draw_batch = DrawList::PerBatch::FromOpaque( draw_list.Unified );
+        ASSERT( draw_list.Opaque.DrawCount == draw_list.Unified.OpaqueCommandsCount() );
+
         cmd->SetGraphicsRootSignature( self->RootSignature.Get() );
         cmd->SetPipelineState( self->Pipeline.Get() );
-        cmd->SetGraphicsRootConstants( 0, draw_list );
+        cmd->SetGraphicsRootConstants( 0, draw_batch );
         cmd->SetGraphicsRootConstants( 1, constants );
         cmd->SetGraphicsRootConstants( 2, env );
         cmd->SetGraphicsRootConstant( 3, ( UINT )tlas_srv );
-        cmd->DispatchMesh( { .X = draw_list.DrawCount } );
+        cmd->DispatchMesh( { .X = draw_list.Unified.OpaqueCommandsCount() } );
       } );
 }
 

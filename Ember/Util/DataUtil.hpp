@@ -4,6 +4,8 @@
 #include <string_view>
 #include <type_traits>
 
+#include "HelperUtils.hpp"
+
 using byte = unsigned char;
 
 namespace Ember
@@ -27,24 +29,47 @@ constexpr size_t operator""_GiB( size_t const gibs )
   return gibs * ( 1 << 30 );
 }
 
-constexpr uint32_t ByteSizeOf( std::ranges::contiguous_range auto& range )
+template <typename T, typename TFrom>
+T CheckedCast( TFrom&& value )
+  requires std::is_arithmetic_v<std::remove_cvref_t<T>> and std::is_arithmetic_v<std::remove_cvref_t<TFrom>>
 {
-  return ( uint32_t )( std::ranges::size( range ) * sizeof( std::ranges::range_value_t<decltype( range )> ) );
+  // If T is signed and TFrom is unsigned, this check is useless.
+  // But it may upcast the signed to an overflowed positive and fail.
+  if constexpr ( not std::is_signed_v<T> and std::is_signed_v<TFrom> ) ASSERT( std::numeric_limits<T>::min() <= value );
+  ASSERT( value <= std::numeric_limits<T>::max() );
+  return static_cast<T>( std::forward<std::remove_cvref_t<TFrom>>( value ) );
+}
+
+constexpr uint32_t U32ByteSizeOf( std::ranges::contiguous_range auto const& range )
+{
+  return CheckedCast<uint32_t>( std::ranges::size( range ) * sizeof( std::ranges::range_value_t<decltype( range )> ) );
+}
+
+constexpr size_t ByteSizeOf( std::ranges::contiguous_range auto const& range )
+{
+  return std::ranges::size( range ) * sizeof( std::ranges::range_value_t<decltype( range )> );
 }
 
 constexpr uint32_t StrideOf( std::ranges::contiguous_range auto& range )
 {
-  return ( uint32_t )sizeof( std::ranges::range_value_t<decltype( range )> );
+  return CheckedCast<uint32_t>( sizeof( std::ranges::range_value_t<decltype( range )> ) );
 }
 
 constexpr uint32_t CountOf( std::ranges::sized_range auto& range )
 {
-  return ( uint32_t )std::ranges::size( range );
+  return CheckedCast<uint32_t>( std::ranges::size( range ) );
 }
 
 constexpr auto DataOf( std::ranges::contiguous_range auto& range )
 {
   return std::ranges::data( range );
+}
+
+auto AsBytes( std::ranges::contiguous_range auto& range )
+{
+  uint32_t const size = U32ByteSizeOf( range );
+  byte*          data = ( byte* )DataOf( range );
+  return std::span( data, size );
 }
 
 template <typename T>

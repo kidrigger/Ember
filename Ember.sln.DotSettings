@@ -31,35 +31,73 @@
 	<s:String x:Key="/Default/CodeStyle/Naming/CppNamingOptions/Abbreviations/=RID/@EntryIndexedValue">RID</s:String>
 	<s:String x:Key="/Default/CodeStyle/Naming/CppNamingOptions/Abbreviations/=RTV/@EntryIndexedValue">RTV</s:String>
 	<s:String x:Key="/Default/CodeStyle/Naming/CppNamingOptions/Abbreviations/=VS/@EntryIndexedValue">VS</s:String>
-	<s:String x:Key="/Default/CodeStyle/Naming/CppNamingOptions/Rules/=0CE18C67F5C1864AA2EECC2162CFFA07/@EntryIndexedValue">&lt;NamingElement Priority="1" Title="Classes and structs"&gt;&lt;Descriptor Static="Indeterminate" Constexpr="Indeterminate" Const="Indeterminate" Volatile="Indeterminate" Accessibility="NOT_APPLICABLE"&gt;&lt;type Name="__interface" /&gt;&lt;type Name="class" /&gt;&lt;type Name="enum" /&gt;&lt;type Name="struct" /&gt;&lt;type Name="union" /&gt;&lt;/Descriptor&gt;&lt;Policy Inspect="True" WarnAboutPrefixesAndSuffixes="False" Prefix="" Suffix="" Style="AaBb" /&gt;&lt;/NamingElement&gt;</s:String>
+	<s:String x:Key="/Default/CodeStyle/Naming/CppNamingOptions/Rules/=0AFB7787612DF743B09AD9412E48D4CC/@EntryIndexedValue"></s:String>
+	<s:Boolean x:Key="/Default/CodeStyle/Naming/CppNamingOptions/Rules/=0AFB7787612DF743B09AD9412E48D4CC/@EntryIndexRemoved">True</s:Boolean>
+	<s:String x:Key="/Default/CodeStyle/Naming/CppNamingOptions/Rules/=0B82708A1BA7774EB13D27F245698A56/@EntryIndexedValue"></s:String>
+	<s:Boolean x:Key="/Default/CodeStyle/Naming/CppNamingOptions/Rules/=0B82708A1BA7774EB13D27F245698A56/@EntryIndexRemoved">True</s:Boolean>
+	<s:String x:Key="/Default/CodeStyle/Naming/CppNamingOptions/Rules/=0CE18C67F5C1864AA2EECC2162CFFA07/@EntryIndexedValue"></s:String>
+	<s:Boolean x:Key="/Default/CodeStyle/Naming/CppNamingOptions/Rules/=0CE18C67F5C1864AA2EECC2162CFFA07/@EntryIndexRemoved">True</s:Boolean>
+	<s:String x:Key="/Default/CodeStyle/Naming/CppNamingOptions/Rules/=18392FF80FA40749AA8CC53981A32AE0/@EntryIndexedValue"></s:String>
+	<s:Boolean x:Key="/Default/CodeStyle/Naming/CppNamingOptions/Rules/=18392FF80FA40749AA8CC53981A32AE0/@EntryIndexRemoved">True</s:Boolean>
+	<s:String x:Key="/Default/CodeStyle/Naming/CppNamingOptions/Rules/=2229A2BE1AA9214483A51F028530E042/@EntryIndexedValue"></s:String>
+	<s:Boolean x:Key="/Default/CodeStyle/Naming/CppNamingOptions/Rules/=2229A2BE1AA9214483A51F028530E042/@EntryIndexRemoved">True</s:Boolean>
 	
 	
 	<s:String x:Key="/Default/CodeStyle/Naming/CppNamingOptions/Rules/=2C44BF8362D53043BD3DF83D176C5531/@EntryIndexedValue">&lt;NamingElement Priority="18" Title="Typedefs"&gt;&lt;Descriptor Static="Indeterminate" Constexpr="Indeterminate" Const="Indeterminate" Volatile="Indeterminate" Accessibility="NOT_APPLICABLE"&gt;&lt;type Name="type alias" /&gt;&lt;type Name="typedef" /&gt;&lt;/Descriptor&gt;&lt;Policy Inspect="True" WarnAboutPrefixesAndSuffixes="False" Prefix="" Suffix="" Style="AaBb"&gt;&lt;ExtraRule Prefix="" Suffix="" Style="aa_bb" /&gt;&lt;/Policy&gt;&lt;/NamingElement&gt;</s:String>
-	<s:String x:Key="/Default/CodeStyle/Naming/CppNamingOptions/Rules/=2F464884E2466E48B16F52067454A77C/@EntryIndexedValue">&lt;NamingElement Priority="9" Title="Global functions"&gt;&lt;Descriptor Static="Indeterminate" Constexpr="Indeterminate" Const="Indeterminate" Volatile="Indeterminate" Accessibility="NOT_APPLICABLE"&gt;&lt;type Name="global function" /&gt;&lt;/Descriptor&gt;&lt;Policy Inspect="True" WarnAboutPrefixesAndSuffixes="False" Prefix="" Suffix="" Style="AaBb" /&gt;&lt;/NamingElement&gt;</s:String>
+	<s:String x:Key="/Default/CodeStyle/Naming/CppNamingOptions/Rules/=2F464884E2466E48B16F52067454A77C/@EntryIndexedValue"></s:String>
+	<s:Boolean x:Key="/Default/CodeStyle/Naming/CppNamingOptions/Rules/=2F464884E2466E48B16F52067454A77C/@EntryIndexRemoved">True</s:Boolean>
 	
 	
 	
-	<s:String x:Key="/Default/CodeStyle/Naming/CppNamingOptions/Rules/=49EE04F231D12649A3142426620C0B8B/@EntryIndexedValue">&lt;NamingElement Priority="2" Title="Concepts"&gt;&lt;Descriptor Static="Indeterminate" Constexpr="Indeterminate" Const="Indeterminate" Volatile="Indeterminate" Accessibility="NOT_APPLICABLE" /&gt;&lt;Policy Inspect="True" WarnAboutPrefixesAndSuffixes="False" Prefix="" Suffix="" Style="aa_bb" /&gt;&lt;/NamingElement&gt;</s:String>
+	<s:String x:Key="/Default/CodeStyle/Naming/CppNamingOptions/Rules/=49EE04F231D12649A3142426620C0B8B/@EntryIndexedValue"></s:String>
+	<s:Boolean x:Key="/Default/CodeStyle/Naming/CppNamingOptions/Rules/=49EE04F231D12649A3142426620C0B8B/@EntryIndexRemoved">True</s:Boolean>
+	<s:String x:Key="/Default/CodeStyle/Naming/CppNamingOptions/Rules/=5653BA7B6222F349B94149A2A53C35B8/@EntryIndexedValue"></s:String>
+	<s:Boolean x:Key="/Default/CodeStyle/Naming/CppNamingOptions/Rules/=5653BA7B6222F349B94149A2A53C35B8/@EntryIndexRemoved">True</s:Boolean>
 	
 	
 	
 	
 	<s:String x:Key="/Default/CodeStyle/Naming/CppNamingOptions/Rules/=66A90C536C4C0143B12D5E1483BC23B0/@EntryIndexedValue">&lt;NamingElement Priority="15" Title="Other constants"&gt;&lt;Descriptor Static="True" Constexpr="Indeterminate" Const="True" Volatile="Indeterminate" Accessibility="NOT_APPLICABLE"&gt;&lt;type Name="class field" /&gt;&lt;type Name="local variable" /&gt;&lt;type Name="struct field" /&gt;&lt;/Descriptor&gt;&lt;Policy Inspect="True" WarnAboutPrefixesAndSuffixes="False" Prefix="k" Suffix="" Style="AaBb" /&gt;&lt;/NamingElement&gt;</s:String>
+	<s:String x:Key="/Default/CodeStyle/Naming/CppNamingOptions/Rules/=72514D5DF422D442B71A277F97B72887/@EntryIndexedValue"></s:String>
+	<s:Boolean x:Key="/Default/CodeStyle/Naming/CppNamingOptions/Rules/=72514D5DF422D442B71A277F97B72887/@EntryIndexRemoved">True</s:Boolean>
 	<s:String x:Key="/Default/CodeStyle/Naming/CppNamingOptions/Rules/=752DF71964D6AA4C97D07EBE461D4889/@EntryIndexedValue">&lt;NamingElement Priority="17" Title="Namespaces"&gt;&lt;Descriptor Static="Indeterminate" Constexpr="Indeterminate" Const="Indeterminate" Volatile="Indeterminate" Accessibility="NOT_APPLICABLE"&gt;&lt;type Name="namespace" /&gt;&lt;type Name="namespace alias" /&gt;&lt;/Descriptor&gt;&lt;Policy Inspect="True" WarnAboutPrefixesAndSuffixes="False" Prefix="" Suffix="" Style="AaBb" /&gt;&lt;/NamingElement&gt;</s:String>
-	<s:String x:Key="/Default/CodeStyle/Naming/CppNamingOptions/Rules/=7DE09C7C877FF94FB5EB8E718160472D/@EntryIndexedValue">&lt;NamingElement Priority="10" Title="Class and struct methods"&gt;&lt;Descriptor Static="Indeterminate" Constexpr="Indeterminate" Const="Indeterminate" Volatile="Indeterminate" Accessibility="NOT_APPLICABLE"&gt;&lt;type Name="member function" /&gt;&lt;/Descriptor&gt;&lt;Policy Inspect="True" WarnAboutPrefixesAndSuffixes="False" Prefix="" Suffix="" Style="AaBb" /&gt;&lt;/NamingElement&gt;</s:String>
+	<s:String x:Key="/Default/CodeStyle/Naming/CppNamingOptions/Rules/=7DE09C7C877FF94FB5EB8E718160472D/@EntryIndexedValue"></s:String>
+	<s:Boolean x:Key="/Default/CodeStyle/Naming/CppNamingOptions/Rules/=7DE09C7C877FF94FB5EB8E718160472D/@EntryIndexRemoved">True</s:Boolean>
 	<s:String x:Key="/Default/CodeStyle/Naming/CppNamingOptions/Rules/=7F0B4AF3CEAF5C47B7750279CE3F2D7D/@EntryIndexedValue">&lt;NamingElement Priority="14" Title="Enum members"&gt;&lt;Descriptor Static="Indeterminate" Constexpr="Indeterminate" Const="Indeterminate" Volatile="Indeterminate" Accessibility="NOT_APPLICABLE"&gt;&lt;type Name="scoped enumerator" /&gt;&lt;type Name="unscoped enumerator" /&gt;&lt;/Descriptor&gt;&lt;Policy Inspect="True" WarnAboutPrefixesAndSuffixes="False" Prefix="k" Suffix="" Style="AaBb" /&gt;&lt;/NamingElement&gt;</s:String>
-	<s:String x:Key="/Default/CodeStyle/Naming/CppNamingOptions/Rules/=7F3683088AFABE459609825034CA3F04/@EntryIndexedValue">&lt;NamingElement Priority="11" Title="Class and struct fields"&gt;&lt;Descriptor Static="Indeterminate" Constexpr="Indeterminate" Const="Indeterminate" Volatile="Indeterminate" Accessibility="NOT_APPLICABLE"&gt;&lt;type Name="class field" /&gt;&lt;type Name="struct field" /&gt;&lt;/Descriptor&gt;&lt;Policy Inspect="True" WarnAboutPrefixesAndSuffixes="False" Prefix="m_" Suffix="" Style="AaBb" /&gt;&lt;/NamingElement&gt;</s:String>
-	<s:String x:Key="/Default/CodeStyle/Naming/CppNamingOptions/Rules/=84EF2C7E8E3DD045940950E8511519DB/@EntryIndexedValue">&lt;NamingElement Priority="13" Title="Union members"&gt;&lt;Descriptor Static="Indeterminate" Constexpr="Indeterminate" Const="Indeterminate" Volatile="Indeterminate" Accessibility="NOT_APPLICABLE"&gt;&lt;type Name="union member" /&gt;&lt;/Descriptor&gt;&lt;Policy Inspect="True" WarnAboutPrefixesAndSuffixes="False" Prefix="u_" Suffix="" Style="AaBb" /&gt;&lt;/NamingElement&gt;</s:String>
-	<s:String x:Key="/Default/CodeStyle/Naming/CppNamingOptions/Rules/=9775FCA5FD613242BBAB7C24A4557E9B/@EntryIndexedValue">&lt;NamingElement Priority="3" Title="Enums"&gt;&lt;Descriptor Static="Indeterminate" Constexpr="Indeterminate" Const="Indeterminate" Volatile="Indeterminate" Accessibility="NOT_APPLICABLE"&gt;&lt;type Name="enum" /&gt;&lt;/Descriptor&gt;&lt;Policy Inspect="True" WarnAboutPrefixesAndSuffixes="False" Prefix="" Suffix="" Style="AaBb" /&gt;&lt;/NamingElement&gt;</s:String>
+	<s:String x:Key="/Default/CodeStyle/Naming/CppNamingOptions/Rules/=7F3683088AFABE459609825034CA3F04/@EntryIndexedValue"></s:String>
+	<s:Boolean x:Key="/Default/CodeStyle/Naming/CppNamingOptions/Rules/=7F3683088AFABE459609825034CA3F04/@EntryIndexRemoved">True</s:Boolean>
+	<s:String x:Key="/Default/CodeStyle/Naming/CppNamingOptions/Rules/=84EF2C7E8E3DD045940950E8511519DB/@EntryIndexedValue"></s:String>
+	<s:Boolean x:Key="/Default/CodeStyle/Naming/CppNamingOptions/Rules/=84EF2C7E8E3DD045940950E8511519DB/@EntryIndexRemoved">True</s:Boolean>
+	<s:String x:Key="/Default/CodeStyle/Naming/CppNamingOptions/Rules/=8F69F48E2532F54CBAA0039D4557825E/@EntryIndexedValue"></s:String>
+	<s:Boolean x:Key="/Default/CodeStyle/Naming/CppNamingOptions/Rules/=8F69F48E2532F54CBAA0039D4557825E/@EntryIndexRemoved">True</s:Boolean>
+	<s:String x:Key="/Default/CodeStyle/Naming/CppNamingOptions/Rules/=9775FCA5FD613242BBAB7C24A4557E9B/@EntryIndexedValue"></s:String>
+	<s:Boolean x:Key="/Default/CodeStyle/Naming/CppNamingOptions/Rules/=9775FCA5FD613242BBAB7C24A4557E9B/@EntryIndexRemoved">True</s:Boolean>
+	<s:String x:Key="/Default/CodeStyle/Naming/CppNamingOptions/Rules/=A42D627FA43B054F91D1E1C4281D8896/@EntryIndexedValue"></s:String>
+	<s:Boolean x:Key="/Default/CodeStyle/Naming/CppNamingOptions/Rules/=A42D627FA43B054F91D1E1C4281D8896/@EntryIndexRemoved">True</s:Boolean>
+	<s:String x:Key="/Default/CodeStyle/Naming/CppNamingOptions/Rules/=A7EBF16DA3BDCB42A0B710704BC8A053/@EntryIndexedValue"></s:String>
+	<s:Boolean x:Key="/Default/CodeStyle/Naming/CppNamingOptions/Rules/=A7EBF16DA3BDCB42A0B710704BC8A053/@EntryIndexRemoved">True</s:Boolean>
+	<s:String x:Key="/Default/CodeStyle/Naming/CppNamingOptions/Rules/=B4556EA1F4F30548869E555CC6EE7D8A/@EntryIndexedValue"></s:String>
+	<s:Boolean x:Key="/Default/CodeStyle/Naming/CppNamingOptions/Rules/=B4556EA1F4F30548869E555CC6EE7D8A/@EntryIndexRemoved">True</s:Boolean>
+	<s:String x:Key="/Default/CodeStyle/Naming/CppNamingOptions/Rules/=B6E900853D6D05429D8C57765B2E546A/@EntryIndexedValue"></s:String>
+	<s:Boolean x:Key="/Default/CodeStyle/Naming/CppNamingOptions/Rules/=B6E900853D6D05429D8C57765B2E546A/@EntryIndexRemoved">True</s:Boolean>
+	<s:String x:Key="/Default/CodeStyle/Naming/CppNamingOptions/Rules/=B82A063F0DDD98498A70D8D7EBB97F8D/@EntryIndexedValue"></s:String>
+	<s:Boolean x:Key="/Default/CodeStyle/Naming/CppNamingOptions/Rules/=B82A063F0DDD98498A70D8D7EBB97F8D/@EntryIndexRemoved">True</s:Boolean>
+	<s:String x:Key="/Default/CodeStyle/Naming/CppNamingOptions/Rules/=BBE8AA08E662BF409B2CB08EC597C493/@EntryIndexedValue"></s:String>
+	<s:Boolean x:Key="/Default/CodeStyle/Naming/CppNamingOptions/Rules/=BBE8AA08E662BF409B2CB08EC597C493/@EntryIndexRemoved">True</s:Boolean>
 	
 	<s:String x:Key="/Default/CodeStyle/Naming/CppNamingOptions/Rules/=BEBE68BE9A7588458FE4578618115920/@EntryIndexedValue">&lt;NamingElement Priority="16" Title="Global constants"&gt;&lt;Descriptor Static="Indeterminate" Constexpr="Indeterminate" Const="True" Volatile="Indeterminate" Accessibility="NOT_APPLICABLE"&gt;&lt;type Name="global variable" /&gt;&lt;/Descriptor&gt;&lt;Policy Inspect="True" WarnAboutPrefixesAndSuffixes="False" Prefix="k" Suffix="" Style="AaBb" /&gt;&lt;/NamingElement&gt;</s:String>
+	<s:String x:Key="/Default/CodeStyle/Naming/CppNamingOptions/Rules/=CD68CDC102F9EC49A7AED82701C6E1EC/@EntryIndexedValue"></s:String>
+	<s:Boolean x:Key="/Default/CodeStyle/Naming/CppNamingOptions/Rules/=CD68CDC102F9EC49A7AED82701C6E1EC/@EntryIndexRemoved">True</s:Boolean>
 	
 	
 	<s:String x:Key="/Default/CodeStyle/Naming/CppNamingOptions/Rules/=D130EC02CA747E4F9C8CFC7827D662EF/@EntryIndexedValue">&lt;NamingElement Priority="12" Title="Class and struct public fields"&gt;&lt;Descriptor Static="Indeterminate" Constexpr="Indeterminate" Const="Indeterminate" Volatile="Indeterminate" Accessibility="PUBLIC"&gt;&lt;type Name="class field" /&gt;&lt;type Name="struct field" /&gt;&lt;/Descriptor&gt;&lt;Policy Inspect="True" WarnAboutPrefixesAndSuffixes="False" Prefix="" Suffix="" Style="AaBb" /&gt;&lt;/NamingElement&gt;</s:String>
-	<s:String x:Key="/Default/CodeStyle/Naming/CppNamingOptions/Rules/=DF1619E609797B46AE471D33F42D65A5/@EntryIndexedValue">&lt;NamingElement Priority="4" Title="Unions"&gt;&lt;Descriptor Static="Indeterminate" Constexpr="Indeterminate" Const="Indeterminate" Volatile="Indeterminate" Accessibility="NOT_APPLICABLE"&gt;&lt;type Name="union" /&gt;&lt;/Descriptor&gt;&lt;Policy Inspect="True" WarnAboutPrefixesAndSuffixes="False" Prefix="" Suffix="" Style="AaBb" /&gt;&lt;/NamingElement&gt;</s:String>
+	<s:String x:Key="/Default/CodeStyle/Naming/CppNamingOptions/Rules/=DF1619E609797B46AE471D33F42D65A5/@EntryIndexedValue"></s:String>
+	<s:Boolean x:Key="/Default/CodeStyle/Naming/CppNamingOptions/Rules/=DF1619E609797B46AE471D33F42D65A5/@EntryIndexRemoved">True</s:Boolean>
 	
 	
 	<s:String x:Key="/Default/CodeStyle/Naming/CppNamingOptions/Rules/=F2581E09ACA4804CB8D75B47297193F8/@EntryIndexedValue">&lt;NamingElement Priority="8" Title="Global variables"&gt;&lt;Descriptor Static="Indeterminate" Constexpr="Indeterminate" Const="Indeterminate" Volatile="Indeterminate" Accessibility="NOT_APPLICABLE"&gt;&lt;type Name="global variable" /&gt;&lt;/Descriptor&gt;&lt;Policy Inspect="True" WarnAboutPrefixesAndSuffixes="False" Prefix="g_" Suffix="" Style="AaBb" /&gt;&lt;/NamingElement&gt;</s:String>
+	<s:String x:Key="/Default/CodeStyle/Naming/CppNamingOptions/Rules/=F8C5BB9048C1424CAEB8B32C149DB8AB/@EntryIndexedValue"></s:String>
+	<s:Boolean x:Key="/Default/CodeStyle/Naming/CppNamingOptions/Rules/=F8C5BB9048C1424CAEB8B32C149DB8AB/@EntryIndexRemoved">True</s:Boolean>
 	
 	<s:Boolean x:Key="/Default/Environment/InjectedLayers/FileInjectedLayer/=B3843F128982F84197671DCD3E6242D0/@KeyIndexDefined">True</s:Boolean>
 	<s:String x:Key="/Default/Environment/InjectedLayers/FileInjectedLayer/=B3843F128982F84197671DCD3E6242D0/AbsolutePath/@EntryValue">C:\Users\Eon\source\repos\Ember\Ember.sln.DotSettings</s:String>

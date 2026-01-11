@@ -39,6 +39,7 @@ public:
 
   void                         UpdateReprs();
   [[nodiscard]] SRVHandle      PrepareFrame();
+  [[nodiscard]] SRVHandle      GetSRVHandle() const;
 
   MaterialManager( MaterialManager const& other )                = delete;
   MaterialManager( MaterialManager&& other ) noexcept            = delete;

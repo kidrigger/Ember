@@ -15,7 +15,7 @@ Ember::PerfCounter::PerfCounter(
     std::vector<ComPtr<ID3D12QueryHeap>> query_heaps, std::vector<ComPtr<ID3D12Resource>> query_readback_buffers )
   : m_QueryHeaps{ std::move( query_heaps ) }, m_QueryReadbackBuffers{ std::move( query_readback_buffers ) }
 {
-  ZeroMemory( m_256FrameAvgBuffer, ByteSizeOf( m_256FrameAvgBuffer ) );
+  ZeroMemory( m_256FrameAvgBuffer, U32ByteSizeOf( m_256FrameAvgBuffer ) );
   ::QueryPerformanceCounter( &m_PrevQueryPerfCounter );
 
   ZeroMemory( &m_PipelineStats, sizeof( m_PipelineStats ) );

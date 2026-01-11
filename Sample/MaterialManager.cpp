@@ -72,6 +72,11 @@ Ember::SRVHandle Ember::MaterialManager::PrepareFrame()
   return m_DataBuffer.GetSRVHandle();
 }
 
+Ember::SRVHandle Ember::MaterialManager::GetSRVHandle() const
+{
+  return m_DataBuffer.GetSRVHandle();
+}
+
 Ember::MaterialManager::~MaterialManager()
 {
   ASSERT( m_FreeList.InUse() == 0 );

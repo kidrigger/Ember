@@ -1,6 +1,8 @@
 #include "Scene.hpp"
 
+#include <algorithm>
 #include <imgui.h>
+#include <numeric>
 
 #include <Graphics/RenderDevice.hpp>
 #include <Util/DataUtil.hpp>
@@ -148,30 +150,67 @@ Ember::ObjectPool<Ember::MaterialImpl>& Ember::World::MaterialManager()
   return manager;
 }
 
-Ember::DrawList::DrawList( RenderDevice* render_device, GeometryManager* geometry_manager, uint32_t const frame_count )
-  : m_RenderDevice{ render_device }, m_GeometryManager{ geometry_manager }, m_FrameResources{ frame_count }
+uint32_t Ember::DrawList::Info2::OpaqueCommandsCount() const
+{
+  return ( MaskedCommandsOffset - OpaqueCommandsOffset ) / ( uint32_t )sizeof( AmpCommand );
+}
+
+uint32_t Ember::DrawList::Info2::MaskedCommandsCount() const
+{
+  return ( TransparentCommandsOffset - MaskedCommandsOffset ) / ( uint32_t )sizeof( AmpCommand );
+}
+
+uint32_t Ember::DrawList::Info2::TransparentCommandsCount() const
+{
+  return ( CommandsEnd - TransparentCommandsOffset ) / ( uint32_t )sizeof( AmpCommand );
+}
+
+Ember::DrawList::DrawList(
+    RenderDevice*    render_device,
+    GeometryManager* geometry_manager,
+    MaterialManager* material_manager,
+    uint32_t const   frame_count )
+  : m_RenderDevice{ render_device }
+  , m_GeometryManager{ geometry_manager }
+  , m_MaterialManager{ material_manager }
+  , m_FrameResources{ frame_count }
 {}
 
 void Ember::DrawList::PushDraw( WorldTransform const& transform, Mesh const& mesh, Material const& material )
 {
-  std::vector<MeshDraw>* draw_infos;
+  std::vector<MeshDraw>*   draw_infos;
+  std::vector<AmpCommand>* commands;
   switch ( material->GetAlphaMode() )
   {
     case AlphaMode::kOpaque:
       draw_infos = &m_OpaqueDrawInfos;
+      commands   = &m_OpaqueCommands;
       break;
     case AlphaMode::kMask:
       draw_infos = &m_MaskedDrawInfos;
+      commands   = &m_MaskedCommands;
       break;
     case AlphaMode::kBlend:
       draw_infos = &m_TransparentDrawInfos;
+      commands   = &m_TransparentCommands;
       break;
     default:
       UNREACHABLE;
   }
 
-  uint32_t const transform_idx = ( uint32_t )m_Transforms.size();
+  uint32_t const transform_idx = CountOf( m_Transforms );
   m_Transforms.push_back( transform );
+
+  uint32_t const mesh_idx = CountOf( m_Meshes );
+  m_Meshes.emplace_back( mesh.VertexDataStart, mesh.VertexLiteStart, material->GetHandle(), mesh.FirstMeshlet );
+
+  uint32_t const instance_idx = CountOf( m_Instances );
+  {
+    auto* instance = &m_Instances.emplace_back();
+    DirectX::XMStoreFloat4x4( &instance->Transform, transform.Transform );
+    DirectX::XMStoreFloat4x4( &instance->InvTransform, transform.InvTransform );
+    instance->MeshID = mesh_idx;
+  }
 
   int remaining_meshlets = ( int )mesh.MeshletCount;
   int meshlet_offset     = ( int )mesh.FirstMeshlet;
@@ -187,18 +226,20 @@ void Ember::DrawList::PushDraw( WorldTransform const& transform, Mesh const& mes
         std::min( remaining_meshlets, 32 ),
         material->GetHandle() );
 
+    commands->emplace_back( instance_idx, meshlet_offset, std::min( remaining_meshlets, 32 ) );
+
     remaining_meshlets -= 32;
     meshlet_offset     += 32;
   }
 }
 
+namespace Ember
+{
 namespace
 {
-
-void ResizedWrite(
-    Ember::RenderDevice* render_device, Ember::Buffer* buffer, std::ranges::contiguous_range auto const& draws )
+void ResizedWrite( RenderDevice* render_device, Buffer* buffer, std::ranges::contiguous_range auto const& draws )
 {
-  uint32_t const draw_size = ByteSizeOf( draws );
+  uint32_t const draw_size = U32ByteSizeOf( draws );
 
   if ( buffer->GetSize() < draw_size )
   {
@@ -206,7 +247,28 @@ void ResizedWrite(
   }
   buffer->Write( 0, draw_size, DataOf( draws ) );
 }
+
+void ResizedWriteRaw( RenderDevice* render_device, Buffer* buffer, std::span<std::span<byte>> const& draws )
+{
+  size_t const required_size = std::accumulate(
+      draws.begin(), draws.end(), ( size_t )0, []( size_t acc, auto const& buf ) { return acc + buf.size_bytes(); } );
+
+  if ( buffer->GetSize() < required_size )
+  {
+    *buffer = render_device->CreateRawStorageBuffer( required_size );
+    buffer->SetName( L"Unified Raw" );
+  }
+
+  size_t offset = 0;
+  for ( auto const& bytes : draws )
+  {
+    size_t const size = bytes.size_bytes();
+    buffer->Write( offset, size, bytes.data() );
+    offset += size;
+  }
+}
 } // namespace
+} // namespace Ember
 
 Ember::DrawList::Batches Ember::DrawList::PrepareFrame( uint32_t const frame_idx )
 {
@@ -216,6 +278,17 @@ Ember::DrawList::Batches Ember::DrawList::PrepareFrame( uint32_t const frame_idx
   ResizedWrite( m_RenderDevice, &resources.OpaqueDrawBuffer, m_OpaqueDrawInfos );
   ResizedWrite( m_RenderDevice, &resources.MaskedDrawBuffer, m_MaskedDrawInfos );
   ResizedWrite( m_RenderDevice, &resources.TransparentDrawBuffer, m_TransparentDrawInfos );
+
+  std::array data = {
+    AsBytes( m_Meshes ),         AsBytes( m_Instances ),           AsBytes( m_OpaqueCommands ),
+    AsBytes( m_MaskedCommands ), AsBytes( m_TransparentCommands ),
+  };
+  ResizedWriteRaw( m_RenderDevice, &resources.UnifiedResourceBuffer, data );
+  uint32_t const instances_offset  = U32ByteSizeOf( m_Meshes );
+  uint32_t const opaque_cmd_offset = CheckedCast<uint32_t>( instances_offset + ByteSizeOf( m_Instances ) );
+  uint32_t const masked_cmd_offset = CheckedCast<uint32_t>( opaque_cmd_offset + ByteSizeOf( m_OpaqueCommands ) );
+  uint32_t const trans_cmd_offset  = CheckedCast<uint32_t>( masked_cmd_offset + ByteSizeOf( m_MaskedCommands ) );
+  uint32_t const cmd_end_offset    = CheckedCast<uint32_t>( trans_cmd_offset + ByteSizeOf( m_TransparentCommands ) );
 
   return {
     .Opaque = {
@@ -235,6 +308,17 @@ Ember::DrawList::Batches Ember::DrawList::PrepareFrame( uint32_t const frame_idx
       resources.TransparentDrawBuffer.GetSRVHandle(),
       CountOf( m_TransparentDrawInfos ),
       m_GeometryManager->GetSRVHandle(),
+    },
+    .Unified = {
+      .GeometryBuffer = m_GeometryManager->GetSRVHandle(),
+      .MaterialBuffer = m_MaterialManager->PrepareFrame(),
+      .TopLevelAS = {},
+      .DrawBuffer = resources.UnifiedResourceBuffer.GetSRVHandle(),
+      .InstancesOffset = instances_offset,
+      .OpaqueCommandsOffset = opaque_cmd_offset,
+      .MaskedCommandsOffset = masked_cmd_offset,
+      .TransparentCommandsOffset = trans_cmd_offset,
+      .CommandsEnd = cmd_end_offset,
     }
   };
 }
@@ -245,6 +329,12 @@ void Ember::DrawList::Clear()
   m_OpaqueDrawInfos.clear();
   m_MaskedDrawInfos.clear();
   m_TransparentDrawInfos.clear();
+
+  m_Instances.clear();
+  m_Meshes.clear();
+  m_OpaqueCommands.clear();
+  m_MaskedCommands.clear();
+  m_TransparentCommands.clear();
 }
 
 size_t Ember::DrawList::GetOpaqueCount() const

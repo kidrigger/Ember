@@ -215,7 +215,7 @@
       <ShaderModel>6.8</ShaderModel>
       <EntryPointName>%(Filename)</EntryPointName>
       <ShaderType>Library</ShaderType>
-      <AdditionalOptions>-enable-16bit-types -HV 2021</AdditionalOptions>
+      <AdditionalOptions>-enable-16bit-types -HV 2021 -Fd $(OutputPath)%(Filename).pdb</AdditionalOptions>
     </FxCompile>
   </ItemDefinitionGroup>
   <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='RenderDoc_Compat|x64'">
@@ -244,7 +244,7 @@
       <ShaderModel>6.8</ShaderModel>
       <EntryPointName>%(Filename)</EntryPointName>
       <ShaderType>Library</ShaderType>
-      <AdditionalOptions>-enable-16bit-types -HV 2021</AdditionalOptions>
+      <AdditionalOptions>-enable-16bit-types -HV 2021 -Fd $(OutputPath)%(Filename).pdb</AdditionalOptions>
     </FxCompile>
   </ItemDefinitionGroup>
   <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='Release|x64'">
@@ -609,6 +609,7 @@
     <None Include="DirShadow.hlsli" />
     <None Include="Geometry.hlsli" />
     <None Include="Environment.hlsli" />
+    <None Include="Geometry2.hlsli" />
     <None Include="LightData.hlsli" />
     <None Include="Material.hlsli" />
     <None Include="Math.hlsli" />
@@ -617,6 +618,7 @@
     <None Include="Quantization.hlsli" />
     <None Include="SpotLightCommon.hlsli" />
     <None Include="SpotShadow.hlsli" />
+    <None Include="Triangle2.hlsli" />
     <None Include="TrianglePSCommon.hlsli" />
     <None Include="Utility.hlsli" />
     <None Include="IBLCommon.hlsli" />
@@ -1061,6 +1063,18 @@
       <ShaderType Condition="'$(Configuration)|$(Platform)'=='ReleaseWithDebug|Win32'">Pixel</ShaderType>
       <ShaderType Condition="'$(Configuration)|$(Platform)'=='RenderDoc_Compat|Win32'">Pixel</ShaderType>
       <ShaderType Condition="'$(Configuration)|$(Platform)'=='RenderDoc_Compat|x64'">Pixel</ShaderType>
+    </FxCompile>
+    <FxCompile Include="TriangleAS2.hlsl">
+      <ShaderType Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">Amplification</ShaderType>
+      <ShaderType Condition="'$(Configuration)|$(Platform)'=='RenderDoc_Compat|x64'">Amplification</ShaderType>
+      <ShaderType Condition="'$(Configuration)|$(Platform)'=='ReleaseWithDebug|x64'">Amplification</ShaderType>
+      <ShaderType Condition="'$(Configuration)|$(Platform)'=='Release|x64'">Amplification</ShaderType>
+    </FxCompile>
+    <FxCompile Include="TriangleMS2.hlsl">
+      <ShaderType Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">Mesh</ShaderType>
+      <ShaderType Condition="'$(Configuration)|$(Platform)'=='RenderDoc_Compat|x64'">Mesh</ShaderType>
+      <ShaderType Condition="'$(Configuration)|$(Platform)'=='ReleaseWithDebug|x64'">Mesh</ShaderType>
+      <ShaderType Condition="'$(Configuration)|$(Platform)'=='Release|x64'">Mesh</ShaderType>
     </FxCompile>
     <FxCompile Include="TriangleTransparentPS.hlsl">
       <ShaderType Condition="'$(Configuration)|$(Platform)'=='Release|x64'">Pixel</ShaderType>

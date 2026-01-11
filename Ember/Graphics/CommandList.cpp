@@ -118,7 +118,7 @@ void Ember::CommandList::DrawInstanced(
 }
 
 void Ember::CommandList::SetGraphicsRootConstantBufferView(
-    uint32_t root_parameter_index, D3D12_GPU_VIRTUAL_ADDRESS const buffer_location )
+    uint32_t const root_parameter_index, D3D12_GPU_VIRTUAL_ADDRESS const buffer_location ) const
 {
   m_CommandList->SetGraphicsRootConstantBufferView( root_parameter_index, buffer_location );
 }

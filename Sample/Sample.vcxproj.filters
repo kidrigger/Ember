@@ -361,6 +361,12 @@
     <None Include="SpotShadow.hlsli">
       <Filter>Shaders\Shadows\SpotLight</Filter>
     </None>
+    <None Include="Triangle2.hlsli">
+      <Filter>Shaders\Meshes</Filter>
+    </None>
+    <None Include="Geometry2.hlsli">
+      <Filter>Shaders</Filter>
+    </None>
   </ItemGroup>
   <ItemGroup>
     <FxCompile Include="EqrectToCube.hlsl">
@@ -491,6 +497,12 @@
     </FxCompile>
     <FxCompile Include="SpotShadowPS.hlsl">
       <Filter>Shaders\Shadows\SpotLight</Filter>
+    </FxCompile>
+    <FxCompile Include="TriangleAS2.hlsl">
+      <Filter>Shaders\Meshes</Filter>
+    </FxCompile>
+    <FxCompile Include="TriangleMS2.hlsl">
+      <Filter>Shaders\Meshes</Filter>
     </FxCompile>
   </ItemGroup>
   <ItemGroup>

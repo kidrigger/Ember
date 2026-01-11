@@ -1,0 +1,83 @@
+#ifndef TRIANGLE_HLSLI_
+#define TRIANGLE_HLSLI_
+
+#include "Geometry2.hlsli"
+
+#include "Bindless.hlsli"
+#include "Camera.hlsli"
+#include "Colors.hlsli"
+#include "Environment.hlsli"
+#include "LightData.hlsli"
+#include "Material.hlsli"
+#include "Quantization.hlsli"
+
+struct MeshletPayload
+{
+  uint MeshletID[32];
+  uint InstanceIdx;
+  uint FirstMeshlet;
+};
+
+struct MSVertexOut
+{
+  float4 ScreenPosition : SV_POSITION;
+  float4 Position : POSITION;
+  float3 Normal : NORMAL;
+  float  LinearDepth : LINEAR_DEPTH;
+  float4 Tangent : TANGENT;
+  float4 Color : COLOR;
+  float2 TexCoord[2] : TEXCOORD;
+};
+
+struct MSPrimitiveOut
+{
+  float3 MeshletColor : MESHLET_COLOR;
+  MatID  Material : MATERIAL;
+};
+
+struct PSIn
+{
+  float4 ScreenPosition : SV_POSITION;
+  float4 Position : POSITION;
+  float3 Normal : NORMAL;
+  float  LinearDepth : LINEAR_DEPTH;
+  float4 Tangent : TANGENT;
+  float4 Color : COLOR;
+  float2 TexCoord[2] : TEXCOORD;
+  float3 MeshletColor : MESHLET_COLOR;
+  MatID  Material : MATERIAL;
+};
+
+ConstantBuffer<DrawBatch> g_DrawList : register( b0, space0 );
+
+cbuffer                   BindlessIndex : register( b1, space0 )
+{
+  ResID g_Materials;
+  ResID g_Camera;
+  ResID g_ConfigID;
+  ResID g_PointLights;
+  uint  g_ShadowPointLightCount;
+  uint  g_PointLightCount;
+  ResID g_DirLights;
+  uint  g_ShadowDirLightCount;
+  uint  g_DirLightCount;
+  ResID g_SpotLights;
+  uint  g_ShadowSpotLightCount;
+  uint  g_SpotLightCount;
+}
+
+cbuffer EnvironmentBlock : register( b2, space0 )
+{
+  Environment g_Env;
+}
+
+cbuffer RaytraceBlock : register( b3, space0 )
+{
+  ResID g_TLAS;
+}
+
+SamplerState           g_DefaultSampler : register( s0, space0 );
+SamplerState           g_ClampedSampler : register( s1, space0 );
+SamplerComparisonState g_ShadowSampler : register( s2, space0 );
+
+#endif

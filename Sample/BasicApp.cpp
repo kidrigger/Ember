@@ -158,7 +158,7 @@ Ember::BasicApp::BasicApp(
   , m_Environment{ std::move( environment ) }
   , m_MaterialManager{ std::move( material_manager ) }
   , m_GeometryManager{ std::move( geometry_manager ) }
-  , m_DrawList{ m_RenderDevice.get(), m_GeometryManager.get(), RenderDevice::kNumFrames }
+  , m_DrawList{ m_RenderDevice.get(), m_GeometryManager.get(), m_MaterialManager.get(), RenderDevice::kNumFrames }
   , m_World{ std::move( world ) }
   , m_LightManager{ std::move( light_manager ) }
   , m_TextureLoader{ std::move( texture_loader ) }
@@ -321,7 +321,8 @@ void Ember::BasicApp::PrepareTLAS( CommandList* cmd, uint32_t frame_idx )
   Buffer* desc_buf = &m_RTX.InstanceDesc[frame_idx];
   if ( desc_buf->GetSize() < ByteSizeOf( m_RTX.InstanceVec ) )
   {
-    *desc_buf = m_RenderDevice->CreateStorageBuffer( ByteSizeOf( m_RTX.InstanceVec ), StrideOf( m_RTX.InstanceVec ) );
+    *desc_buf =
+        m_RenderDevice->CreateStorageBuffer( U32ByteSizeOf( m_RTX.InstanceVec ), StrideOf( m_RTX.InstanceVec ) );
     wchar_t name[32];
     swprintf_s( name, 32, L"TLAS Instance Desc Buffer %d", frame_idx );
     desc_buf->SetName( name );
@@ -796,9 +797,9 @@ void Ember::BasicApp::Render()
                         { m_DrawList.PushDraw( wt, mesh, material ); } );
   }
 
-  FrameGraphResource      bb_res = frame_graph.import( "Backbuffer", backbuffer.GetDesc(), FG::Texture{ backbuffer } );
+  FrameGraphResource bb_res = frame_graph.import( "Backbuffer", backbuffer.GetDesc(), FG::Texture{ backbuffer } );
 
-  DrawList::Batches const draw_list_info = m_DrawList.PrepareFrame( frame_idx );
+  DrawList::Batches  draw_list_info = m_DrawList.PrepareFrame( frame_idx );
 
   m_PerfCounter->UpdatePipelineStats( frame_idx );
   m_PerfCounter->BeginQuery( command_list.Get(), frame_idx );
@@ -814,47 +815,45 @@ void Ember::BasicApp::Render()
     m_LightManager->RenderAllShadows( &command_list, draw_list_info, *m_Camera, frame_idx );
   }
 
-  SRVHandle const materials_srv           = m_MaterialManager->PrepareFrame();
+  if ( g_Debug.RaytracedShadows )
+  {
+    PrepareTLAS( &command_list, frame_idx );
+    draw_list_info.Unified.TopLevelAS = command_list.Bind( BindSRV{ m_RTX.TLAS[frame_idx] } );
+  }
 
   m_FGBlackboard.get<DrawList::Batches>() = draw_list_info;
   m_FGBlackboard.get<PerFrameConstants>() = {
-    .MaterialsBuffer = materials_srv,
+    .MaterialsBuffer = m_MaterialManager->GetSRVHandle(),
     .Camera          = camera_cbv,
     .ConfigBuffer    = m_ConfigurationBuffer.GetCBVHandle(),
     .LightInfo       = light_info,
   };
 
-  m_FGBlackboard.get<Environment::GpuRepr>() = m_Environment->Repr();
-
-  if ( g_Debug.RaytracedShadows )
-  {
-    PrepareTLAS( &command_list, frame_idx );
-  }
+  m_FGBlackboard.get<Environment::GpuRepr>()     = m_Environment->Repr();
 
   auto const                        atmosphere   = m_UpdateAtmosphericSky( &frame_graph, &m_FGBlackboard, frame_idx );
 
-  FrameGraphResource                depth_buffer = m_DrawPrePass( &frame_graph, m_FGBlackboard );
+  auto const                        depth_buffer = m_DrawPrePass( &frame_graph, m_FGBlackboard );
 
-  std::optional<FrameGraphResource> tlas;
+  std::optional<FrameGraphResource> top_level_as;
   if ( g_Debug.RaytracedShadows )
   {
-    tlas = frame_graph.import( "TLAS", {}, FG::Buffer{ m_RTX.TLAS[frame_idx] } );
+    top_level_as = frame_graph.import( "Top Level AS", {}, FG::Buffer{ m_RTX.TLAS[frame_idx] } );
   }
-  FrameGraphResource       opaque_pass_fwd = m_RenderOpaqueMeshes( &frame_graph, m_FGBlackboard, depth_buffer, tlas );
+  auto const opaque_pass_fwd = m_RenderOpaqueMeshes( &frame_graph, m_FGBlackboard, depth_buffer, top_level_as );
 
-  auto const               gbuffer         = m_UpdateGBuffer( &frame_graph, m_FGBlackboard, depth_buffer );
-  FrameGraphResource const omni_pass_rt    = m_RenderOmniLights( &frame_graph, m_FGBlackboard, gbuffer );
-  FrameGraphResource const spot_pass_rt    = m_RenderSpotLights( &frame_graph, m_FGBlackboard, gbuffer, omni_pass_rt );
-  FrameGraphResource const opaque_pass_dfr =
-      m_RenderScreenSpaceLighting( &frame_graph, m_FGBlackboard, gbuffer, spot_pass_rt );
+  auto const gbuffer         = m_UpdateGBuffer( &frame_graph, m_FGBlackboard, depth_buffer );
+  auto const omni_pass_rt    = m_RenderOmniLights( &frame_graph, m_FGBlackboard, gbuffer );
+  auto const spot_pass_rt    = m_RenderSpotLights( &frame_graph, m_FGBlackboard, gbuffer, omni_pass_rt );
+  auto const opaque_pass_dfr = m_RenderScreenSpaceLighting( &frame_graph, m_FGBlackboard, gbuffer, spot_pass_rt );
 
-  auto opaque_pass = RenderPass::RenderDepthData{
-    .RenderTarget = g_UseDeferredRendering ? opaque_pass_dfr : opaque_pass_fwd,
-    .DepthStencil = depth_buffer,
+  auto const opaque_pass     = RenderPass::RenderDepthData{
+        .RenderTarget = g_UseDeferredRendering ? opaque_pass_dfr : opaque_pass_fwd,
+        .DepthStencil = depth_buffer,
   };
 
-  auto const alpha_tested      = m_RenderMaskedMeshes( &frame_graph, m_FGBlackboard, opaque_pass, tlas );
-  auto const transparency_pass = m_RenderTransparentMeshes( &frame_graph, m_FGBlackboard, alpha_tested, tlas );
+  auto const alpha_tested      = m_RenderMaskedMeshes( &frame_graph, m_FGBlackboard, opaque_pass, top_level_as );
+  auto const transparency_pass = m_RenderTransparentMeshes( &frame_graph, m_FGBlackboard, alpha_tested, top_level_as );
 
   m_RenderBackground.UseProceduralAtmosphericSky = g_Debug.SkyMode == DebugConfig::kAtmosphere;
   auto const skybox_pass = m_RenderBackground( &frame_graph, m_FGBlackboard, transparency_pass, atmosphere.SkyViewLUT );
@@ -870,7 +869,7 @@ void Ember::BasicApp::Render()
         ZoneScopedN( "ImGUI" );
 
         FG::Context::FrameData const& frame_data = context->GetFrameData();
-        CommandList*                  cmd        = frame_data.CommandList;
+        CommandList const*            cmd        = frame_data.CommandList;
 
         PIXScopedEvent( cmd->Get(), PIX_COLOR_DEFAULT, "ImGUI" );
 

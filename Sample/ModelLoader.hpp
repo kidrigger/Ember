@@ -85,12 +85,12 @@ class ModelLoader
   {
     struct Offsets
     {
-      uint32_t VertexPositions;
-      uint32_t VertexData;
-      uint32_t Meshlets;
-      uint32_t MeshletTriangles;
-      uint32_t MeshletVertices;
-      uint32_t Indices;
+      size_t VertexPositions;
+      size_t VertexData;
+      size_t Meshlets;
+      size_t MeshletTriangles;
+      size_t MeshletVertices;
+      size_t Indices;
     };
     std::map<cgltf_material const*, MaterialImpl*> MaterialCache;
     std::map<cgltf_node const*, flecs::entity>     NodeCache;

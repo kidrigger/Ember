@@ -289,7 +289,7 @@ Ember::LightInfo Ember::Internal::DirectionLightManager::PrepareFrame(
   if ( m_DataBuffers[frame_index].GetSize() < m_TotalLightCount * sizeof( DirLightRepr ) )
   {
     m_DataBuffers[frame_index] =
-        m_RenderDevice->CreateStorageBuffer( ByteSizeOf( m_LightData ), StrideOf( m_LightData ) );
+        m_RenderDevice->CreateStorageBuffer( U32ByteSizeOf( m_LightData ), StrideOf( m_LightData ) );
     wchar_t name[] = L"Dir Light Buffer 0";
     name[18]       = L'0' + ( wchar_t )frame_index;
     m_DataBuffers[frame_index].SetName( name );

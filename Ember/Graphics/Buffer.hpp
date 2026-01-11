@@ -33,7 +33,7 @@ public:
 
   Buffer( std::shared_ptr<BufferImpl> impl );
 
-  void                                    Write( uint32_t offset, uint32_t size, void const* data ) const;
+  void                                    Write( size_t offset, size_t size, void const* data ) const;
   [[nodiscard]] ID3D12Resource*           GetBuffer() const noexcept;
   [[nodiscard]] uint64_t                  GetSize() const noexcept;
   [[nodiscard]] Type                      GetType() const noexcept;
