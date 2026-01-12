@@ -150,58 +150,58 @@ Ember::ObjectPool<Ember::MaterialImpl>& Ember::World::MaterialManager()
   return manager;
 }
 
-uint32_t Ember::DrawList::Info2::OpaqueCommandsCount() const
+Ember::DrawList::PerBatch Ember::DrawList::Batches::Opaque() const
+{
+  return {
+    .GeometryBuffer  = GeometryBuffer,
+    .MaterialBuffer  = MaterialBuffer,
+    .TopLevelAS      = TopLevelAS,
+    .DrawBuffer      = DrawBuffer,
+    .InstancesOffset = InstancesOffset,
+    .CommandsOffset  = OpaqueCommandsOffset,
+    .CommandsCount   = OpaqueCommandsCount(),
+  };
+}
+
+Ember::DrawList::PerBatch Ember::DrawList::Batches::Masked() const
+{
+  return {
+    .GeometryBuffer  = GeometryBuffer,
+    .MaterialBuffer  = MaterialBuffer,
+    .TopLevelAS      = TopLevelAS,
+    .DrawBuffer      = DrawBuffer,
+    .InstancesOffset = InstancesOffset,
+    .CommandsOffset  = MaskedCommandsOffset,
+    .CommandsCount   = MaskedCommandsCount(),
+  };
+}
+
+Ember::DrawList::PerBatch Ember::DrawList::Batches::Transparent() const
+{
+  return {
+    .GeometryBuffer  = GeometryBuffer,
+    .MaterialBuffer  = MaterialBuffer,
+    .TopLevelAS      = TopLevelAS,
+    .DrawBuffer      = DrawBuffer,
+    .InstancesOffset = InstancesOffset,
+    .CommandsOffset  = TransparentCommandsOffset,
+    .CommandsCount   = TransparentCommandsCount(),
+  };
+}
+
+uint32_t Ember::DrawList::Batches::OpaqueCommandsCount() const
 {
   return ( MaskedCommandsOffset - OpaqueCommandsOffset ) / ( uint32_t )sizeof( AmpCommand );
 }
 
-uint32_t Ember::DrawList::Info2::MaskedCommandsCount() const
+uint32_t Ember::DrawList::Batches::MaskedCommandsCount() const
 {
   return ( TransparentCommandsOffset - MaskedCommandsOffset ) / ( uint32_t )sizeof( AmpCommand );
 }
 
-uint32_t Ember::DrawList::Info2::TransparentCommandsCount() const
+uint32_t Ember::DrawList::Batches::TransparentCommandsCount() const
 {
   return ( CommandsEnd - TransparentCommandsOffset ) / ( uint32_t )sizeof( AmpCommand );
-}
-
-Ember::DrawList::PerBatch Ember::DrawList::PerBatch::Opaque( Info2 const& info )
-{
-  return {
-    .GeometryBuffer  = info.GeometryBuffer,
-    .MaterialBuffer  = info.MaterialBuffer,
-    .TopLevelAS      = info.TopLevelAS,
-    .DrawBuffer      = info.DrawBuffer,
-    .InstancesOffset = info.InstancesOffset,
-    .CommandsOffset  = info.OpaqueCommandsOffset,
-    .CommandsCount   = info.OpaqueCommandsCount(),
-  };
-}
-
-Ember::DrawList::PerBatch Ember::DrawList::PerBatch::Masked( Info2 const& info )
-{
-  return {
-    .GeometryBuffer  = info.GeometryBuffer,
-    .MaterialBuffer  = info.MaterialBuffer,
-    .TopLevelAS      = info.TopLevelAS,
-    .DrawBuffer      = info.DrawBuffer,
-    .InstancesOffset = info.InstancesOffset,
-    .CommandsOffset  = info.MaskedCommandsOffset,
-    .CommandsCount   = info.MaskedCommandsCount(),
-  };
-}
-
-Ember::DrawList::PerBatch Ember::DrawList::PerBatch::Transparent( Info2 const& info )
-{
-  return {
-    .GeometryBuffer  = info.GeometryBuffer,
-    .MaterialBuffer  = info.MaterialBuffer,
-    .TopLevelAS      = info.TopLevelAS,
-    .DrawBuffer      = info.DrawBuffer,
-    .InstancesOffset = info.InstancesOffset,
-    .CommandsOffset  = info.TransparentCommandsOffset,
-    .CommandsCount   = info.TransparentCommandsCount(),
-  };
 }
 
 Ember::DrawList::DrawList(
@@ -217,28 +217,21 @@ Ember::DrawList::DrawList(
 
 void Ember::DrawList::PushDraw( WorldTransform const& transform, Mesh const& mesh, Material const& material )
 {
-  std::vector<MeshDraw>*   draw_infos;
   std::vector<AmpCommand>* commands;
   switch ( material->GetAlphaMode() )
   {
     case AlphaMode::kOpaque:
-      draw_infos = &m_OpaqueDrawInfos;
-      commands   = &m_OpaqueCommands;
+      commands = &m_OpaqueCommands;
       break;
     case AlphaMode::kMask:
-      draw_infos = &m_MaskedDrawInfos;
-      commands   = &m_MaskedCommands;
+      commands = &m_MaskedCommands;
       break;
     case AlphaMode::kBlend:
-      draw_infos = &m_TransparentDrawInfos;
-      commands   = &m_TransparentCommands;
+      commands = &m_TransparentCommands;
       break;
     default:
       UNREACHABLE;
   }
-
-  uint32_t const transform_idx = CountOf( m_Transforms );
-  m_Transforms.push_back( transform );
 
   uint32_t const mesh_idx = CountOf( m_Meshes );
   m_Meshes.emplace_back( mesh.VertexDataStart, mesh.VertexLiteStart, material->GetHandle(), mesh.FirstMeshlet );
@@ -256,15 +249,6 @@ void Ember::DrawList::PushDraw( WorldTransform const& transform, Mesh const& mes
 
   while ( remaining_meshlets > 0 )
   {
-    draw_infos->emplace_back(
-        transform_idx,
-        1,
-        mesh.VertexDataStart,
-        mesh.VertexLiteStart,
-        meshlet_offset,
-        std::min( remaining_meshlets, 32 ),
-        material->GetHandle() );
-
     commands->emplace_back( instance_idx, meshlet_offset, std::min( remaining_meshlets, 32 ) );
 
     remaining_meshlets -= 32;
@@ -313,12 +297,7 @@ Ember::DrawList::Batches Ember::DrawList::PrepareFrame( uint32_t const frame_idx
 {
   FrameResources& resources = m_FrameResources[frame_idx];
 
-  ResizedWrite( m_RenderDevice, &resources.TransformBuffer, m_Transforms );
-  ResizedWrite( m_RenderDevice, &resources.OpaqueDrawBuffer, m_OpaqueDrawInfos );
-  ResizedWrite( m_RenderDevice, &resources.MaskedDrawBuffer, m_MaskedDrawInfos );
-  ResizedWrite( m_RenderDevice, &resources.TransparentDrawBuffer, m_TransparentDrawInfos );
-
-  std::array data = {
+  std::array      data      = {
     AsBytes( m_Meshes ),         AsBytes( m_Instances ),           AsBytes( m_OpaqueCommands ),
     AsBytes( m_MaskedCommands ), AsBytes( m_TransparentCommands ),
   };
@@ -330,45 +309,20 @@ Ember::DrawList::Batches Ember::DrawList::PrepareFrame( uint32_t const frame_idx
   uint32_t const cmd_end_offset    = CheckedCast<uint32_t>( trans_cmd_offset + ByteSizeOf( m_TransparentCommands ) );
 
   return {
-    .Opaque = {
-      resources.TransformBuffer.GetSRVHandle(),
-      resources.OpaqueDrawBuffer.GetSRVHandle(),
-      CountOf( m_OpaqueDrawInfos ),
-      m_GeometryManager->GetSRVHandle(),
-    },
-    .Masked = {
-      resources.TransformBuffer.GetSRVHandle(),
-      resources.MaskedDrawBuffer.GetSRVHandle(),
-      CountOf( m_MaskedDrawInfos ),
-      m_GeometryManager->GetSRVHandle(),
-    },
-    .Transparent = {
-      resources.TransformBuffer.GetSRVHandle(),
-      resources.TransparentDrawBuffer.GetSRVHandle(),
-      CountOf( m_TransparentDrawInfos ),
-      m_GeometryManager->GetSRVHandle(),
-    },
-    .Unified = {
-      .GeometryBuffer = m_GeometryManager->GetSRVHandle(),
-      .MaterialBuffer = m_MaterialManager->PrepareFrame(),
-      .TopLevelAS = {},
-      .DrawBuffer = resources.UnifiedResourceBuffer.GetSRVHandle(),
-      .InstancesOffset = instances_offset,
-      .OpaqueCommandsOffset = opaque_cmd_offset,
-      .MaskedCommandsOffset = masked_cmd_offset,
-      .TransparentCommandsOffset = trans_cmd_offset,
-      .CommandsEnd = cmd_end_offset,
-    }
+    .GeometryBuffer            = m_GeometryManager->GetSRVHandle(),
+    .MaterialBuffer            = m_MaterialManager->PrepareFrame(),
+    .TopLevelAS                = {},
+    .DrawBuffer                = resources.UnifiedResourceBuffer.GetSRVHandle(),
+    .InstancesOffset           = instances_offset,
+    .OpaqueCommandsOffset      = opaque_cmd_offset,
+    .MaskedCommandsOffset      = masked_cmd_offset,
+    .TransparentCommandsOffset = trans_cmd_offset,
+    .CommandsEnd               = cmd_end_offset,
   };
 }
 
 void Ember::DrawList::Clear()
 {
-  m_Transforms.clear();
-  m_OpaqueDrawInfos.clear();
-  m_MaskedDrawInfos.clear();
-  m_TransparentDrawInfos.clear();
-
   m_Instances.clear();
   m_Meshes.clear();
   m_OpaqueCommands.clear();
@@ -378,22 +332,22 @@ void Ember::DrawList::Clear()
 
 size_t Ember::DrawList::GetOpaqueCount() const
 {
-  return m_OpaqueDrawInfos.size();
+  return m_OpaqueCommands.size();
 }
 
 size_t Ember::DrawList::GetMaskedCount() const
 {
-  return m_MaskedDrawInfos.size();
+  return m_MaskedCommands.size();
 }
 
 size_t Ember::DrawList::GetTransparentCount() const
 {
-  return m_TransparentDrawInfos.size();
+  return m_TransparentCommands.size();
 }
 
 size_t Ember::DrawList::GetTotalCount() const
 {
-  return m_OpaqueDrawInfos.size() + m_TransparentDrawInfos.size() + m_MaskedDrawInfos.size();
+  return m_OpaqueCommands.size() + m_TransparentCommands.size() + m_MaskedCommands.size();
 }
 
 Ember::World::World()

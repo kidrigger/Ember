@@ -139,7 +139,7 @@ Ember::RenderPass::RenderDepthData Ember::RenderPass::TransparencyForward::Execu
         data.RenderTarget = builder.write( render_depth.RenderTarget, FG::Attachment{ .Index = 0, .ForceSrgb = true } );
         data.DepthStencil = builder.write( render_depth.DepthStencil, FG::DepthStencil{} );
       },
-      [self = this, bb = &bb]( RenderDepthData const&, FrameGraphPassResources& res, FG::Context* context )
+      [self = this, bb = &bb]( RenderDepthData const&, FrameGraphPassResources&, FG::Context* context )
       {
         ZoneScopedN( "Transparency Pass" );
 
@@ -149,9 +149,7 @@ Ember::RenderPass::RenderDepthData Ember::RenderPass::TransparencyForward::Execu
 
         auto const& constants = bb->get<PerFrameConstants>();
         auto const& env       = bb->get<Environment::GpuRepr>();
-        auto const& draw_list = bb->get<DrawList::Batches>().Unified;
-
-        auto const  batch     = DrawList::PerBatch::Transparent( draw_list );
+        auto const  batch     = bb->get<DrawList::Batches>().Transparent();
 
         cmd->SetGraphicsRootSignature( self->RootSignature.Get() );
         // TODO: Sort transparent objects back to front
@@ -288,7 +286,7 @@ Ember::RenderPass::RenderDepthData Ember::RenderPass::MaskedForward::Execute(
             builder.write( render_depth_data.RenderTarget, FG::Attachment{ .Index = 0, .ForceSrgb = true } );
         data.DepthStencil = builder.write( render_depth_data.DepthStencil, FG::DepthStencil{} );
       },
-      [self = this, bb = &bb]( RenderDepthData const&, FrameGraphPassResources& res, FG::Context const* context )
+      [self = this, bb = &bb]( RenderDepthData const&, FrameGraphPassResources&, FG::Context const* context )
       {
         ZoneScopedN( "Alpha Tested Pass" );
 
@@ -298,9 +296,9 @@ Ember::RenderPass::RenderDepthData Ember::RenderPass::MaskedForward::Execute(
 
         auto const& constants = bb->get<PerFrameConstants>();
         auto const& env       = bb->get<Environment::GpuRepr>();
-        auto const& draw_list = bb->get<DrawList::Batches>().Unified;
+        auto const& draw_list = bb->get<DrawList::Batches>();
 
-        auto const  batch     = DrawList::PerBatch::Masked( draw_list );
+        auto const  batch     = draw_list.Masked();
 
         cmd->SetGraphicsRootSignature( self->RootSignature.Get() );
         cmd->SetPipelineState( self->Pipeline.Get() );

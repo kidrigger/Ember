@@ -152,7 +152,7 @@ FrameGraphResource Ember::RenderPass::OpaqueForward::Execute(
             } );
         builder.read( depth, FG::DepthStencilRead{} );
       },
-      [self = this, bb = &bb]( FrameGraphResource const&, FrameGraphPassResources& res, FG::Context const* context )
+      [self = this, bb = &bb]( FrameGraphResource const&, FrameGraphPassResources&, FG::Context const* context )
       {
         ZoneScopedN( "Opaque Forward" );
 
@@ -164,7 +164,7 @@ FrameGraphResource Ember::RenderPass::OpaqueForward::Execute(
         auto const& env        = bb->get<Environment::GpuRepr>();
         auto const& draw_list  = bb->get<DrawList::Batches>();
 
-        auto const  draw_batch = DrawList::PerBatch::Opaque( draw_list.Unified );
+        auto const  draw_batch = draw_list.Opaque();
 
         cmd->SetGraphicsRootSignature( self->RootSignature.Get() );
         cmd->SetPipelineState( self->Pipeline.Get() );

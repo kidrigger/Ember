@@ -307,7 +307,7 @@ void Ember::Internal::OmniLightManager::RenderOmniShadow(
 
   command_list->ClearDepthStencilView( texture.GetTexture(), D3D12_CLEAR_FLAG_DEPTH, 1.0f, 0 );
 
-  auto const       batch = DrawList::PerBatch::Opaque( draw_list.Unified );
+  auto const       batch = draw_list.Opaque();
 
   PackedData const packed_data{
     .Position       = omni_light.Position,

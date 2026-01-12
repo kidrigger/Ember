@@ -360,7 +360,7 @@ void Ember::Internal::DirectionLightManager::RenderDirShadow(
 
   command_list->ClearDepthStencilView( texture.GetTexture(), D3D12_CLEAR_FLAG_DEPTH, 1.0f, 0 );
 
-  auto const       batch = DrawList::PerBatch::Opaque( draw_info.Unified );
+  auto const       batch = draw_info.Opaque();
 
   PackedData const packed_data{
     .LightData    = m_DataBuffers[frame_index].GetSRVHandle(),

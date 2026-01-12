@@ -50,19 +50,19 @@ FrameGraphResource Ember::RenderPass::DepthPrePass::Execute(
         CommandList*                  cmd        = frame_data.CommandList;
         PIXScopedEvent( cmd->Get(), PIX_COLOR_DEFAULT, "Depth PrePass" );
 
-        DrawList::Info2 const&   draw_list = blackboard.get<DrawList::Batches>().Unified;
+        DrawList::Batches const& draw_list = blackboard.get<DrawList::Batches>();
         PerFrameConstants const& constants = blackboard.get<PerFrameConstants>();
 
         cmd->SetGraphicsRootSignature( this->m_RootSignature.Get() );
         cmd->SetGraphicsRootConstants( 1, constants );
 
-        auto const opaque_batch = DrawList::PerBatch::Opaque( draw_list );
+        auto const opaque_batch = draw_list.Opaque();
 
         cmd->SetPipelineState( this->m_OpaquePipeline.Get() );
         cmd->SetGraphicsRootConstants( 0, opaque_batch );
         cmd->DispatchMesh( { .X = opaque_batch.CommandsCount } );
 
-        auto const masked_batch = DrawList::PerBatch::Masked( draw_list );
+        auto const masked_batch = draw_list.Masked();
 
         cmd->SetPipelineState( this->m_MaskedPipeline.Get() );
         cmd->SetGraphicsRootConstants( 0, masked_batch );

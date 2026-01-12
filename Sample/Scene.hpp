@@ -349,11 +349,6 @@ class DrawList
 {
   struct FrameResources
   {
-    Buffer TransformBuffer;
-    Buffer OpaqueDrawBuffer;
-    Buffer MaskedDrawBuffer;
-    Buffer TransparentDrawBuffer;
-
     Buffer UnifiedResourceBuffer;
   };
 
@@ -361,10 +356,6 @@ class DrawList
   GeometryManager*            m_GeometryManager;
   MaterialManager*            m_MaterialManager;
 
-  std::vector<WorldTransform> m_Transforms;
-  std::vector<MeshDraw>       m_OpaqueDrawInfos;
-  std::vector<MeshDraw>       m_MaskedDrawInfos;
-  std::vector<MeshDraw>       m_TransparentDrawInfos;
   std::vector<FrameResources> m_FrameResources;
 
   // New API
@@ -375,15 +366,18 @@ class DrawList
   std::vector<AmpCommand>   m_TransparentCommands;
 
 public:
-  struct Info
+  struct PerBatch
   {
-    SRVHandle Transforms;
-    SRVHandle DrawInfos;
-    uint32_t  DrawCount;
-    SRVHandle GeometryHandle;
+    SRVHandle GeometryBuffer;
+    SRVHandle MaterialBuffer;
+    SRVHandle TopLevelAS;
+    SRVHandle DrawBuffer;
+    uint32_t  InstancesOffset;
+    uint32_t  CommandsOffset;
+    uint32_t  CommandsCount;
   };
 
-  struct Info2
+  struct Batches
   {
     SRVHandle GeometryBuffer;
     SRVHandle MaterialBuffer;
@@ -395,33 +389,15 @@ public:
     uint32_t  TransparentCommandsOffset;
     uint32_t  CommandsEnd;
 
+    PerBatch  Opaque() const;
+    PerBatch  Masked() const;
+    PerBatch  Transparent() const;
+
+  private:
     // Helpers
     [[nodiscard]] uint32_t OpaqueCommandsCount() const;
     [[nodiscard]] uint32_t MaskedCommandsCount() const;
     [[nodiscard]] uint32_t TransparentCommandsCount() const;
-  };
-
-  struct PerBatch
-  {
-    SRVHandle       GeometryBuffer;
-    SRVHandle       MaterialBuffer;
-    SRVHandle       TopLevelAS;
-    SRVHandle       DrawBuffer;
-    uint32_t        InstancesOffset;
-    uint32_t        CommandsOffset;
-    uint32_t        CommandsCount;
-
-    static PerBatch Opaque( Info2 const& info );
-    static PerBatch Masked( Info2 const& info );
-    static PerBatch Transparent( Info2 const& info );
-  };
-
-  struct Batches
-  {
-    Info  Opaque;
-    Info  Masked;
-    Info  Transparent;
-    Info2 Unified;
   };
 
   DrawList(

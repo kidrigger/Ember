@@ -153,9 +153,9 @@ Ember::RenderPass::GBuffer::Data Ember::RenderPass::GBuffer::Execute(
 
         auto const& constants = bb->get<PerFrameConstants>();
         auto const& env       = bb->get<Environment::GpuRepr>();
-        auto const& draw_list = bb->get<DrawList::Batches>().Unified;
+        auto const& draw_list = bb->get<DrawList::Batches>();
 
-        auto const  batch     = DrawList::PerBatch::Opaque( draw_list );
+        auto const  batch     = draw_list.Opaque();
 
         cmd->SetGraphicsRootSignature( self->RootSignature.Get() );
         cmd->SetPipelineState( self->Pipeline.Get() );

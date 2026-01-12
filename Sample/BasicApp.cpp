@@ -818,7 +818,7 @@ void Ember::BasicApp::Render()
   if ( g_Debug.RaytracedShadows )
   {
     PrepareTLAS( &command_list, frame_idx );
-    draw_list_info.Unified.TopLevelAS = command_list.Bind( BindSRV{ m_RTX.TLAS[frame_idx] } );
+    draw_list_info.TopLevelAS = command_list.Bind( BindSRV{ m_RTX.TLAS[frame_idx] } );
   }
 
   m_FGBlackboard.get<DrawList::Batches>() = draw_list_info;
