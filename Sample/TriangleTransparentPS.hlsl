@@ -3,8 +3,8 @@
 
 float4 TriangleTransparentPS( PSIn IN ) : SV_TARGET0
 {
-  ConstantBuffer<Camera>     camera    = ResourceDescriptorHeap[g_Camera];
   StructuredBuffer<Material> materials = ResourceDescriptorHeap[g_Materials];
+  ConstantBuffer<Camera>     camera    = ResourceDescriptorHeap[g_Camera];
 
   //
   Material mat         = materials[NonUniformResourceIndex( IN.Material )];

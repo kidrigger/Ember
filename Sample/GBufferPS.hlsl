@@ -1,5 +1,4 @@
 #include "DebugConfig.hlsli"
-#include "Triangle.hlsli"
 #include "TrianglePSCommon.hlsli"
 
 struct PSOutput

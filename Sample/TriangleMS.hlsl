@@ -28,15 +28,18 @@ void TriangleMS(
     out indices uint3             tris[MAX_TRIANGLES],
     out primitives MSPrimitiveOut materials[MAX_TRIANGLES] )
 {
-  StructuredBuffer<Transform> transforms   = ResourceDescriptorHeap[g_DrawList.Transforms];
-  ByteAddressBuffer           ugb          = ResourceDescriptorHeap[g_DrawList.Geometry];
-  ConstantBuffer<Camera>      camera       = ResourceDescriptorHeap[g_Camera];
+  ByteAddressBuffer      draw_buffer  = ResourceDescriptorHeap[g_DrawBatch.DrawBuffer];
+  ByteAddressBuffer      ugb          = ResourceDescriptorHeap[g_DrawBatch.GeometryBuffer];
+  ConstantBuffer<Camera> camera       = ResourceDescriptorHeap[g_Camera];
 
-  uint                        meshlet_idx  = amp_payload.MeshletID[IN.GroupID.x] + amp_payload.FirstMeshlet;
-  uint                        meshlet_addr = sizeof( Meshlet ) * meshlet_idx;
+  uint                   meshlet_idx  = amp_payload.MeshletID[IN.GroupID.x] + amp_payload.FirstMeshlet;
+  uint                   meshlet_addr = Meshlet_size * meshlet_idx;
 
-  Meshlet                     meshlet      = ugb.Load<Meshlet>( meshlet_addr );
-  Transform                   transform    = transforms[NonUniformResourceIndex( amp_payload.Transform )];
+  DrawInstance           instance =
+      draw_buffer.Load<DrawInstance>( g_DrawBatch.InstancesOffset + DrawInstance_size * amp_payload.InstanceIdx );
+  Meshlet  meshlet = ugb.Load<Meshlet>( meshlet_addr );
+
+  DrawMesh mesh    = draw_buffer.Load<DrawMesh>( /* Meshoffset + */ DrawMesh_size * instance.MeshID );
 
   SetMeshOutputCounts( meshlet.VertexCount, meshlet.TriangleCount );
 
@@ -44,16 +47,16 @@ void TriangleMS(
   {
     uint       index      = ugb.Load( 4 * ( meshlet.VertexOffset + i ) );
 
-    VertexLite vertex_pos = ugb.Load<VertexLite>( sizeof( VertexLite ) * ( index + amp_payload.VertexLiteStart ) );
-    VertexData vertex     = ugb.Load<VertexData>( sizeof( VertexData ) * ( index + amp_payload.FirstVertex ) );
+    VertexLite vertex_pos = ugb.Load<VertexLite>( VertexLite_size * ( index + mesh.VertexLiteStart ) );
+    VertexData vertex     = ugb.Load<VertexData>( VertexData_size * ( index + mesh.VertexDataStart ) );
 
-    float4     world_pos  = mul( transform.Model, vertex_pos.Position );
+    float4     world_pos  = mul( instance.Transform, vertex_pos.Position );
     float4     clip_pos   = mul( camera.View, world_pos );
     float4     screen_pos = mul( camera.Projection, clip_pos );
 
-    float3     normal     = normalize( mul( vertex.GetNormal(), transform.InvModel ).xyz );
+    float3     normal     = normalize( mul( vertex.GetNormal(), instance.InvTransform ).xyz );
     float4     tangent    = vertex.GetTangent();
-    tangent = float4( normalize( mul( float4( tangent.xyz, 0.0f ), transform.InvModel ).xyz ), tangent.w );
+    tangent = float4( normalize( mul( float4( tangent.xyz, 0.0f ), instance.InvTransform ).xyz ), tangent.w );
 
     verts[i].ScreenPosition = screen_pos;
     verts[i].Position       = world_pos;
@@ -73,7 +76,7 @@ void TriangleMS(
     uint2 data            = ugb.Load2( buf_offset );
     tris[i]               = GetBytes( data, sub_offset );
 
-    materials[i].Material = amp_payload.Material;
+    materials[i].Material = mesh.Material;
 #ifndef STRIP_DEBUG_CONFIG
     materials[i].MeshletColor = UnpackColor32( SimpleHash( meshlet_idx ) ).rgb;
 #endif

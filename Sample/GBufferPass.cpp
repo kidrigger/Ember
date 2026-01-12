@@ -11,9 +11,9 @@
 bool Ember::RenderPass::GBuffer::Create( GBuffer* out, RenderDevice* render_device, DXGI_FORMAT const depth_format )
 {
   ComPtr<ID3DBlob> amp_shader_blob;
-  ERR_FAIL_RET_F( D3DReadFileToBlob( L"TriangleAS.cso", &amp_shader_blob ) );
+  ERR_FAIL_RET_F( D3DReadFileToBlob( L"TriangleAS2.cso", &amp_shader_blob ) );
   ComPtr<ID3DBlob> mesh_shader_blob;
-  ERR_FAIL_RET_F( D3DReadFileToBlob( L"TriangleMS.cso", &mesh_shader_blob ) );
+  ERR_FAIL_RET_F( D3DReadFileToBlob( L"TriangleMS2.cso", &mesh_shader_blob ) );
   ComPtr<ID3DBlob> gbuffer_shader_blob;
   ERR_FAIL_RET_F( D3DReadFileToBlob( L"GBufferPS.cso", &gbuffer_shader_blob ) );
 
@@ -41,7 +41,7 @@ bool Ember::RenderPass::GBuffer::Create( GBuffer* out, RenderDevice* render_devi
                                                           D3D12_ROOT_SIGNATURE_FLAG_DENY_HULL_SHADER_ROOT_ACCESS;
 
   CD3DX12_ROOT_PARAMETER1 root_parameters[3];
-  root_parameters[0].InitAsConstants( sizeof( DrawList::Info ) / 4, 0 );
+  root_parameters[0].InitAsConstants( sizeof( DrawList::PerBatch ) / 4, 0 );
   root_parameters[1].InitAsConstants( sizeof( PerFrameConstants ) / 4, 1 );
   root_parameters[2].InitAsConstants( sizeof( Environment::GpuRepr ) / 4, 2 );
 
@@ -153,14 +153,16 @@ Ember::RenderPass::GBuffer::Data Ember::RenderPass::GBuffer::Execute(
 
         auto const& constants = bb->get<PerFrameConstants>();
         auto const& env       = bb->get<Environment::GpuRepr>();
-        auto const& draw_list = bb->get<DrawList::Batches>().Opaque;
+        auto const& draw_list = bb->get<DrawList::Batches>().Unified;
+
+        auto const  batch     = DrawList::PerBatch::Opaque( draw_list );
 
         cmd->SetGraphicsRootSignature( self->RootSignature.Get() );
         cmd->SetPipelineState( self->Pipeline.Get() );
-        cmd->SetGraphicsRootConstants( 0, draw_list );
+        cmd->SetGraphicsRootConstants( 0, batch );
         cmd->SetGraphicsRootConstants( 1, constants );
         cmd->SetGraphicsRootConstants( 2, env );
-        cmd->DispatchMesh( { .X = draw_list.DrawCount } );
+        cmd->DispatchMesh( { .X = batch.CommandsCount } );
       } );
 }
 

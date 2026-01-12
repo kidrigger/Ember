@@ -411,44 +411,9 @@ public:
     uint32_t        CommandsOffset;
     uint32_t        CommandsCount;
 
-    static PerBatch FromOpaque( Info2 const& info )
-    {
-      return {
-        .GeometryBuffer  = info.GeometryBuffer,
-        .MaterialBuffer  = info.MaterialBuffer,
-        .TopLevelAS      = info.TopLevelAS,
-        .DrawBuffer      = info.DrawBuffer,
-        .InstancesOffset = info.InstancesOffset,
-        .CommandsOffset  = info.OpaqueCommandsOffset,
-        .CommandsCount   = info.OpaqueCommandsCount(),
-      };
-    }
-
-    static PerBatch FromMasked( Info2 const& info )
-    {
-      return {
-        .GeometryBuffer  = info.GeometryBuffer,
-        .MaterialBuffer  = info.MaterialBuffer,
-        .TopLevelAS      = info.TopLevelAS,
-        .DrawBuffer      = info.DrawBuffer,
-        .InstancesOffset = info.InstancesOffset,
-        .CommandsOffset  = info.MaskedCommandsOffset,
-        .CommandsCount   = info.MaskedCommandsCount(),
-      };
-    }
-
-    static PerBatch FromTransparent( Info2 const& info )
-    {
-      return {
-        .GeometryBuffer  = info.GeometryBuffer,
-        .MaterialBuffer  = info.MaterialBuffer,
-        .TopLevelAS      = info.TopLevelAS,
-        .DrawBuffer      = info.DrawBuffer,
-        .InstancesOffset = info.InstancesOffset,
-        .CommandsOffset  = info.TransparentCommandsOffset,
-        .CommandsCount   = info.TransparentCommandsCount(),
-      };
-    }
+    static PerBatch Opaque( Info2 const& info );
+    static PerBatch Masked( Info2 const& info );
+    static PerBatch Transparent( Info2 const& info );
   };
 
   struct Batches
@@ -493,7 +458,7 @@ public:
 
   World();
 
-  void Update( float delta_seconds ) const;
+  void Update( float delta_time ) const;
 
   //
   flecs::world const& GetECS() const;

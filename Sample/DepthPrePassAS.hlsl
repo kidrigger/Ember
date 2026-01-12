@@ -31,27 +31,27 @@ void DepthPrePassAS( uint3 group_id : SV_GroupID, uint3 local_id : SV_GroupThrea
   ConstantBuffer<DebugConfig> config = ResourceDescriptorHeap[g_ConfigID];
 #endif
 
-  uint                       mesh_draw_idx = group_id.x;
-  uint                       meshlet_idx   = local_id.x;
-  bool                       is_visible    = false;
+  ByteAddressBuffer      draws        = ResourceDescriptorHeap[g_DrawBatch.DrawBuffer];
+  ConstantBuffer<Camera> camera       = ResourceDescriptorHeap[g_Camera];
 
-  StructuredBuffer<MeshDraw> mesh_draws    = ResourceDescriptorHeap[g_DrawList.MeshDraws];
-  MeshDraw                   current_draw  = mesh_draws[NonUniformResourceIndex( mesh_draw_idx )];
+  uint                   draw_cmd_idx = group_id.x;
+  uint                   meshlet_idx  = local_id.x;
+  bool                   is_visible   = false;
 
-  ConstantBuffer<Camera>     camera        = ResourceDescriptorHeap[g_Camera];
+  AmpCommand             cmd = draws.Load<AmpCommand>( g_DrawBatch.CommandsOffset + AmpCommand_size * draw_cmd_idx );
 
-  if ( meshlet_idx < current_draw.MeshletCount )
+  if ( meshlet_idx < cmd.MeshletCount )
   {
-    ByteAddressBuffer           meshlet_buffer   = ResourceDescriptorHeap[g_DrawList.Geometry];
+    ByteAddressBuffer ugb          = ResourceDescriptorHeap[g_DrawBatch.GeometryBuffer];
 
-    uint                        meshlet_addr     = sizeof( Meshlet ) * ( current_draw.FirstMeshlet + meshlet_idx );
-    Meshlet                     meshlet          = meshlet_buffer.Load<Meshlet>( meshlet_addr );
+    uint              meshlet_addr = Meshlet_size * ( cmd.FirstMeshlet + meshlet_idx );
+    Meshlet           meshlet      = ugb.Load<Meshlet>( meshlet_addr );
 
-    StructuredBuffer<Transform> transform_buffer = ResourceDescriptorHeap[g_DrawList.Transforms];
-    float4x4                    model = transform_buffer[NonUniformResourceIndex( current_draw.FirstTransform )].Model;
+    float4x4          model =
+        draws.Load<DrawInstance>( g_DrawBatch.InstancesOffset + DrawInstance_size * cmd.InstanceID ).Transform;
 
-    float4                      ws_bounds = TransformBoundingSphere( model, meshlet.BoundingSphere );
-    float4                      vs_bounds = TransformBoundingSphere( camera.View, ws_bounds );
+    float4 ws_bounds = TransformBoundingSphere( model, meshlet.BoundingSphere );
+    float4 vs_bounds = TransformBoundingSphere( camera.View, ws_bounds );
 
 #ifndef STRIP_DEBUG_CONFIG
     if ( !config.DisableMeshletFrustumCulling )
@@ -74,10 +74,8 @@ void DepthPrePassAS( uint3 group_id : SV_GroupID, uint3 local_id : SV_GroupThrea
 
     if ( local_id.x == 0 )
     {
-      pl.Transform    = current_draw.FirstTransform;
-      pl.FirstVertex  = current_draw.VertexLiteStart;
-      pl.FirstMeshlet = current_draw.FirstMeshlet;
-      pl.Material     = current_draw.Material;
+      pl.InstanceIdx  = cmd.InstanceID;
+      pl.FirstMeshlet = cmd.FirstMeshlet;
     }
   }
 

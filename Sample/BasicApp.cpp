@@ -829,21 +829,17 @@ void Ember::BasicApp::Render()
     .LightInfo       = light_info,
   };
 
-  m_FGBlackboard.get<Environment::GpuRepr>()     = m_Environment->Repr();
+  m_FGBlackboard.get<Environment::GpuRepr>() = m_Environment->Repr();
 
-  auto const                        atmosphere   = m_UpdateAtmosphericSky( &frame_graph, &m_FGBlackboard, frame_idx );
+  auto const atmosphere                      = m_UpdateAtmosphericSky( &frame_graph, &m_FGBlackboard, frame_idx );
 
-  auto const                        depth_buffer = m_DrawPrePass( &frame_graph, m_FGBlackboard );
+  auto const depth_buffer                    = m_DrawPrePass( &frame_graph, m_FGBlackboard );
 
-  std::optional<FrameGraphResource> top_level_as;
-  if ( g_Debug.RaytracedShadows )
-  {
-    top_level_as = frame_graph.import( "Top Level AS", {}, FG::Buffer{ m_RTX.TLAS[frame_idx] } );
-  }
-  auto const opaque_pass_fwd = m_RenderOpaqueMeshes( &frame_graph, m_FGBlackboard, depth_buffer, top_level_as );
 
-  auto const gbuffer         = m_UpdateGBuffer( &frame_graph, m_FGBlackboard, depth_buffer );
-  auto const omni_pass_rt    = m_RenderOmniLights( &frame_graph, m_FGBlackboard, gbuffer );
+  auto const opaque_pass_fwd                 = m_RenderOpaqueMeshes( &frame_graph, m_FGBlackboard, depth_buffer );
+
+  auto const gbuffer                         = m_UpdateGBuffer( &frame_graph, m_FGBlackboard, depth_buffer );
+  auto const omni_pass_rt                    = m_RenderOmniLights( &frame_graph, m_FGBlackboard, gbuffer );
   auto const spot_pass_rt    = m_RenderSpotLights( &frame_graph, m_FGBlackboard, gbuffer, omni_pass_rt );
   auto const opaque_pass_dfr = m_RenderScreenSpaceLighting( &frame_graph, m_FGBlackboard, gbuffer, spot_pass_rt );
 
@@ -852,8 +848,8 @@ void Ember::BasicApp::Render()
         .DepthStencil = depth_buffer,
   };
 
-  auto const alpha_tested      = m_RenderMaskedMeshes( &frame_graph, m_FGBlackboard, opaque_pass, top_level_as );
-  auto const transparency_pass = m_RenderTransparentMeshes( &frame_graph, m_FGBlackboard, alpha_tested, top_level_as );
+  auto const alpha_tested      = m_RenderMaskedMeshes( &frame_graph, m_FGBlackboard, opaque_pass );
+  auto const transparency_pass = m_RenderTransparentMeshes( &frame_graph, m_FGBlackboard, alpha_tested );
 
   m_RenderBackground.UseProceduralAtmosphericSky = g_Debug.SkyMode == DebugConfig::kAtmosphere;
   auto const skybox_pass = m_RenderBackground( &frame_graph, m_FGBlackboard, transparency_pass, atmosphere.SkyViewLUT );

@@ -50,19 +50,23 @@ FrameGraphResource Ember::RenderPass::DepthPrePass::Execute(
         CommandList*                  cmd        = frame_data.CommandList;
         PIXScopedEvent( cmd->Get(), PIX_COLOR_DEFAULT, "Depth PrePass" );
 
-        DrawList::Batches const& draw_list_info_list = blackboard.get<DrawList::Batches>();
-        PerFrameConstants const& constants           = blackboard.get<PerFrameConstants>();
+        DrawList::Info2 const&   draw_list = blackboard.get<DrawList::Batches>().Unified;
+        PerFrameConstants const& constants = blackboard.get<PerFrameConstants>();
 
         cmd->SetGraphicsRootSignature( this->m_RootSignature.Get() );
         cmd->SetGraphicsRootConstants( 1, constants );
 
+        auto const opaque_batch = DrawList::PerBatch::Opaque( draw_list );
+
         cmd->SetPipelineState( this->m_OpaquePipeline.Get() );
-        cmd->SetGraphicsRootConstants( 0, draw_list_info_list.Opaque );
-        cmd->DispatchMesh( { .X = draw_list_info_list.Opaque.DrawCount } );
+        cmd->SetGraphicsRootConstants( 0, opaque_batch );
+        cmd->DispatchMesh( { .X = opaque_batch.CommandsCount } );
+
+        auto const masked_batch = DrawList::PerBatch::Masked( draw_list );
 
         cmd->SetPipelineState( this->m_MaskedPipeline.Get() );
-        cmd->SetGraphicsRootConstants( 0, draw_list_info_list.Masked );
-        cmd->DispatchMesh( { .X = draw_list_info_list.Masked.DrawCount } );
+        cmd->SetGraphicsRootConstants( 0, masked_batch );
+        cmd->DispatchMesh( { .X = masked_batch.CommandsCount } );
       } );
 }
 
@@ -96,7 +100,7 @@ bool Ember::RenderPass::DepthPrePass::Create(
                                                           D3D12_ROOT_SIGNATURE_FLAG_DENY_HULL_SHADER_ROOT_ACCESS;
 
   CD3DX12_ROOT_PARAMETER1 root_parameter[2];
-  root_parameter[0].InitAsConstants( sizeof( DrawList::Info ) / 4, 0 );
+  root_parameter[0].InitAsConstants( sizeof( DrawList::PerBatch ) / 4, 0 );
   root_parameter[1].InitAsConstants( sizeof( PerFrameConstants ) / 4, 1 );
 
   CD3DX12_STATIC_SAMPLER_DESC           static_sampler_desc{ 0 };

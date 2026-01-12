@@ -165,6 +165,45 @@ uint32_t Ember::DrawList::Info2::TransparentCommandsCount() const
   return ( CommandsEnd - TransparentCommandsOffset ) / ( uint32_t )sizeof( AmpCommand );
 }
 
+Ember::DrawList::PerBatch Ember::DrawList::PerBatch::Opaque( Info2 const& info )
+{
+  return {
+    .GeometryBuffer  = info.GeometryBuffer,
+    .MaterialBuffer  = info.MaterialBuffer,
+    .TopLevelAS      = info.TopLevelAS,
+    .DrawBuffer      = info.DrawBuffer,
+    .InstancesOffset = info.InstancesOffset,
+    .CommandsOffset  = info.OpaqueCommandsOffset,
+    .CommandsCount   = info.OpaqueCommandsCount(),
+  };
+}
+
+Ember::DrawList::PerBatch Ember::DrawList::PerBatch::Masked( Info2 const& info )
+{
+  return {
+    .GeometryBuffer  = info.GeometryBuffer,
+    .MaterialBuffer  = info.MaterialBuffer,
+    .TopLevelAS      = info.TopLevelAS,
+    .DrawBuffer      = info.DrawBuffer,
+    .InstancesOffset = info.InstancesOffset,
+    .CommandsOffset  = info.MaskedCommandsOffset,
+    .CommandsCount   = info.MaskedCommandsCount(),
+  };
+}
+
+Ember::DrawList::PerBatch Ember::DrawList::PerBatch::Transparent( Info2 const& info )
+{
+  return {
+    .GeometryBuffer  = info.GeometryBuffer,
+    .MaterialBuffer  = info.MaterialBuffer,
+    .TopLevelAS      = info.TopLevelAS,
+    .DrawBuffer      = info.DrawBuffer,
+    .InstancesOffset = info.InstancesOffset,
+    .CommandsOffset  = info.TransparentCommandsOffset,
+    .CommandsCount   = info.TransparentCommandsCount(),
+  };
+}
+
 Ember::DrawList::DrawList(
     RenderDevice*    render_device,
     GeometryManager* geometry_manager,

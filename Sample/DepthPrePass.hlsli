@@ -5,18 +5,16 @@
 #include "Camera.hlsli"
 #include "Colors.hlsli"
 #include "Environment.hlsli"
-#include "Geometry.hlsli"
+#include "Geometry2.hlsli"
 #include "LightData.hlsli"
 #include "Material.hlsli"
 #include "Quantization.hlsli"
 
 struct MeshletPayload
 {
-  uint  MeshletID[32];
-  uint  Transform;
-  uint  FirstVertex;
-  uint  FirstMeshlet;
-  MatID Material;
+  uint MeshletID[32];
+  uint InstanceIdx;
+  uint FirstMeshlet;
 };
 
 struct MSVertexOut
@@ -36,12 +34,9 @@ struct PSIn
   MatID  Material : MATERIAL;
 };
 
-cbuffer DrawListBlock : register( b0, space0 )
-{
-  DrawList g_DrawList;
-}
+ConstantBuffer<DrawBatch> g_DrawBatch : register( b0, space0 );
 
-cbuffer BindlessIndex : register( b1, space0 )
+cbuffer                   BindlessIndex : register( b1, space0 )
 {
   ResID g_Materials;
   ResID g_Camera;

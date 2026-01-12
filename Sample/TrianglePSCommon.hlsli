@@ -66,7 +66,7 @@ template <typename TRayQuery>
 float3 CalcDirLightContrib( in BRDFCookTorranceGGX brdf, float4 ws_position, float3 view_dir, in TRayQuery rq )
 {
   StructuredBuffer<DirLight>      dir_lights  = ResourceDescriptorHeap[g_DirLights];
-  RaytracingAccelerationStructure tlas        = ResourceDescriptorHeap[g_TLAS];
+  RaytracingAccelerationStructure tlas        = ResourceDescriptorHeap[g_DrawBatch.TopLevelAS];
 
   float3                          dir_contrib = 0.0f;
   int                             light_idx   = 0;
@@ -87,7 +87,7 @@ template <typename TRayQuery>
 float3 CalcPointLightContrib( in BRDFCookTorranceGGX brdf, float4 ws_position, float3 view_dir, in TRayQuery rq )
 {
   StructuredBuffer<PointLight>    point_lights  = ResourceDescriptorHeap[g_PointLights];
-  RaytracingAccelerationStructure tlas          = ResourceDescriptorHeap[g_TLAS];
+  RaytracingAccelerationStructure tlas          = ResourceDescriptorHeap[g_DrawBatch.TopLevelAS];
 
   float3                          point_contrib = 0.0f;
   int                             light_idx     = 0;
@@ -108,7 +108,7 @@ template <typename TRayQuery>
 float3 CalcSpotLightContrib( in BRDFCookTorranceGGX brdf, float4 ws_position, float3 view_dir, in TRayQuery rq )
 {
   StructuredBuffer<SpotLight>     spot_lights  = ResourceDescriptorHeap[g_SpotLights];
-  RaytracingAccelerationStructure tlas         = ResourceDescriptorHeap[g_TLAS];
+  RaytracingAccelerationStructure tlas         = ResourceDescriptorHeap[g_DrawBatch.TopLevelAS];
 
   float3                          spot_contrib = 0.0f;
   int                             light_idx    = 0;
