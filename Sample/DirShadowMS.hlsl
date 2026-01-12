@@ -30,30 +30,31 @@ void DirShadowMS(
     out indices uint3             tris[MAX_TRIANGLES],
     out primitives MSPrimitiveOut rt_array_idx[MAX_TRIANGLES] )
 {
-  StructuredBuffer<Transform> transforms    = ResourceDescriptorHeap[g_DrawList.Transforms];
-  StructuredBuffer<MeshDraw>  mesh_draw_buf = ResourceDescriptorHeap[g_DrawList.MeshDraws];
-  MeshDraw                    mesh_draw     = mesh_draw_buf[amp_payload.MeshDrawID];
+  ByteAddressBuffer draw_buffer = ResourceDescriptorHeap[g_DrawBatch.DrawBuffer];
+  ByteAddressBuffer ugb         = ResourceDescriptorHeap[g_DrawBatch.GeometryBuffer];
+  AmpCommand cmd = draw_buffer.Load<AmpCommand>( g_DrawBatch.CommandsOffset + AmpCommand_size * amp_payload.DrawCmdID );
 
-  ByteAddressBuffer           ugb           = ResourceDescriptorHeap[g_DrawList.Geometry];
+  StructuredBuffer<DirLight> light_data   = ResourceDescriptorHeap[g_LightData];
 
-  StructuredBuffer<DirLight>  light_data    = ResourceDescriptorHeap[g_LightData];
+  uint                       meshlet_idx  = amp_payload.MeshletID[IN.GroupID.x] + cmd.FirstMeshlet;
+  uint                       view_idx     = amp_payload.ViewID[IN.GroupID.x];
 
-  uint                        meshlet_idx   = amp_payload.MeshletID[IN.GroupID.x] + mesh_draw.FirstMeshlet;
-  uint                        view_idx      = amp_payload.ViewID[IN.GroupID.x];
+  uint                       meshlet_addr = Meshlet_size * meshlet_idx;
 
-  uint                        meshlet_addr  = sizeof( Meshlet ) * meshlet_idx;
-
-  Meshlet                     meshlet       = ugb.Load<Meshlet>( meshlet_addr );
-  Transform                   transform     = transforms[mesh_draw.FirstTransform];
+  Meshlet                    meshlet      = ugb.Load<Meshlet>( meshlet_addr );
+  DrawInstance               instance =
+      draw_buffer.Load<DrawInstance>( g_DrawBatch.InstancesOffset + DrawInstance_size * cmd.InstanceID );
 
   SetMeshOutputCounts( meshlet.VertexCount, meshlet.TriangleCount );
+
+  DrawMesh mesh = draw_buffer.Load<DrawMesh>( /* Meshoffset + */ DrawMesh_size * instance.MeshID );
 
   for ( int i = IN.LocalID.x; i < meshlet.VertexCount; i += GROUP_SIZE )
   {
     uint       index            = ugb.Load( 4 * ( meshlet.VertexOffset + i ) );
-    VertexLite vertex           = ugb.Load<VertexLite>( sizeof( VertexLite ) * ( index + mesh_draw.VertexLiteStart ) );
+    VertexLite vertex           = ugb.Load<VertexLite>( VertexLite_size * ( index + mesh.VertexLiteStart ) );
 
-    float4     world_position   = mul( transform.Model, vertex.Position );
+    float4     world_position   = mul( instance.Transform, vertex.Position );
     float4     screen_position  = mul( light_data[g_LightIdx].LightSpaceMat[view_idx], world_position );
     screen_position            /= screen_position.w;
 

@@ -22,27 +22,30 @@ groupshared MeshletPayload pl;
 NUM_THREADS( 32, 1, 1 )
 void OmniShadowAS( uint3 group_id : SV_GroupID, uint3 local_id : SV_GroupThreadID )
 {
-  uint                                 mesh_draw_idx = group_id.x;
-  uint                                 meshlet_idx   = local_id.x;
-  uint                                 visible_count = 0;
+  ByteAddressBuffer draws         = ResourceDescriptorHeap[g_DrawBatch.DrawBuffer];
 
-  StructuredBuffer<MeshDraw>           mesh_draws    = ResourceDescriptorHeap[g_DrawList.MeshDraws];
-  MeshDraw                             current_draw  = mesh_draws[NonUniformResourceIndex( mesh_draw_idx )];
+  uint              draw_cmd_idx  = group_id.x;
+  uint              meshlet_idx   = local_id.x;
+  uint              visible_count = 0;
 
-  ConstantBuffer<ProjectionTransforms> proj_view     = ResourceDescriptorHeap[g_ProjViewID];
+  AmpCommand        cmd = draws.Load<AmpCommand>( g_DrawBatch.CommandsOffset + AmpCommand_size * draw_cmd_idx );
 
-  if ( meshlet_idx < current_draw.MeshletCount )
+  ConstantBuffer<ProjectionTransforms> proj_view = ResourceDescriptorHeap[g_ProjViewID];
+
+  if ( meshlet_idx < cmd.MeshletCount )
   {
-    ByteAddressBuffer           meshlet_buffer   = ResourceDescriptorHeap[g_DrawList.Geometry];
-    uint                        meshlet_addr     = sizeof( Meshlet ) * ( current_draw.FirstMeshlet + meshlet_idx );
-    Meshlet                     meshlet          = meshlet_buffer.Load<Meshlet>( meshlet_addr );
+    ByteAddressBuffer ugb          = ResourceDescriptorHeap[g_DrawBatch.GeometryBuffer];
 
-    StructuredBuffer<Transform> transform_buffer = ResourceDescriptorHeap[g_DrawList.Transforms];
-    float4x4                    model  = transform_buffer[NonUniformResourceIndex( current_draw.FirstTransform )].Model;
-    float4                      bounds = TransformBoundingSphere( model, meshlet.BoundingSphere );
+    uint              meshlet_addr = Meshlet_size * ( cmd.FirstMeshlet + meshlet_idx );
+    Meshlet           meshlet      = ugb.Load<Meshlet>( meshlet_addr );
 
-    bool                        is_view_visible[6];
-    [unroll] for ( int i = 0; i < 6; i++ )
+    float4x4          model =
+        draws.Load<DrawInstance>( g_DrawBatch.InstancesOffset + DrawInstance_size * cmd.InstanceID ).Transform;
+
+    float4 bounds = TransformBoundingSphere( model, meshlet.BoundingSphere );
+
+    bool   is_view_visible[6];
+    for ( int i = 0; i < 6; i++ )
     {
       // We know this is only translation and orientation. No need for whole transform
       float4 ls_position  = mul( proj_view.Views[i], float4( bounds.xyz - g_LightPosition, 1.0f ) );
@@ -53,7 +56,7 @@ void OmniShadowAS( uint3 group_id : SV_GroupID, uint3 local_id : SV_GroupThreadI
     if ( visible_count > 0 )
     {
       uint write_idx = WavePrefixSum( visible_count );
-      [unroll] for ( int i = 0; i < 6; i++ )
+      for ( int i = 0; i < 6; i++ )
       {
         if ( is_view_visible[i] )
         {
@@ -66,7 +69,7 @@ void OmniShadowAS( uint3 group_id : SV_GroupID, uint3 local_id : SV_GroupThreadI
 
     if ( local_id.x == 0 )
     {
-      pl.MeshDrawID = mesh_draw_idx;
+      pl.DrawCmdID = draw_cmd_idx;
     }
   }
 

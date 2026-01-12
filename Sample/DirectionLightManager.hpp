@@ -88,11 +88,11 @@ public:
       CommandList* command_list, DrawList::Batches const& draw_info, Camera const& camera, uint32_t frame_idx );
 
   void RenderDirShadow(
-      CommandList*             command_list,
+      CommandList const*       command_list,
       DrawList::Batches const& draw_info,
       Camera const&            camera,
       uint32_t                 frame_index,
-      uint32_t                 light_index );
+      uint32_t                 light_index ) const;
 };
 
 } // namespace Internal

@@ -11,6 +11,8 @@ struct VertexLite
   half2 TexCoord[2]; // 16
 };
 
+#define VertexLite_size 16
+
 struct VertexData
 {
   uint          Normal;   // 04
@@ -34,11 +36,15 @@ struct VertexData
   }
 };
 
+#define VertexData_size 16
+
 struct Transform
 {
-  float4x4 Model;
-  float4x4 InvModel;
+  float4x4 Model;    // 64  64
+  float4x4 InvModel; // 64 128
 };
+
+#define Transform_size 128
 
 struct Meshlet
 {
@@ -51,25 +57,59 @@ struct Meshlet
   uint  ConeApex;       // 32 // xyz = offset
 };
 
-struct MeshDraw
+#define Meshlet_size 32
+
+struct DrawBatch
 {
-  uint  FirstTransform;
-  uint  TransformCount;
-  uint  VertexDataStart;
-  uint  VertexLiteStart;
-  uint  FirstMeshlet;
-  uint  MeshletCount;
-  MatID Material;
-  uint  Pad1;
+  ResID GeometryBuffer;  // 04 04
+  ResID MaterialBuffer;  // 04 08
+  ResID TopLevelAS;      // 04 12
+  ResID DrawBuffer;      // 04 16
+  uint  InstancesOffset; // 04 20
+  uint  CommandsOffset;  // 04 24
+  uint  CommandsCount;   // 04 28
 };
 
-struct DrawList
+#define DrawBatch_size 28
+
+// Contains all the information for a single 'mesh'
+// TODO: Let this be resident in the VRAM
+struct DrawMesh
 {
-  ResID Transforms;
-  ResID MeshDraws;
-  uint  MeshDrawCount;
-  ResID Geometry;
+  uint  VertexDataStart; // 04 04
+  uint  VertexLiteStart; // 04 08
+  MatID Material;        // 04 12
+  uint  FirstMeshlet;    // 04 16
 };
 
+#define DrawMesh_size 16
+
+// What transform, which mesh
+// Should be updated every frame. (For dynamic)
+struct DrawInstance
+{
+  float4x4 Transform;    // 64  64
+  float4x4 InvTransform; // 64 128
+  uint     MeshID;       // 04 132 // TODO: Tuck this into the matrices.
+};
+
+#define DrawInstance_size 132
+
+/*
+ * Which instance to pick up (for the amplification shader)
+ * Update every frame
+ *
+ * TODO: Split into commands with exactly 32 meshlets.
+ * Bucket the rest into a special command set.
+ */
+struct AmpCommand
+{
+  uint InstanceID;   // Which instance (index DrawInstance)
+  uint FirstMeshlet; // Which meshlet of this instance. (Mesh.FirstMeshlet + FirstMeshlet in the geometry)
+  uint MeshletCount; // How many meshlets to draw.
+  uint Pad0;
+};
+
+#define AmpCommand_size 16
 
 #endif

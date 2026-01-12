@@ -9,13 +9,12 @@ namespace
 {
 struct PackedData
 {
-  Ember::DrawList::Info DrawList;
-  DirectX::XMFLOAT3     Position;
-  float                 FarPlane;
-  Ember::CBVHandle      ProjViewHandle;
+  DirectX::XMFLOAT3 Position;
+  float             FarPlane;
+  Ember::CBVHandle  ProjViewHandle;
 };
 
-static_assert( sizeof( PackedData ) == 36 );
+static_assert( sizeof( PackedData ) == 20 );
 } // namespace
 
 Ember::Internal::OmniLightManager::OmniLightManager(
@@ -86,11 +85,13 @@ void Ember::Internal::OmniLightManager::Create(
                                                           D3D12_ROOT_SIGNATURE_FLAG_DENY_DOMAIN_SHADER_ROOT_ACCESS |
                                                           D3D12_ROOT_SIGNATURE_FLAG_DENY_HULL_SHADER_ROOT_ACCESS;
 
-  CD3DX12_ROOT_PARAMETER1 root_parameter;
-  root_parameter.InitAsConstants( sizeof( PackedData ) / 4, 0 );
+  CD3DX12_ROOT_PARAMETER1 root_parameters[2];
+  root_parameters[0].InitAsConstants( sizeof( DrawList::PerBatch ) / 4, 0 );
+  root_parameters[1].InitAsConstants( sizeof( PackedData ) / 4, 1 );
 
   CD3DX12_VERSIONED_ROOT_SIGNATURE_DESC root_signature_desc;
-  root_signature_desc.Init_1_1( 1, &root_parameter, 0, nullptr, root_signature_flags );
+  root_signature_desc.Init_1_1(
+      CountOf( root_parameters ), DataOf( root_parameters ), 0, nullptr, root_signature_flags );
 
   D3D_ROOT_SIGNATURE_VERSION root_signature_version = render_device->FetchHighestRootSignatureVersion();
 
@@ -306,15 +307,17 @@ void Ember::Internal::OmniLightManager::RenderOmniShadow(
 
   command_list->ClearDepthStencilView( texture.GetTexture(), D3D12_CLEAR_FLAG_DEPTH, 1.0f, 0 );
 
+  auto const       batch = DrawList::PerBatch::Opaque( draw_list.Unified );
+
   PackedData const packed_data{
-    .DrawList       = draw_list.Opaque,
     .Position       = omni_light.Position,
     .FarPlane       = omni_light.Range,
     .ProjViewHandle = m_ShadowProjectionBuffer.GetCBVHandle(),
   };
-  command_list->SetGraphicsRootConstants( 0, packed_data );
+  command_list->SetGraphicsRootConstants( 0, batch );
+  command_list->SetGraphicsRootConstants( 1, packed_data );
 
   command_list->OMSetRenderTargets( 0, nullptr, &texture );
 
-  command_list->DispatchMesh( { .X = draw_list.Opaque.DrawCount } );
+  command_list->DispatchMesh( { .X = batch.CommandsCount } );
 }

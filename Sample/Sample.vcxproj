@@ -607,9 +607,8 @@
     <None Include="DebugConfig.hlsli" />
     <None Include="DepthPrePass.hlsli" />
     <None Include="DirShadow.hlsli" />
-    <None Include="Geometry.hlsli" />
     <None Include="Environment.hlsli" />
-    <None Include="Geometry2.hlsli" />
+    <None Include="Geometry.hlsli" />
     <None Include="LightData.hlsli" />
     <None Include="Material.hlsli" />
     <None Include="Math.hlsli" />

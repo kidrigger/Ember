@@ -22,29 +22,32 @@ groupshared SpotShadowPayload pl;
 NUM_THREADS( 32, 1, 1 )
 void SpotShadowAS( uint3 group_id : SV_GroupID, uint3 local_id : SV_GroupThreadID )
 {
-  uint                        mesh_draw_idx = group_id.x;
-  uint                        meshlet_idx   = local_id.x;
-  bool                        is_visible    = false;
+  ByteAddressBuffer draws        = ResourceDescriptorHeap[g_DrawBatch.DrawBuffer];
 
-  StructuredBuffer<MeshDraw>  mesh_draws    = ResourceDescriptorHeap[g_DrawList.MeshDraws];
-  MeshDraw                    current_draw  = mesh_draws[NonUniformResourceIndex( mesh_draw_idx )];
+  uint              draw_cmd_idx = group_id.x;
+  uint              meshlet_idx  = local_id.x;
+  bool              is_visible   = false;
 
-  StructuredBuffer<SpotLight> spot_lights   = ResourceDescriptorHeap[g_SpotLightBuffer];
-  SpotLight                   spot_light    = spot_lights[g_LightID];
+  AmpCommand        cmd = draws.Load<AmpCommand>( g_DrawBatch.CommandsOffset + AmpCommand_size * draw_cmd_idx );
 
-  if ( meshlet_idx < current_draw.MeshletCount )
+  StructuredBuffer<SpotLight> spot_lights = ResourceDescriptorHeap[g_SpotLightBuffer];
+  SpotLight                   spot_light  = spot_lights[g_LightID];
+
+  if ( meshlet_idx < cmd.MeshletCount )
   {
-    ByteAddressBuffer           meshlet_buffer   = ResourceDescriptorHeap[g_DrawList.Geometry];
+    ByteAddressBuffer ugb          = ResourceDescriptorHeap[g_DrawBatch.GeometryBuffer];
 
-    uint                        meshlet_addr     = sizeof( Meshlet ) * ( current_draw.FirstMeshlet + meshlet_idx );
-    Meshlet                     meshlet          = meshlet_buffer.Load<Meshlet>( meshlet_addr );
+    uint              meshlet_addr = Meshlet_size * ( cmd.FirstMeshlet + meshlet_idx );
+    Meshlet           meshlet      = ugb.Load<Meshlet>( meshlet_addr );
 
-    StructuredBuffer<Transform> transform_buffer = ResourceDescriptorHeap[g_DrawList.Transforms];
-    float4x4                    model = transform_buffer[NonUniformResourceIndex( current_draw.FirstTransform )].Model;
+    DrawInstance      instance =
+        draws.Load<DrawInstance>( g_DrawBatch.InstancesOffset + DrawInstance_size * cmd.InstanceID );
 
-    float4                      ws_bounds = TransformBoundingSphere( model, meshlet.BoundingSphere );
-    is_visible                            = true;
+    float4 ws_bounds = TransformBoundingSphere( instance.Transform, meshlet.BoundingSphere );
+    is_visible       = true;
     //! IsCulled(ws_bounds, spot_light.Position, spot_light.Direction, spot_light.ConeOuterCutoff);
+
+    DrawMesh mesh = draws.Load<DrawMesh>( /* Meshoffset + */ DrawMesh_size * instance.MeshID );
 
     if ( is_visible )
     {
@@ -54,9 +57,9 @@ void SpotShadowAS( uint3 group_id : SV_GroupID, uint3 local_id : SV_GroupThreadI
 
     if ( local_id.x == 0 )
     {
-      pl.FirstMeshlet    = current_draw.FirstMeshlet;
-      pl.VertexLiteStart = current_draw.VertexLiteStart;
-      pl.FirstTransform  = current_draw.FirstTransform;
+      pl.FirstMeshlet    = cmd.FirstMeshlet;
+      pl.VertexLiteStart = mesh.VertexLiteStart;
+      pl.InstanceIdx     = cmd.InstanceID;
     }
   }
 

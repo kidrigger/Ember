@@ -7,29 +7,32 @@ groupshared MeshletPayload pl;
 NUM_THREADS( 32, 1, 1 )
 void DirShadowAS( uint3 group_id : SV_GroupID, uint3 local_id : SV_GroupThreadID )
 {
-  uint                       mesh_draw_idx = group_id.x;
-  uint                       meshlet_idx   = local_id.x;
-  uint                       visible_count = 0;
+  ByteAddressBuffer draws         = ResourceDescriptorHeap[g_DrawBatch.DrawBuffer];
 
-  StructuredBuffer<MeshDraw> mesh_draws    = ResourceDescriptorHeap[g_DrawList.MeshDraws];
-  MeshDraw                   current_draw  = mesh_draws[NonUniformResourceIndex( mesh_draw_idx )];
+  uint              draw_cmd_idx  = group_id.x;
+  uint              meshlet_idx   = local_id.x;
+  uint              visible_count = 0;
 
-  StructuredBuffer<DirLight> light_data    = ResourceDescriptorHeap[g_LightData];
+  AmpCommand        cmd = draws.Load<AmpCommand>( g_DrawBatch.CommandsOffset + AmpCommand_size * draw_cmd_idx );
 
-  if ( meshlet_idx < current_draw.MeshletCount )
+  StructuredBuffer<DirLight> light_data = ResourceDescriptorHeap[g_LightData];
+
+  if ( meshlet_idx < cmd.MeshletCount )
   {
-    ByteAddressBuffer           meshlet_buffer   = ResourceDescriptorHeap[g_DrawList.Geometry];
-    StructuredBuffer<Transform> transform_buffer = ResourceDescriptorHeap[g_DrawList.Transforms];
+    ByteAddressBuffer ugb          = ResourceDescriptorHeap[g_DrawBatch.GeometryBuffer];
 
-    uint                        meshlet_addr     = sizeof( Meshlet ) * ( current_draw.FirstMeshlet + meshlet_idx );
-    Meshlet                     meshlet          = meshlet_buffer.Load<Meshlet>( meshlet_addr );
-    float4x4                    model            = transform_buffer[current_draw.FirstTransform].Model;
-    float4                      ws_bounds        = TransformBoundingSphere( model, meshlet.BoundingSphere );
+    uint              meshlet_addr = Meshlet_size * ( cmd.FirstMeshlet + meshlet_idx );
+    Meshlet           meshlet      = ugb.Load<Meshlet>( meshlet_addr );
 
-    float3                      light_dir        = light_data[g_LightIdx].Direction;
+    float4x4          model =
+        draws.Load<DrawInstance>( g_DrawBatch.InstancesOffset + DrawInstance_size * cmd.InstanceID ).Transform;
 
-    bool                        is_inside_prev   = false;
-    bool                        is_view_visible[NUM_CASCADES];
+    float4 ws_bounds      = TransformBoundingSphere( model, meshlet.BoundingSphere );
+
+    float3 light_dir      = light_data[g_LightIdx].Direction;
+
+    bool   is_inside_prev = false;
+    bool   is_view_visible[NUM_CASCADES];
     [unroll] for ( int i = NUM_CASCADES - 1; i >= 0; i-- )
     {
       float4 cascade_cull_info = g_CullParams[i];
@@ -63,7 +66,7 @@ void DirShadowAS( uint3 group_id : SV_GroupID, uint3 local_id : SV_GroupThreadID
 
     if ( local_id.x == 0 )
     {
-      pl.MeshDrawID = mesh_draw_idx;
+      pl.DrawCmdID = draw_cmd_idx;
     }
   }
 

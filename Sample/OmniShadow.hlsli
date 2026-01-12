@@ -4,14 +4,15 @@
 #include "Bindless.hlsli"
 #include "Geometry.hlsli"
 
-const static float kNearPlane = 0.01f;
+const static float        kNearPlane = 0.01f;
 
-cbuffer            QuickTransforms : register( b0 )
+ConstantBuffer<DrawBatch> g_DrawBatch : register( b0 );
+
+cbuffer                   QuickTransforms : register( b1 )
 {
-  DrawList g_DrawList;
-  float3   g_LightPosition;
-  float    g_FarPlane;
-  ResID    g_ProjViewID;
+  float3 g_LightPosition;
+  float  g_FarPlane;
+  ResID  g_ProjViewID;
 }
 
 struct ProjectionTransforms
@@ -23,7 +24,7 @@ struct MeshletPayload
 {
   uint MeshletID[192];
   uint ViewID[192];
-  uint MeshDrawID;
+  uint DrawCmdID;
 };
 
 struct MSVertexOut

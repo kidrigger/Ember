@@ -13,10 +13,9 @@ namespace
 {
 struct PackedData
 {
-  Ember::DrawList::Info DrawList;
-  Ember::SRVHandle      LightData;
-  uint32_t              LightIdx;
-  Ember::CBVHandle      CameraBuffer;
+  Ember::SRVHandle LightData;
+  uint32_t         LightIdx;
+  Ember::CBVHandle CameraBuffer;
 };
 } // namespace
 
@@ -93,9 +92,10 @@ void Ember::Internal::DirectionLightManager::Create(
                                                           D3D12_ROOT_SIGNATURE_FLAG_DENY_DOMAIN_SHADER_ROOT_ACCESS |
                                                           D3D12_ROOT_SIGNATURE_FLAG_DENY_HULL_SHADER_ROOT_ACCESS;
 
-  CD3DX12_ROOT_PARAMETER1 root_parameters[2];
-  root_parameters[0].InitAsConstants( sizeof( PackedData ) / 4, 0 );
-  root_parameters[1].InitAsConstants( kNumCascades * sizeof( DirectX::XMFLOAT4 ) / 4, 1 );
+  CD3DX12_ROOT_PARAMETER1 root_parameters[3];
+  root_parameters[0].InitAsConstants( sizeof( DrawList::PerBatch ) / 4, 0 );
+  root_parameters[1].InitAsConstants( sizeof( PackedData ) / 4, 1 );
+  root_parameters[2].InitAsConstants( kNumCascades * sizeof( DirectX::XMFLOAT4 ) / 4, 2 );
 
   CD3DX12_VERSIONED_ROOT_SIGNATURE_DESC root_signature_desc;
   root_signature_desc.Init_1_1(
@@ -318,8 +318,8 @@ void Ember::Internal::DirectionLightManager::RenderAllShadows(
       barriers.begin(),
       []( Texture const& tex )
       {
-        auto current_state = tex.GetCurrentState();
-        auto next_state    = D3D12_RESOURCE_STATE_DEPTH_WRITE;
+        auto const current_state = tex.GetCurrentState();
+        auto const next_state    = D3D12_RESOURCE_STATE_DEPTH_WRITE;
         tex.SetCurrentState( next_state );
         return CD3DX12_RESOURCE_BARRIER::Transition( tex.GetTexture(), current_state, next_state );
       } );
@@ -336,8 +336,8 @@ void Ember::Internal::DirectionLightManager::RenderAllShadows(
       barriers.begin(),
       []( Texture const& tex )
       {
-        auto current_state = tex.GetCurrentState();
-        auto next_state    = D3D12_RESOURCE_STATE_PIXEL_SHADER_RESOURCE;
+        auto const current_state = tex.GetCurrentState();
+        auto const next_state    = D3D12_RESOURCE_STATE_PIXEL_SHADER_RESOURCE;
         tex.SetCurrentState( next_state );
         return CD3DX12_RESOURCE_BARRIER::Transition( tex.GetTexture(), current_state, next_state );
       } );
@@ -346,31 +346,31 @@ void Ember::Internal::DirectionLightManager::RenderAllShadows(
 }
 
 void Ember::Internal::DirectionLightManager::RenderDirShadow(
-    CommandList*             command_list,
+    CommandList const*       command_list,
     DrawList::Batches const& draw_info,
     Camera const&            camera,
     uint32_t const           frame_index,
-    uint32_t const           light_index )
+    uint32_t const           light_index ) const
 {
   PIXScopedEvent( command_list->Get(), PIX_COLOR_DEFAULT, "Render Directional Shadow %u", light_index );
   ZoneScoped;
 
-  Texture&      texture   = m_ActiveShadows[light_index];
-  DirLightRepr& dir_light = m_LightData[light_index];
+  Texture const&      texture   = m_ActiveShadows[light_index];
+  DirLightRepr const& dir_light = m_LightData[light_index];
 
   command_list->ClearDepthStencilView( texture.GetTexture(), D3D12_CLEAR_FLAG_DEPTH, 1.0f, 0 );
 
-  PackedData packed_data{
-    .DrawList     = draw_info.Opaque,
+  auto const       batch = DrawList::PerBatch::Opaque( draw_info.Unified );
+
+  PackedData const packed_data{
     .LightData    = m_DataBuffers[frame_index].GetSRVHandle(),
     .LightIdx     = light_index,
     .CameraBuffer = camera.GetLastUpdatedBuffer(),
   };
 
-  command_list->SetGraphicsRootConstants( 0, packed_data );
   command_list->OMSetRenderTargets( 0, nullptr, &texture );
-
-  // TODO: Alpha tested + Blended
-  command_list->SetGraphicsRootConstants( 1, dir_light.CascadeSph );
-  command_list->DispatchMesh( { .X = draw_info.Opaque.DrawCount } );
+  command_list->SetGraphicsRootConstants( 0, batch );
+  command_list->SetGraphicsRootConstants( 1, packed_data );
+  command_list->SetGraphicsRootConstants( 2, dir_light.CascadeSph );
+  command_list->DispatchMesh( { .X = batch.CommandsCount } );
 }

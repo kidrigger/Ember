@@ -5,7 +5,7 @@
 #include "Camera.hlsli"
 #include "Colors.hlsli"
 #include "Environment.hlsli"
-#include "Geometry2.hlsli"
+#include "Geometry.hlsli"
 #include "LightData.hlsli"
 #include "Material.hlsli"
 #include "Quantization.hlsli"

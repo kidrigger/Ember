@@ -4,19 +4,20 @@
 #include "Geometry.hlsli"
 #include "LightData.hlsli"
 
-const static float kNearPlane = 0.01f;
+const static float        kNearPlane = 0.01f;
 
-cbuffer            QuickTransforms : register( b0 )
+ConstantBuffer<DrawBatch> g_DrawBatch : register( b0 );
+
+cbuffer                   QuickTransforms : register( b1 )
 {
-  DrawList g_DrawList;
-  ResID    g_SpotLightBuffer;
-  uint     g_LightID;
+  ResID g_SpotLightBuffer;
+  uint  g_LightID;
 }
 
 struct SpotShadowPayload
 {
   uint MeshletID[32];
-  uint FirstTransform;
+  uint InstanceIdx;
   uint VertexLiteStart;
   uint FirstMeshlet;
 };

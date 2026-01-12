@@ -1,12 +1,11 @@
 #ifndef TRIANGLE_HLSLI_
 #define TRIANGLE_HLSLI_
 
-#include "Geometry2.hlsli"
-
 #include "Bindless.hlsli"
 #include "Camera.hlsli"
 #include "Colors.hlsli"
 #include "Environment.hlsli"
+#include "Geometry.hlsli"
 #include "LightData.hlsli"
 #include "Material.hlsli"
 #include "Quantization.hlsli"

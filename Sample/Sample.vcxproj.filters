@@ -313,9 +313,6 @@
     <None Include="PBR.hlsli">
       <Filter>Shaders\Meshes</Filter>
     </None>
-    <None Include="Geometry.hlsli">
-      <Filter>Shaders</Filter>
-    </None>
     <None Include="Camera.hlsli">
       <Filter>Shaders\Utils</Filter>
     </None>
@@ -361,7 +358,7 @@
     <None Include="Triangle.hlsli">
       <Filter>Shaders\Meshes</Filter>
     </None>
-    <None Include="Geometry2.hlsli">
+    <None Include="Geometry.hlsli">
       <Filter>Shaders</Filter>
     </None>
   </ItemGroup>

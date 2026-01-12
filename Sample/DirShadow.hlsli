@@ -6,15 +6,17 @@
 #include "Geometry.hlsli"
 #include "LightData.hlsli"
 
-cbuffer QuickTransforms : register( b0 )
+ConstantBuffer<DrawBatch> g_DrawBatch : register( b0 );
+
+//
+cbuffer QuickTransforms : register( b1 )
 {
-  DrawList g_DrawList;
-  ResID    g_LightData;
-  uint     g_LightIdx;
-  ResID    g_Camera;
+  ResID g_LightData;
+  uint  g_LightIdx;
+  ResID g_Camera;
 }
 
-cbuffer LightCullParameters : register( b1 )
+cbuffer LightCullParameters : register( b2 )
 {
   float4 g_CullParams[NUM_CASCADES];
 }
@@ -23,7 +25,7 @@ struct MeshletPayload
 {
   uint MeshletID[32 * NUM_CASCADES];
   uint ViewID[32 * NUM_CASCADES];
-  uint MeshDrawID;
+  uint DrawCmdID;
 };
 
 struct MSVertexOut
