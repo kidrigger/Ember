@@ -28,7 +28,8 @@ class Camera;
 
 class BasicApp final : public IApp
 {
-  using RenderQueryType = flecs::query<WorldTransform const, Mesh const, Geometry const, Material const>;
+  using RenderQueryType =
+      flecs::query<WorldTransform const, Mesh const, Geometry const, Material const, BottomLevelAS const>;
 
   DXGI_FORMAT constexpr static kDepthFormat = DXGI_FORMAT_D32_FLOAT;
 
@@ -69,18 +70,6 @@ class BasicApp final : public IApp
 
   // ==========================
 
-  // ==== Raytracing Pipeline ====
-  //
-  struct RTX
-  {
-    std::vector<D3D12_RAYTRACING_INSTANCE_DESC> InstanceVec;
-    Buffer                                      InstanceDesc[RenderDevice::kNumFrames];
-    Buffer                                      TLAS[RenderDevice::kNumFrames];
-    Buffer                                      Scratch[RenderDevice::kNumFrames];
-  };
-
-  RTX                              m_RTX;
-
   std::unique_ptr<Camera>          m_Camera;
   DirectX::XMUINT2                 m_PrevMouse{};
   Buffer                           m_ConfigurationBuffer;
@@ -97,7 +86,6 @@ class BasicApp final : public IApp
   flecs::entity                 m_SceneRoot;
 
   void                          SetupRenderPasses();
-  void                          PrepareTLAS( CommandList* cmd, uint32_t frame_idx );
 
   static void                   InitImGui( HWND const window_handle, RenderDevice* render_device );
 

@@ -349,8 +349,13 @@ class DrawList
 {
   struct FrameResources
   {
+    Buffer RaytracingInstances;
+    Buffer RaytracingScratch;
+    Buffer TopLevelAS;
     Buffer UnifiedResourceBuffer;
   };
+
+  using RaytracingInstance = D3D12_RAYTRACING_INSTANCE_DESC;
 
   RenderDevice*               m_RenderDevice;
   GeometryManager*            m_GeometryManager;
@@ -359,11 +364,12 @@ class DrawList
   std::vector<FrameResources> m_FrameResources;
 
   // New API
-  std::vector<DrawMesh>     m_Meshes;
-  std::vector<DrawInstance> m_Instances;
-  std::vector<AmpCommand>   m_OpaqueCommands;
-  std::vector<AmpCommand>   m_MaskedCommands;
-  std::vector<AmpCommand>   m_TransparentCommands;
+  std::vector<RaytracingInstance> m_RaytracingInstances;
+  std::vector<DrawMesh>           m_Meshes;
+  std::vector<DrawInstance>       m_Instances;
+  std::vector<AmpCommand>         m_OpaqueCommands;
+  std::vector<AmpCommand>         m_MaskedCommands;
+  std::vector<AmpCommand>         m_TransparentCommands;
 
 public:
   struct PerBatch
@@ -379,19 +385,19 @@ public:
 
   struct Batches
   {
-    SRVHandle GeometryBuffer;
-    SRVHandle MaterialBuffer;
-    SRVHandle TopLevelAS;
-    SRVHandle DrawBuffer;
-    uint32_t  InstancesOffset;
-    uint32_t  OpaqueCommandsOffset;
-    uint32_t  MaskedCommandsOffset;
-    uint32_t  TransparentCommandsOffset;
-    uint32_t  CommandsEnd;
+    SRVHandle              GeometryBuffer;
+    SRVHandle              MaterialBuffer;
+    SRVHandle              TopLevelAS;
+    SRVHandle              DrawBuffer;
+    uint32_t               InstancesOffset;
+    uint32_t               OpaqueCommandsOffset;
+    uint32_t               MaskedCommandsOffset;
+    uint32_t               TransparentCommandsOffset;
+    uint32_t               CommandsEnd;
 
-    PerBatch  Opaque() const;
-    PerBatch  Masked() const;
-    PerBatch  Transparent() const;
+    [[nodiscard]] PerBatch Opaque() const;
+    [[nodiscard]] PerBatch Masked() const;
+    [[nodiscard]] PerBatch Transparent() const;
 
   private:
     // Helpers
@@ -406,8 +412,10 @@ public:
       MaterialManager* material_manager,
       uint32_t         frame_count );
 
-  void                  PushDraw( WorldTransform const& transform, Mesh const& mesh, Material const& material );
+  void PushDraw(
+      WorldTransform const& transform, Mesh const& mesh, Material const& material, BottomLevelAS const& blas );
   [[nodiscard]] Batches PrepareFrame( uint32_t frame_idx );
+  [[nodiscard]] Batches PrepareFrameWithRaytracing( CommandList* cmd, uint32_t frame_idx );
   void                  Clear();
   [[nodiscard]] size_t  GetOpaqueCount() const;
   [[nodiscard]] size_t  GetMaskedCount() const;

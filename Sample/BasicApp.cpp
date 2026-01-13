@@ -164,9 +164,10 @@ Ember::BasicApp::BasicApp(
   , m_TextureLoader{ std::move( texture_loader ) }
   , m_ModelLoader{ std::move( model_loader ) }
 {
-  m_RenderQuery = m_World->GetECS().query<WorldTransform const, Mesh const, Geometry const, Material const>();
+  m_RenderQuery =
+      m_World->GetECS().query<WorldTransform const, Mesh const, Geometry const, Material const, BottomLevelAS const>();
 
-  _             = m_World->GetECS()
+  _ = m_World->GetECS()
           .component<RotatingModel>()
           .member<float>( "Speed", 0, offsetof( RotatingModel, Speed ) )
           .add( flecs::With, m_World->GetECS().component<Rotation>() );
@@ -285,85 +286,6 @@ void Ember::BasicApp::SetupRenderPasses()
       &m_RenderBackground, m_RenderDevice.get(), DirectX::MakeSRGB( swapchain_format ), kDepthFormat ) );
 
   ENSURE( RenderPass::Atmosphere::Create( &m_UpdateAtmosphericSky, m_RenderDevice.get() ) );
-}
-
-void Ember::BasicApp::PrepareTLAS( CommandList* cmd, uint32_t frame_idx )
-{
-  auto*                p_cmd   = cmd->Get();
-
-  D3D12_GLOBAL_BARRIER barrier = {
-    .SyncBefore   = D3D12_BARRIER_SYNC_BUILD_RAYTRACING_ACCELERATION_STRUCTURE,
-    .SyncAfter    = D3D12_BARRIER_SYNC_BUILD_RAYTRACING_ACCELERATION_STRUCTURE,
-    .AccessBefore = D3D12_BARRIER_ACCESS_RAYTRACING_ACCELERATION_STRUCTURE_READ,
-    .AccessAfter  = D3D12_BARRIER_ACCESS_RAYTRACING_ACCELERATION_STRUCTURE_WRITE,
-  };
-  auto barrier_group = CD3DX12_BARRIER_GROUP{ 1, &barrier };
-  p_cmd->Barrier( 1, &barrier_group );
-
-  // TODO: Use bump allocator for this.
-
-  m_RTX.InstanceVec.clear();
-  int i = 0;
-  m_World->GetECS().each(
-      [&]( WorldTransform const& wt, BottomLevelAS const& blas )
-      {
-        auto& desc                 = m_RTX.InstanceVec.emplace_back();
-        desc.AccelerationStructure = blas.ASBuffer.GetGPUVirtualAddress();
-        desc.Flags                 = D3D12_RAYTRACING_INSTANCE_FLAG_NONE;
-        auto* ptr                  = ( DirectX::XMFLOAT3X4* )&desc.Transform;
-        XMStoreFloat3x4( ptr, wt.Transform );
-        desc.InstanceMask                        = 0xFF;
-        desc.Flags                               = D3D12_RAYTRACING_INSTANCE_FLAG_NONE;
-        desc.InstanceID                          = ( i++ & 0xFFFFFF );
-        desc.InstanceContributionToHitGroupIndex = 0xFFFFFF;
-      } );
-
-  Buffer* desc_buf = &m_RTX.InstanceDesc[frame_idx];
-  if ( desc_buf->GetSize() < ByteSizeOf( m_RTX.InstanceVec ) )
-  {
-    *desc_buf =
-        m_RenderDevice->CreateStorageBuffer( U32ByteSizeOf( m_RTX.InstanceVec ), StrideOf( m_RTX.InstanceVec ) );
-    wchar_t name[32];
-    swprintf_s( name, 32, L"TLAS Instance Desc Buffer %d", frame_idx );
-    desc_buf->SetName( name );
-  }
-  desc_buf->Write( 0, ByteSizeOf( m_RTX.InstanceVec ), DataOf( m_RTX.InstanceVec ) );
-
-  D3D12_BUILD_RAYTRACING_ACCELERATION_STRUCTURE_INPUTS inputs = {
-    .Type          = D3D12_RAYTRACING_ACCELERATION_STRUCTURE_TYPE_TOP_LEVEL,
-    .Flags         = D3D12_RAYTRACING_ACCELERATION_STRUCTURE_BUILD_FLAG_PREFER_FAST_BUILD,
-    .NumDescs      = CountOf( m_RTX.InstanceVec ),
-    .DescsLayout   = D3D12_ELEMENTS_LAYOUT_ARRAY,
-    .InstanceDescs = desc_buf->GetGPUVirtualAddress(),
-  };
-
-  D3D12_RAYTRACING_ACCELERATION_STRUCTURE_PREBUILD_INFO prebuild;
-  m_RenderDevice->GetDevice()->GetRaytracingAccelerationStructurePrebuildInfo( &inputs, &prebuild );
-
-  Buffer* scratch_buf = &m_RTX.Scratch[frame_idx];
-  if ( scratch_buf->GetSize() < prebuild.ScratchDataSizeInBytes )
-  {
-    *scratch_buf = m_RenderDevice->CreateRawStorageBuffer( prebuild.ScratchDataSizeInBytes );
-    wchar_t name[32];
-    swprintf_s( name, 32, L"TLAS Scratch Buffer %d", frame_idx );
-    scratch_buf->SetName( name );
-  }
-
-  Buffer* tlas_buf = &m_RTX.TLAS[frame_idx];
-  if ( tlas_buf->GetSize() < prebuild.ResultDataMaxSizeInBytes )
-  {
-    *tlas_buf = m_RenderDevice->CreateASBuffer( prebuild.ResultDataMaxSizeInBytes );
-    wchar_t name[32];
-    swprintf_s( name, 32, L"TLAS %d", frame_idx );
-    tlas_buf->SetName( name );
-  }
-
-  D3D12_BUILD_RAYTRACING_ACCELERATION_STRUCTURE_DESC const desc = {
-    .DestAccelerationStructureData    = tlas_buf->GetGPUVirtualAddress(),
-    .Inputs                           = inputs,
-    .ScratchAccelerationStructureData = scratch_buf->GetGPUVirtualAddress(),
-  };
-  p_cmd->BuildRaytracingAccelerationStructure( &desc, 0, nullptr );
 }
 
 void Ember::BasicApp::LoadContent()
@@ -793,13 +715,14 @@ void Ember::BasicApp::Render()
 
   {
     ZoneScopedN( "Upload Transforms" );
-    m_RenderQuery.each( [&]( WorldTransform const& wt, Mesh const& mesh, Geometry const&, Material const& material )
-                        { m_DrawList.PushDraw( wt, mesh, material ); } );
+    m_RenderQuery.each( [&]( WorldTransform const& wt,
+                             Mesh const&           mesh,
+                             Geometry const&,
+                             Material const&      material,
+                             BottomLevelAS const& blas ) { m_DrawList.PushDraw( wt, mesh, material, blas ); } );
   }
 
   FrameGraphResource bb_res = frame_graph.import( "Backbuffer", backbuffer.GetDesc(), FG::Texture{ backbuffer } );
-
-  DrawList::Batches  draw_list_info = m_DrawList.PrepareFrame( frame_idx );
 
   m_PerfCounter->UpdatePipelineStats( frame_idx );
   m_PerfCounter->BeginQuery( command_list.Get(), frame_idx );
@@ -808,17 +731,15 @@ void Ember::BasicApp::Render()
 
   command_list.SetDescriptorHeaps( m_RenderDevice->GetBindlessDescriptorHeaps() );
 
-  LightManager::GpuInfo light_info = m_LightManager->PrepareFrame( *m_Camera, frame_idx );
+  LightManager::GpuInfo   light_info     = m_LightManager->PrepareFrame( *m_Camera, frame_idx );
+
+  DrawList::Batches const draw_list_info = g_Debug.RaytracedShadows
+                                               ? m_DrawList.PrepareFrameWithRaytracing( &command_list, frame_idx )
+                                               : m_DrawList.PrepareFrame( frame_idx );
 
   if ( not g_Debug.RaytracedShadows or g_UseDeferredRendering )
   {
     m_LightManager->RenderAllShadows( &command_list, draw_list_info, *m_Camera, frame_idx );
-  }
-
-  if ( g_Debug.RaytracedShadows )
-  {
-    PrepareTLAS( &command_list, frame_idx );
-    draw_list_info.TopLevelAS = command_list.Bind( BindSRV{ m_RTX.TLAS[frame_idx] } );
   }
 
   m_FGBlackboard.get<DrawList::Batches>() = draw_list_info;

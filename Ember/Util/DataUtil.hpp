@@ -37,7 +37,7 @@ T CheckedCast( TFrom&& value )
   // But it may upcast the signed to an overflowed positive and fail.
   if constexpr ( not std::is_signed_v<T> and std::is_signed_v<TFrom> ) ASSERT( std::numeric_limits<T>::min() <= value );
   ASSERT( value <= std::numeric_limits<T>::max() );
-  return static_cast<T>( std::forward<std::remove_cvref_t<TFrom>>( value ) );
+  return static_cast<T>( std::forward<TFrom>( value ) );
 }
 
 constexpr uint32_t U32ByteSizeOf( std::ranges::contiguous_range auto const& range )
