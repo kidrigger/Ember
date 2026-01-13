@@ -235,7 +235,8 @@ void Ember::DrawList::PushDraw(
   }
 
   uint32_t const mesh_idx = CountOf( m_Meshes );
-  m_Meshes.emplace_back( mesh.VertexDataStart, mesh.VertexLiteStart, material->GetHandle(), mesh.FirstMeshlet );
+  m_Meshes.emplace_back(
+      mesh.VertexDataStart, mesh.VertexLiteStart, material->GetHandle(), mesh.FirstMeshlet, mesh.FirstIndex );
 
   uint32_t const instance_idx = CountOf( m_Instances );
   {

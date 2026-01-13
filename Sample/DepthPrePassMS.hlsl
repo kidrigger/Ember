@@ -47,7 +47,7 @@ void DepthPrePassMS(
   {
     uint       index        = ugb.Load( 4 * ( meshlet.VertexOffset + i ) );
 
-    VertexLite vertex       = ugb.Load<VertexLite>( sizeof( VertexLite ) * ( index + mesh.VertexLiteStart ) );
+    VertexLite vertex       = ugb.Load<VertexLite>( VertexLite_size * ( index + mesh.VertexLiteStart ) );
 
     float4     world_pos    = mul( instance.Transform, vertex.Position );
     float4     clip_pos     = mul( camera.View, world_pos );

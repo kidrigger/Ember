@@ -14,9 +14,9 @@
 bool Ember::RenderPass::OpaqueForward::Create( OpaqueForward* out, Desc const& desc )
 {
   ComPtr<ID3DBlob> amp_shader_blob;
-  ERR_FAIL_RET_F( D3DReadFileToBlob( L"TriangleAS2.cso", &amp_shader_blob ) );
+  ERR_FAIL_RET_F( D3DReadFileToBlob( L"TriangleAS.cso", &amp_shader_blob ) );
   ComPtr<ID3DBlob> mesh_shader_blob;
-  ERR_FAIL_RET_F( D3DReadFileToBlob( L"TriangleMS2.cso", &mesh_shader_blob ) );
+  ERR_FAIL_RET_F( D3DReadFileToBlob( L"TriangleMS.cso", &mesh_shader_blob ) );
   ComPtr<ID3DBlob> pixel_shader_blob;
   ERR_FAIL_RET_F( D3DReadFileToBlob( L"TrianglePS.cso", &pixel_shader_blob ) );
 

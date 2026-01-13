@@ -80,9 +80,10 @@ struct DrawMesh
   uint  VertexLiteStart; // 04 08
   MatID Material;        // 04 12
   uint  FirstMeshlet;    // 04 16
+  uint  IndexStart;      // 04 20
 };
 
-#define DrawMesh_size 16
+#define DrawMesh_size 20
 
 // What transform, which mesh
 // Should be updated every frame. (For dynamic)

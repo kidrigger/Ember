@@ -11,9 +11,9 @@
 bool Ember::RenderPass::GBuffer::Create( GBuffer* out, RenderDevice* render_device, DXGI_FORMAT const depth_format )
 {
   ComPtr<ID3DBlob> amp_shader_blob;
-  ERR_FAIL_RET_F( D3DReadFileToBlob( L"TriangleAS2.cso", &amp_shader_blob ) );
+  ERR_FAIL_RET_F( D3DReadFileToBlob( L"TriangleAS.cso", &amp_shader_blob ) );
   ComPtr<ID3DBlob> mesh_shader_blob;
-  ERR_FAIL_RET_F( D3DReadFileToBlob( L"TriangleMS2.cso", &mesh_shader_blob ) );
+  ERR_FAIL_RET_F( D3DReadFileToBlob( L"TriangleMS.cso", &mesh_shader_blob ) );
   ComPtr<ID3DBlob> gbuffer_shader_blob;
   ERR_FAIL_RET_F( D3DReadFileToBlob( L"GBufferPS.cso", &gbuffer_shader_blob ) );
 

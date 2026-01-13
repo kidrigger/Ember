@@ -12,7 +12,7 @@ Possibly good for deployment.
 	- [X] Swapchain
 	- [X] Presentation
 	- [X] Synchronization Primitives
-- [ ] Setup D3D12 Renderer
+- [X] Setup D3D12 Renderer
 	- [X] Pipeline Creation
 	- [X] Render Triangle
 	- [X] Render Box
@@ -23,27 +23,40 @@ Possibly good for deployment.
 		- [X] Render on Screen
 	- [X] Camera
 		- [X] Fixed
-		- [ ] With User Control
-	- [ ] Scene Rendering
-		- [ ] Load glTF2.0 Mesh
-		- [ ] Render Mesh
-		- [ ] Scene Hierarchy
+		- [X] With User Control
+	- [X] Scene Rendering
+		- [X] Load glTF2.0 Mesh
+		- [X] Render Mesh
+		- [X] Scene Hierarchy
 - [ ] Rendering Features
-	- [ ] Lighting
-		- [ ] Blinn-Phong
-		- [ ] PBR
-			- [ ] Punctual
-			- [ ] Static IBL
-				- [ ] Diffuse Cubemap Convolution.
-				- [ ] Prefilter
-				- [ ] Diffuse 3rd order SH.
+	- [X] Lighting
+		- [X] Blinn-Phong
+		- [X] PBR
+			- [X] Punctual
+			- [X] Static IBL
+				- [X] Diffuse Cubemap Convolution.
+				- [X] Prefilter
+				- [X] Diffuse 3rd order SH.
 			- [ ] Reflection Probe
-				- [ ] Diffuse 3rd order SH.
+			- [ ] Light Probe (Diffuse 3rd order SH.)
 		- [ ] Shadows
 			- [ ] PCSS
-			- [ ] Cascaded Shadow Maps
-			- [ ] Omni-Shadow maps
+			- [X] Cascaded Shadow Maps
+			- [X] Omni-Shadow maps
 			- [ ] Dual-paraboloid
-- [ ] Miscellaneous
+		- [ ] Global Illumination
+			- [ ] PBRT
+		- [ ] Ambient Occlusion
+			- [ ] SSAO
+			- [ ] GTAO
+	- [ ] Raytracing
+		- [X] Shadows
+		- [ ] Lighting (ReSTIR-DI)
+		- [X] Reflections
+		- [ ] AO
+		- [ ] GI
+			- [ ] DDGI
+			- [ ] ReSTIR-GI
+- [X] Miscellaneous
 	- [X] Perf Query
-	- [ ] Profiling/Instrumentation
+	- [X] Profiling/Instrumentation

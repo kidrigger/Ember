@@ -319,6 +319,7 @@ struct DrawMesh
   uint32_t       VertexLiteStart; // 04 08
   MaterialHandle Material;        // 04 12
   uint32_t       FirstMeshlet;    // 04 16
+  uint32_t       IndexStart;      // 04 20
 };
 
 // What transform, which mesh
@@ -327,7 +328,7 @@ struct DrawInstance
 {
   DirectX::XMFLOAT4X4 Transform;    // 64  64
   DirectX::XMFLOAT4X4 InvTransform; // 64 128
-  uint32_t            MeshID;       // 4 132 // TODO: Tuck this into the matrices.
+  uint32_t            MeshID;       // 04 132 // TODO: Tuck this into the matrices.
 };
 
 /*

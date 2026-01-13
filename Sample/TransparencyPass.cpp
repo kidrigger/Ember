@@ -17,9 +17,9 @@ bool Ember::RenderPass::TransparencyForward::Create(
   out->RenderTargetFormat = rt_format;
 
   ComPtr<ID3DBlob> amp_shader_blob;
-  ERR_FAIL_RET_F( D3DReadFileToBlob( L"TriangleAS2.cso", &amp_shader_blob ) );
+  ERR_FAIL_RET_F( D3DReadFileToBlob( L"TriangleAS.cso", &amp_shader_blob ) );
   ComPtr<ID3DBlob> mesh_shader_blob;
-  ERR_FAIL_RET_F( D3DReadFileToBlob( L"TriangleMS2.cso", &mesh_shader_blob ) );
+  ERR_FAIL_RET_F( D3DReadFileToBlob( L"TriangleMS.cso", &mesh_shader_blob ) );
   ComPtr<ID3DBlob> alpha_blended_pixel_shader_blob;
   ERR_FAIL_RET_F( D3DReadFileToBlob( L"TriangleTransparentPS.cso", &alpha_blended_pixel_shader_blob ) );
 
@@ -173,9 +173,9 @@ bool Ember::RenderPass::MaskedForward::Create(
   out->RenderTargetFormat = rt_format;
 
   ComPtr<ID3DBlob> amp_shader_blob;
-  ERR_FAIL_RET_F( D3DReadFileToBlob( L"TriangleAS2.cso", &amp_shader_blob ) );
+  ERR_FAIL_RET_F( D3DReadFileToBlob( L"TriangleAS.cso", &amp_shader_blob ) );
   ComPtr<ID3DBlob> mesh_shader_blob;
-  ERR_FAIL_RET_F( D3DReadFileToBlob( L"TriangleMS2.cso", &mesh_shader_blob ) );
+  ERR_FAIL_RET_F( D3DReadFileToBlob( L"TriangleMS.cso", &mesh_shader_blob ) );
   ComPtr<ID3DBlob> alpha_tested_pixel_shader_blob;
   ERR_FAIL_RET_F( D3DReadFileToBlob( L"TrianglePS.cso", &alpha_tested_pixel_shader_blob ) );
 
