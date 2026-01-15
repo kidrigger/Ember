@@ -3,6 +3,13 @@
 
 #include "Constants.hlsli"
 
+float3 MulQuatVec(float4 quat, float3 vec)
+{
+// Based on Euler-Rodriques' formula
+// v + 2 * cross(r, (s * v + cross(r, v))) / m
+  return vec + 2.0f * cross(quat.xyz, (quat.w * vec + cross(quat.xyz, vec))) / dot(quat, quat);
+}
+
 // Sphere repr (cx, cy, cz, r)
 bool PointInsideSphere( float3 pnt, float4 sphere )
 {

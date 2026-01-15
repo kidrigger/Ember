@@ -11,43 +11,23 @@ struct PackedData
 {
   DirectX::XMFLOAT3 Position;
   float             FarPlane;
-  Ember::CBVHandle  ProjViewHandle;
 };
 
-static_assert( sizeof( PackedData ) == 20 );
+static_assert( sizeof( PackedData ) == 16 );
 } // namespace
 
 Ember::Internal::OmniLightManager::OmniLightManager(
     RenderDevice*               render_device,
     World*                      world,
-    Buffer                      projection_buffer,
     std::vector<Buffer>         light_buffers,
     ComPtr<ID3D12PipelineState> shadow_pipeline,
     ComPtr<ID3D12RootSignature> shadow_root_signature )
   : m_RenderDevice{ render_device }
   , m_World{ world }
-  , m_ShadowProjectionBuffer{ std::move( projection_buffer ) }
   , m_RootSignature{ std::move( shadow_root_signature ) }
   , m_Pipeline{ std::move( shadow_pipeline ) }
   , m_DataBuffers{ std::move( light_buffers ) }
 {
-  // We use left handed just this once.
-
-  DirectX::XMVECTOR const origin  = DirectX::XMVectorSet( 0.0f, 0.0f, 0.0f, 1.0f );
-  DirectX::XMVECTOR const up      = DirectX::XMVectorSet( 0.0f, 1.0f, 0.0f, 0.0f );
-  DirectX::XMVECTOR const right   = DirectX::XMVectorSet( 1.0f, 0.0f, 0.0f, 0.0f );
-  DirectX::XMVECTOR const forward = DirectX::XMVectorSet( 0.0f, 0.0f, 1.0f, 0.0f );
-
-  DirectX::XMMATRIX       views[6];
-  views[0] = DirectX::XMMatrixLookToLH( origin, right, up );
-  views[1] = DirectX::XMMatrixLookToLH( origin, DirectX::XMVectorNegate( right ), up );
-  views[2] = DirectX::XMMatrixLookToLH( origin, up, DirectX::XMVectorNegate( forward ) );
-  views[3] = DirectX::XMMatrixLookToLH( origin, DirectX::XMVectorNegate( up ), forward );
-  views[4] = DirectX::XMMatrixLookToLH( origin, forward, up );
-  views[5] = DirectX::XMMatrixLookToLH( origin, DirectX::XMVectorNegate( forward ), up );
-
-  m_ShadowProjectionBuffer.Write( 0, ByteSizeOf( views ), DataOf( views ) );
-
   m_LightQuery =
       m_World->GetECS().query_builder<WorldTransform const, OmniLight const>().without<ShadowCaster>().build();
 
@@ -58,9 +38,6 @@ Ember::Internal::OmniLightManager::OmniLightManager(
 void Ember::Internal::OmniLightManager::Create(
     OmniLightManager* light_manager, RenderDevice* render_device, World* world, uint32_t const num_frames )
 {
-
-  Buffer              proj_buffer = render_device->CreateConstantBuffer( 6 * sizeof( DirectX::XMMATRIX ) );
-
   std::vector<Buffer> buffers;
   buffers.reserve( num_frames );
   for ( uint32_t i = 0; i < num_frames; i++ )
@@ -144,12 +121,7 @@ void Ember::Internal::OmniLightManager::Create(
   ERR_ABORT( shadow_pipeline->SetName( L"Omni Shadow Pipeline" ) );
 
   new ( light_manager ) OmniLightManager{
-    render_device,
-    world,
-    std::move( proj_buffer ),
-    std::move( buffers ),
-    std::move( shadow_pipeline ),
-    std::move( shadow_root_sig ),
+    render_device, world, std::move( buffers ), std::move( shadow_pipeline ), std::move( shadow_root_sig ),
   };
 }
 
@@ -310,9 +282,8 @@ void Ember::Internal::OmniLightManager::RenderOmniShadow(
   auto const       batch = draw_list.Opaque();
 
   PackedData const packed_data{
-    .Position       = omni_light.Position,
-    .FarPlane       = omni_light.Range,
-    .ProjViewHandle = m_ShadowProjectionBuffer.GetCBVHandle(),
+    .Position = omni_light.Position,
+    .FarPlane = omni_light.Range,
   };
   command_list->SetGraphicsRootConstants( 0, batch );
   command_list->SetGraphicsRootConstants( 1, packed_data );

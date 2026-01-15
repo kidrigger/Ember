@@ -31,14 +31,12 @@ void OmniShadowMS(
   ByteAddressBuffer ugb         = ResourceDescriptorHeap[g_DrawBatch.GeometryBuffer];
   AmpCommand cmd = draw_buffer.Load<AmpCommand>( g_DrawBatch.CommandsOffset + AmpCommand_size * amp_payload.DrawCmdID );
 
-  ConstantBuffer<ProjectionTransforms> proj_view    = ResourceDescriptorHeap[g_ProjViewID];
+  uint       meshlet_idx  = amp_payload.MeshletID[IN.GroupID.x] + cmd.FirstMeshlet;
+  uint       meshlet_addr = Meshlet_size * meshlet_idx;
+  uint       view_idx     = amp_payload.ViewID[IN.GroupID.x];
 
-  uint                                 meshlet_idx  = amp_payload.MeshletID[IN.GroupID.x] + cmd.FirstMeshlet;
-  uint                                 meshlet_addr = Meshlet_size * meshlet_idx;
-  uint                                 view_idx     = amp_payload.ViewID[IN.GroupID.x];
-
-  Meshlet                              meshlet      = ugb.Load<Meshlet>( meshlet_addr );
-  DrawInstance                         instance =
+  Meshlet    meshlet      = ugb.Load<Meshlet>( meshlet_addr );
+  DrawInstance instance =
       draw_buffer.Load<DrawInstance>( g_DrawBatch.InstancesOffset + DrawInstance_size * cmd.InstanceID );
 
   DrawMesh mesh = draw_buffer.Load<DrawMesh>( /* Meshoffset + */ DrawMesh_size * instance.MeshID );
@@ -56,7 +54,7 @@ void OmniShadowMS(
 
     float4     world_position = mul( instance.Transform, vertex.Position );
 
-    float4     pos            = mul( proj_view.Views[view_idx], float4( world_position.xyz - g_LightPosition, 1.0f ) );
+    float4     pos = float4( MulQuatVec( kViewOrientations[view_idx], world_position.xyz - g_LightPosition ), 1.0f );
 
     // Manually calculating the projection
     verts[i].ScreenPosition = float4( pos.x, pos.y, pos.z * f / ( f - n ) - pos.w * n * f / ( f - n ), pos.z );

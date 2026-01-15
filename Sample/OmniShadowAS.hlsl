@@ -2,8 +2,6 @@
 #include "OmniShadow.hlsli"
 #include "Utility.hlsli"
 
-#define ROOT2 1.41421356237f
-
 bool IsCulled( float3 ls_center, float radius )
 {
   float3 c_o    = ls_center + float3( 0, 0, ROOT2 * radius );
@@ -30,8 +28,6 @@ void OmniShadowAS( uint3 group_id : SV_GroupID, uint3 local_id : SV_GroupThreadI
 
   AmpCommand        cmd = draws.Load<AmpCommand>( g_DrawBatch.CommandsOffset + AmpCommand_size * draw_cmd_idx );
 
-  ConstantBuffer<ProjectionTransforms> proj_view = ResourceDescriptorHeap[g_ProjViewID];
-
   if ( meshlet_idx < cmd.MeshletCount )
   {
     ByteAddressBuffer ugb          = ResourceDescriptorHeap[g_DrawBatch.GeometryBuffer];
@@ -48,8 +44,8 @@ void OmniShadowAS( uint3 group_id : SV_GroupID, uint3 local_id : SV_GroupThreadI
     for ( int i = 0; i < 6; i++ )
     {
       // We know this is only translation and orientation. No need for whole transform
-      float4 ls_position  = mul( proj_view.Views[i], float4( bounds.xyz - g_LightPosition, 1.0f ) );
-      is_view_visible[i]  = !IsCulled( ls_position.xyz, bounds.w );
+      float3 ls_position  = MulQuatVec( kViewOrientations[i], bounds.xyz - g_LightPosition );
+      is_view_visible[i]  = !IsCulled( ls_position, bounds.w );
       visible_count      += is_view_visible[i] ? 1 : 0;
     }
 

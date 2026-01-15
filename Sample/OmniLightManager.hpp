@@ -38,7 +38,6 @@ class OmniLightManager
 
   RenderDevice*               m_RenderDevice{ nullptr };
   World*                      m_World{ nullptr };
-  Buffer                      m_ShadowProjectionBuffer;
   ComPtr<ID3D12RootSignature> m_RootSignature;
   ComPtr<ID3D12PipelineState> m_Pipeline;
   std::vector<OmniLightRepr>  m_LightData;
@@ -60,7 +59,6 @@ public:
   explicit OmniLightManager(
       RenderDevice*               render_device,
       World*                      world,
-      Buffer                      shadow_projection_buffer,
       std::vector<Buffer>         buffers,
       ComPtr<ID3D12PipelineState> shadow_pipeline,
       ComPtr<ID3D12RootSignature> shadow_root_signature );

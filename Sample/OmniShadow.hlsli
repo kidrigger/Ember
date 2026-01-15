@@ -1,6 +1,7 @@
 #ifndef OMNI_SHADER_HLSLI_
 #define OMNI_SHADER_HLSLI_
 
+#include "Math.hlsli"
 #include "Bindless.hlsli"
 #include "Geometry.hlsli"
 
@@ -12,12 +13,15 @@ cbuffer                   QuickTransforms : register( b1 )
 {
   float3 g_LightPosition;
   float  g_FarPlane;
-  ResID  g_ProjViewID;
 }
 
-struct ProjectionTransforms
-{
-  float4x4 Views[6];
+static const float4 kViewOrientations[] = {
+  float4( 0, -INV_ROOT2, 0, INV_ROOT2 ),
+  float4( 0, INV_ROOT2, 0, INV_ROOT2 ),
+  float4( INV_ROOT2, 0, 0, INV_ROOT2 ),
+  float4( -INV_ROOT2, 0, 0, INV_ROOT2 ),
+  float4( 0, 0, 0, 1 ),
+  float4( 0, 1, 0, 0 ),
 };
 
 struct MeshletPayload
