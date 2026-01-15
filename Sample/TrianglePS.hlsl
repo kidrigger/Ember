@@ -55,7 +55,7 @@ float4 TrianglePS( PSIn IN ) : SV_TARGET0
   float3 dir_contrib;
   float3 ambient_contrib;
 
-  if ( brdf.Roughness < RT_MAX_ROUGHNESS && IsValidHandle( g_DrawBatch.TopLevelAS ) )
+  if ( IsValidHandle( g_DrawBatch.TopLevelAS ) )
   {
     RayQuery<RAY_FLAG_CULL_BACK_FACING_TRIANGLES> query;
     point_contrib = CalcPointLightContrib( brdf, IN.Position, view_dir, query );
@@ -66,66 +66,78 @@ float4 TrianglePS( PSIn IN ) : SV_TARGET0
     float cosine_factor =
         max( dot( brdf.Normal, view_dir ), 0.0f ); // Normal instead of Halfway since there's no halfway in ambient.
 
-    float3 f_0                = 0.04f;
-    f_0                       = lerp( f_0, brdf.Albedo, brdf.Metallic );
-    float3 specular_part      = FresnelSchlickRoughness( cosine_factor, f_0, brdf.Roughness );
-    float3 diffuse_part       = 1.0f - specular_part;
+    float3 f_0            = 0.04f;
+    f_0                   = lerp( f_0, brdf.Albedo, brdf.Metallic );
+    float3 specular_part  = FresnelSchlickRoughness( cosine_factor, f_0, brdf.Roughness );
+    float3 diffuse_part   = 1.0f - specular_part;
 
-    diffuse_part             *= 1.0f - brdf.Metallic; // Metals don't have diffuse/refractions.
+    diffuse_part         *= 1.0f - brdf.Metallic; // Metals don't have diffuse/refractions.
 
-    float3 reflection_dir     = reflect( -view_dir, brdf.Normal );
-
-    float  n_dot_v            = max( dot( brdf.Normal, view_dir ), 0.0f );
-    float3 prefiltered_color  = g_Env.SamplePrefiltered( reflection_dir, brdf.Roughness, g_DefaultSampler ).rgb;
-
-    // TODO: Not sure this is physically accurate.
-    // Verify math.
-    RaytracingAccelerationStructure tlas = ResourceDescriptorHeap[g_DrawBatch.TopLevelAS];
-
-    RayDesc                         desc;
-    desc.Origin    = IN.Position.xyz;
-    desc.Direction = reflection_dir;
-    desc.TMin      = 0.0001f;
-    desc.TMax      = 100.0f;
-
-    query.TraceRayInline( tlas, RAY_FLAG_CULL_BACK_FACING_TRIANGLES, ~0, desc );
-    query.Proceed();
-
-    if ( query.CommittedStatus() == COMMITTED_TRIANGLE_HIT )
+    float3 specular       = 0.0f;
+    if ( !config.RemoveSpecularContrib )
     {
-      uint              instance_id = query.CommittedInstanceID();
-      ByteAddressBuffer draws       = ResourceDescriptorHeap[g_DrawBatch.DrawBuffer];
-      ByteAddressBuffer ugb         = ResourceDescriptorHeap[g_DrawBatch.GeometryBuffer];
-      DrawInstance instance = draws.Load<DrawInstance>( g_DrawBatch.InstancesOffset + DrawInstance_size * instance_id );
-      DrawMesh     mesh     = draws.Load<DrawMesh>( DrawMesh_size * instance.MeshID );
+      float3 reflection_dir    = reflect( -view_dir, brdf.Normal );
 
-      if ( IsValidHandle( mesh.Material ) )
+      float  n_dot_v           = max( dot( brdf.Normal, view_dir ), 0.0f );
+      float3 prefiltered_color = g_Env.SamplePrefiltered( reflection_dir, brdf.Roughness, g_DefaultSampler ).rgb;
+
+      if ( brdf.Roughness < RT_MAX_ROUGHNESS )
       {
-        Material   refl_mat = materials[mesh.Material];
+        // TODO: Not sure this is physically accurate.
+        // Verify math.
+        RaytracingAccelerationStructure tlas = ResourceDescriptorHeap[g_DrawBatch.TopLevelAS];
 
-        float2     bary     = query.CommittedTriangleBarycentrics();
-        uint       prim     = query.CommittedPrimitiveIndex();
-        uint3      inds     = ugb.Load3( 4 * ( mesh.IndexStart + prim * 3 ) );
-        VertexLite v0       = ugb.Load<VertexLite>( VertexLite_size * ( mesh.VertexLiteStart + inds[0] ) );
-        VertexLite v1       = ugb.Load<VertexLite>( VertexLite_size * ( mesh.VertexLiteStart + inds[1] ) );
-        VertexLite v2       = ugb.Load<VertexLite>( VertexLite_size * ( mesh.VertexLiteStart + inds[2] ) );
+        RayDesc                         desc;
+        desc.Origin    = IN.Position.xyz;
+        desc.Direction = reflection_dir;
+        desc.TMin      = 0.0001f;
+        desc.TMax      = 100.0f;
 
-        float2     uv[2];
-        uv[0] = v0.TexCoord[0] + ( v1.TexCoord[0] - v0.TexCoord[0] ) * bary.x +
-                ( v2.TexCoord[0] - v0.TexCoord[0] ) * bary.y;
-        uv[1] = v0.TexCoord[1] + ( v1.TexCoord[1] - v0.TexCoord[1] ) * bary.x +
-                ( v2.TexCoord[1] - v0.TexCoord[1] ) * bary.y;
+        query.TraceRayInline( tlas, RAY_FLAG_CULL_BACK_FACING_TRIANGLES, ~0, desc );
+        query.Proceed();
 
-        prefiltered_color = lerp(
-            refl_mat.GetAlbedo( uv, g_DefaultSampler ).rgb,
-            prefiltered_color,
-            smoothstep( 0.0f, RT_MAX_ROUGHNESS, brdf.Roughness ) );
+        if ( query.CommittedStatus() == COMMITTED_TRIANGLE_HIT )
+        {
+          uint              instance_id = query.CommittedInstanceID();
+          ByteAddressBuffer draws       = ResourceDescriptorHeap[g_DrawBatch.DrawBuffer];
+          ByteAddressBuffer ugb         = ResourceDescriptorHeap[g_DrawBatch.GeometryBuffer];
+          DrawInstance      instance =
+              draws.Load<DrawInstance>( g_DrawBatch.InstancesOffset + DrawInstance_size * instance_id );
+          DrawMesh mesh = draws.Load<DrawMesh>( DrawMesh_size * instance.MeshID );
+
+          if ( IsValidHandle( mesh.Material ) )
+          {
+            Material   refl_mat = materials[mesh.Material];
+
+            float2     bary     = query.CommittedTriangleBarycentrics();
+            uint       prim     = query.CommittedPrimitiveIndex();
+            uint3      inds     = ugb.Load3( 4 * ( mesh.IndexStart + prim * 3 ) );
+            VertexLite v0       = ugb.Load<VertexLite>( VertexLite_size * ( mesh.VertexLiteStart + inds[0] ) );
+            VertexLite v1       = ugb.Load<VertexLite>( VertexLite_size * ( mesh.VertexLiteStart + inds[1] ) );
+            VertexLite v2       = ugb.Load<VertexLite>( VertexLite_size * ( mesh.VertexLiteStart + inds[2] ) );
+
+            float2     uv[2];
+            uv[0] = v0.TexCoord[0] + ( v1.TexCoord[0] - v0.TexCoord[0] ) * bary.x +
+                    ( v2.TexCoord[0] - v0.TexCoord[0] ) * bary.y;
+            uv[1] = v0.TexCoord[1] + ( v1.TexCoord[1] - v0.TexCoord[1] ) * bary.x +
+                    ( v2.TexCoord[1] - v0.TexCoord[1] ) * bary.y;
+
+            prefiltered_color = lerp(
+                refl_mat.GetAlbedo( uv, g_DefaultSampler ).rgb,
+                prefiltered_color,
+                smoothstep( 0.0f, RT_MAX_ROUGHNESS, brdf.Roughness ) );
+          }
+        }
       }
+      float2 env_brdf = g_Env.SampleBrdfLut( n_dot_v, brdf.Roughness, g_ClampedSampler );
+      specular        = prefiltered_color * ( specular_part * env_brdf.x + env_brdf.y );
     }
-    float2 env_brdf = g_Env.SampleBrdfLut( n_dot_v, brdf.Roughness, g_ClampedSampler );
-    float3 specular = prefiltered_color * ( specular_part * env_brdf.x + env_brdf.y );
 
-    float3 diffuse  = brdf.Albedo * g_Env.SampleIrradiance( brdf.Normal, g_DefaultSampler );
+    float3 diffuse = 0.0f;
+    if ( !config.RemoveDiffuseContrib )
+    {
+      diffuse = brdf.Albedo * g_Env.SampleIrradiance( brdf.Normal, g_DefaultSampler );
+    }
 
     ambient_contrib = ( diffuse_part * diffuse + specular ) * brdf.Occlusion;
   }
