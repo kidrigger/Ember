@@ -85,7 +85,7 @@ Ember::TexCubeDesc::operator Ember::TextureDesc() const
     .Width     = Side,
     .Height    = Side,
     .MipLevels = MipLevels,
-    .ArraySize = 6,
+    .ArraySize = 1,
     .Usage     = Usage,
     .Dim       = TextureDim::kCube,
     .InitState = InitState.value_or( DefaultInitStateFor( Usage ) ),
@@ -279,7 +279,7 @@ std::shared_ptr<Ember::TextureImpl> Ember::TextureManager::CreateTextureImpl( Te
   if ( desc.Usage == TextureUsage::kReadWrite )
   {
     auto const uav_format = DirectX::MakeLinear( desc.Format );
-    auto const uav_desc   = desc.ArraySize > 1
+    auto const uav_desc   = actual_array_size > 1
                                 ? CD3DX12_UNORDERED_ACCESS_VIEW_DESC::Tex2DArray( uav_format, actual_array_size )
                                 : CD3DX12_UNORDERED_ACCESS_VIEW_DESC::Tex2D( uav_format );
     uav_handle            = m_Bindless->CreateDescriptorHandle( texture.Get(), uav_desc );
