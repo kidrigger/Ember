@@ -16,9 +16,6 @@
     <Filter Include="Resource Files\Config">
       <UniqueIdentifier>{52131402-d9ee-4ad9-89cf-f0e76e13d180}</UniqueIdentifier>
     </Filter>
-    <Filter Include="Shaders">
-      <UniqueIdentifier>{6ebb7bb3-b9d2-4732-9069-cc6c9c511227}</UniqueIdentifier>
-    </Filter>
     <Filter Include="Source Files\Util">
       <UniqueIdentifier>{fc249c3a-6ef3-43b0-908c-1daea7dce634}</UniqueIdentifier>
     </Filter>
@@ -37,35 +34,11 @@
     <Filter Include="Source Files\Graphics">
       <UniqueIdentifier>{85ce07da-36fa-4e71-8747-84a6579a74ac}</UniqueIdentifier>
     </Filter>
-    <Filter Include="Source Files\Resources">
-      <UniqueIdentifier>{f75ef165-5c2d-4b1b-ba6e-fcba641e1d15}</UniqueIdentifier>
-    </Filter>
-    <Filter Include="Header Files\Resources">
-      <UniqueIdentifier>{703a95d3-f874-457e-8d9a-08207f4f1b83}</UniqueIdentifier>
-    </Filter>
-    <Filter Include="Shaders\IBL">
-      <UniqueIdentifier>{0cf9a7d1-17b5-47ca-a7bf-1487b3801c13}</UniqueIdentifier>
-    </Filter>
     <Filter Include="Resource Files\Assets\Environment">
       <UniqueIdentifier>{80e73104-2be7-41de-aa80-443053321e2d}</UniqueIdentifier>
     </Filter>
     <Filter Include="Resource Files\Assets\Scenes">
       <UniqueIdentifier>{3f1b6069-d8a4-48b7-a470-d65aa5217a43}</UniqueIdentifier>
-    </Filter>
-    <Filter Include="Shaders\Shadows">
-      <UniqueIdentifier>{19b95aa5-3537-429c-84f2-4fd0eea82243}</UniqueIdentifier>
-    </Filter>
-    <Filter Include="Shaders\Utils">
-      <UniqueIdentifier>{e5054b06-327b-4e25-86de-082460938480}</UniqueIdentifier>
-    </Filter>
-    <Filter Include="Shaders\Meshes">
-      <UniqueIdentifier>{adc7aab0-8972-4e53-b006-c56043c1d5ec}</UniqueIdentifier>
-    </Filter>
-    <Filter Include="Shaders\Meshes\Forward">
-      <UniqueIdentifier>{3c704815-4fdd-45a7-9c2c-b6334a96518c}</UniqueIdentifier>
-    </Filter>
-    <Filter Include="Shaders\Meshes\Deferred">
-      <UniqueIdentifier>{6aa6fc91-b2cc-472e-a463-77c6f342fcd3}</UniqueIdentifier>
     </Filter>
     <Filter Include="Header Files\Passes">
       <UniqueIdentifier>{ef966d89-19fe-4754-85bb-4d79dcb8d79e}</UniqueIdentifier>
@@ -73,29 +46,74 @@
     <Filter Include="Source Files\Passes">
       <UniqueIdentifier>{9cb2a318-b3ee-466f-808f-379c472bf996}</UniqueIdentifier>
     </Filter>
-    <Filter Include="Shaders\Atmosphere">
-      <UniqueIdentifier>{1a829239-b011-4709-9d4e-8c5ad3903102}</UniqueIdentifier>
-    </Filter>
     <Filter Include="Header Files\Editor">
       <UniqueIdentifier>{b57f4924-8a57-47ca-9c68-89f0a51be1f8}</UniqueIdentifier>
     </Filter>
     <Filter Include="Source Files\Editor">
       <UniqueIdentifier>{488073bf-8185-47bd-a2c7-8fb9162097da}</UniqueIdentifier>
     </Filter>
-    <Filter Include="Shaders\DepthPrePass">
-      <UniqueIdentifier>{393f6fa7-7e17-49b5-b98e-34d9dbbfc157}</UniqueIdentifier>
+    <Filter Include="Source Files\Render">
+      <UniqueIdentifier>{0a08950f-4f43-491a-8a90-e915a2e6050d}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="Header Files\Render">
+      <UniqueIdentifier>{40e4005d-c944-401e-88ee-c12b806dce5c}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="Header Files\Loaders">
+      <UniqueIdentifier>{703a95d3-f874-457e-8d9a-08207f4f1b83}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="Source Files\Loaders">
+      <UniqueIdentifier>{f75ef165-5c2d-4b1b-ba6e-fcba641e1d15}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="Header Files\Util">
+      <UniqueIdentifier>{a3bc85c6-231f-4c3c-9f8a-be1e4cbbf890}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="Shaders">
+      <UniqueIdentifier>{f0457ae0-6735-4da6-875c-856edb62fcf9}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="Shaders\Util">
+      <UniqueIdentifier>{d6f43ff8-a216-4625-8a09-ecb02567ee2f}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="Shaders\Atmosphere">
+      <UniqueIdentifier>{be52a75c-764f-41b6-83bd-848e96f18cbc}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="Shaders\Depth">
+      <UniqueIdentifier>{69cc7bb2-e486-4d3c-b6cf-dc282f0ecc0c}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="Shaders\Shadows">
+      <UniqueIdentifier>{f862abf9-da53-4429-a979-401647334a35}</UniqueIdentifier>
     </Filter>
     <Filter Include="Shaders\Shadows\Directional">
-      <UniqueIdentifier>{1534ca4f-9c75-47a5-a9e7-ab3a134bde01}</UniqueIdentifier>
+      <UniqueIdentifier>{bb312119-265d-4f62-8257-1dbfd714036a}</UniqueIdentifier>
     </Filter>
-    <Filter Include="Shaders\Shadows\OmniDirectional">
-      <UniqueIdentifier>{1df1e871-7caf-40de-994d-466ae28c2a2e}</UniqueIdentifier>
+    <Filter Include="Shaders\Shadows\Omni">
+      <UniqueIdentifier>{fef0c608-6de4-40a7-939e-ccd27f2cddf9}</UniqueIdentifier>
     </Filter>
-    <Filter Include="Shaders\Shadows\SpotLight">
-      <UniqueIdentifier>{982cb2d3-9a43-4d4e-96ae-235c850078af}</UniqueIdentifier>
+    <Filter Include="Shaders\Shadows\Spot">
+      <UniqueIdentifier>{6c9eeab7-c574-479f-82e3-9dbbc3a08ece}</UniqueIdentifier>
     </Filter>
-    <Filter Include="Shaders\ReflectionProbe">
-      <UniqueIdentifier>{b516c79c-b71d-44aa-8525-a28fb69a975d}</UniqueIdentifier>
+    <Filter Include="Shaders\Environment">
+      <UniqueIdentifier>{cd2e15e4-b3c8-4ba7-9db7-d2bab2323c29}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="Shaders\Environment\IBL">
+      <UniqueIdentifier>{dea8bcb7-7b8e-4650-adc9-1b7149a37441}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="Shaders\Environment\Probe">
+      <UniqueIdentifier>{6096ea1d-8166-454e-9cc8-55c999ee64c5}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="Shaders\Mesh">
+      <UniqueIdentifier>{464c18cd-e0a0-4047-97ef-81adf876a78d}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="Shaders\Deferred">
+      <UniqueIdentifier>{197799bd-a372-45c8-a7f9-d2aec3e84867}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="Shaders\Background">
+      <UniqueIdentifier>{1bdad232-0e4f-4f52-a5e5-5b43fb2c9203}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="Shaders\Common">
+      <UniqueIdentifier>{a696d99d-511f-4982-9285-a3866b1ffb14}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="Shaders\PBR">
+      <UniqueIdentifier>{449d3437-1bc7-4a22-b2c2-c9b2872d4e1e}</UniqueIdentifier>
     </Filter>
   </ItemGroup>
   <ItemGroup>
@@ -108,37 +126,19 @@
     <ClCompile Include="IApp.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
-    <ClCompile Include="ObjectPool.cpp">
-      <Filter>Source Files\Scene</Filter>
-    </ClCompile>
     <ClCompile Include="Scene.cpp">
       <Filter>Source Files\Scene</Filter>
     </ClCompile>
     <ClCompile Include="TextureLoader.cpp">
-      <Filter>Source Files\Resources</Filter>
+      <Filter>Source Files\Loaders</Filter>
     </ClCompile>
     <ClCompile Include="ModelLoader.cpp">
-      <Filter>Source Files\Resources</Filter>
+      <Filter>Source Files\Loaders</Filter>
     </ClCompile>
     <ClCompile Include="CgltfImpl.cpp">
       <Filter>Source Files\Util</Filter>
     </ClCompile>
-    <ClCompile Include="Environment.cpp">
-      <Filter>Source Files\Scene</Filter>
-    </ClCompile>
     <ClCompile Include="Camera.cpp">
-      <Filter>Source Files\Scene</Filter>
-    </ClCompile>
-    <ClCompile Include="OmniLightManager.cpp">
-      <Filter>Source Files\Scene</Filter>
-    </ClCompile>
-    <ClCompile Include="LightHandle.cpp">
-      <Filter>Source Files\Scene</Filter>
-    </ClCompile>
-    <ClCompile Include="LightManager.cpp">
-      <Filter>Source Files\Scene</Filter>
-    </ClCompile>
-    <ClCompile Include="DirectionLightManager.cpp">
       <Filter>Source Files\Scene</Filter>
     </ClCompile>
     <ClCompile Include="MaterialManager.cpp">
@@ -152,9 +152,6 @@
     </ClCompile>
     <ClCompile Include="Input.cpp">
       <Filter>Source Files</Filter>
-    </ClCompile>
-    <ClCompile Include="SpotLightManager.cpp">
-      <Filter>Source Files\Scene</Filter>
     </ClCompile>
     <ClCompile Include="FrameGraphHelper.cpp">
       <Filter>Source Files\Graphics</Filter>
@@ -192,6 +189,30 @@
     <ClCompile Include="ReflectionProbe.cpp">
       <Filter>Source Files\Scene</Filter>
     </ClCompile>
+    <ClCompile Include="Render\DrawList.cpp">
+      <Filter>Source Files\Render</Filter>
+    </ClCompile>
+    <ClCompile Include="ObjectPool.cpp">
+      <Filter>Source Files\Util</Filter>
+    </ClCompile>
+    <ClCompile Include="OmniLightManager.cpp">
+      <Filter>Source Files\Graphics</Filter>
+    </ClCompile>
+    <ClCompile Include="LightManager.cpp">
+      <Filter>Source Files\Graphics</Filter>
+    </ClCompile>
+    <ClCompile Include="LightHandle.cpp">
+      <Filter>Source Files\Graphics</Filter>
+    </ClCompile>
+    <ClCompile Include="DirectionLightManager.cpp">
+      <Filter>Source Files\Graphics</Filter>
+    </ClCompile>
+    <ClCompile Include="SpotLightManager.cpp">
+      <Filter>Source Files\Graphics</Filter>
+    </ClCompile>
+    <ClCompile Include="Environment.cpp">
+      <Filter>Source Files\Graphics</Filter>
+    </ClCompile>
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="BasicApp.hpp">
@@ -203,34 +224,16 @@
     <ClInclude Include="Scene.hpp">
       <Filter>Header Files\Scene</Filter>
     </ClInclude>
-    <ClInclude Include="ObjectPool.hpp">
-      <Filter>Header Files\Scene</Filter>
-    </ClInclude>
     <ClInclude Include="TextureLoader.hpp">
-      <Filter>Header Files\Resources</Filter>
+      <Filter>Header Files\Loaders</Filter>
     </ClInclude>
     <ClInclude Include="ModelLoader.hpp">
-      <Filter>Header Files\Resources</Filter>
+      <Filter>Header Files\Loaders</Filter>
     </ClInclude>
     <ClInclude Include="Color.hpp">
       <Filter>Header Files\Graphics</Filter>
     </ClInclude>
-    <ClInclude Include="Environment.hpp">
-      <Filter>Header Files\Scene</Filter>
-    </ClInclude>
-    <ClInclude Include="OmniLightManager.hpp">
-      <Filter>Header Files\Scene</Filter>
-    </ClInclude>
     <ClInclude Include="Camera.hpp">
-      <Filter>Header Files\Scene</Filter>
-    </ClInclude>
-    <ClInclude Include="LightHandle.hpp">
-      <Filter>Header Files\Scene</Filter>
-    </ClInclude>
-    <ClInclude Include="LightManager.hpp">
-      <Filter>Header Files\Scene</Filter>
-    </ClInclude>
-    <ClInclude Include="DirectionLightManager.hpp">
       <Filter>Header Files\Scene</Filter>
     </ClInclude>
     <ClInclude Include="MaterialManager.hpp">
@@ -244,9 +247,6 @@
     </ClInclude>
     <ClInclude Include="Input.hpp">
       <Filter>Header Files</Filter>
-    </ClInclude>
-    <ClInclude Include="SpotLightManager.hpp">
-      <Filter>Header Files\Scene</Filter>
     </ClInclude>
     <ClInclude Include="FrameGraphHelper.hpp">
       <Filter>Header Files\Graphics</Filter>
@@ -287,6 +287,30 @@
     <ClInclude Include="ReflectionProbe.hpp">
       <Filter>Header Files\Scene</Filter>
     </ClInclude>
+    <ClInclude Include="Render\DrawList.hpp">
+      <Filter>Header Files\Render</Filter>
+    </ClInclude>
+    <ClInclude Include="ObjectPool.hpp">
+      <Filter>Header Files\Util</Filter>
+    </ClInclude>
+    <ClInclude Include="OmniLightManager.hpp">
+      <Filter>Header Files\Graphics</Filter>
+    </ClInclude>
+    <ClInclude Include="SpotLightManager.hpp">
+      <Filter>Header Files\Graphics</Filter>
+    </ClInclude>
+    <ClInclude Include="DirectionLightManager.hpp">
+      <Filter>Header Files\Graphics</Filter>
+    </ClInclude>
+    <ClInclude Include="LightManager.hpp">
+      <Filter>Header Files\Graphics</Filter>
+    </ClInclude>
+    <ClInclude Include="LightHandle.hpp">
+      <Filter>Header Files\Graphics</Filter>
+    </ClInclude>
+    <ClInclude Include="Environment.hpp">
+      <Filter>Header Files\Graphics</Filter>
+    </ClInclude>
   </ItemGroup>
   <ItemGroup>
     <None Include="..\.clang-format">
@@ -301,218 +325,78 @@
     <None Include="PLAN.md">
       <Filter>Resource Files</Filter>
     </None>
-    <None Include="IBLCommon.hlsli">
-      <Filter>Shaders\IBL</Filter>
-    </None>
-    <None Include="Bindless.hlsli">
-      <Filter>Shaders\Utils</Filter>
-    </None>
-    <None Include="Colors.hlsli">
-      <Filter>Shaders\Utils</Filter>
-    </None>
-    <None Include="Utility.hlsli">
-      <Filter>Shaders\Utils</Filter>
-    </None>
-    <None Include="LightData.hlsli">
-      <Filter>Shaders\Shadows</Filter>
-    </None>
-    <None Include="Quantization.hlsli">
-      <Filter>Shaders\Utils</Filter>
-    </None>
-    <None Include="PBR.hlsli">
-      <Filter>Shaders\Meshes</Filter>
-    </None>
-    <None Include="Camera.hlsli">
-      <Filter>Shaders\Utils</Filter>
-    </None>
-    <None Include="Math.hlsli">
-      <Filter>Shaders\Utils</Filter>
-    </None>
-    <None Include="DebugConfig.hlsli">
-      <Filter>Shaders\Utils</Filter>
-    </None>
-    <None Include="Environment.hlsli">
-      <Filter>Shaders\Utils</Filter>
-    </None>
-    <None Include="Material.hlsli">
-      <Filter>Shaders\Utils</Filter>
-    </None>
-    <None Include="TrianglePSCommon.hlsli">
-      <Filter>Shaders\Meshes\Forward</Filter>
-    </None>
-    <None Include="OmniLightCommon.hlsli">
-      <Filter>Shaders\Meshes\Deferred</Filter>
-    </None>
-    <None Include="SpotLightCommon.hlsli">
-      <Filter>Shaders\Meshes\Deferred</Filter>
-    </None>
-    <None Include="AtmosphereCommon.hlsli">
+    <None Include="Shaders\AtmosphereCommon.hlsli">
       <Filter>Shaders\Atmosphere</Filter>
     </None>
-    <None Include="Constants.hlsli">
-      <Filter>Shaders\Utils</Filter>
+    <None Include="Shaders\DepthPrePass.hlsli">
+      <Filter>Shaders\Depth</Filter>
     </None>
-    <None Include="DepthPrePass.hlsli">
-      <Filter>Shaders\DepthPrePass</Filter>
-    </None>
-    <None Include="DirShadow.hlsli">
+    <None Include="Shaders\DirShadow.hlsli">
       <Filter>Shaders\Shadows\Directional</Filter>
     </None>
-    <None Include="OmniShadow.hlsli">
-      <Filter>Shaders\Shadows\OmniDirectional</Filter>
+    <None Include="Shaders\OmniShadow.hlsli">
+      <Filter>Shaders\Shadows\Omni</Filter>
     </None>
-    <None Include="SpotShadow.hlsli">
-      <Filter>Shaders\Shadows\SpotLight</Filter>
+    <None Include="Shaders\SpotShadow.hlsli">
+      <Filter>Shaders\Shadows\Spot</Filter>
     </None>
-    <None Include="Triangle.hlsli">
-      <Filter>Shaders\Meshes</Filter>
+    <None Include="Shaders\Colors.hlsli">
+      <Filter>Shaders\Util</Filter>
     </None>
-    <None Include="Geometry.hlsli">
-      <Filter>Shaders</Filter>
+    <None Include="Shaders\Bindless.hlsli">
+      <Filter>Shaders\Util</Filter>
     </None>
-    <None Include="ReflectionProbe.hlsli">
-      <Filter>Shaders\ReflectionProbe</Filter>
+    <None Include="Shaders\IBLCommon.hlsli">
+      <Filter>Shaders\Environment\IBL</Filter>
     </None>
-  </ItemGroup>
-  <ItemGroup>
-    <FxCompile Include="EqrectToCube.hlsl">
-      <Filter>Shaders\IBL</Filter>
-    </FxCompile>
-    <FxCompile Include="DiffuseIrradiance.hlsl">
-      <Filter>Shaders\IBL</Filter>
-    </FxCompile>
-    <FxCompile Include="Prefilter.hlsl">
-      <Filter>Shaders\IBL</Filter>
-    </FxCompile>
-    <FxCompile Include="BrdfLUT.hlsl">
-      <Filter>Shaders\IBL</Filter>
-    </FxCompile>
-    <FxCompile Include="BackgroundPS.hlsl">
-      <Filter>Shaders</Filter>
-    </FxCompile>
-    <FxCompile Include="BackgroundVS.hlsl">
-      <Filter>Shaders</Filter>
-    </FxCompile>
-    <FxCompile Include="TriangleVS.hlsl">
-      <Filter>Shaders\Meshes</Filter>
-    </FxCompile>
-    <FxCompile Include="MipMapCube.hlsl">
-      <Filter>Shaders\Utils</Filter>
-    </FxCompile>
-    <FxCompile Include="MipMap.hlsl">
-      <Filter>Shaders\Utils</Filter>
-    </FxCompile>
-    <FxCompile Include="BackgroundMS.hlsl">
-      <Filter>Shaders</Filter>
-    </FxCompile>
-    <FxCompile Include="TriangleTransparentPS.hlsl">
-      <Filter>Shaders\Meshes\Forward</Filter>
-    </FxCompile>
-    <FxCompile Include="TriangleMaskedPS.hlsl">
-      <Filter>Shaders\Meshes\Forward</Filter>
-    </FxCompile>
-    <FxCompile Include="TrianglePS.hlsl">
-      <Filter>Shaders\Meshes\Forward</Filter>
-    </FxCompile>
-    <FxCompile Include="GBufferMaskedPS.hlsl">
-      <Filter>Shaders\Meshes\Deferred</Filter>
-    </FxCompile>
-    <FxCompile Include="GBufferPS.hlsl">
-      <Filter>Shaders\Meshes\Deferred</Filter>
-    </FxCompile>
-    <FxCompile Include="LightingPS.hlsl">
-      <Filter>Shaders\Meshes\Deferred</Filter>
-    </FxCompile>
-    <FxCompile Include="LightingMS.hlsl">
-      <Filter>Shaders\Meshes\Deferred</Filter>
-    </FxCompile>
-    <FxCompile Include="OmniLightingAS.hlsl">
-      <Filter>Shaders\Meshes\Deferred</Filter>
-    </FxCompile>
-    <FxCompile Include="OmniLightingMS.hlsl">
-      <Filter>Shaders\Meshes\Deferred</Filter>
-    </FxCompile>
-    <FxCompile Include="OmniLightingPS.hlsl">
-      <Filter>Shaders\Meshes\Deferred</Filter>
-    </FxCompile>
-    <FxCompile Include="SpotLightingAS.hlsl">
-      <Filter>Shaders\Meshes\Deferred</Filter>
-    </FxCompile>
-    <FxCompile Include="SpotLightingMS.hlsl">
-      <Filter>Shaders\Meshes\Deferred</Filter>
-    </FxCompile>
-    <FxCompile Include="SpotLightingPS.hlsl">
-      <Filter>Shaders\Meshes\Deferred</Filter>
-    </FxCompile>
-    <FxCompile Include="ScreenSpaceTriangleVS.hlsl">
-      <Filter>Shaders\Utils</Filter>
-    </FxCompile>
-    <FxCompile Include="TransmittanceLUTPS.hlsl">
-      <Filter>Shaders\Atmosphere</Filter>
-    </FxCompile>
-    <FxCompile Include="SkyViewLUTPS.hlsl">
-      <Filter>Shaders\Atmosphere</Filter>
-    </FxCompile>
-    <FxCompile Include="AtmosphereBackgroundPS.hlsl">
-      <Filter>Shaders</Filter>
-    </FxCompile>
-    <FxCompile Include="EmptyPS.hlsl">
-      <Filter>Shaders</Filter>
-    </FxCompile>
-    <FxCompile Include="DepthPrePassAS.hlsl">
-      <Filter>Shaders\DepthPrePass</Filter>
-    </FxCompile>
-    <FxCompile Include="DepthPrePassMS.hlsl">
-      <Filter>Shaders\DepthPrePass</Filter>
-    </FxCompile>
-    <FxCompile Include="DepthPrePassMaskedPS.hlsl">
-      <Filter>Shaders\DepthPrePass</Filter>
-    </FxCompile>
-    <FxCompile Include="DirShadowAS.hlsl">
-      <Filter>Shaders\Shadows\Directional</Filter>
-    </FxCompile>
-    <FxCompile Include="DirShadowMS.hlsl">
-      <Filter>Shaders\Shadows\Directional</Filter>
-    </FxCompile>
-    <FxCompile Include="DirShadowVS.hlsl">
-      <Filter>Shaders\Shadows\Directional</Filter>
-    </FxCompile>
-    <FxCompile Include="OmniShadowAS.hlsl">
-      <Filter>Shaders\Shadows\OmniDirectional</Filter>
-    </FxCompile>
-    <FxCompile Include="OmniShadowMS.hlsl">
-      <Filter>Shaders\Shadows\OmniDirectional</Filter>
-    </FxCompile>
-    <FxCompile Include="OmniShadowPS.hlsl">
-      <Filter>Shaders\Shadows\OmniDirectional</Filter>
-    </FxCompile>
-    <FxCompile Include="OmniShadowVS.hlsl">
-      <Filter>Shaders\Shadows\OmniDirectional</Filter>
-    </FxCompile>
-    <FxCompile Include="SpotShadowAS.hlsl">
-      <Filter>Shaders\Shadows\SpotLight</Filter>
-    </FxCompile>
-    <FxCompile Include="SpotShadowMS.hlsl">
-      <Filter>Shaders\Shadows\SpotLight</Filter>
-    </FxCompile>
-    <FxCompile Include="SpotShadowPS.hlsl">
-      <Filter>Shaders\Shadows\SpotLight</Filter>
-    </FxCompile>
-    <FxCompile Include="TriangleAS.hlsl">
-      <Filter>Shaders\Meshes</Filter>
-    </FxCompile>
-    <FxCompile Include="TriangleMS.hlsl">
-      <Filter>Shaders\Meshes</Filter>
-    </FxCompile>
-    <FxCompile Include="ReflectionProbeAS.hlsl">
-      <Filter>Shaders\ReflectionProbe</Filter>
-    </FxCompile>
-    <FxCompile Include="ReflectionProbeMS.hlsl">
-      <Filter>Shaders\ReflectionProbe</Filter>
-    </FxCompile>
-    <FxCompile Include="ReflectionProbePS.hlsl">
-      <Filter>Shaders\ReflectionProbe</Filter>
-    </FxCompile>
+    <None Include="Shaders\Utility.hlsli">
+      <Filter>Shaders\Util</Filter>
+    </None>
+    <None Include="Shaders\Math.hlsli">
+      <Filter>Shaders\Util</Filter>
+    </None>
+    <None Include="Shaders\Environment.hlsli">
+      <Filter>Shaders\Environment</Filter>
+    </None>
+    <None Include="Shaders\ReflectionProbe.hlsli">
+      <Filter>Shaders\Environment\Probe</Filter>
+    </None>
+    <None Include="Shaders\Geometry.hlsli">
+      <Filter>Shaders\Mesh</Filter>
+    </None>
+    <None Include="Shaders\Triangle.hlsli">
+      <Filter>Shaders\Mesh</Filter>
+    </None>
+    <None Include="Shaders\TrianglePSCommon.hlsli">
+      <Filter>Shaders\Mesh</Filter>
+    </None>
+    <None Include="Shaders\Quantization.hlsli">
+      <Filter>Shaders\Util</Filter>
+    </None>
+    <None Include="Shaders\OmniLightCommon.hlsli">
+      <Filter>Shaders\Deferred</Filter>
+    </None>
+    <None Include="Shaders\SpotLightCommon.hlsli">
+      <Filter>Shaders\Deferred</Filter>
+    </None>
+    <None Include="Shaders\LightData.hlsli">
+      <Filter>Shaders\Deferred</Filter>
+    </None>
+    <None Include="Shaders\Camera.hlsli">
+      <Filter>Shaders\Common</Filter>
+    </None>
+    <None Include="Shaders\Constants.hlsli">
+      <Filter>Shaders\Common</Filter>
+    </None>
+    <None Include="Shaders\DebugConfig.hlsli">
+      <Filter>Shaders\Common</Filter>
+    </None>
+    <None Include="Shaders\Material.hlsli">
+      <Filter>Shaders\Common</Filter>
+    </None>
+    <None Include="Shaders\PBR.hlsli">
+      <Filter>Shaders\PBR</Filter>
+    </None>
   </ItemGroup>
   <ItemGroup>
     <CopyFileToFolders Include="Assets\container2.png">
@@ -586,5 +470,136 @@
     <Image Include="Assets\checkerboard.png">
       <Filter>Resource Files</Filter>
     </Image>
+  </ItemGroup>
+  <ItemGroup>
+    <FxCompile Include="Shaders\DepthPrePassAS.hlsl">
+      <Filter>Shaders\Depth</Filter>
+    </FxCompile>
+    <FxCompile Include="Shaders\DepthPrePassMaskedPS.hlsl">
+      <Filter>Shaders\Depth</Filter>
+    </FxCompile>
+    <FxCompile Include="Shaders\DepthPrePassMS.hlsl">
+      <Filter>Shaders\Depth</Filter>
+    </FxCompile>
+    <FxCompile Include="Shaders\DirShadowAS.hlsl">
+      <Filter>Shaders\Shadows\Directional</Filter>
+    </FxCompile>
+    <FxCompile Include="Shaders\DirShadowMS.hlsl">
+      <Filter>Shaders\Shadows\Directional</Filter>
+    </FxCompile>
+    <FxCompile Include="Shaders\OmniShadowAS.hlsl">
+      <Filter>Shaders\Shadows\Omni</Filter>
+    </FxCompile>
+    <FxCompile Include="Shaders\OmniShadowMS.hlsl">
+      <Filter>Shaders\Shadows\Omni</Filter>
+    </FxCompile>
+    <FxCompile Include="Shaders\OmniShadowPS.hlsl">
+      <Filter>Shaders\Shadows\Omni</Filter>
+    </FxCompile>
+    <FxCompile Include="Shaders\SpotShadowAS.hlsl">
+      <Filter>Shaders\Shadows\Spot</Filter>
+    </FxCompile>
+    <FxCompile Include="Shaders\SpotShadowMS.hlsl">
+      <Filter>Shaders\Shadows\Spot</Filter>
+    </FxCompile>
+    <FxCompile Include="Shaders\SpotShadowPS.hlsl">
+      <Filter>Shaders\Shadows\Spot</Filter>
+    </FxCompile>
+    <FxCompile Include="Shaders\MipMap.hlsl">
+      <Filter>Shaders\Util</Filter>
+    </FxCompile>
+    <FxCompile Include="Shaders\MipMapCube.hlsl">
+      <Filter>Shaders\Util</Filter>
+    </FxCompile>
+    <FxCompile Include="Shaders\Prefilter.hlsl">
+      <Filter>Shaders\Environment\IBL</Filter>
+    </FxCompile>
+    <FxCompile Include="Shaders\DiffuseIrradiance.hlsl">
+      <Filter>Shaders\Environment\IBL</Filter>
+    </FxCompile>
+    <FxCompile Include="Shaders\BrdfLUT.hlsl">
+      <Filter>Shaders\Environment\IBL</Filter>
+    </FxCompile>
+    <FxCompile Include="Shaders\ReflectionProbeAS.hlsl">
+      <Filter>Shaders\Environment\Probe</Filter>
+    </FxCompile>
+    <FxCompile Include="Shaders\ReflectionProbeMS.hlsl">
+      <Filter>Shaders\Environment\Probe</Filter>
+    </FxCompile>
+    <FxCompile Include="Shaders\ReflectionProbePS.hlsl">
+      <Filter>Shaders\Environment\Probe</Filter>
+    </FxCompile>
+    <FxCompile Include="Shaders\EqrectToCube.hlsl">
+      <Filter>Shaders\Environment\IBL</Filter>
+    </FxCompile>
+    <FxCompile Include="Shaders\TriangleAS.hlsl">
+      <Filter>Shaders\Mesh</Filter>
+    </FxCompile>
+    <FxCompile Include="Shaders\TriangleMaskedPS.hlsl">
+      <Filter>Shaders\Mesh</Filter>
+    </FxCompile>
+    <FxCompile Include="Shaders\TriangleMS.hlsl">
+      <Filter>Shaders\Mesh</Filter>
+    </FxCompile>
+    <FxCompile Include="Shaders\TrianglePS.hlsl">
+      <Filter>Shaders\Mesh</Filter>
+    </FxCompile>
+    <FxCompile Include="Shaders\TriangleTransparentPS.hlsl">
+      <Filter>Shaders\Mesh</Filter>
+    </FxCompile>
+    <FxCompile Include="Shaders\TransmittanceLUTPS.hlsl">
+      <Filter>Shaders\Atmosphere</Filter>
+    </FxCompile>
+    <FxCompile Include="Shaders\GBufferPS.hlsl">
+      <Filter>Shaders\Deferred</Filter>
+    </FxCompile>
+    <FxCompile Include="Shaders\GBufferMaskedPS.hlsl">
+      <Filter>Shaders\Deferred</Filter>
+    </FxCompile>
+    <FxCompile Include="Shaders\OmniLightingPS.hlsl">
+      <Filter>Shaders\Deferred</Filter>
+    </FxCompile>
+    <FxCompile Include="Shaders\OmniLightingAS.hlsl">
+      <Filter>Shaders\Deferred</Filter>
+    </FxCompile>
+    <FxCompile Include="Shaders\OmniLightingMS.hlsl">
+      <Filter>Shaders\Deferred</Filter>
+    </FxCompile>
+    <FxCompile Include="Shaders\SpotLightingPS.hlsl">
+      <Filter>Shaders\Deferred</Filter>
+    </FxCompile>
+    <FxCompile Include="Shaders\SpotLightingAS.hlsl">
+      <Filter>Shaders\Deferred</Filter>
+    </FxCompile>
+    <FxCompile Include="Shaders\SpotLightingMS.hlsl">
+      <Filter>Shaders\Deferred</Filter>
+    </FxCompile>
+    <FxCompile Include="Shaders\SkyViewLUTPS.hlsl">
+      <Filter>Shaders\Atmosphere</Filter>
+    </FxCompile>
+    <FxCompile Include="Shaders\LightingPS.hlsl">
+      <Filter>Shaders\Deferred</Filter>
+    </FxCompile>
+    <FxCompile Include="Shaders\LightingMS.hlsl">
+      <Filter>Shaders\Deferred</Filter>
+    </FxCompile>
+    <FxCompile Include="Shaders\AtmosphereBackgroundPS.hlsl">
+      <Filter>Shaders\Background</Filter>
+    </FxCompile>
+    <FxCompile Include="Shaders\BackgroundPS.hlsl">
+      <Filter>Shaders\Background</Filter>
+    </FxCompile>
+    <FxCompile Include="Shaders\BackgroundVS.hlsl">
+      <Filter>Shaders\Background</Filter>
+    </FxCompile>
+    <FxCompile Include="Shaders\BackgroundMS.hlsl">
+      <Filter>Shaders\Background</Filter>
+    </FxCompile>
+    <FxCompile Include="Shaders\EmptyPS.hlsl">
+      <Filter>Shaders\Common</Filter>
+    </FxCompile>
+    <FxCompile Include="Shaders\ScreenSpaceTriangleVS.hlsl">
+      <Filter>Shaders\Common</Filter>
+    </FxCompile>
   </ItemGroup>
 </Project>

@@ -7,6 +7,7 @@
 #include <Util/FlatMap.hpp>
 #include "Color.hpp"
 #include "LightHandle.hpp"
+#include "Render/DrawList.hpp"
 #include "Scene.hpp"
 
 namespace Ember

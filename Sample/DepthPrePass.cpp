@@ -4,6 +4,7 @@
 #include <Util/HelperUtils.hpp>
 #include <Util/Profiling.hpp>
 #include "FrameGraphHelper.hpp"
+#include "Render/DrawList.hpp"
 #include "Scene.hpp"
 #include "fg/Blackboard.hpp"
 #include "fg/FrameGraph.hpp"

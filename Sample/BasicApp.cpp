@@ -28,6 +28,7 @@
 #include "fg/FrameGraph.hpp"
 #include "fg/JsonWriter.hpp"
 
+#include "Render/DrawList.hpp"
 #include "imgui.h"
 #include "imgui_impl_dx12.h"
 #include "imgui_impl_win32.h"
@@ -394,7 +395,10 @@ void Ember::BasicApp::LoadContent()
                 s = 0.3f;
               } );
 
-  _ = m_ModelLoader->TryLoadModel( "MetalRoughSpheres.glb" )->child_of( m_SceneRoot ).set_name( "MetalRough" );
+  _ = m_ModelLoader->TryLoadModel( "CompareRoughness.glb" )
+          ->child_of( m_SceneRoot )
+          .set_name( "CompareRoughness" )
+          .insert( []( Translation& t ) { t = { 0.5f, 4.0f, 0.0f }; } );
 
   auto const rm = m_World->GetECS()
                       .entity( "HelmetRotator" )

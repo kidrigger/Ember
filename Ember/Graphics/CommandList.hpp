@@ -112,7 +112,7 @@ public:
   HRESULT Reset( ComPtr<ID3D12CommandAllocator> allocator );
   HRESULT Close();
 
-  ID3D12GraphicsCommandList7* Get() const noexcept;
+  [[nodiscard]] ID3D12GraphicsCommandList7* Get() const noexcept;
 
   using Content = std::tuple<
       ComPtr<ID3D12GraphicsCommandList7>,

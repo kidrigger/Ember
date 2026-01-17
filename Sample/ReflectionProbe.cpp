@@ -202,9 +202,10 @@ FrameGraphResource Ember::Proto::ReflectionProbe::Execute(
         CommandList*                  cmd        = frame_data.CommandList;
         PIXScopedEvent( cmd->Get(), PIX_COLOR_DEFAULT, "Reflection Probe Mipmap" );
 
-        FG::Texture* tex = &res.get<FG::Texture>( base_probe );
+        FG::Texture* tex    = &res.get<FG::Texture>( base_probe );
 
-        ASSERT( loader->TryGenerateMipMapCube( cmd, tex ) );
+        bool         result = loader->TryGenerateMipMapCube( cmd, tex );
+        ASSERT( result );
       } );
 }
 

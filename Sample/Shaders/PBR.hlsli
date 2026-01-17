@@ -78,14 +78,14 @@ float PBRGeometrySmith( float n_dot_v, float n_dot_l, float roughness )
 // https://en.wikipedia.org/wiki/Schlick%27s_approximation
 float3 FresnelSchlick( float cosine, float3 f_0 )
 {
-  return f_0 + ( 1.0f - f_0 ) * pow( clamp( 1.0f - cosine, 0.0f, 1.0f ), 5.0f ); // Clamp to avoid artifacts.
+  return f_0 + ( 1.0f - f_0 ) * pow( saturate( 1.0f - cosine ), 5.0f ); // Clamp to avoid artifacts.
 }
 
 // Sebastian Lagarde
 float3 FresnelSchlickRoughness( float cosine, float3 f_0, float roughness )
 {
   return f_0 + ( max( ( 1.0f - roughness ).xxx, f_0 ) - f_0 ) *
-                   pow( clamp( 1.0f - cosine, 0.0f, 1.0f ), 5.0f ); // Clamp to avoid artifacts.
+                   pow( saturate( 1.0f - cosine ), 5.0f ); // Clamp to avoid artifacts.
 }
 
 struct BRDFCookTorranceGGX
