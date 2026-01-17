@@ -3,6 +3,52 @@
 
 #define RT_MAX_ROUGHNESS 0.2f
 
+cbuffer Probe : register( b3 )
+{
+  ResID g_ProbeTex;
+  half4 g_ProbeInfo;
+}
+
+float3 SampleProbePrefilter( in TextureCube prefilter, float3 direction, float roughness, in SamplerState sam )
+{
+  const static float kMaxMipLevel          = 5.0f;
+  const static float kRoughnessToMipFactor = 2; // we reach max mip at 1/kRougnessToMipMultiplier
+  float              mip                   = kMaxMipLevel * saturate( roughness * kRoughnessToMipFactor );
+  return prefilter.SampleLevel( sam, direction, mip ).rgb;
+}
+
+float3 GetAmbientInfluenceProbe(
+    in TextureCube prefilter, in BRDFCookTorranceGGX brdf, float3 view_dir, bool use_diffuse, bool use_spec )
+{
+  float cosine_factor =
+      max( dot( brdf.Normal, view_dir ), 0.0f ); // Normal instead of Halfway since there's no halfway in ambient.
+
+  float3 f_0             = 0.04f;
+  f_0                    = lerp( f_0, brdf.Albedo, brdf.Metallic );
+  float3 specular_part   = FresnelSchlickRoughness( cosine_factor, f_0, brdf.Roughness );
+  float3 diffuse_part    = 1.0f - specular_part;
+
+  diffuse_part          *= 1.0f - brdf.Metallic; // Metals don't have diffuse/refractions.
+
+  float3 reflection_dir  = reflect( -view_dir, brdf.Normal );
+
+  float3 specular        = 0.0f.xxx;
+  float3 diffuse         = 0.0f.xxx;
+  if ( use_spec )
+  {
+    float  n_dot_v           = max( dot( brdf.Normal, view_dir ), 0.0f );
+    float3 prefiltered_color = SampleProbePrefilter( prefilter, reflection_dir, brdf.Roughness, g_DefaultSampler ).rgb;
+    float2 env_brdf          = g_Env.SampleBrdfLut( n_dot_v, brdf.Roughness, g_ClampedSampler );
+    specular                 = prefiltered_color * ( specular_part * env_brdf.x + env_brdf.y );
+  }
+  if ( use_diffuse )
+  {
+    diffuse = brdf.Albedo * g_Env.SampleIrradiance( brdf.Normal, g_DefaultSampler );
+  }
+
+  return ( diffuse_part * diffuse + specular ) * brdf.Occlusion;
+}
+
 float4 TrianglePS( PSIn IN ) : SV_TARGET0
 {
   StructuredBuffer<Material> materials = ResourceDescriptorHeap[g_Materials];
@@ -150,14 +196,23 @@ float4 TrianglePS( PSIn IN ) : SV_TARGET0
 #ifdef STRIP_DEBUG_CONFIG
     ambient_contrib = GetAmbientInfluence( g_Env, brdf, view_dir, g_DefaultSampler, g_ClampedSampler );
 #else
-    ambient_contrib = GetAmbientInfluence(
-        g_Env,
-        brdf,
-        view_dir,
-        g_DefaultSampler,
-        g_ClampedSampler,
-        !config.RemoveDiffuseContrib,
-        !config.RemoveSpecularContrib );
+    if ( IsValidHandle( g_ProbeTex ) )
+    {
+      TextureCube prefil = ResourceDescriptorHeap[g_ProbeTex];
+      ambient_contrib    = GetAmbientInfluenceProbe(
+          prefil, brdf, view_dir, !config.RemoveDiffuseContrib, !config.RemoveSpecularContrib );
+    }
+    else
+    {
+      ambient_contrib = GetAmbientInfluence(
+          g_Env,
+          brdf,
+          view_dir,
+          g_DefaultSampler,
+          g_ClampedSampler,
+          !config.RemoveDiffuseContrib,
+          !config.RemoveSpecularContrib );
+    }
 #endif
   }
 

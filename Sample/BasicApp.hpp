@@ -11,6 +11,7 @@
 #include "GBufferPass.hpp"
 #include "IApp.hpp"
 #include "LightingPass.hpp"
+#include "ReflectionProbe.hpp"
 #include "RenderPassCommon.hpp"
 #include "Scene.hpp"
 #include "SkyboxPass.hpp"
@@ -67,6 +68,7 @@ class BasicApp final : public IApp
   // Environment
   RenderPass::Atmosphere m_UpdateAtmosphericSky;
   RenderPass::Skybox     m_RenderBackground;
+  Proto::ReflectionProbe m_Probe;
 
   // ==========================
 

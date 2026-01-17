@@ -94,6 +94,9 @@
     <Filter Include="Shaders\Shadows\SpotLight">
       <UniqueIdentifier>{982cb2d3-9a43-4d4e-96ae-235c850078af}</UniqueIdentifier>
     </Filter>
+    <Filter Include="Shaders\ReflectionProbe">
+      <UniqueIdentifier>{b516c79c-b71d-44aa-8525-a28fb69a975d}</UniqueIdentifier>
+    </Filter>
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="Main.cpp">
@@ -185,6 +188,9 @@
     </ClCompile>
     <ClCompile Include="DepthPrePass.cpp">
       <Filter>Source Files\Passes</Filter>
+    </ClCompile>
+    <ClCompile Include="ReflectionProbe.cpp">
+      <Filter>Source Files\Scene</Filter>
     </ClCompile>
   </ItemGroup>
   <ItemGroup>
@@ -278,6 +284,9 @@
     <ClInclude Include="DepthPrePass.hpp">
       <Filter>Header Files\Passes</Filter>
     </ClInclude>
+    <ClInclude Include="ReflectionProbe.hpp">
+      <Filter>Header Files\Scene</Filter>
+    </ClInclude>
   </ItemGroup>
   <ItemGroup>
     <None Include="..\.clang-format">
@@ -360,6 +369,9 @@
     </None>
     <None Include="Geometry.hlsli">
       <Filter>Shaders</Filter>
+    </None>
+    <None Include="ReflectionProbe.hlsli">
+      <Filter>Shaders\ReflectionProbe</Filter>
     </None>
   </ItemGroup>
   <ItemGroup>
@@ -491,6 +503,15 @@
     </FxCompile>
     <FxCompile Include="TriangleMS.hlsl">
       <Filter>Shaders\Meshes</Filter>
+    </FxCompile>
+    <FxCompile Include="ReflectionProbeAS.hlsl">
+      <Filter>Shaders\ReflectionProbe</Filter>
+    </FxCompile>
+    <FxCompile Include="ReflectionProbeMS.hlsl">
+      <Filter>Shaders\ReflectionProbe</Filter>
+    </FxCompile>
+    <FxCompile Include="ReflectionProbePS.hlsl">
+      <Filter>Shaders\ReflectionProbe</Filter>
     </FxCompile>
   </ItemGroup>
   <ItemGroup>

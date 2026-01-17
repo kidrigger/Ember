@@ -69,10 +69,36 @@ void Ember::RenderTargetManager::RSSetScissorViewport(
 void Ember::RenderTargetManager::ClearRenderTargetView(
     ID3D12GraphicsCommandList* command_list, ID3D12Resource* render_target, float const color[] ) const
 {
+  // CreateRenderTargetView by default uses all the layers of the array
+  // but only the top mip.
+  auto const                        desc       = render_target->GetDesc();
   D3D12_CPU_DESCRIPTOR_HANDLE const rtv_handle = m_RTVDescriptorHeap->GetCPUDescriptorHandleForHeapStart();
-  m_D3D12Device->CreateRenderTargetView( render_target, nullptr, rtv_handle );
+  if ( desc.MipLevels == 1 )
+  {
+    m_D3D12Device->CreateRenderTargetView( render_target, nullptr, rtv_handle );
+    command_list->ClearRenderTargetView( rtv_handle, color, 0, nullptr );
 
-  command_list->ClearRenderTargetView( rtv_handle, color, 0, nullptr );
+    return;
+  }
+
+  // So we need to manually clear the mips.
+  D3D12_RENDER_TARGET_VIEW_DESC rtv_desc = {
+    .Format         = desc.Format,
+    .ViewDimension  = D3D12_RTV_DIMENSION_TEXTURE2DARRAY,
+    .Texture2DArray = {
+      .MipSlice        = 0,
+      .FirstArraySlice = 0,
+      .ArraySize       = desc.DepthOrArraySize,
+      .PlaneSlice      = 0,
+    },
+  };
+  for ( uint_fast16_t i = 0; i < desc.MipLevels; i++ )
+  {
+    rtv_desc.Texture2DArray.MipSlice = i;
+    m_D3D12Device->CreateRenderTargetView( render_target, &rtv_desc, rtv_handle );
+
+    command_list->ClearRenderTargetView( rtv_handle, color, 0, nullptr );
+  }
 }
 
 void Ember::RenderTargetManager::ClearRenderTargetView(

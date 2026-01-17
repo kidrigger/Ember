@@ -20,7 +20,7 @@ float4 PrepareColor( float4 color )
 NUM_THREADS( 8, 8, 1 )
 void MipMapCube( uint3 dt_id : SV_DispatchThreadID )
 {
-  float2                   side_uv   = g_TexelSize * ( dt_id.xy + 0.5f );
+  float2                   side_uv   = ( dt_id.xy + 0.5f );
   float3                   tex_coord = GetCubeDir( side_uv, dt_id.z, g_TexelSize.x );
 
   TextureCube              src       = ResourceDescriptorHeap[g_InputIndex];

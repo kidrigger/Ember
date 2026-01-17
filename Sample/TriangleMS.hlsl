@@ -61,7 +61,6 @@ void TriangleMS(
     verts[i].ScreenPosition = screen_pos;
     verts[i].Position       = world_pos;
     verts[i].Normal         = normal;
-    verts[i].LinearDepth    = clip_pos.z;
     verts[i].Tangent        = tangent;
     verts[i].Color          = vertex.GetColor();
     verts[i].TexCoord[0]    = vertex_pos.TexCoord[0];

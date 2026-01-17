@@ -349,9 +349,12 @@ bool Ember::TextureLoader::TryGenerateMipMapCube( CommandList* command_list, Tex
   }
 #endif
 
-  CD3DX12_RESOURCE_BARRIER barrier =
-      CD3DX12_RESOURCE_BARRIER::Transition( resource, D3D12_RESOURCE_STATE_COPY_DEST, texture_resource_state );
-  command_list->ResourceBarrier( barrier );
+  if ( texture_resource_state != D3D12_RESOURCE_STATE_COPY_DEST )
+  {
+    CD3DX12_RESOURCE_BARRIER barrier =
+        CD3DX12_RESOURCE_BARRIER::Transition( resource, D3D12_RESOURCE_STATE_COPY_DEST, texture_resource_state );
+    command_list->ResourceBarrier( barrier );
+  }
 
   return true;
 }

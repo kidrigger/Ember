@@ -20,7 +20,6 @@ VSOut TriangleVS( uint vertex_idx : SV_VERTEXID )
   OUT.ScreenPosition = screen_pos;
   OUT.Position       = world_pos;
   OUT.Normal         = normal;
-  OUT.LinearDepth    = clip_pos.z;
   OUT.Tangent        = tangent;
   OUT.Color          = vertex.GetColor();
   OUT.TexCoord[0]    = vertex.GetTexCoord( 0 );

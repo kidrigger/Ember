@@ -22,7 +22,6 @@ struct MSVertexOut
   float4 ScreenPosition : SV_POSITION;
   float4 Position : POSITION;
   float3 Normal : NORMAL;
-  float  LinearDepth : LINEAR_DEPTH;
   float4 Tangent : TANGENT;
   float4 Color : COLOR;
   float2 TexCoord[2] : TEXCOORD;
@@ -39,7 +38,6 @@ struct PSIn
   float4 ScreenPosition : SV_POSITION;
   float4 Position : POSITION;
   float3 Normal : NORMAL;
-  float  LinearDepth : LINEAR_DEPTH;
   float4 Tangent : TANGENT;
   float4 Color : COLOR;
   float2 TexCoord[2] : TEXCOORD;
@@ -65,13 +63,10 @@ cbuffer                   BindlessIndex : register( b1, space0 )
   uint  g_SpotLightCount;
 }
 
-cbuffer EnvironmentBlock : register( b2, space0 )
-{
-  Environment g_Env;
-}
+ConstantBuffer<Environment> g_Env : register( b2, space0 );
 
-SamplerState           g_DefaultSampler : register( s0, space0 );
-SamplerState           g_ClampedSampler : register( s1, space0 );
-SamplerComparisonState g_ShadowSampler : register( s2, space0 );
+SamplerState                g_DefaultSampler : register( s0, space0 );
+SamplerState                g_ClampedSampler : register( s1, space0 );
+SamplerComparisonState      g_ShadowSampler : register( s2, space0 );
 
 #endif

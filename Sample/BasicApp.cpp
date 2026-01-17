@@ -64,13 +64,14 @@ struct DebugConfig
   SkyMode  SkyMode                      = kAtmosphere;
   uint32_t RemoveDiffuseContrib         = false;
   uint32_t RemoveSpecularContrib        = false;
-  uint32_t RaytracedShadows             = false;
 
   uint32_t DisableMeshletFrustumCulling = false;
 } g_Debug;
 
 bool                  g_OutputFrameGraph        = false;
 bool                  g_UseDeferredRendering    = false;
+bool                  g_Raytracing              = false;
+bool                  g_UseProbes               = false;
 
 constexpr char const* kVisualizationModeNames[] = {
   "Render", "Meshlet", "World Position", "Albedo", "Normal", "ORM", "Emissive", "Lighting Only",
@@ -153,16 +154,16 @@ Ember::BasicApp::BasicApp(
   , m_WindowHandle{ window_handle }
   , m_RenderDevice{ std::move( render_device ) }
   , m_PerfCounter{ std::move( perf_counter ) }
+  , m_TextureLoader{ std::move( texture_loader ) }
+  , m_ModelLoader{ std::move( model_loader ) }
   , m_FGContext{}
   , m_Camera{ std::move( camera ) }
   , m_Environment{ std::move( environment ) }
   , m_MaterialManager{ std::move( material_manager ) }
   , m_GeometryManager{ std::move( geometry_manager ) }
-  , m_DrawList{ m_RenderDevice.get(), m_GeometryManager.get(), m_MaterialManager.get(), RenderDevice::kNumFrames }
   , m_World{ std::move( world ) }
+  , m_DrawList{ m_RenderDevice.get(), m_GeometryManager.get(), m_MaterialManager.get(), RenderDevice::kNumFrames }
   , m_LightManager{ std::move( light_manager ) }
-  , m_TextureLoader{ std::move( texture_loader ) }
-  , m_ModelLoader{ std::move( model_loader ) }
 {
   m_RenderQuery =
       m_World->GetECS().query<WorldTransform const, Mesh const, Geometry const, Material const, BottomLevelAS const>();
@@ -286,6 +287,8 @@ void Ember::BasicApp::SetupRenderPasses()
       &m_RenderBackground, m_RenderDevice.get(), DirectX::MakeSRGB( swapchain_format ), kDepthFormat ) );
 
   ENSURE( RenderPass::Atmosphere::Create( &m_UpdateAtmosphericSky, m_RenderDevice.get() ) );
+
+  ENSURE( Proto::ReflectionProbe::Create( &m_Probe, m_RenderDevice.get(), { 0.0f, 4.0f, 0.0f }, 15.0f ) );
 }
 
 void Ember::BasicApp::LoadContent()
@@ -390,6 +393,8 @@ void Ember::BasicApp::LoadContent()
                 t = { 2.0f, 0.5f, 0.0 };
                 s = 0.3f;
               } );
+
+  _ = m_ModelLoader->TryLoadModel( "MetalRoughSpheres.glb" )->child_of( m_SceneRoot ).set_name( "MetalRough" );
 
   auto const rm = m_World->GetECS()
                       .entity( "HelmetRotator" )
@@ -517,16 +522,15 @@ void Ember::BasicApp::Update()
         ImGui::Checkbox( "Remove Specular Contribution", &scratch );
         g_Debug.RemoveSpecularContrib = ( uint32_t )scratch;
 
-        scratch                       = ( bool )g_Debug.RaytracedShadows;
-        ImGui::Checkbox( "Raytrace Shadows", &scratch );
-        g_Debug.RaytracedShadows = ( uint32_t )scratch;
-
-        scratch                  = ( bool )g_Debug.DisableMeshletFrustumCulling;
+        scratch                       = ( bool )g_Debug.DisableMeshletFrustumCulling;
         ImGui::Checkbox( "Disable Meshlet Frustum Culling", &scratch );
         g_Debug.DisableMeshletFrustumCulling = ( uint32_t )scratch;
 
         ImGui::Checkbox( "Use Deferred Rendering", &g_UseDeferredRendering );
         g_OutputFrameGraph = ImGui::Button( "Output FrameGraph" );
+
+        ImGui::Checkbox( "Enable Raytracing", &g_Raytracing );
+        ImGui::Checkbox( "Enable Probes", &g_UseProbes );
       }
       ImGui::End();
     }
@@ -606,7 +610,7 @@ void Ember::BasicApp::Update()
       std::function<void( flecs::entity )> const hit_test = [&]( flecs::entity e )
       {
         WorldBoundingBox const* lt              = e.try_get_mut<WorldBoundingBox>();
-        bool                    is_actual_bound = e.has<LocalBoundingBox>();
+        bool const              is_actual_bound = e.has<LocalBoundingBox>();
         if ( lt )
         {
           float dist;
@@ -733,11 +737,11 @@ void Ember::BasicApp::Render()
 
   LightManager::GpuInfo   light_info     = m_LightManager->PrepareFrame( *m_Camera, frame_idx );
 
-  DrawList::Batches const draw_list_info = g_Debug.RaytracedShadows
+  DrawList::Batches const draw_list_info = g_Raytracing
                                                ? m_DrawList.PrepareFrameWithRaytracing( &command_list, frame_idx )
                                                : m_DrawList.PrepareFrame( frame_idx );
 
-  if ( not g_Debug.RaytracedShadows or g_UseDeferredRendering )
+  if ( not g_Raytracing or g_UseDeferredRendering )
   {
     m_LightManager->RenderAllShadows( &command_list, draw_list_info, *m_Camera, frame_idx );
   }
@@ -753,11 +757,16 @@ void Ember::BasicApp::Render()
   m_FGBlackboard.get<Environment::GpuRepr>() = m_Environment->Repr();
 
   auto const atmosphere                      = m_UpdateAtmosphericSky( &frame_graph, &m_FGBlackboard, frame_idx );
+  auto const probe                           = m_Probe( &frame_graph, m_FGBlackboard, m_TextureLoader.get() );
 
   auto const depth_buffer                    = m_DrawPrePass( &frame_graph, m_FGBlackboard );
 
-
-  auto const opaque_pass_fwd                 = m_RenderOpaqueMeshes( &frame_graph, m_FGBlackboard, depth_buffer );
+  auto const opaque_pass_fwd                 = g_UseProbes
+                                                   ? m_RenderOpaqueMeshes.Execute(
+                                         &frame_graph,
+                                         m_FGBlackboard,
+                                         RenderPass::OpaqueForward::Input{ depth_buffer, probe, m_Probe.ProbeInfo } )
+                                                   : m_RenderOpaqueMeshes.Execute( &frame_graph, m_FGBlackboard, depth_buffer );
 
   auto const gbuffer                         = m_UpdateGBuffer( &frame_graph, m_FGBlackboard, depth_buffer );
   auto const omni_pass_rt                    = m_RenderOmniLights( &frame_graph, m_FGBlackboard, gbuffer );

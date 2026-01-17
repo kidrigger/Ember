@@ -45,7 +45,7 @@ bool Ember::Environment::TryLoadFrom(
       .Format    = DXGI_FORMAT_R11G11B10_FLOAT,
       .Side      = kEnvCubeSide,
       .Usage     = TextureUsage::kReadWrite,
-      .MipLevels = MipLevels::kBase,
+      .MipLevels = MipLevels::kAuto,
       .InitState = D3D12_RESOURCE_STATE_UNORDERED_ACCESS,
   } );
   skybox.SetName( L"Skybox" );

@@ -321,6 +321,7 @@
     <ClCompile Include="DepthPrePass.cpp" />
     <ClCompile Include="Inspector.cpp" />
     <ClCompile Include="PickingGizmo.cpp" />
+    <ClCompile Include="ReflectionProbe.cpp" />
     <ClCompile Include="SceneTree.cpp" />
     <ClCompile Include="TransparencyPass.cpp" />
     <ClCompile Include="SkyboxPass.cpp" />
@@ -353,6 +354,7 @@
     <ClInclude Include="DepthPrePass.hpp" />
     <ClInclude Include="Inspector.hpp" />
     <ClInclude Include="PickingGizmo.hpp" />
+    <ClInclude Include="ReflectionProbe.hpp" />
     <ClInclude Include="SceneTree.hpp" />
     <ClInclude Include="TransparencyPass.hpp" />
     <ClInclude Include="SkyboxPass.hpp" />
@@ -615,6 +617,7 @@
     <None Include="OmniLightCommon.hlsli" />
     <None Include="OmniShadow.hlsli" />
     <None Include="Quantization.hlsli" />
+    <None Include="ReflectionProbe.hlsli" />
     <None Include="SpotLightCommon.hlsli" />
     <None Include="SpotShadow.hlsli" />
     <None Include="Triangle.hlsli" />
@@ -951,6 +954,24 @@
       <ShaderType Condition="'$(Configuration)|$(Platform)'=='RenderDoc_Compat|Win32'">Compute</ShaderType>
       <ShaderModel Condition="'$(Configuration)|$(Platform)'=='RenderDoc_Compat|Win32'">4.0</ShaderModel>
       <ShaderType Condition="'$(Configuration)|$(Platform)'=='RenderDoc_Compat|x64'">Compute</ShaderType>
+    </FxCompile>
+    <FxCompile Include="ReflectionProbeAS.hlsl">
+      <ShaderType Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">Amplification</ShaderType>
+      <ShaderType Condition="'$(Configuration)|$(Platform)'=='RenderDoc_Compat|x64'">Amplification</ShaderType>
+      <ShaderType Condition="'$(Configuration)|$(Platform)'=='ReleaseWithDebug|x64'">Amplification</ShaderType>
+      <ShaderType Condition="'$(Configuration)|$(Platform)'=='Release|x64'">Amplification</ShaderType>
+    </FxCompile>
+    <FxCompile Include="ReflectionProbeMS.hlsl">
+      <ShaderType Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">Mesh</ShaderType>
+      <ShaderType Condition="'$(Configuration)|$(Platform)'=='RenderDoc_Compat|x64'">Mesh</ShaderType>
+      <ShaderType Condition="'$(Configuration)|$(Platform)'=='ReleaseWithDebug|x64'">Mesh</ShaderType>
+      <ShaderType Condition="'$(Configuration)|$(Platform)'=='Release|x64'">Mesh</ShaderType>
+    </FxCompile>
+    <FxCompile Include="ReflectionProbePS.hlsl">
+      <ShaderType Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">Pixel</ShaderType>
+      <ShaderType Condition="'$(Configuration)|$(Platform)'=='RenderDoc_Compat|x64'">Pixel</ShaderType>
+      <ShaderType Condition="'$(Configuration)|$(Platform)'=='ReleaseWithDebug|x64'">Pixel</ShaderType>
+      <ShaderType Condition="'$(Configuration)|$(Platform)'=='Release|x64'">Pixel</ShaderType>
     </FxCompile>
     <FxCompile Include="ScreenSpaceTriangleVS.hlsl">
       <ShaderType Condition="'$(Configuration)|$(Platform)'=='ReleaseWithDebug|x64'">Vertex</ShaderType>

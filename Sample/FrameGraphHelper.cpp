@@ -120,7 +120,18 @@ void Ember::FG::Context::SetRenderTarget(
   }
 
   m_CurrentRenderTargets.Resources[index] = render_target.GetTexture();
-  m_CurrentRenderTargets.Descriptions[index] = {
+  if ( render_target.GetDesc().Dim == TextureDim::kCube )
+  {
+    m_CurrentRenderTargets.Descriptions[index] = {
+      .Format         = as_srgb ? DirectX::MakeSRGB( desc.Format ) : desc.Format,
+      .ViewDimension  = D3D12_RTV_DIMENSION_TEXTURE2DARRAY,
+      .Texture2DArray = { .MipSlice = 0, .FirstArraySlice = 0, .ArraySize = 6, .PlaneSlice = 0, },
+    };
+  }
+  else
+  {
+    // Texture2D
+    m_CurrentRenderTargets.Descriptions[index] = {
     .Format        = as_srgb ? DirectX::MakeSRGB(desc.Format) : desc.Format,
     .ViewDimension = D3D12_RTV_DIMENSION_TEXTURE2D,
     .Texture2D     = {
@@ -128,6 +139,9 @@ void Ember::FG::Context::SetRenderTarget(
       .PlaneSlice = 0,
     },
   };
+  }
+
+
   m_CurrentRenderTargets.LoadOps[index] = load_op;
 }
 
@@ -144,12 +158,32 @@ void Ember::FG::Context::SetDepthTarget(
     .Resource = depth_target.GetTexture(),
     .Desc     = {
       .Format        = desc.Format,
-      .ViewDimension = D3D12_DSV_DIMENSION_TEXTURE2D,
       .Flags         = D3D12_DSV_FLAG_NONE,
-      .Texture2D     = { .MipSlice = 0 },
     },
     .LoadOp = load_op,
   };
+
+  switch ( desc.Dim )
+  {
+    case TextureDim::k2D:
+    {
+      m_CurrentDepthTarget.Desc.ViewDimension = D3D12_DSV_DIMENSION_TEXTURE2D;
+      m_CurrentDepthTarget.Desc.Texture2D     = { .MipSlice = 0 };
+    }
+    break;
+    case TextureDim::kCube:
+    {
+      m_CurrentDepthTarget.Desc.ViewDimension  = D3D12_DSV_DIMENSION_TEXTURE2DARRAY;
+      m_CurrentDepthTarget.Desc.Texture2DArray = {
+        .MipSlice        = 0,
+        .FirstArraySlice = 0,
+        .ArraySize       = desc.ArraySize * 6u,
+      };
+    }
+    break;
+    default:
+      UNREACHABLE;
+  }
 }
 
 void Ember::FG::Context::PreparePass()
@@ -165,13 +199,6 @@ void Ember::FG::Context::PreparePass()
           true,
           []( bool const acc, ID3D12Resource const* res ) { return acc and res != nullptr; } ),
       "All Render Targets from 0 to Largest must be set." );
-
-  m_FrameData.CommandList->OMSetRenderTargets(
-      rt_count,
-      DataOf( m_CurrentRenderTargets.Resources ),
-      DataOf( m_CurrentRenderTargets.Descriptions ),
-      m_CurrentDepthTarget.Resource,
-      &m_CurrentDepthTarget.Desc );
 
   m_FrameData.CommandList->RSSetScissorViewport( m_RenderTargetSize.x, m_RenderTargetSize.y );
 
@@ -192,27 +219,43 @@ void Ember::FG::Context::PreparePass()
         m_FrameData.CommandList->ClearRenderTargetView( m_CurrentRenderTargets.Resources[i], kBlack );
       }
       break;
+      default:
+        UNREACHABLE;
     }
   }
 
-  switch ( m_CurrentDepthTarget.LoadOp )
+  if ( m_CurrentDepthTarget.Resource )
   {
-    case LoadOperation::kLoad:
+    switch ( m_CurrentDepthTarget.LoadOp )
+    {
+      case LoadOperation::kLoad:
+        break;
+      case LoadOperation::kDiscard:
+      {
+        m_FrameData.CommandList->DiscardResource( m_CurrentDepthTarget.Resource );
+      }
       break;
-    case LoadOperation::kDiscard:
-    {
-      m_FrameData.CommandList->DiscardResource( m_CurrentDepthTarget.Resource );
+      case LoadOperation::kClear:
+      {
+        m_FrameData.CommandList->ClearDepthStencilView(
+            m_CurrentDepthTarget.Resource, D3D12_CLEAR_FLAG_DEPTH, 1.0f, 0 );
+      }
+      break;
+      default:
+        UNREACHABLE;
     }
-    break;
-    case LoadOperation::kClear:
-    {
-      m_FrameData.CommandList->ClearDepthStencilView( m_CurrentDepthTarget.Resource, D3D12_CLEAR_FLAG_DEPTH, 1.0f, 0 );
-    }
-    break;
   }
+
+  m_FrameData.CommandList->OMSetRenderTargets(
+      rt_count,
+      DataOf( m_CurrentRenderTargets.Resources ),
+      DataOf( m_CurrentRenderTargets.Descriptions ),
+      m_CurrentDepthTarget.Resource,
+      m_CurrentDepthTarget.Resource ? &m_CurrentDepthTarget.Desc : nullptr );
 
   // Clear for next pass
   m_CurrentDepthTarget.Resource = nullptr;
+  m_CurrentDepthTarget.Desc     = {};
   m_CurrentRenderTargets.Resources.clear();
   m_CurrentRenderTargets.Descriptions.clear();
   m_RenderTargetSize = {};

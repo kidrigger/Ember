@@ -105,14 +105,12 @@ Read DecodeReadFlags( uint32_t v );
 using Write = std::variant<Attachment, DepthStencil, CopyDst>;
 Write DecodeWriteFlags( uint32_t v );
 
-class Texture : public ::Ember::Texture
+class Texture : public Ember::Texture
 {
-  using Super = ::Ember::Texture;
+  using Super = Ember::Texture;
 
 public:
-  using Desc = Super::Desc;
-
-  Texture()  = default;
+  Texture() = default;
   Texture( Super const& other );
   Texture( Super&& other ) noexcept;
   Texture& operator=( Super const& other );
