@@ -8,6 +8,7 @@
 #include "BindlessManager.hpp"
 #include "DeviceHandle.hpp"
 #include "ScopedDeviceHandle.hpp"
+#include "Util/DataUtil.hpp"
 #include "Util/DirectXHeaders.hpp"
 
 namespace Ember
@@ -52,6 +53,8 @@ struct TextureDesc
   TextureUsage                         Usage     = TextureUsage::kReadonly;
   TextureDim                           Dim       = TextureDim::k2D;
   std::optional<D3D12_RESOURCE_STATES> InitState = std::nullopt;
+
+  HashFnv1A                            Hash() const;
 };
 
 class Sampler

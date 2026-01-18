@@ -4,6 +4,12 @@
 #include "Util/DirectXHeaders.hpp"
 #include "Util/HelperUtils.hpp"
 
+Ember::HashFnv1A Ember::TextureDesc::Hash() const
+{
+  return HashFnv1A{ Format } << Width << Height << MipLevels << ArraySize << ( uint32_t )Usage << ( uint32_t )Dim
+                             << InitState.has_value() << InitState.value_or( D3D12_RESOURCE_STATE_COMMON );
+}
+
 Ember::Sampler::SamplerInfoImpl::SamplerInfoImpl( BindlessManager* const bindless, SamplerHandle handle )
   : Bindless{ bindless }, Handle{ std::move( handle ) }
 {}

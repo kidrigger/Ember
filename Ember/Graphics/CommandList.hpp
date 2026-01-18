@@ -83,8 +83,8 @@ public:
         root_parameter_index, U32ByteSizeOf( value ) / 4, DataOf( value ), byte_offset / 4 );
   }
 
-  void SetGraphicsRootConstants(
-      uint32_t root_parameter_index, IsUnitObject auto const& value, uint32_t byte_offset = 0 ) const
+  void SetGraphicsRootConstants( uint32_t root_parameter_index, auto const& value, uint32_t byte_offset = 0 ) const
+    requires not std::ranges::range<decltype( value )> and not std::is_pointer_v<decltype( value )>
   {
     // TODO: Move to autocasting process.
     ASSERT( byte_offset % 4 == 0 );

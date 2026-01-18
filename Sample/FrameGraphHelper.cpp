@@ -263,7 +263,7 @@ void Ember::FG::Context::PreparePass()
 
 Ember::FG::Texture Ember::FG::Context::CreateTexture( Texture::Desc const& desc )
 {
-  uint64_t const hash      = HashFnv1A( sizeof( Texture::Desc ), ( byte* )&desc );
+  uint64_t const hash      = desc.Hash();
 
   auto           it        = m_TransientTextures.Find( hash );
   auto&          res_queue = it == m_TransientTextures.end() ? m_TransientTextures.Put( hash, {} ) : it->second;
@@ -281,7 +281,7 @@ Ember::FG::Texture Ember::FG::Context::CreateTexture( Texture::Desc const& desc 
 
 void Ember::FG::Context::DestroyTexture( Texture::Desc const& desc, Texture tex )
 {
-  uint64_t const hash = HashFnv1A( sizeof( Texture::Desc ), ( byte* )&desc );
+  uint64_t const hash = desc.Hash();
 
   auto           it   = m_TransientTextures.Find( hash );
   if ( it == m_TransientTextures.end() ) return;

@@ -73,7 +73,7 @@ auto AsBytes( std::ranges::contiguous_range auto& range )
 }
 
 template <typename T>
-concept IsUnitObject = not std::ranges::range<T> and not std::is_pointer_v<T>;
+concept IsByteHashable = not std::ranges::range<T> and not std::is_pointer_v<T> and not std::is_aggregate_v<T>;
 
 class HashFnv1A
 {
@@ -99,7 +99,7 @@ public:
     m_Value = hash;
   }
 
-  constexpr HashFnv1A( IsUnitObject auto const& data ) : HashFnv1A( sizeof( data ), ( byte const* )&data )
+  constexpr HashFnv1A( IsByteHashable auto const& data ) : HashFnv1A( sizeof( data ), ( byte const* )&data )
   {}
 
   constexpr HashFnv1A( std::ranges::contiguous_range auto& range )
@@ -116,7 +116,7 @@ public:
     return *this;
   }
 
-  constexpr HashFnv1A& Combine( IsUnitObject auto const& data )
+  constexpr HashFnv1A& Combine( IsByteHashable auto const& data )
   {
     return Combine( sizeof( data ), ( byte const* )&data );
   }
@@ -137,65 +137,6 @@ public:
     return m_Value;
   }
 };
-//
-// constexpr uint64_t HashFnv1A( size_t const size, byte const* data )
-//{
-//  if ( size == 0 ) return 0;
-//
-//  uint64_t hash = 0xcbf29ce484222325; /* Offset */
-//
-//  for ( size_t i = 0; i < size; ++i )
-//  {
-//    hash = hash ^ data[i];
-//    hash = hash * 0x00000100000001b3; /* Prime */
-//  }
-//
-//  return hash;
-//}
-//
-// constexpr uint64_t HashFnv1A( std::ranges::contiguous_range auto& range )
-//{
-//  byte const*  bytes = ( byte const* )DataOf( range );
-//  size_t const size  = ByteSizeOf( range );
-//  return HashFnv1A( size, bytes );
-//}
-//
-// constexpr uint64_t HashFnv1A( IsUnitObject auto const& data )
-//{
-//  byte const*  bytes = ( byte const* )&data;
-//  size_t const size  = sizeof( data );
-//
-//  return HashFnv1A( size, bytes );
-//}
-//
-// constexpr uint64_t HashFnv1A( std::string_view const& data )
-//{
-//  byte const*  bytes = ( byte const* )data.data();
-//  size_t const size  = data.size() * sizeof( char );
-//
-//  return HashFnv1A( size, bytes );
-//}
-//
-// constexpr uint64_t HashFnv1ACombine( uint64_t hash, size_t const size, byte const* data )
-//{
-//  if ( size == 0 ) return hash;
-//
-//  for ( size_t i = 0; i < size; ++i )
-//  {
-//    hash = hash ^ data[i];
-//    hash = hash * 0x00000100000001b3; /* Prime */
-//  }
-//
-//  return hash;
-//}
-//
-// constexpr uint64_t HashFnv1ACombine( uint64_t hash, IsUnitObject auto const& data )
-//{
-//  byte const*  bytes = ( byte const* )&data;
-//  size_t const size  = sizeof( data );
-//
-//  return HashFnv1ACombine( hash, size, bytes );
-//}
 
 class StringID
 {
