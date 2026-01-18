@@ -30,7 +30,7 @@ ConstantBuffer<Environment> g_Env : register( b2 );
 
 cbuffer                     QuickTransforms : register( b3 )
 {
-  half4 g_ProbeInfo;
+  float4 g_ProbeInfo;
 }
 
 SamplerState           g_DefaultSampler : register( s0, space0 );

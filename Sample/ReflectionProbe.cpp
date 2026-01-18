@@ -137,36 +137,36 @@ FrameGraphResource Ember::Proto::ReflectionProbe::Execute(
   auto const  pipeline   = m_Pipeline;
   auto const& probe_info = ProbeInfo;
 
-  auto        probe      = frame_graph->addCallbackPass(
+  auto const  probe      = frame_graph->addCallbackPass(
       "Reflection Probe Capture",
       [&]( FrameGraph::Builder& builder, std::pair<FrameGraphResource, FrameGraphResource>& probe )
       {
         probe.first = builder.create<FG::Texture>(
             "Reflection Probe",
             {
-                            .Format    = DXGI_FORMAT_R11G11B10_FLOAT,
-                            .Width     = kSide,
-                            .Height    = kSide,
-                            .MipLevels = MipLevels::kAuto,
-                            .ArraySize = 1,
-                            .Usage     = TextureUsage::kRenderTarget,
-                            .Dim       = TextureDim::kCube,
-                            .InitState = D3D12_RESOURCE_STATE_RENDER_TARGET,
+                      .Format    = kRenderTargetFormat,
+                      .Width     = kSide,
+                      .Height    = kSide,
+                      .MipLevels = MipLevels::kAuto,
+                      .ArraySize = 1,
+                      .Usage     = TextureUsage::kRenderTarget,
+                      .Dim       = TextureDim::kCube,
+                      .InitState = D3D12_RESOURCE_STATE_RENDER_TARGET,
             } );
         probe.second = builder.create<FG::Texture>(
-            "Reflection Probe",
+            "Reflection Probe Depth",
             {
-                            .Format    = kDepthFormat,
-                            .Width     = kSide,
-                            .Height    = kSide,
-                            .MipLevels = MipLevels::kAuto,
-                            .ArraySize = 1,
-                            .Usage     = TextureUsage::kDepthStencil,
-                            .Dim       = TextureDim::kCube,
-                            .InitState = D3D12_RESOURCE_STATE_DEPTH_WRITE,
+                      .Format    = kDepthFormat,
+                      .Width     = kSide,
+                      .Height    = kSide,
+                      .MipLevels = MipLevels::kAuto,
+                      .ArraySize = 1,
+                      .Usage     = TextureUsage::kDepthStencil,
+                      .Dim       = TextureDim::kCube,
+                      .InitState = D3D12_RESOURCE_STATE_DEPTH_WRITE,
             } );
 
-        probe.first = builder.write( probe.first, FG::Attachment{ .Index = 0, .LoadOp = FG::LoadOperation::kClear } );
+        probe.first  = builder.write( probe.first, FG::Attachment{ .Index = 0, .LoadOp = FG::LoadOperation::kClear } );
         probe.second = builder.write( probe.second, FG::DepthStencil{ .LoadOp = FG::LoadOperation::kClear } );
       },
       [=]( std::pair<FrameGraphResource, FrameGraphResource> const&,
@@ -195,7 +195,6 @@ FrameGraphResource Ember::Proto::ReflectionProbe::Execute(
       { base_probe = builder.write( probe.first, FG::CopyDst{} ); },
       [=]( FrameGraphResource const& base_probe, FrameGraphPassResources& res, FG::Context const* context )
       {
-        // TODO: This will be super expensive without some 'serious' culling.
         ZoneScopedN( "Reflection Probe Mipmap" );
 
         FG::Context::FrameData const& frame_data = context->GetFrameData();
@@ -205,6 +204,7 @@ FrameGraphResource Ember::Proto::ReflectionProbe::Execute(
         FG::Texture* tex    = &res.get<FG::Texture>( base_probe );
 
         bool         result = loader->TryGenerateMipMapCube( cmd, tex );
+
         ASSERT( result );
       } );
 }

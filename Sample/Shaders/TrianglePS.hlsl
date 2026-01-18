@@ -5,8 +5,8 @@
 
 cbuffer Probe : register( b3 )
 {
-  ResID g_ProbeTex;
-  half4 g_ProbeInfo;
+  ResID  g_ProbeTex;
+  float4 g_ProbeInfo;
 }
 
 float3 SampleProbePrefilter( in TextureCube prefilter, float3 direction, float roughness, in SamplerState sam )

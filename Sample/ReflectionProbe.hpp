@@ -23,10 +23,10 @@ class ReflectionProbe
 public:
   struct Probe
   {
-    Float16 PositionX;
-    Float16 PositionY;
-    Float16 PositionZ;
-    Float16 CaptureRadius;
+    float PositionX;
+    float PositionY;
+    float PositionZ;
+    float CaptureRadius;
   };
 
 private:
