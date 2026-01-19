@@ -173,7 +173,7 @@ FrameGraphResource Ember::RenderPass::OpaqueForward::Execute(
         cmd->SetGraphicsRootConstants( 0, draw_batch );
         cmd->SetGraphicsRootConstants( 1, constants );
         cmd->SetGraphicsRootConstants( 2, env );
-        cmd->SetGraphicsRootConstant( 3, ( UINT )SRVHandle{} );
+        cmd->SetGraphicsRootConstants( 3, ( UINT )SRVHandle{}, 16 );
         cmd->DispatchMesh( { .X = draw_batch.CommandsCount } );
       } );
 }
@@ -231,8 +231,8 @@ FrameGraphResource Ember::RenderPass::OpaqueForward::Execute(
         cmd->SetGraphicsRootConstants( 0, draw_batch );
         cmd->SetGraphicsRootConstants( 1, constants );
         cmd->SetGraphicsRootConstants( 2, env );
-        cmd->SetGraphicsRootConstant( 3, ( UINT )probe_texture->GetSRVHandle() );
-        cmd->SetGraphicsRootConstants( 3, probe_info, 4 );
+        cmd->SetGraphicsRootConstants( 3, probe_info );
+        cmd->SetGraphicsRootConstants( 3, ( UINT )probe_texture->GetSRVHandle(), sizeof( probe_info ) );
         cmd->DispatchMesh( { .X = draw_batch.CommandsCount } );
       } );
 }

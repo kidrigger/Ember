@@ -157,6 +157,7 @@ Ember::RenderPass::RenderDepthData Ember::RenderPass::TransparencyForward::Execu
         cmd->SetGraphicsRootConstants( 0, batch );
         cmd->SetGraphicsRootConstants( 1, constants );
         cmd->SetGraphicsRootConstants( 2, env );
+        cmd->SetGraphicsRootConstants( 3, ( UINT )SRVHandle{}, 16 );
         cmd->DispatchMesh( { .X = batch.CommandsCount } );
       } );
 }
@@ -306,7 +307,7 @@ Ember::RenderPass::RenderDepthData Ember::RenderPass::MaskedForward::Execute(
         cmd->SetGraphicsRootConstants( 0, batch );
         cmd->SetGraphicsRootConstants( 1, constants );
         cmd->SetGraphicsRootConstants( 2, env );
-        cmd->SetGraphicsRootConstant( 3, ( UINT )SRVHandle{} );
+        cmd->SetGraphicsRootConstants( 3, ( UINT )SRVHandle{}, 16 );
         cmd->DispatchMesh( { .X = batch.CommandsCount } );
       } );
 }

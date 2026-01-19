@@ -5,8 +5,8 @@
 
 cbuffer Probe : register( b3 )
 {
-  ResID  g_ProbeTex;
   float4 g_ProbeInfo;
+  ResID  g_ProbeTex;
 }
 
 float3 SampleProbePrefilter( in TextureCube prefilter, float3 direction, float roughness, in SamplerState sam )
@@ -17,8 +17,30 @@ float3 SampleProbePrefilter( in TextureCube prefilter, float3 direction, float r
   return prefilter.SampleLevel( sam, direction, mip ).rgb;
 }
 
+float3 ParallaxCorrection( in float3 refl_dir, in float3 position, in float4 probe_info )
+{
+  float3 bound_max = probe_info.xyz + probe_info.www;
+  float3 bound_min = probe_info.xyz - probe_info.www;
+
+  float3 t_max     = ( bound_max - position ) / refl_dir;
+  float3 t_min     = ( bound_min - position ) / refl_dir;
+  float3 t_far     = max( t_max, t_min );
+  float  t         = min( t_far.x, min( t_far.y, t_far.z ) );
+
+  float3 intersect = position + refl_dir * t;
+  refl_dir         = intersect - probe_info.xyz;
+
+  return refl_dir;
+}
+
 float3 GetAmbientInfluenceProbe(
-    in TextureCube prefilter, in BRDFCookTorranceGGX brdf, float3 view_dir, bool use_diffuse, bool use_spec )
+    in TextureCube         prefilter,
+    in BRDFCookTorranceGGX brdf,
+    float4                 probe_info,
+    float3                 position,
+    float3                 view_dir,
+    bool                   use_diffuse,
+    bool                   use_spec )
 {
   float cosine_factor =
       max( dot( brdf.Normal, view_dir ), 0.0f ); // Normal instead of Halfway since there's no halfway in ambient.
@@ -36,7 +58,8 @@ float3 GetAmbientInfluenceProbe(
   float3 diffuse         = 0.0f.xxx;
   if ( use_spec )
   {
-    float  n_dot_v           = max( dot( brdf.Normal, view_dir ), 0.0f );
+    float n_dot_v            = max( dot( brdf.Normal, view_dir ), 0.0f );
+    reflection_dir           = ParallaxCorrection( normalize( reflection_dir ), position, probe_info );
     float3 prefiltered_color = SampleProbePrefilter( prefilter, reflection_dir, brdf.Roughness, g_DefaultSampler ).rgb;
     float2 env_brdf          = g_Env.SampleBrdfLut( n_dot_v, brdf.Roughness, g_ClampedSampler );
     specular                 = prefiltered_color * ( specular_part * env_brdf.x + env_brdf.y );
@@ -122,10 +145,19 @@ float4 TrianglePS( PSIn IN ) : SV_TARGET0
     float3 specular       = 0.0f;
     if ( !config.RemoveSpecularContrib )
     {
-      float3 reflection_dir    = reflect( -view_dir, brdf.Normal );
+      float3 reflection_dir = reflect( -view_dir, brdf.Normal );
 
-      float  n_dot_v           = max( dot( brdf.Normal, view_dir ), 0.0f );
-      float3 prefiltered_color = g_Env.SamplePrefiltered( reflection_dir, brdf.Roughness, g_DefaultSampler ).rgb;
+      float  n_dot_v        = max( dot( brdf.Normal, view_dir ), 0.0f );
+      float3 prefiltered_color;
+      if ( IsValidHandle( g_ProbeTex ) )
+      {
+        TextureCube probe = ResourceDescriptorHeap[g_ProbeTex];
+        prefiltered_color = SampleProbePrefilter( probe, reflection_dir, brdf.Roughness, g_DefaultSampler ).rgb;
+      }
+      else
+      {
+        prefiltered_color = g_Env.SamplePrefiltered( reflection_dir, brdf.Roughness, g_DefaultSampler ).rgb;
+      }
 
       if ( brdf.Roughness < RT_MAX_ROUGHNESS )
       {
@@ -200,7 +232,13 @@ float4 TrianglePS( PSIn IN ) : SV_TARGET0
     {
       TextureCube prefil = ResourceDescriptorHeap[g_ProbeTex];
       ambient_contrib    = GetAmbientInfluenceProbe(
-          prefil, brdf, view_dir, !config.RemoveDiffuseContrib, !config.RemoveSpecularContrib );
+          prefil,
+          brdf,
+          g_ProbeInfo,
+          IN.Position.xyz,
+          view_dir,
+          !config.RemoveDiffuseContrib,
+          !config.RemoveSpecularContrib );
     }
     else
     {
