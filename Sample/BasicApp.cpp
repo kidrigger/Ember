@@ -159,7 +159,8 @@ Ember::BasicApp::BasicApp(
   , m_MipMapGenerator{ std::move( mip_map_generator ) }
   , m_TextureLoader{ std::move( texture_loader ) }
   , m_ModelLoader{ std::move( model_loader ) }
-  , m_FGContext{}
+  , m_FGContext{ m_RenderDevice.get() }
+  , m_TransientTextures{ m_RenderDevice.get() }
   , m_Camera{ std::move( camera ) }
   , m_Environment{ std::move( environment ) }
   , m_MaterialManager{ std::move( material_manager ) }
@@ -434,7 +435,6 @@ void Ember::BasicApp::LoadContent()
   ENSURE( Environment::TryLoadFrom( m_Environment.get(), m_RenderDevice.get(), m_TextureLoader.get(), kEnvMapFile ) );
 
   SetupRenderPasses();
-  m_FGContext = { m_RenderDevice.get() };
 
   m_PrevMouse = Input::Instance().GetMousePosition();
 }
@@ -476,7 +476,7 @@ void Ember::BasicApp::Update()
           0,
           PerfCounter::kMaxDeltaMs );
 
-      ImGui::Text( "Transient Textures: %u", m_FGContext.GetTextureCount() );
+      ImGui::Text( "Transient Textures: %u", m_TransientTextures.GetTextureCount() );
 
       if ( ImGui::CollapsingHeader( "MeshDraws" ) )
       {
@@ -710,7 +710,7 @@ void Ember::BasicApp::Render()
 {
   ZoneScoped;
 
-  m_FGContext.Update();
+  m_TransientTextures.Update();
 
   Texture        backbuffer   = m_RenderDevice->GetCurrentBackbuffer();
   CommandList    command_list = m_RenderDevice->GetGraphicsCommandList();
@@ -854,7 +854,7 @@ void Ember::BasicApp::Render()
 
   {
     ZoneScopedN( "FrameGraph Execute" );
-    frame_graph.execute( &m_FGContext, &m_FGContext );
+    frame_graph.execute( &m_FGContext, &m_TransientTextures );
   }
 
   D3D12_RESOURCE_BARRIER bottom_of_renderpass_barriers[] = {

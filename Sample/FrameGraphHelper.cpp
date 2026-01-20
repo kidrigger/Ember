@@ -7,6 +7,8 @@
 #include <Util/DirectXHeaders.hpp>
 #include <Util/HelperUtils.hpp>
 
+#include "TexturePool.hpp"
+
 #pragma comment( lib, "FrameGraph.lib" )
 
 namespace
@@ -58,18 +60,8 @@ public:
 };
 } // namespace
 
-Ember::FG::Texture Ember::FG::Context::CreateTextureImpl( Texture::Desc const& desc ) const
-{
-  return m_RenderDevice->CreateTexture( desc );
-}
-
 Ember::FG::Context::Context( RenderDevice* render_device )
-  : m_RenderDevice{ render_device }
-  , m_FrameData{}
-  , m_CurrentDepthTarget{}
-  , m_RenderTargetSize{}
-  , m_TickCounter{ 0 }
-  , m_TextureCount{ 0 }
+  : m_RenderDevice{ render_device }, m_FrameData{}, m_CurrentDepthTarget{}, m_RenderTargetSize{}
 {}
 
 Ember::RenderDevice* Ember::FG::Context::GetRenderDevice() const
@@ -132,15 +124,14 @@ void Ember::FG::Context::SetRenderTarget(
   {
     // Texture2D
     m_CurrentRenderTargets.Descriptions[index] = {
-    .Format        = as_srgb ? DirectX::MakeSRGB(desc.Format) : desc.Format,
-    .ViewDimension = D3D12_RTV_DIMENSION_TEXTURE2D,
-    .Texture2D     = {
-      .MipSlice = 0,
-      .PlaneSlice = 0,
-    },
-  };
+      .Format        = as_srgb ? DirectX::MakeSRGB( desc.Format ) : desc.Format,
+      .ViewDimension = D3D12_RTV_DIMENSION_TEXTURE2D,
+      .Texture2D     = {
+        .MipSlice   = 0,
+        .PlaneSlice = 0,
+      },
+    };
   }
-
 
   m_CurrentRenderTargets.LoadOps[index] = load_op;
 }
@@ -157,8 +148,8 @@ void Ember::FG::Context::SetDepthTarget(
   m_CurrentDepthTarget = {
     .Resource = depth_target.GetTexture(),
     .Desc     = {
-      .Format        = desc.Format,
-      .Flags         = D3D12_DSV_FLAG_NONE,
+      .Format = desc.Format,
+      .Flags  = D3D12_DSV_FLAG_NONE,
     },
     .LoadOp = load_op,
   };
@@ -261,51 +252,6 @@ void Ember::FG::Context::PreparePass()
   m_RenderTargetSize = {};
 }
 
-Ember::FG::Texture Ember::FG::Context::CreateTexture( Texture::Desc const& desc )
-{
-  uint64_t const hash      = desc.Hash();
-
-  auto           it        = m_TransientTextures.Find( hash );
-  auto&          res_queue = it == m_TransientTextures.end() ? m_TransientTextures.Put( hash, {} ) : it->second;
-
-  res_queue.TickStamp      = m_TickCounter;
-
-  if ( not res_queue.Empty() )
-  {
-    return res_queue.Pop();
-  }
-
-  m_TextureCount++;
-  return CreateTextureImpl( desc );
-}
-
-void Ember::FG::Context::DestroyTexture( Texture::Desc const& desc, Texture tex )
-{
-  uint64_t const hash = desc.Hash();
-
-  auto           it   = m_TransientTextures.Find( hash );
-  if ( it == m_TransientTextures.end() ) return;
-
-  it->second.Push( std::move( tex ) );
-}
-
-uint32_t Ember::FG::Context::GetTextureCount() const
-{
-  return m_TextureCount;
-}
-
-void Ember::FG::Context::Update()
-{
-  m_TickCounter++;
-
-  m_TransientTextures.EraseIf(
-      [&]( uint64_t const&, TexturePoolEntry const& val )
-      {
-        bool const marked_del = val.Empty() or m_TickCounter - val.TickStamp >= kMaxAge;
-        if ( marked_del ) m_TextureCount -= ( uint32_t )val.Queue.size();
-        return marked_del;
-      } );
-}
 
 Ember::FG::DepthStencilRead::operator uint32_t() const
 {
@@ -446,16 +392,16 @@ Ember::FG::Texture& Ember::FG::Texture::operator=( Super&& other ) noexcept
 void Ember::FG::Texture::create( Desc const& desc, void* alloc )
 {
   ASSERT( alloc );
-  Context* rd = ( Context* )alloc;
-  *this       = rd->CreateTexture( desc );
+  TexturePool* allocator = ( TexturePool* )alloc;
+  *this                  = allocator->CreateTexture( desc );
 }
 
 // ReSharper disable once CppInconsistentNaming
 void Ember::FG::Texture::destroy( Desc const& desc, void* alloc )
 {
   ASSERT( alloc );
-  Context* context = ( Context* )alloc;
-  context->DestroyTexture( desc, std::move( *this ) );
+  TexturePool* allocator = ( TexturePool* )alloc;
+  allocator->DestroyTexture( desc, std::move( *this ) );
 }
 
 // ReSharper disable once CppInconsistentNaming
@@ -472,7 +418,7 @@ void Ember::FG::Texture::preRead( Desc const& desc, uint32_t const flags, void* 
     case ReadType::kDSV:
     {
       ASSERT( desc.Usage == TextureUsage::kDepthStencil );
-      auto const depth_stencil = std::get<DepthStencilRead>( decoded );
+      [[maybe_unused]] auto const depth_stencil = std::get<DepthStencilRead>( decoded );
 
       if ( current_state != D3D12_RESOURCE_STATE_DEPTH_READ )
       {
@@ -563,22 +509,4 @@ void Ember::FG::Texture::preWrite( [[maybe_unused]] Desc const& desc, uint32_t c
     default:
       UNREACHABLE;
   }
-}
-
-bool Ember::FG::Context::TexturePoolEntry::Empty() const
-{
-  return Queue.empty();
-}
-
-Ember::FG::Texture Ember::FG::Context::TexturePoolEntry::Pop()
-{
-  Texture tex = Queue.front();
-  Queue.pop();
-
-  return tex;
-}
-
-void Ember::FG::Context::TexturePoolEntry::Push( Texture tex )
-{
-  Queue.push( std::move( tex ) );
 }

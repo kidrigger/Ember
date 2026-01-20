@@ -2,7 +2,6 @@
 
 #include <Graphics/RenderDevice.hpp>
 #include <Util/DirectXHeaders.hpp>
-#include <Util/Runtime.hpp>
 #include "Atmosphere.hpp"
 #include "DepthPrePass.hpp"
 #include "Environment.hpp"
@@ -15,6 +14,7 @@
 #include "RenderPassCommon.hpp"
 #include "Scene.hpp"
 #include "SkyboxPass.hpp"
+#include "TexturePool.hpp"
 #include "TransparencyPass.hpp"
 #include "fg/Blackboard.hpp"
 
@@ -47,6 +47,7 @@ class BasicApp final : public IApp
 
   // Specifics
   FG::Context          m_FGContext;
+  TexturePool          m_TransientTextures;
   FrameGraphBlackboard m_FGBlackboard;
 
   // ==== Raster Pipeline ====

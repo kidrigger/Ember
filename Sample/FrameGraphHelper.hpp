@@ -111,8 +111,8 @@ class Texture : public Ember::Texture
 
 public:
   Texture() = default;
-  Texture( Super const& other );
-  Texture( Super&& other ) noexcept;
+  explicit Texture( Super const& other );
+  explicit Texture( Super&& other ) noexcept;
   Texture& operator=( Super const& other );
   Texture& operator=( Super&& other ) noexcept;
 
@@ -149,25 +149,12 @@ struct Buffer
 class Context
 {
 public:
-  // Approx 1 second at 120 FPS
-  uint64_t constexpr static kMaxAge = 120;
-
   struct FrameData
   {
     CommandList* CommandList;
   };
 
 private:
-  struct TexturePoolEntry
-  {
-    std::queue<Texture> Queue;
-    uint64_t            TickStamp;
-
-    bool                Empty() const;
-    Texture             Pop();
-    void                Push( Texture tex );
-  };
-
   struct RenderTargets
   {
     std::vector<ID3D12Resource*>               Resources;
@@ -184,22 +171,17 @@ private:
 
   RenderDevice*                       m_RenderDevice;
   FrameData                           m_FrameData;
-  FlatMap<uint64_t, TexturePoolEntry> m_TransientTextures;
 
   std::vector<D3D12_RESOURCE_BARRIER> m_Barriers;
   RenderTargets                       m_CurrentRenderTargets;
   DepthTargetEntry                    m_CurrentDepthTarget;
   DirectX::XMUINT2                    m_RenderTargetSize;
 
-  uint64_t                            m_TickCounter;
-  uint32_t                            m_TextureCount;
-
-  [[nodiscard]] Texture               CreateTextureImpl( Texture::Desc const& desc ) const;
   void                                FlushBarriers();
 
 public:
   Context() = default;
-  Context( RenderDevice* render_device );
+  explicit Context( RenderDevice* render_device );
 
   [[nodiscard]] RenderDevice*    GetRenderDevice() const;
   [[nodiscard]] FrameData const& GetFrameData() const;
@@ -209,15 +191,9 @@ public:
 
   void                           SetRenderTarget(
                                 uint32_t index, Texture const& render_target, Texture::Desc const& desc, bool as_srgb, LoadOperation load_op );
-  void                  SetDepthTarget( Texture const& depth_target, Texture::Desc const& desc, LoadOperation load_op );
+  void SetDepthTarget( Texture const& depth_target, Texture::Desc const& desc, LoadOperation load_op );
 
-  void                  PreparePass();
-
-  [[nodiscard]] Texture CreateTexture( Texture::Desc const& desc );
-  void                  DestroyTexture( Texture::Desc const& desc, Texture tex );
-
-  [[nodiscard]] uint32_t GetTextureCount() const;
-  void                   Update();
+  void PreparePass();
 };
 
 } // namespace FG

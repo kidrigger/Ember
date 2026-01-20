@@ -419,6 +419,7 @@
     <ClCompile Include="ReflectionProbe.cpp" />
     <ClCompile Include="Render\DrawList.cpp" />
     <ClCompile Include="SceneTree.cpp" />
+    <ClCompile Include="TexturePool.cpp" />
     <ClCompile Include="TransparencyPass.cpp" />
     <ClCompile Include="SkyboxPass.cpp" />
     <ClCompile Include="BasicApp.cpp" />
@@ -454,6 +455,7 @@
     <ClInclude Include="ReflectionProbe.hpp" />
     <ClInclude Include="Render\DrawList.hpp" />
     <ClInclude Include="SceneTree.hpp" />
+    <ClInclude Include="TexturePool.hpp" />
     <ClInclude Include="TransparencyPass.hpp" />
     <ClInclude Include="SkyboxPass.hpp" />
     <ClInclude Include="BasicApp.hpp" />
