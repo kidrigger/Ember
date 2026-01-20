@@ -149,12 +149,14 @@ Ember::BasicApp::BasicApp(
     std::unique_ptr<GeometryManager> geometry_manager,
     std::unique_ptr<World>           world,
     std::unique_ptr<LightManager>    light_manager,
+    std::unique_ptr<MipMapGenerator> mip_map_generator,
     std::unique_ptr<TextureLoader>   texture_loader,
     std::unique_ptr<ModelLoader>     model_loader )
   : IApp{ nullptr }
   , m_WindowHandle{ window_handle }
   , m_RenderDevice{ std::move( render_device ) }
   , m_PerfCounter{ std::move( perf_counter ) }
+  , m_MipMapGenerator{ std::move( mip_map_generator ) }
   , m_TextureLoader{ std::move( texture_loader ) }
   , m_ModelLoader{ std::move( model_loader ) }
   , m_FGContext{}
@@ -227,8 +229,12 @@ void Ember::BasicApp::Create( BasicApp* app, HINSTANCE const instance_handle )
   auto async_compute_context =
       std::make_shared<Context>( render_device->CreateContext( D3D12_COMMAND_LIST_TYPE_COMPUTE ) );
 
+  auto mip_map_gen = std::make_unique_for_overwrite<MipMapGenerator>();
+  ENSURE( MipMapGenerator::Create( mip_map_gen.get(), render_device.get() ) );
+
   auto texture_loader = std::make_unique_for_overwrite<TextureLoader>();
-  TextureLoader::Create( texture_loader.get(), render_device.get(), async_compute_context, RenderDevice::kNumFrames );
+  TextureLoader::Create(
+      texture_loader.get(), render_device.get(), mip_map_gen.get(), async_compute_context, RenderDevice::kNumFrames );
 
   auto model_loader = std::make_unique<ModelLoader>(
       render_device.get(),
@@ -248,6 +254,7 @@ void Ember::BasicApp::Create( BasicApp* app, HINSTANCE const instance_handle )
     std::move( geometry_manager ),
     std::move( world ),
     std::move( light_manager ),
+    std::move( mip_map_gen ),
     std::move( texture_loader ),
     std::move( model_loader ),
   };
@@ -289,7 +296,8 @@ void Ember::BasicApp::SetupRenderPasses()
 
   ENSURE( RenderPass::Atmosphere::Create( &m_UpdateAtmosphericSky, m_RenderDevice.get() ) );
 
-  ENSURE( Proto::ReflectionProbe::Create( &m_Probe, m_RenderDevice.get(), { 0.0f, 4.0f, 0.0f }, 15.0f ) );
+  ENSURE( Proto::ReflectionProbe::Create(
+      &m_Probe, m_RenderDevice.get(), m_MipMapGenerator.get(), { 0.0f, 4.0f, 0.0f }, 15.0f ) );
 }
 
 void Ember::BasicApp::LoadContent()
@@ -761,7 +769,7 @@ void Ember::BasicApp::Render()
   m_FGBlackboard.get<Environment::GpuRepr>() = m_Environment->Repr();
 
   auto const atmosphere                      = m_UpdateAtmosphericSky( &frame_graph, &m_FGBlackboard, frame_idx );
-  auto const probe                           = m_Probe( &frame_graph, m_FGBlackboard, m_TextureLoader.get() );
+  auto const probe                           = m_Probe( &frame_graph, m_FGBlackboard );
 
   auto const depth_buffer                    = m_DrawPrePass( &frame_graph, m_FGBlackboard );
 

@@ -414,6 +414,7 @@
     <ClCompile Include="Atmosphere.cpp" />
     <ClCompile Include="DepthPrePass.cpp" />
     <ClCompile Include="Inspector.cpp" />
+    <ClCompile Include="MipMapGenerator.cpp" />
     <ClCompile Include="PickingGizmo.cpp" />
     <ClCompile Include="ReflectionProbe.cpp" />
     <ClCompile Include="Render\DrawList.cpp" />
@@ -448,6 +449,7 @@
     <ClInclude Include="Atmosphere.hpp" />
     <ClInclude Include="DepthPrePass.hpp" />
     <ClInclude Include="Inspector.hpp" />
+    <ClInclude Include="MipMapGenerator.hpp" />
     <ClInclude Include="PickingGizmo.hpp" />
     <ClInclude Include="ReflectionProbe.hpp" />
     <ClInclude Include="Render\DrawList.hpp" />

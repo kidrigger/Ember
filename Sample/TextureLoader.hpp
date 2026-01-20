@@ -9,6 +9,8 @@
 #include <Graphics/Context.hpp>
 #include <Graphics/Texture.hpp>
 
+#include "MipMapGenerator.hpp"
+
 namespace Ember
 {
 class RenderDevice;
@@ -37,6 +39,8 @@ class TextureLoader
   using TextureCache = std::pmr::unordered_map<std::pmr::string, Texture>;
 
   RenderDevice*                          m_RenderDevice;
+  MipMapGenerator*                       m_MipMapGenerator;
+
   std::pmr::unsynchronized_pool_resource m_CachePool;
   TextureCache                           m_Cache;
   std::mutex                             m_LoadLock;
@@ -51,10 +55,6 @@ class TextureLoader
 
   std::vector<D3D12_RESOURCE_BARRIER>    m_PendingBarriers;
 
-  // Mips
-  ComPtr<ID3D12RootSignature> m_MipMapRootSig;
-  ComPtr<ID3D12PipelineState> m_MipmapPipeline;
-  ComPtr<ID3D12PipelineState> m_MipmapCubePipeline;
 
   //
   bool TryLoadImpl(
@@ -69,19 +69,21 @@ public:
   TextureLoader() = default;
 
   TextureLoader(
-      RenderDevice*               render_device,
-      ComPtr<ID3D12RootSignature> mipmap_root_signature,
-      ComPtr<ID3D12PipelineState> mipmap_pipeline,
-      ComPtr<ID3D12PipelineState> mipmap_cube_pipeline,
-      std::shared_ptr<Context>    copy_context,
-      uint32_t                    upload_frame_count );
+      RenderDevice*            render_device,
+      MipMapGenerator*         mipmap_generator,
+      std::shared_ptr<Context> copy_context,
+      uint32_t                 upload_frame_count );
 
   static bool Create(
       TextureLoader*           loader,
       RenderDevice*            render_device,
+      MipMapGenerator*         mipmap_generator,
       std::shared_ptr<Context> compute_context,
       uint32_t                 upload_frame_count );
 
+  [[nodiscard]] MipMapGenerator* GetMipMapper() const;
+
+  // Loaders
   bool TryLoadTexture(
       Texture*           texture,
       char const*        filename,
@@ -96,8 +98,6 @@ public:
       ColorSpaceOverride color_space_override = ColorSpaceOverride::kNone,
       D3D12_RESOURCE_STATES final_state       = D3D12_RESOURCE_STATE_PIXEL_SHADER_RESOURCE );
 
-  bool             TryGenerateMipMaps( CommandList* command_list, Texture* texture ) const;
-  bool             TryGenerateMipMapCube( CommandList* command_list, Texture* texture ) const;
   Context::Receipt EndBatch();
 
   void             Update();

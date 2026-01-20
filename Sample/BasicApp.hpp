@@ -34,15 +34,16 @@ class BasicApp final : public IApp
 
   DXGI_FORMAT constexpr static kDepthFormat = DXGI_FORMAT_D32_FLOAT;
 
-  HWND                           m_WindowHandle{ nullptr };
-  uint32_t                       m_WindowWidth{ 1280 };
-  uint32_t                       m_WindowHeight{ 720 };
+  HWND                             m_WindowHandle{ nullptr };
+  uint32_t                         m_WindowWidth{ 1280 };
+  uint32_t                         m_WindowHeight{ 720 };
 
-  std::unique_ptr<RenderDevice>  m_RenderDevice;
-  std::unique_ptr<PerfCounter>   m_PerfCounter;
-  std::unique_ptr<TextureLoader> m_TextureLoader;
-  std::unique_ptr<ModelLoader>   m_ModelLoader;
-  wchar_t                        m_SprintfBuffer[1024]{};
+  std::unique_ptr<RenderDevice>    m_RenderDevice;
+  std::unique_ptr<PerfCounter>     m_PerfCounter;
+  std::unique_ptr<MipMapGenerator> m_MipMapGenerator;
+  std::unique_ptr<TextureLoader>   m_TextureLoader;
+  std::unique_ptr<ModelLoader>     m_ModelLoader;
+  wchar_t                          m_SprintfBuffer[1024]{};
 
   // Specifics
   FG::Context          m_FGContext;
@@ -102,6 +103,7 @@ public:
       std::unique_ptr<GeometryManager> geometry_manager,
       std::unique_ptr<World>           world,
       std::unique_ptr<LightManager>    light_manager,
+      std::unique_ptr<MipMapGenerator> mip_map_generator,
       std::unique_ptr<TextureLoader>   texture_loader,
       std::unique_ptr<ModelLoader>     model_loader );
 

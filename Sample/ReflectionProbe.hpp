@@ -11,6 +11,7 @@ class FrameGraphBlackboard;
 
 namespace Ember
 {
+class MipMapGenerator;
 class RenderDevice;
 class TextureLoader;
 } // namespace Ember
@@ -34,6 +35,7 @@ private:
   const static DXGI_FORMAT    kRenderTargetFormat = DXGI_FORMAT_R11G11B10_FLOAT;
   const static DXGI_FORMAT    kDepthFormat        = DXGI_FORMAT_D16_UNORM;
 
+  MipMapGenerator*            m_MipMapGenerator;
   ComPtr<ID3D12PipelineState> m_Pipeline;
   ComPtr<ID3D12RootSignature> m_RootSignature;
 
@@ -42,13 +44,19 @@ public:
 
   ReflectionProbe() = default;
   ReflectionProbe(
-      ComPtr<ID3D12PipelineState> pipeline, ComPtr<ID3D12RootSignature> root_signature, Probe const& probe_info );
+      MipMapGenerator*            mip_map_generator,
+      ComPtr<ID3D12PipelineState> pipeline,
+      ComPtr<ID3D12RootSignature> root_signature,
+      Probe const&                probe_info );
 
-  static bool Create( ReflectionProbe* out, RenderDevice* render_device, DirectX::XMFLOAT3 position, float radius );
+  static bool Create(
+      ReflectionProbe*  out,
+      RenderDevice*     render_device,
+      MipMapGenerator*  mip_map_generator,
+      DirectX::XMFLOAT3 position,
+      float             radius );
 
-  FrameGraphResource Execute(
-      FrameGraph* frame_graph, FrameGraphBlackboard const& blackboard, TextureLoader* loader ) const;
-  FrameGraphResource operator()(
-      FrameGraph* frame_graph, FrameGraphBlackboard const& blackboard, TextureLoader* loader ) const;
+  FrameGraphResource Execute( FrameGraph* frame_graph, FrameGraphBlackboard const& blackboard ) const;
+  FrameGraphResource operator()( FrameGraph* frame_graph, FrameGraphBlackboard const& blackboard ) const;
 };
 } // namespace Ember::Proto

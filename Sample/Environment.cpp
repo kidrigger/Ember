@@ -299,7 +299,7 @@ bool Ember::Environment::TryLoadFrom(
 
     command_list.ResourceBarrier( CD3DX12_RESOURCE_BARRIER::UAV( skybox.GetTexture() ) );
 
-    if ( not texture_loader->TryGenerateMipMapCube( &command_list, &skybox ) ) return false;
+    if ( not texture_loader->GetMipMapper()->TryGenerateMipMapCube( &command_list, &skybox ) ) return false;
 
     command_list.ResourceBarrier( CD3DX12_RESOURCE_BARRIER::UAV( skybox.GetTexture() ) );
 

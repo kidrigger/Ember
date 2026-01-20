@@ -10,12 +10,22 @@
 #include "TextureLoader.hpp"
 
 Ember::Proto::ReflectionProbe::ReflectionProbe(
-    ComPtr<ID3D12PipelineState> pipeline, ComPtr<ID3D12RootSignature> root_signature, Probe const& probe )
-  : m_Pipeline{ std::move( pipeline ) }, m_RootSignature{ std::move( root_signature ) }, ProbeInfo{ probe }
+    MipMapGenerator*            mip_map_generator,
+    ComPtr<ID3D12PipelineState> pipeline,
+    ComPtr<ID3D12RootSignature> root_signature,
+    Probe const&                probe )
+  : m_MipMapGenerator{ mip_map_generator }
+  , m_Pipeline{ std::move( pipeline ) }
+  , m_RootSignature{ std::move( root_signature ) }
+  , ProbeInfo{ probe }
 {}
 
 bool Ember::Proto::ReflectionProbe::Create(
-    ReflectionProbe* out, RenderDevice* render_device, DirectX::XMFLOAT3 position, float radius )
+    ReflectionProbe*  out,
+    RenderDevice*     render_device,
+    MipMapGenerator*  mip_map_generator,
+    DirectX::XMFLOAT3 position,
+    float             radius )
 {
   ComPtr<ID3DBlob> amp_shader_blob;
   ERR_FAIL_RET_F( D3DReadFileToBlob( L"ReflectionProbeAS.cso", &amp_shader_blob ) );
@@ -119,6 +129,7 @@ bool Ember::Proto::ReflectionProbe::Create(
   ERR_FAIL_RET_F( device->CreatePipelineState( &pipeline_state_stream_desc, IID_PPV_ARGS( &pipeline ) ) );
 
   new ( out ) ReflectionProbe{
+    mip_map_generator,
     std::move( pipeline ),
     std::move( root_signature ),
     { position.x, position.y, position.z, radius },
@@ -128,7 +139,7 @@ bool Ember::Proto::ReflectionProbe::Create(
 }
 
 FrameGraphResource Ember::Proto::ReflectionProbe::Execute(
-    FrameGraph* frame_graph, FrameGraphBlackboard const& blackboard, TextureLoader* loader ) const
+    FrameGraph* frame_graph, FrameGraphBlackboard const& blackboard ) const
 {
   auto const& constants  = blackboard.get<PerFrameConstants>();
   auto const& env        = blackboard.get<Environment::GpuRepr>();
@@ -203,14 +214,14 @@ FrameGraphResource Ember::Proto::ReflectionProbe::Execute(
 
         FG::Texture* tex    = &res.get<FG::Texture>( base_probe );
 
-        bool         result = loader->TryGenerateMipMapCube( cmd, tex );
+        bool         result = m_MipMapGenerator->TryGenerateMipMapCube( cmd, tex );
 
         ASSERT( result );
       } );
 }
 
 FrameGraphResource Ember::Proto::ReflectionProbe::operator()(
-    FrameGraph* frame_graph, FrameGraphBlackboard const& blackboard, TextureLoader* loader ) const
+    FrameGraph* frame_graph, FrameGraphBlackboard const& blackboard ) const
 {
-  return Execute( frame_graph, blackboard, loader );
+  return Execute( frame_graph, blackboard );
 }
