@@ -1,9 +1,9 @@
 #ifndef OMNI_SHADER_HLSLI_
 #define OMNI_SHADER_HLSLI_
 
-#include "Math.hlsli"
 #include "Bindless.hlsli"
 #include "Geometry.hlsli"
+#include "Math.hlsli"
 
 const static float        kNearPlane = 0.01f;
 
