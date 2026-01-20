@@ -102,7 +102,7 @@ struct Material
     {
       uint      tex_coord_idx = ( PackedEmissiveFactor >> 30 ) & 0x3;
       Texture2D texture       = ResourceDescriptorHeap[EmissiveTextureIndex];
-      return emissive * texture.Sample( texture_sampler, tex_coord_idx ).rgb;
+      return emissive * texture.Sample( texture_sampler, in_texcoord[tex_coord_idx] ).rgb;
     }
     return emissive;
   }
