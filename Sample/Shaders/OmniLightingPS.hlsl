@@ -17,7 +17,6 @@ cbuffer GBufferIn : register( b0 )
 
 cbuffer BindlessIndex : register( b1 )
 {
-  ResID g_Materials;
   ResID g_Camera;
   ResID g_ConfigID;
   ResID g_PointLights;

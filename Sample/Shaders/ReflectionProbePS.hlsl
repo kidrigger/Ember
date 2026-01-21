@@ -63,7 +63,7 @@ float3 CalcSpotLightContrib( in BRDFCookTorranceGGX brdf, float4 ws_position, fl
 
 float4 ReflectionProbePS( PSIn IN ) : SV_TARGET0
 {
-  StructuredBuffer<Material> materials = ResourceDescriptorHeap[g_Materials];
+  StructuredBuffer<Material> materials = ResourceDescriptorHeap[g_DrawBatch.MaterialBuffer];
 
   //
   float3              view_dir = normalize( g_ProbeInfo.xyz - IN.Position.xyz );

@@ -13,8 +13,8 @@ struct PSOutput
 
 PSOutput GBufferMaskedPS( PSIn IN )
 {
-  ConstantBuffer<Camera>     camera    = ResourceDescriptorHeap[g_Camera];
-  StructuredBuffer<Material> materials = ResourceDescriptorHeap[g_Materials];
+  ConstantBuffer<Camera>     camera    = ResourceDescriptorHeap[g_DrawBatch.MaterialBuffer];
+  StructuredBuffer<Material> materials = ResourceDescriptorHeap[g_DrawBatch.MaterialBuffer];
 
 #ifndef STRIP_DEBUG_CONFIG
   ConstantBuffer<DebugConfig> config = ResourceDescriptorHeap[g_ConfigID];

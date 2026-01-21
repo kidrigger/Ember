@@ -3,7 +3,7 @@
 
 void DepthPrePassMaskedPS( PSIn IN )
 {
-  StructuredBuffer<Material> materials = ResourceDescriptorHeap[g_Materials];
+  StructuredBuffer<Material> materials = ResourceDescriptorHeap[g_DrawBatch.MaterialBuffer];
 
   Material                   mat       = materials[NonUniformResourceIndex( IN.Material )];
 

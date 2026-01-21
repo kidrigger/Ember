@@ -7,7 +7,6 @@ namespace Ember
 
 struct PerFrameConstants
 {
-  SRVHandle             MaterialsBuffer;
   CBVHandle             Camera;
   CBVHandle             ConfigBuffer;
   LightManager::GpuInfo LightInfo;

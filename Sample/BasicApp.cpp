@@ -760,10 +760,9 @@ void Ember::BasicApp::Render()
 
   m_FGBlackboard.get<DrawList::Batches>() = draw_list_info;
   m_FGBlackboard.get<PerFrameConstants>() = {
-    .MaterialsBuffer = m_MaterialManager->GetSRVHandle(),
-    .Camera          = camera_cbv,
-    .ConfigBuffer    = m_ConfigurationBuffer.GetCBVHandle(),
-    .LightInfo       = light_info,
+    .Camera       = camera_cbv,
+    .ConfigBuffer = m_ConfigurationBuffer.GetCBVHandle(),
+    .LightInfo    = light_info,
   };
 
   m_FGBlackboard.get<Environment::GpuRepr>() = m_Environment->Repr();
