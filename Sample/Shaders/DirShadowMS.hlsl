@@ -34,7 +34,7 @@ void DirShadowMS(
   ByteAddressBuffer ugb         = ResourceDescriptorHeap[g_DrawBatch.GeometryBuffer];
   AmpCommand cmd = draw_buffer.Load<AmpCommand>( g_DrawBatch.CommandsOffset + AmpCommand_size * amp_payload.DrawCmdID );
 
-  StructuredBuffer<DirLight> light_data   = ResourceDescriptorHeap[g_LightData];
+  StructuredBuffer<DirLight> light_data   = ResourceDescriptorHeap[g_Lights.DirLights];
 
   uint                       meshlet_idx  = amp_payload.MeshletID[IN.GroupID.x] + cmd.FirstMeshlet;
   uint                       view_idx     = amp_payload.ViewID[IN.GroupID.x];

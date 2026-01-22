@@ -28,14 +28,13 @@ void DepthPrePassMS(
     out indices uint3             tris[MAX_TRIANGLES],
     out primitives MSPrimitiveOut prims[MAX_TRIANGLES] )
 {
-  ByteAddressBuffer      draw_buffer  = ResourceDescriptorHeap[g_DrawBatch.DrawBuffer];
-  ByteAddressBuffer      ugb          = ResourceDescriptorHeap[g_DrawBatch.GeometryBuffer];
-  ConstantBuffer<Camera> camera       = ResourceDescriptorHeap[g_Camera];
+  ByteAddressBuffer draw_buffer  = ResourceDescriptorHeap[g_DrawBatch.DrawBuffer];
+  ByteAddressBuffer ugb          = ResourceDescriptorHeap[g_DrawBatch.GeometryBuffer];
 
-  uint                   meshlet_idx  = amp_payload.MeshletID[IN.GroupID.x] + amp_payload.FirstMeshlet;
-  uint                   meshlet_addr = Meshlet_size * meshlet_idx;
+  uint              meshlet_idx  = amp_payload.MeshletID[IN.GroupID.x] + amp_payload.FirstMeshlet;
+  uint              meshlet_addr = Meshlet_size * meshlet_idx;
 
-  DrawInstance           instance =
+  DrawInstance      instance =
       draw_buffer.Load<DrawInstance>( g_DrawBatch.InstancesOffset + DrawInstance_size * amp_payload.InstanceIdx );
   Meshlet  meshlet = ugb.Load<Meshlet>( meshlet_addr );
 
@@ -50,8 +49,8 @@ void DepthPrePassMS(
     VertexLite vertex       = ugb.Load<VertexLite>( VertexLite_size * ( index + mesh.VertexLiteStart ) );
 
     float4     world_pos    = mul( instance.Transform, vertex.Position );
-    float4     clip_pos     = mul( camera.View, world_pos );
-    float4     screen_pos   = mul( camera.Projection, clip_pos );
+    float4     clip_pos     = mul( g_Camera.View, world_pos );
+    float4     screen_pos   = mul( g_Camera.Projection, clip_pos );
 
     verts[i].ScreenPosition = screen_pos;
     verts[i].TexCoord[0]    = vertex.TexCoord[0];

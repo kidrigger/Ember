@@ -71,8 +71,7 @@ public:
       uint32_t instance_count,
       uint32_t start_vertex_location,
       uint32_t start_instance_location ) const;
-  void SetGraphicsRootConstantBufferView(
-      uint32_t root_parameter_index, D3D12_GPU_VIRTUAL_ADDRESS buffer_location ) const;
+  void SetGraphicsRootConstantBuffer( uint32_t root_parameter_index, Buffer const& buffer ) const;
   void SetGraphicsRootConstant( uint32_t root_parameter_index, uint32_t value, uint32_t index_offset = 0 ) const;
   void SetGraphicsRootConstants(
       uint32_t root_parameter_index, std::ranges::range auto const& value, uint32_t byte_offset = 0 ) const

@@ -48,6 +48,7 @@ class BasicApp final : public IApp
   // Specifics
   FG::Context          m_FGContext;
   TexturePool          m_TransientTextures;
+  Buffer               m_FrameConstantBuffers[RenderDevice::kNumFrames];
   FrameGraphBlackboard m_FGBlackboard;
 
   // ==== Raster Pipeline ====
@@ -76,7 +77,6 @@ class BasicApp final : public IApp
 
   std::unique_ptr<Camera>          m_Camera;
   DirectX::XMUINT2                 m_PrevMouse{};
-  Buffer                           m_ConfigurationBuffer;
 
   std::unique_ptr<Environment>     m_Environment;
   std::unique_ptr<MaterialManager> m_MaterialManager;

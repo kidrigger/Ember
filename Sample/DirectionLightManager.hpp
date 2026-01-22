@@ -85,14 +85,12 @@ public:
   LightInfo PrepareFrame( Camera const& camera, uint32_t frame_index );
 
   //
-  void RenderAllShadows(
-      CommandList* command_list, DrawList::Batches const& draw_info, Camera const& camera, uint32_t frame_idx );
+  void RenderAllShadows( CommandList* command_list, DrawList::Batches const& draw_info, Buffer const& frame_constants );
 
   void RenderDirShadow(
       CommandList const*       command_list,
       DrawList::Batches const& draw_info,
-      Camera const&            camera,
-      uint32_t                 frame_index,
+      Buffer const&            frame_constants,
       uint32_t                 light_index ) const;
 };
 

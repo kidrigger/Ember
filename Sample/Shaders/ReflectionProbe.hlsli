@@ -2,8 +2,11 @@
 #define REFLECTION_PROBE_HLSLI_
 
 #include "Bindless.hlsli"
+#include "Camera.hlsli"
+#include "DebugConfig.hlsli"
 #include "Environment.hlsli"
 #include "Geometry.hlsli"
+#include "LightData.hlsli"
 #include "Math.hlsli"
 
 const static float        kNearPlane = 0.01f;
@@ -12,17 +15,9 @@ ConstantBuffer<DrawBatch> g_DrawBatch : register( b0 );
 
 cbuffer                   BindlessIndex : register( b1 )
 {
-  ResID g_Camera;
-  ResID g_ConfigID;
-  ResID g_PointLights;
-  uint  g_ShadowPointLightCount;
-  uint  g_PointLightCount;
-  ResID g_DirLights;
-  uint  g_ShadowDirLightCount;
-  uint  g_DirLightCount;
-  ResID g_SpotLights;
-  uint  g_ShadowSpotLightCount;
-  uint  g_SpotLightCount;
+  Camera      g_Camera;
+  LightInfo   g_Lights;
+  DebugConfig g_Debug;
 }
 
 ConstantBuffer<Environment> g_Env : register( b2 );

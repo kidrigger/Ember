@@ -15,7 +15,7 @@ void DirShadowAS( uint3 group_id : SV_GroupID, uint3 local_id : SV_GroupThreadID
 
   AmpCommand        cmd = draws.Load<AmpCommand>( g_DrawBatch.CommandsOffset + AmpCommand_size * draw_cmd_idx );
 
-  StructuredBuffer<DirLight> light_data = ResourceDescriptorHeap[g_LightData];
+  StructuredBuffer<DirLight> light_data = ResourceDescriptorHeap[g_Lights.DirLights];
 
   if ( meshlet_idx < cmd.MeshletCount )
   {

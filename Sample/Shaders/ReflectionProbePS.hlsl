@@ -4,16 +4,16 @@
 
 float3 CalcDirLightContrib( in BRDFCookTorranceGGX brdf, float4 ws_position, float3 view_dir )
 {
-  StructuredBuffer<DirLight> dir_lights  = ResourceDescriptorHeap[g_DirLights];
+  StructuredBuffer<DirLight> dir_lights  = ResourceDescriptorHeap[g_Lights.DirLights];
 
   float3                     dir_contrib = 0.0f;
   int                        light_idx   = 0;
-  // for ( ; light_idx < g_ShadowDirLightCount; light_idx++ )
+  // for ( ; light_idx < g_Lights.ShadowDirLightCount; light_idx++ )
   //{
   //   dir_contrib += CalcShadowingLightContrib( dir_lights[light_idx], brdf, ws_position, view_dir, g_ShadowSampler );
   // }
 
-  for ( ; light_idx < g_DirLightCount; light_idx++ )
+  for ( ; light_idx < g_Lights.DirLightCount; light_idx++ )
   {
     dir_contrib += CalcLightContrib( dir_lights[light_idx], brdf, ws_position, view_dir );
   }
@@ -23,17 +23,17 @@ float3 CalcDirLightContrib( in BRDFCookTorranceGGX brdf, float4 ws_position, flo
 
 float3 CalcPointLightContrib( in BRDFCookTorranceGGX brdf, float4 ws_position, float3 view_dir )
 {
-  StructuredBuffer<PointLight> point_lights  = ResourceDescriptorHeap[g_PointLights];
+  StructuredBuffer<PointLight> point_lights  = ResourceDescriptorHeap[g_Lights.PointLights];
 
   float3                       point_contrib = 0.0f;
   int                          light_idx     = 0;
-  // for ( ; light_idx < g_ShadowPointLightCount; light_idx++ )
+  // for ( ; light_idx < g_Lights.ShadowPointLightCount; light_idx++ )
   //{
   //   point_contrib += CalcShadowingLightContrib( point_lights[light_idx], brdf, ws_position, view_dir, g_ShadowSampler
   //   );
   // }
 
-  for ( ; light_idx < g_PointLightCount; light_idx++ )
+  for ( ; light_idx < g_Lights.PointLightCount; light_idx++ )
   {
     point_contrib += CalcLightContrib( point_lights[light_idx], brdf, ws_position, view_dir );
   }
@@ -43,17 +43,17 @@ float3 CalcPointLightContrib( in BRDFCookTorranceGGX brdf, float4 ws_position, f
 
 float3 CalcSpotLightContrib( in BRDFCookTorranceGGX brdf, float4 ws_position, float3 view_dir )
 {
-  StructuredBuffer<SpotLight> spot_lights  = ResourceDescriptorHeap[g_SpotLights];
+  StructuredBuffer<SpotLight> spot_lights  = ResourceDescriptorHeap[g_Lights.SpotLights];
 
   float3                      spot_contrib = 0.0f;
   int                         light_idx    = 0;
-  // for ( ; light_idx < g_ShadowSpotLightCount; light_idx++ )
+  // for ( ; light_idx < g_Lights.ShadowSpotLightCount; light_idx++ )
   //{
   //   spot_contrib += CalcShadowingLightContrib( spot_lights[light_idx], brdf, ws_position, view_dir, g_ShadowSampler
   //   );
   // }
 
-  for ( ; light_idx < g_SpotLightCount; light_idx++ )
+  for ( ; light_idx < g_Lights.SpotLightCount; light_idx++ )
   {
     spot_contrib += CalcLightContrib( spot_lights[light_idx], brdf, ws_position, view_dir );
   }

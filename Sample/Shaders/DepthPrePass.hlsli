@@ -4,6 +4,7 @@
 #include "Bindless.hlsli"
 #include "Camera.hlsli"
 #include "Colors.hlsli"
+#include "DebugConfig.hlsli"
 #include "Environment.hlsli"
 #include "Geometry.hlsli"
 #include "LightData.hlsli"
@@ -38,17 +39,9 @@ ConstantBuffer<DrawBatch> g_DrawBatch : register( b0, space0 );
 
 cbuffer                   BindlessIndex : register( b1, space0 )
 {
-  ResID g_Camera;
-  ResID g_ConfigID;
-  ResID g_PointLights;
-  uint  g_ShadowPointLightCount;
-  uint  g_PointLightCount;
-  ResID g_DirLights;
-  uint  g_ShadowDirLightCount;
-  uint  g_DirLightCount;
-  ResID g_SpotLights;
-  uint  g_ShadowSpotLightCount;
-  uint  g_SpotLightCount;
+  Camera      g_Camera;
+  LightInfo   g_Lights;
+  DebugConfig g_Debug;
 }
 
 SamplerState g_DefaultSampler : register( s0 );

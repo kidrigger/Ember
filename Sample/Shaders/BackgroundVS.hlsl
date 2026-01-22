@@ -2,11 +2,9 @@
 #include "Camera.hlsli"
 #include "Utility.hlsli"
 
-cbuffer BackgroundCB : register( b0 )
-{
-  ResID g_Camera;
-  ResID g_Skybox;
-}
+ConstantBuffer<Camera> g_Camera : register( b0 );
+
+ResID                  g_Skybox : register( b0 );
 
 struct BackgroundOut
 {
@@ -22,14 +20,12 @@ const static float3 kPosition[] = {
 
 BackgroundOut BackgroundVS( uint vertex_id : SV_VERTEXID )
 {
-  BackgroundOut          OUT;
+  BackgroundOut OUT;
 
-  ConstantBuffer<Camera> camera = ResourceDescriptorHeap[g_Camera];
+  OUT.ScreenPosition = float4( kPosition[vertex_id], 1.0f );
 
-  OUT.ScreenPosition            = float4( kPosition[vertex_id], 1.0f );
-
-  float4 clip_space             = mul( camera.InvProj, float4( kPosition[vertex_id], 1.0f ) );
-  OUT.SkyboxCoord               = mul( camera.InvView, clip_space / clip_space.w ).xyz - camera.Position.xyz;
+  float4 clip_space  = mul( g_Camera.InvProj, float4( kPosition[vertex_id], 1.0f ) );
+  OUT.SkyboxCoord    = mul( g_Camera.InvView, clip_space / clip_space.w ).xyz - g_Camera.Position.xyz;
 
   return OUT;
 }

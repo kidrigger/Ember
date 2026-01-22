@@ -1,21 +1,14 @@
 #include "Camera.hlsli"
+#include "DebugConfig.hlsli"
 #include "LightData.hlsli"
 #include "OmniLightCommon.hlsli"
 #include "Utility.hlsli"
 
 cbuffer BindlessIndex : register( b1 )
 {
-  ResID g_Camera;
-  ResID g_ConfigID;
-  ResID g_PointLights;
-  uint  g_ShadowPointLightCount;
-  uint  g_PointLightCount;
-  ResID g_DirLights;
-  uint  g_ShadowDirLightCount;
-  uint  g_DirLightCount;
-  ResID g_SpotLights;
-  uint  g_ShadowSpotLightCount;
-  uint  g_SpotLightCount;
+  Camera      g_Camera;
+  LightInfo   g_Lights;
+  DebugConfig g_Debug;
 }
 
 struct MSIn
@@ -66,8 +59,7 @@ void OmniLightingMS(
     out indices uint3             tris[20],
     out primitives MSPrimitiveOut out_light_id[20] )
 {
-  StructuredBuffer<PointLight> point_lights = ResourceDescriptorHeap[g_PointLights];
-  ConstantBuffer<Camera>       camera       = ResourceDescriptorHeap[g_Camera];
+  StructuredBuffer<PointLight> point_lights = ResourceDescriptorHeap[g_Lights.PointLights];
 
   uint                         light_idx    = lights.LightID[IN.GroupID.x];
 
@@ -79,7 +71,7 @@ void OmniLightingMS(
     float4 local = float4(
         normalize( kVertices[i] ) * 1.323169f * point_lights[light_idx].Range + point_lights[light_idx].Position,
         1.0f );
-    float4 screen_pos       = mul( camera.Projection, mul( camera.View, local ) );
+    float4 screen_pos       = mul( g_Camera.Projection, mul( g_Camera.View, local ) );
     verts[i].ScreenPosition = screen_pos;
     verts[i].TexCoord       = screen_pos.xy / screen_pos.w * float2( 0.5f, -0.5f ) + 0.5f;
   }

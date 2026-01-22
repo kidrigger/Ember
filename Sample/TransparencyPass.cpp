@@ -7,7 +7,6 @@
 #include "Environment.hpp"
 #include "FrameGraphHelper.hpp"
 #include "RenderPassCommon.hpp"
-#include "Scene.hpp"
 #include "fg/Blackboard.hpp"
 #include "fg/FrameGraph.hpp"
 
@@ -48,7 +47,7 @@ bool Ember::RenderPass::TransparencyForward::Create(
 
   CD3DX12_ROOT_PARAMETER1 root_parameters[3];
   root_parameters[0].InitAsConstants( sizeof( DrawList::PerBatch ) / 4, 0 );
-  root_parameters[1].InitAsConstants( sizeof( PerFrameConstants ) / 4, 1 );
+  root_parameters[1].InitAsConstantBufferView( 1 );
   root_parameters[2].InitAsConstants( sizeof( Environment::GpuRepr ) / 4, 2 );
 
   CD3DX12_VERSIONED_ROOT_SIGNATURE_DESC root_signature_desc;
@@ -132,6 +131,13 @@ bool Ember::RenderPass::TransparencyForward::Create(
 Ember::RenderPass::RenderDepthData Ember::RenderPass::TransparencyForward::Execute(
     FrameGraph* frame_graph, FrameGraphBlackboard const& bb, RenderDepthData const& render_depth ) const
 {
+  auto const& pipeline        = Pipeline;
+  auto const& root_signature  = RootSignature;
+
+  auto const& [constants_buf] = bb.get<FrameConstants>();
+  auto const& env             = bb.get<Environment::GpuRepr>();
+  auto const  batch           = bb.get<DrawList::Batches>().Transparent();
+
   return frame_graph->addCallbackPass(
       "Transparency Pass",
       [&]( FrameGraph::Builder& builder, RenderPass::RenderDepthData& data )
@@ -139,7 +145,7 @@ Ember::RenderPass::RenderDepthData Ember::RenderPass::TransparencyForward::Execu
         data.RenderTarget = builder.write( render_depth.RenderTarget, FG::Attachment{ .Index = 0, .ForceSrgb = true } );
         data.DepthStencil = builder.write( render_depth.DepthStencil, FG::DepthStencil{} );
       },
-      [self = this, bb = &bb]( RenderDepthData const&, FrameGraphPassResources&, FG::Context* context )
+      [=]( RenderDepthData const&, FrameGraphPassResources&, FG::Context* context )
       {
         ZoneScopedN( "Transparency Pass" );
 
@@ -147,15 +153,11 @@ Ember::RenderPass::RenderDepthData Ember::RenderPass::TransparencyForward::Execu
         CommandList*                  cmd        = frame_data.CommandList;
         PIXScopedEvent( cmd->Get(), PIX_COLOR_DEFAULT, "Transparency Pass" );
 
-        auto const& constants = bb->get<PerFrameConstants>();
-        auto const& env       = bb->get<Environment::GpuRepr>();
-        auto const  batch     = bb->get<DrawList::Batches>().Transparent();
-
-        cmd->SetGraphicsRootSignature( self->RootSignature.Get() );
+        cmd->SetGraphicsRootSignature( root_signature.Get() );
         // TODO: Sort transparent objects back to front
-        cmd->SetPipelineState( self->Pipeline.Get() );
+        cmd->SetPipelineState( pipeline.Get() );
         cmd->SetGraphicsRootConstants( 0, batch );
-        cmd->SetGraphicsRootConstants( 1, constants );
+        cmd->SetGraphicsRootConstantBuffer( 1, constants_buf );
         cmd->SetGraphicsRootConstants( 2, env );
         cmd->SetGraphicsRootConstants( 3, ( UINT )SRVHandle{}, 16 );
         cmd->DispatchMesh( { .X = batch.CommandsCount } );
@@ -205,7 +207,7 @@ bool Ember::RenderPass::MaskedForward::Create(
 
   CD3DX12_ROOT_PARAMETER1 root_parameters[4];
   root_parameters[0].InitAsConstants( sizeof( DrawList::PerBatch ) / 4, 0 );
-  root_parameters[1].InitAsConstants( sizeof( PerFrameConstants ) / 4, 1 );
+  root_parameters[1].InitAsConstantBufferView( 1 );
   root_parameters[2].InitAsConstants( sizeof( Environment::GpuRepr ) / 4, 2 );
   root_parameters[3].InitAsConstants( sizeof( Proto::ReflectionProbe::Probe ) / 4 + 1, 3 );
 
@@ -280,6 +282,14 @@ bool Ember::RenderPass::MaskedForward::Create(
 Ember::RenderPass::RenderDepthData Ember::RenderPass::MaskedForward::Execute(
     FrameGraph* frame_graph, FrameGraphBlackboard const& bb, RenderDepthData const& render_depth_data ) const
 {
+  auto const root_sig         = RootSignature;
+  auto const pipeline         = Pipeline;
+
+  auto const& [constants_buf] = bb.get<FrameConstants>();
+  auto const& env             = bb.get<Environment::GpuRepr>();
+  auto const& draw_list       = bb.get<DrawList::Batches>();
+  auto const  batch           = draw_list.Masked();
+
   return frame_graph->addCallbackPass(
       "Alpha Tested Pass",
       [&]( FrameGraph::Builder& builder, RenderDepthData& data )
@@ -288,7 +298,7 @@ Ember::RenderPass::RenderDepthData Ember::RenderPass::MaskedForward::Execute(
             builder.write( render_depth_data.RenderTarget, FG::Attachment{ .Index = 0, .ForceSrgb = true } );
         data.DepthStencil = builder.write( render_depth_data.DepthStencil, FG::DepthStencil{} );
       },
-      [self = this, bb = &bb]( RenderDepthData const&, FrameGraphPassResources&, FG::Context const* context )
+      [=]( RenderDepthData const&, FrameGraphPassResources&, FG::Context const* context )
       {
         ZoneScopedN( "Alpha Tested Pass" );
 
@@ -296,16 +306,10 @@ Ember::RenderPass::RenderDepthData Ember::RenderPass::MaskedForward::Execute(
         CommandList*                  cmd        = frame_data.CommandList;
         PIXScopedEvent( cmd->Get(), PIX_COLOR_DEFAULT, "Alpha Tested Pass" );
 
-        auto const& constants = bb->get<PerFrameConstants>();
-        auto const& env       = bb->get<Environment::GpuRepr>();
-        auto const& draw_list = bb->get<DrawList::Batches>();
-
-        auto const  batch     = draw_list.Masked();
-
-        cmd->SetGraphicsRootSignature( self->RootSignature.Get() );
-        cmd->SetPipelineState( self->Pipeline.Get() );
+        cmd->SetGraphicsRootSignature( root_sig.Get() );
+        cmd->SetPipelineState( pipeline.Get() );
         cmd->SetGraphicsRootConstants( 0, batch );
-        cmd->SetGraphicsRootConstants( 1, constants );
+        cmd->SetGraphicsRootConstantBuffer( 1, constants_buf );
         cmd->SetGraphicsRootConstants( 2, env );
         cmd->SetGraphicsRootConstants( 3, ( UINT )SRVHandle{}, 16 );
         cmd->DispatchMesh( { .X = batch.CommandsCount } );

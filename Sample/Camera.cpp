@@ -5,7 +5,7 @@
 
 #include <Graphics/RenderDevice.hpp>
 
-void Ember::Camera::UpdateRepr()
+void Ember::Camera::Update()
 {
   if ( m_DirtyFlags & kViewDirtyBit )
   {
@@ -35,19 +35,6 @@ void Ember::Camera::UpdateRepr()
   }
 
   m_DirtyFlags = 0;
-}
-
-Ember::Camera::Camera( std::vector<Buffer> camera_buffer ) : m_CameraBuffer{ std::move( camera_buffer ) }
-{}
-
-void Ember::Camera::Create( Camera* camera, RenderDevice* render_device, uint32_t num_frames )
-{
-  std::vector<Buffer> buffers;
-  for ( uint32_t i = 0; i < num_frames; i++ )
-  {
-    buffers.push_back( render_device->CreateConstantBuffer( sizeof( GpuRepr ) ) );
-  }
-  new ( camera ) Camera{ std::move( buffers ) };
 }
 
 DirectX::FXMVECTOR& Ember::Camera::GetPosition() const
@@ -125,20 +112,9 @@ DirectX::XMMATRIX const& Ember::Camera::GetInvProj() const
   return m_Repr.InvProj;
 }
 
-Ember::CBVHandle Ember::Camera::PrepareFrame( uint32_t const frame_index )
+Ember::Camera::GpuRepr const& Ember::Camera::GetGpuRepr() const
 {
-  UpdateRepr();
-
-  m_CameraBuffer[frame_index].Write( 0, sizeof( m_Repr ), &m_Repr );
-
-  m_LastFrameHandle = m_CameraBuffer[frame_index].GetCBVHandle();
-
-  return m_LastFrameHandle;
-}
-
-Ember::CBVHandle Ember::Camera::GetLastUpdatedBuffer() const
-{
-  return m_LastFrameHandle;
+  return m_Repr;
 }
 
 DirectX::BoundingFrustum const& Ember::Camera::GetLastUpdatedFrustum() const

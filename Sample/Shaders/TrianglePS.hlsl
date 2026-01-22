@@ -75,10 +75,9 @@ float3 GetAmbientInfluenceProbe(
 float4 TrianglePS( PSIn IN ) : SV_TARGET0
 {
   StructuredBuffer<Material> materials = ResourceDescriptorHeap[g_DrawBatch.MaterialBuffer];
-  ConstantBuffer<Camera>     camera    = ResourceDescriptorHeap[g_Camera];
 
   //
-  float3   view_dir    = normalize( camera.Position.xyz - IN.Position.xyz );
+  float3   view_dir    = normalize( g_Camera.Position.xyz - IN.Position.xyz );
 
   Material mat         = materials[NonUniformResourceIndex( IN.Material )];
 
@@ -88,8 +87,7 @@ float4 TrianglePS( PSIn IN ) : SV_TARGET0
   float3   emissive    = mat.GetEmissive( IN.TexCoord, g_DefaultSampler );
 
 #ifndef STRIP_DEBUG_CONFIG
-  ConstantBuffer<DebugConfig> config = ResourceDescriptorHeap[g_ConfigID];
-  switch ( config.VisualizationMode )
+  switch ( g_Debug.VisualizationMode )
   {
     case kRender:
       break;
@@ -143,7 +141,7 @@ float4 TrianglePS( PSIn IN ) : SV_TARGET0
     diffuse_part         *= 1.0f - brdf.Metallic; // Metals don't have diffuse/refractions.
 
     float3 specular       = 0.0f;
-    if ( !config.RemoveSpecularContrib )
+    if ( !g_Debug.RemoveSpecularContrib )
     {
       float3 reflection_dir = reflect( -view_dir, brdf.Normal );
 
@@ -212,7 +210,7 @@ float4 TrianglePS( PSIn IN ) : SV_TARGET0
     }
 
     float3 diffuse = 0.0f;
-    if ( !config.RemoveDiffuseContrib )
+    if ( !g_Debug.RemoveDiffuseContrib )
     {
       diffuse = brdf.Albedo * g_Env.SampleIrradiance( brdf.Normal, g_DefaultSampler );
     }
@@ -237,8 +235,8 @@ float4 TrianglePS( PSIn IN ) : SV_TARGET0
           g_ProbeInfo,
           IN.Position.xyz,
           view_dir,
-          !config.RemoveDiffuseContrib,
-          !config.RemoveSpecularContrib );
+          !g_Debug.RemoveDiffuseContrib,
+          !g_Debug.RemoveSpecularContrib );
     }
     else
     {
@@ -248,8 +246,8 @@ float4 TrianglePS( PSIn IN ) : SV_TARGET0
           view_dir,
           g_DefaultSampler,
           g_ClampedSampler,
-          !config.RemoveDiffuseContrib,
-          !config.RemoveSpecularContrib );
+          !g_Debug.RemoveDiffuseContrib,
+          !g_Debug.RemoveSpecularContrib );
     }
 #endif
   }

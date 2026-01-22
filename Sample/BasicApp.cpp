@@ -37,7 +37,7 @@ namespace
 {
 std::unordered_map<SIZE_T, Ember::RawDescriptorHandle> g_ImguiHandleMap;
 
-struct DebugConfig
+struct alignas( 16 ) DebugConfigGpuRepr
 {
   enum VisMode : uint32_t
   {
@@ -67,6 +67,7 @@ struct DebugConfig
   uint32_t RemoveSpecularContrib        = false;
 
   uint32_t DisableMeshletFrustumCulling = false;
+  byte     Padding[4];
 } g_Debug;
 
 bool                  g_OutputFrameGraph        = false;
@@ -179,7 +180,8 @@ Ember::BasicApp::BasicApp(
 
   InitImGui( window_handle, m_RenderDevice.get() );
 
-  m_FGBlackboard.add<PerFrameConstants>();
+  m_FGBlackboard.add<FrameConstants>();
+  m_FGBlackboard.add<LightManager::GpuRepr>();
   m_FGBlackboard.add<Environment::GpuRepr>();
   m_FGBlackboard.add<FG::BackbufferInfo>(
       m_RenderDevice->GetSwapchainFormat(), kDepthFormat, m_WindowWidth, m_WindowHeight );
@@ -305,11 +307,12 @@ void Ember::BasicApp::LoadContent()
 {
   ERR_ABORT( ::ShowWindow( m_WindowHandle, SW_SHOW ) );
 
-  // Setup Debug
-  m_ConfigurationBuffer = m_RenderDevice->CreateConstantBuffer( sizeof( DebugConfig ) );
-
   // Setup Camera
-  Camera::Create( m_Camera.get(), m_RenderDevice.get(), RenderDevice::kNumFrames );
+  for ( auto& buf : m_FrameConstantBuffers )
+  {
+    buf = m_RenderDevice->CreateConstantBuffer(
+        sizeof( Camera::GpuRepr ) + sizeof( LightManager::GpuRepr ) + sizeof( DebugConfigGpuRepr ) );
+  }
 
   m_Camera->SetHorizontalFoV( DirectX::XMConvertToRadians( 70.0f ) );
   m_Camera->SetAspectRatio( ( float )m_WindowWidth / ( float )m_WindowHeight );
@@ -567,8 +570,6 @@ void Ember::BasicApp::Update()
     }
   }
 
-  m_ConfigurationBuffer.Write( 0, sizeof( g_Debug ), &g_Debug );
-
   // TODO: Remove function static variables.
   static SceneTree    scene_tree;
   static PickingGizmo picking_gizmo;
@@ -710,8 +711,6 @@ void Ember::BasicApp::Render()
 {
   ZoneScoped;
 
-  m_TransientTextures.Update();
-
   Texture        backbuffer   = m_RenderDevice->GetCurrentBackbuffer();
   CommandList    command_list = m_RenderDevice->GetGraphicsCommandList();
   uint32_t const frame_idx    = m_RenderDevice->GetCurrentFrameIndex();
@@ -722,10 +721,32 @@ void Ember::BasicApp::Render()
       .CommandList = &command_list,
   } );
 
+  std::vector<byte> scratch;
+  {
+    Buffer* const_buffer = &m_FrameConstantBuffers[frame_idx];
+
+    m_TransientTextures.Update();
+    m_Camera->Update();
+    LightManager::GpuRepr light_info = m_LightManager->PrepareFrame( *m_Camera, frame_idx );
+
+    scratch.resize( const_buffer->GetSize() );
+
+    byte* ptr = scratch.data();
+
+    memcpy( ptr, &m_Camera->GetGpuRepr(), sizeof( Camera::GpuRepr ) );
+    ptr += sizeof( Camera::GpuRepr );
+
+    memcpy( ptr, &light_info, sizeof( LightManager::GpuRepr ) );
+    ptr += sizeof( LightManager::GpuRepr );
+
+    memcpy( ptr, &g_Debug, sizeof( DebugConfigGpuRepr ) );
+
+    const_buffer->Write( 0, ByteSizeOf( scratch ), DataOf( scratch ) );
+    scratch.clear();
+  }
+
   FrameGraph frame_graph;
   frame_graph.setPreExecCallback( []( FG::Context* context ) { context->PreparePass(); } );
-
-  CBVHandle const camera_cbv = m_Camera->PrepareFrame( frame_idx );
 
   m_DrawList.Clear();
 
@@ -747,40 +768,33 @@ void Ember::BasicApp::Render()
 
   command_list.SetDescriptorHeaps( m_RenderDevice->GetBindlessDescriptorHeaps() );
 
-  LightManager::GpuInfo   light_info     = m_LightManager->PrepareFrame( *m_Camera, frame_idx );
-
   DrawList::Batches const draw_list_info = g_Raytracing
                                                ? m_DrawList.PrepareFrameWithRaytracing( &command_list, frame_idx )
                                                : m_DrawList.PrepareFrame( frame_idx );
 
   if ( not g_Raytracing or g_UseDeferredRendering )
   {
-    m_LightManager->RenderAllShadows( &command_list, draw_list_info, *m_Camera, frame_idx );
+    m_LightManager->RenderAllShadows(
+        &command_list, draw_list_info, *m_Camera, m_FrameConstantBuffers[frame_idx], frame_idx );
   }
 
-  m_FGBlackboard.get<DrawList::Batches>() = draw_list_info;
-  m_FGBlackboard.get<PerFrameConstants>() = {
-    .Camera       = camera_cbv,
-    .ConfigBuffer = m_ConfigurationBuffer.GetCBVHandle(),
-    .LightInfo    = light_info,
-  };
+  m_FGBlackboard.get<LightManager::GpuRepr>() = m_LightManager->GetGpuRepr();
+  m_FGBlackboard.get<DrawList::Batches>()     = draw_list_info;
+  m_FGBlackboard.get<FrameConstants>()        = { m_FrameConstantBuffers[frame_idx] };
+  m_FGBlackboard.get<Environment::GpuRepr>()  = m_Environment->Repr();
 
-  m_FGBlackboard.get<Environment::GpuRepr>() = m_Environment->Repr();
+  auto const               atmosphere         = m_UpdateAtmosphericSky( &frame_graph, &m_FGBlackboard, frame_idx );
+  auto const               probe              = m_Probe( &frame_graph, m_FGBlackboard );
 
-  auto const atmosphere                      = m_UpdateAtmosphericSky( &frame_graph, &m_FGBlackboard, frame_idx );
-  auto const probe                           = m_Probe( &frame_graph, m_FGBlackboard );
+  auto const               depth_buffer       = m_DrawPrePass( &frame_graph, m_FGBlackboard );
 
-  auto const depth_buffer                    = m_DrawPrePass( &frame_graph, m_FGBlackboard );
+  FrameGraphResource const opaque_pass_fwd =
+      g_UseProbes
+          ? m_RenderOpaqueMeshes.Execute( &frame_graph, m_FGBlackboard, { depth_buffer, probe, m_Probe.ProbeInfo } )
+          : m_RenderOpaqueMeshes.Execute( &frame_graph, m_FGBlackboard, depth_buffer );
 
-  auto const opaque_pass_fwd                 = g_UseProbes
-                                                   ? m_RenderOpaqueMeshes.Execute(
-                                         &frame_graph,
-                                         m_FGBlackboard,
-                                         RenderPass::OpaqueForward::Input{ depth_buffer, probe, m_Probe.ProbeInfo } )
-                                                   : m_RenderOpaqueMeshes.Execute( &frame_graph, m_FGBlackboard, depth_buffer );
-
-  auto const gbuffer                         = m_UpdateGBuffer( &frame_graph, m_FGBlackboard, depth_buffer );
-  auto const omni_pass_rt                    = m_RenderOmniLights( &frame_graph, m_FGBlackboard, gbuffer );
+  auto const gbuffer         = m_UpdateGBuffer( &frame_graph, m_FGBlackboard, depth_buffer );
+  auto const omni_pass_rt    = m_RenderOmniLights( &frame_graph, m_FGBlackboard, gbuffer );
   auto const spot_pass_rt    = m_RenderSpotLights( &frame_graph, m_FGBlackboard, gbuffer, omni_pass_rt );
   auto const opaque_pass_dfr = m_RenderScreenSpaceLighting( &frame_graph, m_FGBlackboard, gbuffer, spot_pass_rt );
 
@@ -792,10 +806,10 @@ void Ember::BasicApp::Render()
   auto const alpha_tested      = m_RenderMaskedMeshes( &frame_graph, m_FGBlackboard, opaque_pass );
   auto const transparency_pass = m_RenderTransparentMeshes( &frame_graph, m_FGBlackboard, alpha_tested );
 
-  m_RenderBackground.UseProceduralAtmosphericSky = g_Debug.SkyMode == DebugConfig::kAtmosphere;
+  m_RenderBackground.UseProceduralAtmosphericSky = g_Debug.SkyMode == DebugConfigGpuRepr::kAtmosphere;
   auto const skybox_pass = m_RenderBackground( &frame_graph, m_FGBlackboard, transparency_pass, atmosphere.SkyViewLUT );
 
-  auto const final_output = g_Debug.SkyMode == DebugConfig::kNone ? transparency_pass.RenderTarget : skybox_pass;
+  auto const final_output = g_Debug.SkyMode == DebugConfigGpuRepr::kNone ? transparency_pass.RenderTarget : skybox_pass;
 
   auto const imgui_out    = frame_graph.addCallbackPass(
       "ImGUI",

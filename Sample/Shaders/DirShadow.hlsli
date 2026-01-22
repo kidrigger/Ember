@@ -3,20 +3,22 @@
 
 #include "Bindless.hlsli"
 #include "Camera.hlsli"
+#include "DebugConfig.hlsli"
 #include "Geometry.hlsli"
 #include "LightData.hlsli"
 
-ConstantBuffer<DrawBatch> g_DrawBatch : register( b0 );
-
-//
-cbuffer QuickTransforms : register( b1 )
+cbuffer FrameConstants : register( b0 )
 {
-  ResID g_LightData;
-  uint  g_LightIdx;
-  ResID g_Camera;
+  Camera      g_Camera;
+  LightInfo   g_Lights;
+  DebugConfig g_Debug;
 }
 
-cbuffer LightCullParameters : register( b2 )
+ConstantBuffer<DrawBatch> g_DrawBatch : register( b1 );
+
+uint                      g_LightIdx : register( b2 );
+
+cbuffer                   LightCullParameters : register( b3 )
 {
   float4 g_CullParams[NUM_CASCADES];
 }

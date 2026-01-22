@@ -12,16 +12,11 @@ struct PSOutput
 
 PSOutput GBufferPS( PSIn IN )
 {
-  ConstantBuffer<Camera>     camera    = ResourceDescriptorHeap[g_Camera];
   StructuredBuffer<Material> materials = ResourceDescriptorHeap[g_DrawBatch.MaterialBuffer];
 
-#ifndef STRIP_DEBUG_CONFIG
-  ConstantBuffer<DebugConfig> config = ResourceDescriptorHeap[g_ConfigID];
-#endif
+  Material                   mat       = materials[NonUniformResourceIndex( IN.Material )];
 
-  Material mat = materials[NonUniformResourceIndex( IN.Material )];
-
-  PSOutput OUT;
+  PSOutput                   OUT;
 
   OUT.Position = float4( IN.Position.xyz, mat.EmissiveStrength );
   OUT.Albedo   = IN.Color * mat.GetAlbedo( IN.TexCoord, g_DefaultSampler );
@@ -31,7 +26,7 @@ PSOutput GBufferPS( PSIn IN )
   OUT.Emissive = float4( mat.GetRawEmissive( IN.TexCoord, g_DefaultSampler ), 0.0f );
 
 #ifndef STRIP_DEBUG_CONFIG
-  if ( config.VisualizationMode == kMeshlet )
+  if ( g_Debug.VisualizationMode == kMeshlet )
   {
     OUT.Albedo = float4( IN.MeshletColor, 1.0f );
   }

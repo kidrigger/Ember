@@ -56,4 +56,17 @@ struct DirLight
   }
 };
 
+struct LightInfo
+{
+  ResID PointLights;
+  uint  ShadowPointLightCount;
+  uint  PointLightCount;
+  ResID DirLights;
+  uint  ShadowDirLightCount;
+  uint  DirLightCount;
+  ResID SpotLights;
+  uint  ShadowSpotLightCount;
+  uint  SpotLightCount;
+};
+
 #endif

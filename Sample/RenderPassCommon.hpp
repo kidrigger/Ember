@@ -5,11 +5,9 @@
 namespace Ember
 {
 
-struct PerFrameConstants
+struct FrameConstants
 {
-  CBVHandle             Camera;
-  CBVHandle             ConfigBuffer;
-  LightManager::GpuInfo LightInfo;
+  Buffer Buffer;
 };
 
 } // namespace Ember

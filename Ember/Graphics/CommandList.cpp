@@ -117,10 +117,10 @@ void Ember::CommandList::DrawInstanced(
       vertex_count_per_instance, instance_count, start_vertex_location, start_instance_location );
 }
 
-void Ember::CommandList::SetGraphicsRootConstantBufferView(
-    uint32_t const root_parameter_index, D3D12_GPU_VIRTUAL_ADDRESS const buffer_location ) const
+void Ember::CommandList::SetGraphicsRootConstantBuffer(
+    uint32_t const root_parameter_index, Buffer const& buffer ) const
 {
-  m_CommandList->SetGraphicsRootConstantBufferView( root_parameter_index, buffer_location );
+  m_CommandList->SetGraphicsRootConstantBufferView( root_parameter_index, buffer.GetGPUVirtualAddress() );
 }
 
 void Ember::CommandList::SetGraphicsRootConstant(

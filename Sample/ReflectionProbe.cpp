@@ -59,7 +59,7 @@ bool Ember::Proto::ReflectionProbe::Create(
 
   CD3DX12_ROOT_PARAMETER1 root_parameters[4];
   root_parameters[0].InitAsConstants( sizeof( DrawList::PerBatch ) / 4, 0 );
-  root_parameters[1].InitAsConstants( sizeof( PerFrameConstants ) / 4, 1 );
+  root_parameters[1].InitAsConstantBufferView( 1 );
   root_parameters[2].InitAsConstants( sizeof( Environment::GpuRepr ) / 4, 2 );
   root_parameters[3].InitAsConstants( sizeof( Probe ) / 4, 3 );
 
@@ -141,40 +141,40 @@ bool Ember::Proto::ReflectionProbe::Create(
 FrameGraphResource Ember::Proto::ReflectionProbe::Execute(
     FrameGraph* frame_graph, FrameGraphBlackboard const& blackboard ) const
 {
-  auto const& constants  = blackboard.get<PerFrameConstants>();
-  auto const& env        = blackboard.get<Environment::GpuRepr>();
-  auto const& batch      = blackboard.get<DrawList::Batches>().Opaque();
-  auto const  root_sig   = m_RootSignature;
-  auto const  pipeline   = m_Pipeline;
-  auto const& probe_info = ProbeInfo;
+  auto const& [constants_buf] = blackboard.get<FrameConstants>();
+  auto const& env             = blackboard.get<Environment::GpuRepr>();
+  auto const& batch           = blackboard.get<DrawList::Batches>().Opaque();
+  auto const  root_sig        = m_RootSignature;
+  auto const  pipeline        = m_Pipeline;
+  auto const& probe_info      = ProbeInfo;
 
-  auto const  probe      = frame_graph->addCallbackPass(
+  auto const  probe           = frame_graph->addCallbackPass(
       "Reflection Probe Capture",
       [&]( FrameGraph::Builder& builder, std::pair<FrameGraphResource, FrameGraphResource>& probe )
       {
         probe.first = builder.create<FG::Texture>(
             "Reflection Probe",
             {
-                      .Format    = kRenderTargetFormat,
-                      .Width     = kSide,
-                      .Height    = kSide,
-                      .MipLevels = MipLevels::kAuto,
-                      .ArraySize = 1,
-                      .Usage     = TextureUsage::kRenderTarget,
-                      .Dim       = TextureDim::kCube,
-                      .InitState = D3D12_RESOURCE_STATE_RENDER_TARGET,
+                           .Format    = kRenderTargetFormat,
+                           .Width     = kSide,
+                           .Height    = kSide,
+                           .MipLevels = MipLevels::kAuto,
+                           .ArraySize = 1,
+                           .Usage     = TextureUsage::kRenderTarget,
+                           .Dim       = TextureDim::kCube,
+                           .InitState = D3D12_RESOURCE_STATE_RENDER_TARGET,
             } );
         probe.second = builder.create<FG::Texture>(
             "Reflection Probe Depth",
             {
-                      .Format    = kDepthFormat,
-                      .Width     = kSide,
-                      .Height    = kSide,
-                      .MipLevels = MipLevels::kAuto,
-                      .ArraySize = 1,
-                      .Usage     = TextureUsage::kDepthStencil,
-                      .Dim       = TextureDim::kCube,
-                      .InitState = D3D12_RESOURCE_STATE_DEPTH_WRITE,
+                           .Format    = kDepthFormat,
+                           .Width     = kSide,
+                           .Height    = kSide,
+                           .MipLevels = MipLevels::kAuto,
+                           .ArraySize = 1,
+                           .Usage     = TextureUsage::kDepthStencil,
+                           .Dim       = TextureDim::kCube,
+                           .InitState = D3D12_RESOURCE_STATE_DEPTH_WRITE,
             } );
 
         probe.first  = builder.write( probe.first, FG::Attachment{ .Index = 0, .LoadOp = FG::LoadOperation::kClear } );
@@ -194,7 +194,7 @@ FrameGraphResource Ember::Proto::ReflectionProbe::Execute(
         cmd->SetGraphicsRootSignature( root_sig.Get() );
         cmd->SetPipelineState( pipeline.Get() );
         cmd->SetGraphicsRootConstants( 0, batch );
-        cmd->SetGraphicsRootConstants( 1, constants );
+        cmd->SetGraphicsRootConstantBuffer( 1, constants_buf );
         cmd->SetGraphicsRootConstants( 2, env );
         cmd->SetGraphicsRootConstants( 3, probe_info );
         cmd->DispatchMesh( { .X = batch.CommandsCount } );

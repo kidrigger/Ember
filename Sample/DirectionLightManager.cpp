@@ -92,10 +92,11 @@ void Ember::Internal::DirectionLightManager::Create(
                                                           D3D12_ROOT_SIGNATURE_FLAG_DENY_DOMAIN_SHADER_ROOT_ACCESS |
                                                           D3D12_ROOT_SIGNATURE_FLAG_DENY_HULL_SHADER_ROOT_ACCESS;
 
-  CD3DX12_ROOT_PARAMETER1 root_parameters[3];
-  root_parameters[0].InitAsConstants( sizeof( DrawList::PerBatch ) / 4, 0 );
-  root_parameters[1].InitAsConstants( sizeof( PackedData ) / 4, 1 );
-  root_parameters[2].InitAsConstants( kNumCascades * sizeof( DirectX::XMFLOAT4 ) / 4, 2 );
+  CD3DX12_ROOT_PARAMETER1 root_parameters[4];
+  root_parameters[0].InitAsConstantBufferView( 0 );
+  root_parameters[1].InitAsConstants( sizeof( DrawList::PerBatch ) / 4, 1 );
+  root_parameters[2].InitAsConstants( 1, 2 );
+  root_parameters[3].InitAsConstants( kNumCascades * sizeof( DirectX::XMFLOAT4 ) / 4, 3 );
 
   CD3DX12_VERSIONED_ROOT_SIGNATURE_DESC root_signature_desc;
   root_signature_desc.Init_1_1(
@@ -300,7 +301,7 @@ Ember::LightInfo Ember::Internal::DirectionLightManager::PrepareFrame(
 }
 
 void Ember::Internal::DirectionLightManager::RenderAllShadows(
-    CommandList* command_list, DrawList::Batches const& draw_info, Camera const& camera, uint32_t const frame_idx )
+    CommandList* command_list, DrawList::Batches const& draw_info, Buffer const& frame_constants )
 {
   ZoneScoped;
   command_list->SetGraphicsRootSignature( m_RootSignature.Get() );
@@ -327,7 +328,7 @@ void Ember::Internal::DirectionLightManager::RenderAllShadows(
 
   for ( uint32_t index = 0; index < m_AllocatedShadows; index++ )
   {
-    RenderDirShadow( command_list, draw_info, camera, frame_idx, index );
+    RenderDirShadow( command_list, draw_info, frame_constants, index );
   }
 
   std::transform(
@@ -348,8 +349,7 @@ void Ember::Internal::DirectionLightManager::RenderAllShadows(
 void Ember::Internal::DirectionLightManager::RenderDirShadow(
     CommandList const*       command_list,
     DrawList::Batches const& draw_info,
-    Camera const&            camera,
-    uint32_t const           frame_index,
+    Buffer const&            frame_constants,
     uint32_t const           light_index ) const
 {
   PIXScopedEvent( command_list->Get(), PIX_COLOR_DEFAULT, "Render Directional Shadow %u", light_index );
@@ -360,17 +360,12 @@ void Ember::Internal::DirectionLightManager::RenderDirShadow(
 
   command_list->ClearDepthStencilView( texture.GetTexture(), D3D12_CLEAR_FLAG_DEPTH, 1.0f, 0 );
 
-  auto const       batch = draw_info.Opaque();
-
-  PackedData const packed_data{
-    .LightData    = m_DataBuffers[frame_index].GetSRVHandle(),
-    .LightIdx     = light_index,
-    .CameraBuffer = camera.GetLastUpdatedBuffer(),
-  };
+  auto const batch = draw_info.Opaque();
 
   command_list->OMSetRenderTargets( 0, nullptr, &texture );
-  command_list->SetGraphicsRootConstants( 0, batch );
-  command_list->SetGraphicsRootConstants( 1, packed_data );
-  command_list->SetGraphicsRootConstants( 2, dir_light.CascadeSph );
+  command_list->SetGraphicsRootConstantBuffer( 0, frame_constants );
+  command_list->SetGraphicsRootConstants( 1, batch );
+  command_list->SetGraphicsRootConstant( 2, light_index );
+  command_list->SetGraphicsRootConstants( 3, dir_light.CascadeSph );
   command_list->DispatchMesh( { .X = batch.CommandsCount } );
 }

@@ -3,6 +3,7 @@
 #include "Colors.hlsli"
 #include "DebugConfig.hlsli"
 #include "Environment.hlsli"
+#include "LightData.hlsli"
 #include "PBR.hlsli"
 #include "Quantization.hlsli"
 
@@ -15,19 +16,11 @@ cbuffer GBufferIn : register( b0 )
   ResID g_Emissive;
 };
 
-cbuffer BindlessIndex : register( b1 )
+cbuffer FrameConstants : register( b1 )
 {
-  ResID g_Camera;
-  ResID g_ConfigID;
-  ResID g_PointLights;
-  uint  g_ShadowPointLightCount;
-  uint  g_PointLightCount;
-  ResID g_DirLights;
-  uint  g_ShadowDirLightCount;
-  uint  g_DirLightCount;
-  ResID g_SpotLights;
-  uint  g_ShadowSpotLightCount;
-  uint  g_SpotLightCount;
+  Camera      g_Camera;
+  LightInfo   g_Lights;
+  DebugConfig g_Debug;
 }
 
 cbuffer EnvBuf : register( b2 )
@@ -42,16 +35,16 @@ SamplerState           g_PointSampler : register( s3 );
 
 float3                 CalcDirLightContrib( in BRDFCookTorranceGGX brdf, float4 ws_position, float3 view_dir )
 {
-  StructuredBuffer<DirLight> dir_lights  = ResourceDescriptorHeap[g_DirLights];
+  StructuredBuffer<DirLight> dir_lights  = ResourceDescriptorHeap[g_Lights.DirLights];
 
   float3                     dir_contrib = 0.0f;
   int                        light_idx   = 0;
-  for ( ; light_idx < g_ShadowDirLightCount; light_idx++ )
+  for ( ; light_idx < g_Lights.ShadowDirLightCount; light_idx++ )
   {
     dir_contrib += CalcShadowingLightContrib( dir_lights[light_idx], brdf, ws_position, view_dir, g_ShadowSampler );
   }
 
-  for ( ; light_idx < g_DirLightCount; light_idx++ )
+  for ( ; light_idx < g_Lights.DirLightCount; light_idx++ )
   {
     dir_contrib += CalcLightContrib( dir_lights[light_idx], brdf, ws_position, view_dir );
   }
@@ -61,16 +54,16 @@ float3                 CalcDirLightContrib( in BRDFCookTorranceGGX brdf, float4 
 
 float3 CalcPointLightContrib( in BRDFCookTorranceGGX brdf, float4 ws_position, float3 view_dir )
 {
-  StructuredBuffer<PointLight> point_lights  = ResourceDescriptorHeap[g_PointLights];
+  StructuredBuffer<PointLight> point_lights  = ResourceDescriptorHeap[g_Lights.PointLights];
 
   float3                       point_contrib = 0.0f;
   int                          light_idx     = 0;
-  for ( ; light_idx < g_ShadowPointLightCount; light_idx++ )
+  for ( ; light_idx < g_Lights.ShadowPointLightCount; light_idx++ )
   {
     point_contrib += CalcShadowingLightContrib( point_lights[light_idx], brdf, ws_position, view_dir, g_ShadowSampler );
   }
 
-  for ( ; light_idx < g_PointLightCount; light_idx++ )
+  for ( ; light_idx < g_Lights.PointLightCount; light_idx++ )
   {
     point_contrib += CalcLightContrib( point_lights[light_idx], brdf, ws_position, view_dir );
   }
@@ -80,16 +73,14 @@ float3 CalcPointLightContrib( in BRDFCookTorranceGGX brdf, float4 ws_position, f
 
 float4 LightingPS( float2 tex_coord : TEXCOORD ) : SV_TARGET
 {
-  Texture2D<float4>      position_tex = ResourceDescriptorHeap[g_Position];
-  Texture2D<float4>      albedo_tex   = ResourceDescriptorHeap[g_Albedo];
-  Texture2D<float2>      normal_tex   = ResourceDescriptorHeap[g_Normal];
-  Texture2D<float4>      orm_tex      = ResourceDescriptorHeap[g_ORM];
-  Texture2D<float4>      emissive_tex = ResourceDescriptorHeap[g_Emissive];
-  ConstantBuffer<Camera> camera       = ResourceDescriptorHeap[g_Camera];
+  Texture2D<float4> position_tex = ResourceDescriptorHeap[g_Position];
+  Texture2D<float4> albedo_tex   = ResourceDescriptorHeap[g_Albedo];
+  Texture2D<float2> normal_tex   = ResourceDescriptorHeap[g_Normal];
+  Texture2D<float4> orm_tex      = ResourceDescriptorHeap[g_ORM];
+  Texture2D<float4> emissive_tex = ResourceDescriptorHeap[g_Emissive];
 
 #ifndef STRIP_DEBUG_CONFIG
-  ConstantBuffer<DebugConfig> config = ResourceDescriptorHeap[g_ConfigID];
-  switch ( config.VisualizationMode )
+  switch ( g_Debug.VisualizationMode )
   {
     case kRender:
       break;
@@ -120,7 +111,7 @@ float4 LightingPS( float2 tex_coord : TEXCOORD ) : SV_TARGET
   float3 emissive     = emissive_tex.Sample( g_PointSampler, tex_coord ).rgb * pos_emission.w;
 
 #ifndef STRIP_DEBUG_CONFIG
-  if ( config.VisualizationMode == kLightingOnly )
+  if ( g_Debug.VisualizationMode == kLightingOnly )
   {
     albedo.xyz = 0.5f;
   }
@@ -134,7 +125,7 @@ float4 LightingPS( float2 tex_coord : TEXCOORD ) : SV_TARGET
   brdf.Occlusion     = orm.x;
   brdf.F0            = lerp( 0.04f, albedo.rgb, orm.z );
 
-  float3 view_dir    = normalize( camera.Position.xyz - position.xyz );
+  float3 view_dir    = normalize( g_Camera.Position.xyz - position.xyz );
 
   float3 dir_contrib = CalcDirLightContrib( brdf, position, view_dir );
 
@@ -147,8 +138,8 @@ float4 LightingPS( float2 tex_coord : TEXCOORD ) : SV_TARGET
       view_dir,
       g_DefaultSampler,
       g_ClampedSampler,
-      !config.RemoveDiffuseContrib,
-      !config.RemoveSpecularContrib );
+      !g_Debug.RemoveDiffuseContrib,
+      !g_Debug.RemoveSpecularContrib );
 #endif
 
   float3 total_contrib = emissive + dir_contrib + ambient_contrib;

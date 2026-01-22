@@ -26,8 +26,9 @@ bool Ember::RenderPass::Skybox::Create(
 
   D3D_ROOT_SIGNATURE_VERSION root_signature_version = render_device->FetchHighestRootSignatureVersion();
 
-  CD3DX12_ROOT_PARAMETER1    root_parameters[1];
-  root_parameters[0].InitAsConstants( 2, 0 );
+  CD3DX12_ROOT_PARAMETER1    root_parameters[2];
+  root_parameters[0].InitAsConstantBufferView( 0 );
+  root_parameters[1].InitAsConstants( 1, 1 );
 
   CD3DX12_STATIC_SAMPLER_DESC      static_sampler_desc = CD3DX12_STATIC_SAMPLER_DESC{ 0 };
 
@@ -103,19 +104,27 @@ FrameGraphResource Ember::RenderPass::Skybox::Execute(
     RenderDepthData const&      render_depth,
     FrameGraphResource const&   sky_view_lut ) const
 {
-  Data const& skybox = frame_graph->addCallbackPass(
+
+  auto const& [constants_buf]                = bb.get<FrameConstants>();
+  auto const& env                            = bb.get<Environment::GpuRepr>();
+  auto const& root_sig                       = RootSignature;
+  auto const& atmos_pipeline                 = AtmospherePipeline;
+  auto const& skybox_pipeline                = SkyboxPipeline;
+  bool const  use_procedural_atmospheric_sky = UseProceduralAtmosphericSky;
+
+  Data const& skybox                         = frame_graph->addCallbackPass(
       "Render Skybox",
       [&]( FrameGraph::Builder& builder, Data& data )
       {
         data.RenderTarget = builder.write( render_depth.RenderTarget, FG::Attachment{ .Index = 0, .ForceSrgb = true } );
         data.DepthStencil = builder.write( render_depth.DepthStencil, FG::DepthStencil{} );
 
-        if ( UseProceduralAtmosphericSky )
+        if ( use_procedural_atmospheric_sky )
         {
           data.SkyViewLUT = builder.read( sky_view_lut, FG::ShaderResource{} );
         }
       },
-      [self = this, bb = &bb]( Data const& data, FrameGraphPassResources& resources, FG::Context const* context )
+      [=]( Data const& data, FrameGraphPassResources& resources, FG::Context const* context )
       {
         ZoneScopedN( "Render Skybox" );
 
@@ -124,22 +133,19 @@ FrameGraphResource Ember::RenderPass::Skybox::Execute(
 
         PIXScopedEvent( cmd->Get(), PIX_COLOR_DEFAULT, "Render Skybox" );
 
-        auto const& constants = bb->get<PerFrameConstants>();
-        auto const& env       = bb->get<Environment::GpuRepr>();
+        cmd->SetGraphicsRootSignature( root_sig.Get() );
+        cmd->SetGraphicsRootConstantBuffer( 0, constants_buf );
 
-        cmd->SetGraphicsRootSignature( self->RootSignature.Get() );
-        cmd->SetGraphicsRootConstant( 0, ( UINT )constants.Camera );
-
-        if ( self->UseProceduralAtmosphericSky )
+        if ( use_procedural_atmospheric_sky )
         {
           FG::Texture const& sky_view = resources.get<FG::Texture>( data.SkyViewLUT );
-          cmd->SetPipelineState( self->AtmospherePipeline.Get() );
-          cmd->SetGraphicsRootConstant( 0, ( UINT )sky_view.GetSRVHandle(), 1 );
+          cmd->SetPipelineState( atmos_pipeline.Get() );
+          cmd->SetGraphicsRootConstant( 1, ( UINT )sky_view.GetSRVHandle() );
         }
         else
         {
-          cmd->SetPipelineState( self->SkyboxPipeline.Get() );
-          cmd->SetGraphicsRootConstant( 0, ( UINT )env.Skybox, 1 );
+          cmd->SetPipelineState( skybox_pipeline.Get() );
+          cmd->SetGraphicsRootConstant( 1, ( UINT )env.Skybox );
         }
 
         cmd->DrawInstanced( 3, 1, 0, 0 );

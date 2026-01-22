@@ -28,24 +28,19 @@ SamplerState           g_PointSampler : register( s3 );
 
 float4                 SpotLightingPS( float4 screen_pos : SV_POSITION, uint light_idx : LIGHT_ID ) : SV_TARGET
 {
-  StructuredBuffer<SpotLight> spot_lights  = ResourceDescriptorHeap[g_SpotLights];
+  StructuredBuffer<SpotLight> spot_lights  = ResourceDescriptorHeap[g_Lights.SpotLights];
 
   Texture2D<float4>           position_tex = ResourceDescriptorHeap[g_Position];
 
   uint2                       tex_size;
   uint                        nlev;
   position_tex.GetDimensions( 0, tex_size.x, tex_size.y, nlev );
-  float2                 tex_coord    = screen_pos.xy / float2( tex_size );
+  float2            tex_coord    = screen_pos.xy / float2( tex_size );
 
-  Texture2D<float4>      albedo_tex   = ResourceDescriptorHeap[g_Albedo];
-  Texture2D<float2>      normal_tex   = ResourceDescriptorHeap[g_Normal];
-  Texture2D<float4>      orm_tex      = ResourceDescriptorHeap[g_ORM];
-  Texture2D<float4>      emissive_tex = ResourceDescriptorHeap[g_Emissive];
-  ConstantBuffer<Camera> camera       = ResourceDescriptorHeap[g_Camera];
-
-#ifndef STRIP_DEBUG_CONFIG
-  ConstantBuffer<DebugConfig> config = ResourceDescriptorHeap[g_ConfigID];
-#endif
+  Texture2D<float4> albedo_tex   = ResourceDescriptorHeap[g_Albedo];
+  Texture2D<float2> normal_tex   = ResourceDescriptorHeap[g_Normal];
+  Texture2D<float4> orm_tex      = ResourceDescriptorHeap[g_ORM];
+  Texture2D<float4> emissive_tex = ResourceDescriptorHeap[g_Emissive];
 
   // w channel of position texture is used for emissive strength
   float4 pos_emission = position_tex.Sample( g_PointSampler, tex_coord );
@@ -57,7 +52,7 @@ float4                 SpotLightingPS( float4 screen_pos : SV_POSITION, uint lig
   float3 emissive     = emissive_tex.Sample( g_PointSampler, tex_coord ).rgb * pos_emission.w;
 
 #ifndef STRIP_DEBUG_CONFIG
-  if ( config.VisualizationMode == kLightingOnly )
+  if ( g_Debug.VisualizationMode == kLightingOnly )
   {
     albedo.xyz = 0.5f;
   }
@@ -71,10 +66,10 @@ float4                 SpotLightingPS( float4 screen_pos : SV_POSITION, uint lig
   brdf.Occlusion  = orm.x;
   brdf.F0         = lerp( 0.04f, albedo.rgb, orm.z );
 
-  float3 view_dir = normalize( camera.Position.xyz - position.xyz );
+  float3 view_dir = normalize( g_Camera.Position.xyz - position.xyz );
 
   float3 spot_contrib =
-      light_idx < g_ShadowSpotLightCount
+      light_idx < g_Lights.ShadowSpotLightCount
           ? CalcShadowingLightContrib( spot_lights[light_idx], brdf, position, view_dir, g_ShadowSampler )
           : CalcLightContrib( spot_lights[light_idx], brdf, position, view_dir );
 

@@ -46,7 +46,7 @@ bool Ember::RenderPass::OpaqueForward::Create( OpaqueForward* out, Desc const& d
 
   CD3DX12_ROOT_PARAMETER1 root_parameters[4];
   root_parameters[0].InitAsConstants( sizeof( DrawList::PerBatch ) / 4, 0 );
-  root_parameters[1].InitAsConstants( sizeof( PerFrameConstants ) / 4, 1 );
+  root_parameters[1].InitAsConstantBufferView( 1 );
   root_parameters[2].InitAsConstants( sizeof( Environment::GpuRepr ) / 4, 2 );
   root_parameters[3].InitAsConstants( sizeof( Proto::ReflectionProbe::Probe ) / 4 + 1, 3 );
 
@@ -129,6 +129,13 @@ bool Ember::RenderPass::OpaqueForward::Create( OpaqueForward* out, Desc const& d
 FrameGraphResource Ember::RenderPass::OpaqueForward::Execute(
     FrameGraph* frame_graph, FrameGraphBlackboard const& bb, FrameGraphResource const depth ) const
 {
+  auto const root_sig         = RootSignature;
+  auto const pipeline         = Pipeline;
+
+  auto const& [constants_buf] = bb.get<FrameConstants>();
+  auto const& env             = bb.get<Environment::GpuRepr>();
+  auto const& draw_list       = bb.get<DrawList::Batches>();
+
   return frame_graph->addCallbackPass(
       "Opaque Forward",
       [&]( FrameGraph::Builder& builder, FrameGraphResource& data )
@@ -154,7 +161,7 @@ FrameGraphResource Ember::RenderPass::OpaqueForward::Execute(
             } );
         builder.read( depth, FG::DepthStencilRead{} );
       },
-      [self = this, bb = &bb]( FrameGraphResource const&, FrameGraphPassResources&, FG::Context const* context )
+      [=]( FrameGraphResource const&, FrameGraphPassResources&, FG::Context const* context )
       {
         ZoneScopedN( "Opaque Forward" );
 
@@ -162,16 +169,12 @@ FrameGraphResource Ember::RenderPass::OpaqueForward::Execute(
         CommandList*                  cmd        = frame_data.CommandList;
         PIXScopedEvent( cmd->Get(), PIX_COLOR_DEFAULT, "Opaque Forward" );
 
-        auto const& constants  = bb->get<PerFrameConstants>();
-        auto const& env        = bb->get<Environment::GpuRepr>();
-        auto const& draw_list  = bb->get<DrawList::Batches>();
+        auto const draw_batch = draw_list.Opaque();
 
-        auto const  draw_batch = draw_list.Opaque();
-
-        cmd->SetGraphicsRootSignature( self->RootSignature.Get() );
-        cmd->SetPipelineState( self->Pipeline.Get() );
+        cmd->SetGraphicsRootSignature( root_sig.Get() );
+        cmd->SetPipelineState( pipeline.Get() );
         cmd->SetGraphicsRootConstants( 0, draw_batch );
-        cmd->SetGraphicsRootConstants( 1, constants );
+        cmd->SetGraphicsRootConstantBuffer( 1, constants_buf );
         cmd->SetGraphicsRootConstants( 2, env );
         cmd->SetGraphicsRootConstants( 3, ( UINT )SRVHandle{}, 16 );
         cmd->DispatchMesh( { .X = draw_batch.CommandsCount } );
@@ -185,7 +188,7 @@ FrameGraphResource Ember::RenderPass::OpaqueForward::Execute(
   auto const pipeline                 = Pipeline;
   auto [depth, probe_tex, probe_info] = in;
 
-  auto const& constants               = bb.get<PerFrameConstants>();
+  auto const& [constants_buf]         = bb.get<FrameConstants>();
   auto const& env                     = bb.get<Environment::GpuRepr>();
   auto const& draw_batch              = bb.get<DrawList::Batches>().Opaque();
 
@@ -229,7 +232,7 @@ FrameGraphResource Ember::RenderPass::OpaqueForward::Execute(
         cmd->SetGraphicsRootSignature( root_sig.Get() );
         cmd->SetPipelineState( pipeline.Get() );
         cmd->SetGraphicsRootConstants( 0, draw_batch );
-        cmd->SetGraphicsRootConstants( 1, constants );
+        cmd->SetGraphicsRootConstantBuffer( 1, constants_buf );
         cmd->SetGraphicsRootConstants( 2, env );
         cmd->SetGraphicsRootConstants( 3, probe_info );
         cmd->SetGraphicsRootConstants( 3, ( UINT )probe_texture->GetSRVHandle(), sizeof( probe_info ) );

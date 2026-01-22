@@ -30,31 +30,27 @@ groupshared SpotLightPayload pl;
 NUM_THREADS( 32, 1, 1 )
 void SpotLightingAS( uint3 dispatch_id : SV_DispatchThreadID )
 {
-  uint light_idx  = dispatch_id.x;
-  bool is_visible = false;
+  uint                        light_idx   = dispatch_id.x;
+  bool                        is_visible  = false;
 
-#ifndef STRIP_DEBUG_CONFIG
-  ConstantBuffer<DebugConfig> config = ResourceDescriptorHeap[g_ConfigID];
-#endif
-  StructuredBuffer<SpotLight> spot_lights = ResourceDescriptorHeap[g_SpotLights];
+  StructuredBuffer<SpotLight> spot_lights = ResourceDescriptorHeap[g_Lights.SpotLights];
 
-  if ( light_idx >= g_SpotLightCount )
+  if ( light_idx >= g_Lights.SpotLightCount )
   {
     is_visible = false;
   }
   else
   {
-    SpotLight              sl           = spot_lights[NonUniformResourceIndex( light_idx )];
-    ConstantBuffer<Camera> camera       = ResourceDescriptorHeap[g_Camera];
+    SpotLight sl           = spot_lights[NonUniformResourceIndex( light_idx )];
 
-    float                  bound_radius = min( sl.Range / 2 * sl.ConeOuterCutoff, sl.Range / 2 );
-    float3                 bound_center = sl.Position + normalize( sl.Direction ) * bound_radius;
+    float     bound_radius = min( sl.Range / 2 * sl.ConeOuterCutoff, sl.Range / 2 );
+    float3    bound_center = sl.Position + normalize( sl.Direction ) * bound_radius;
 
-    float4                 vs_bounds    = TransformBoundingSphere( camera.View, float4( bound_center, bound_radius ) );
+    float4    vs_bounds    = TransformBoundingSphere( g_Camera.View, float4( bound_center, bound_radius ) );
 
-    is_visible                          = !FrustumCull( vs_bounds, camera.CullInfo );
+    is_visible             = !FrustumCull( vs_bounds, g_Camera.CullInfo );
 #ifndef STRIP_DEBUG_CONFIG
-    is_visible = is_visible && config.IsLitVisMode();
+    is_visible = is_visible && g_Debug.IsLitVisMode();
 #endif
   }
 

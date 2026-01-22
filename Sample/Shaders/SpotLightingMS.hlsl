@@ -54,8 +54,7 @@ void SpotLightingMS(
     out indices uint3             tris[80],
     out primitives MSPrimitiveOut out_light_id[80] )
 {
-  StructuredBuffer<SpotLight> spot_lights = ResourceDescriptorHeap[g_SpotLights];
-  ConstantBuffer<Camera>      camera      = ResourceDescriptorHeap[g_Camera];
+  StructuredBuffer<SpotLight> spot_lights = ResourceDescriptorHeap[g_Lights.SpotLights];
 
   uint                        light_idx   = lights.LightID[IN.GroupID.x];
   float                       cosine      = spot_lights[light_idx].ConeOuterCutoff;
@@ -76,7 +75,7 @@ void SpotLightingMS(
     float  z                = z_array[i >> 2];
     float2 local            = lerp( float2( 0.0f, 0.0f ), kVertices[i % 4] * range * slope, min( z, z_array[1] ) );
     float3 ws_volume        = spot_lights[light_idx].Position + light_dir * z * range + right * local.x + up * local.y;
-    float4 screen_pos       = mul( camera.Projection, mul( camera.View, float4( ws_volume, 1.0f ) ) );
+    float4 screen_pos       = mul( g_Camera.Projection, mul( g_Camera.View, float4( ws_volume, 1.0f ) ) );
     verts[i].ScreenPosition = screen_pos;
     verts[i].TexCoord       = ( screen_pos.xy / screen_pos.w ) * float2( 0.5f, -0.5f ) + 0.5f;
   }

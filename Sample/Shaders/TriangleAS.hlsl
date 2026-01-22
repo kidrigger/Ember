@@ -27,18 +27,13 @@ groupshared MeshletPayload pl;
 NUM_THREADS( 32, 1, 1 )
 void TriangleAS( uint3 group_id : SV_GroupID, uint3 local_id : SV_GroupThreadID )
 {
-#ifndef STRIP_DEBUG_CONFIG
-  ConstantBuffer<DebugConfig> config = ResourceDescriptorHeap[g_ConfigID];
-#endif
+  ByteAddressBuffer draws        = ResourceDescriptorHeap[g_DrawBatch.DrawBuffer];
 
-  ByteAddressBuffer      draws        = ResourceDescriptorHeap[g_DrawBatch.DrawBuffer];
-  ConstantBuffer<Camera> camera       = ResourceDescriptorHeap[g_Camera];
+  uint              draw_cmd_idx = group_id.x;
+  uint              meshlet_idx  = local_id.x;
+  bool              is_visible   = false;
 
-  uint                   draw_cmd_idx = group_id.x;
-  uint                   meshlet_idx  = local_id.x;
-  bool                   is_visible   = false;
-
-  AmpCommand             cmd = draws.Load<AmpCommand>( g_DrawBatch.CommandsOffset + AmpCommand_size * draw_cmd_idx );
+  AmpCommand        cmd = draws.Load<AmpCommand>( g_DrawBatch.CommandsOffset + AmpCommand_size * draw_cmd_idx );
 
   if ( meshlet_idx < cmd.MeshletCount )
   {
@@ -51,19 +46,19 @@ void TriangleAS( uint3 group_id : SV_GroupID, uint3 local_id : SV_GroupThreadID 
         draws.Load<DrawInstance>( g_DrawBatch.InstancesOffset + DrawInstance_size * cmd.InstanceID ).Transform;
 
     float4 ws_bounds = TransformBoundingSphere( model, meshlet.BoundingSphere );
-    float4 vs_bounds = TransformBoundingSphere( camera.View, ws_bounds );
+    float4 vs_bounds = TransformBoundingSphere( g_Camera.View, ws_bounds );
 
 #ifndef STRIP_DEBUG_CONFIG
-    if ( !config.DisableMeshletFrustumCulling )
+    if ( !g_Debug.DisableMeshletFrustumCulling )
     {
-      is_visible = !FrustumCull( vs_bounds, camera.CullInfo );
+      is_visible = !FrustumCull( vs_bounds, g_Camera.CullInfo );
     }
     else
     {
       is_visible = true;
     }
 #else
-    is_visible = !FrustumCull( vs_bounds, camera.CullInfo );
+    is_visible = !FrustumCull( vs_bounds, g_Camera.CullInfo );
 #endif
 
     if ( is_visible )

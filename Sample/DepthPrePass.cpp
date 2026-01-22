@@ -52,10 +52,10 @@ FrameGraphResource Ember::RenderPass::DepthPrePass::Execute(
         PIXScopedEvent( cmd->Get(), PIX_COLOR_DEFAULT, "Depth PrePass" );
 
         DrawList::Batches const& draw_list = blackboard.get<DrawList::Batches>();
-        PerFrameConstants const& constants = blackboard.get<PerFrameConstants>();
+        auto const& [constants_buf]        = blackboard.get<FrameConstants>();
 
         cmd->SetGraphicsRootSignature( this->m_RootSignature.Get() );
-        cmd->SetGraphicsRootConstants( 1, constants );
+        cmd->SetGraphicsRootConstantBuffer( 1, constants_buf );
 
         auto const opaque_batch = draw_list.Opaque();
 
@@ -102,7 +102,7 @@ bool Ember::RenderPass::DepthPrePass::Create(
 
   CD3DX12_ROOT_PARAMETER1 root_parameter[2];
   root_parameter[0].InitAsConstants( sizeof( DrawList::PerBatch ) / 4, 0 );
-  root_parameter[1].InitAsConstants( sizeof( PerFrameConstants ) / 4, 1 );
+  root_parameter[1].InitAsConstantBufferView( 1 );
 
   CD3DX12_STATIC_SAMPLER_DESC           static_sampler_desc{ 0 };
 

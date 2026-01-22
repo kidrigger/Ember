@@ -8,17 +8,9 @@
 
 cbuffer BindlessIndex : register( b1 )
 {
-  ResID g_Camera;
-  ResID g_ConfigID;
-  ResID g_PointLights;
-  uint  g_ShadowPointLightCount;
-  uint  g_PointLightCount;
-  ResID g_DirLights;
-  uint  g_ShadowDirLightCount;
-  uint  g_DirLightCount;
-  ResID g_SpotLights;
-  uint  g_ShadowSpotLightCount;
-  uint  g_SpotLightCount;
+  Camera      g_Camera;
+  LightInfo   g_Lights;
+  DebugConfig g_Debug;
 }
 
 bool FrustumCull( float4 vs_bounds, float4 frust )
@@ -45,27 +37,23 @@ groupshared OmniLightPayload pl;
 NUM_THREADS( 32, 1, 1 )
 void OmniLightingAS( uint3 dispatch_id : SV_DispatchThreadID )
 {
-  uint light_idx  = dispatch_id.x;
-  bool is_visible = false;
+  uint                         light_idx    = dispatch_id.x;
+  bool                         is_visible   = false;
 
-#ifndef STRIP_DEBUG_CONFIG
-  ConstantBuffer<DebugConfig> config = ResourceDescriptorHeap[g_ConfigID];
-#endif
-  StructuredBuffer<PointLight> point_lights = ResourceDescriptorHeap[g_PointLights];
+  StructuredBuffer<PointLight> point_lights = ResourceDescriptorHeap[g_Lights.PointLights];
 
-  if ( light_idx >= g_PointLightCount )
+  if ( light_idx >= g_Lights.PointLightCount )
   {
     is_visible = false;
   }
   else
   {
-    PointLight             pl        = point_lights[NonUniformResourceIndex( light_idx )];
-    ConstantBuffer<Camera> camera    = ResourceDescriptorHeap[g_Camera];
-    float4                 vs_bounds = TransformBoundingSphere( camera.View, float4( pl.Position, pl.Range ) );
+    PointLight pl        = point_lights[NonUniformResourceIndex( light_idx )];
+    float4     vs_bounds = TransformBoundingSphere( g_Camera.View, float4( pl.Position, pl.Range ) );
 
-    is_visible                       = !FrustumCull( vs_bounds, camera.CullInfo );
+    is_visible           = !FrustumCull( vs_bounds, g_Camera.CullInfo );
 #ifndef STRIP_DEBUG_CONFIG
-    is_visible = is_visible && config.IsLitVisMode();
+    is_visible = is_visible && g_Debug.IsLitVisMode();
 #endif
   }
 

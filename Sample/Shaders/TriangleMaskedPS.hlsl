@@ -4,7 +4,6 @@
 float4 TriangleMaskedPS( PSIn IN ) : SV_TARGET0
 {
   StructuredBuffer<Material> materials = ResourceDescriptorHeap[g_DrawBatch.MaterialBuffer];
-  ConstantBuffer<Camera>     camera    = ResourceDescriptorHeap[g_Camera];
 
   Material                   mat       = materials[NonUniformResourceIndex( IN.Material )];
 
@@ -17,8 +16,7 @@ float4 TriangleMaskedPS( PSIn IN ) : SV_TARGET0
   float3 emissive    = mat.GetEmissive( IN.TexCoord, g_DefaultSampler );
 
 #ifndef STRIP_DEBUG_CONFIG
-  ConstantBuffer<DebugConfig> config = ResourceDescriptorHeap[g_ConfigID];
-  switch ( config.VisualizationMode )
+  switch ( g_Debug.VisualizationMode )
   {
     case kRender:
       break;
@@ -48,7 +46,7 @@ float4 TriangleMaskedPS( PSIn IN ) : SV_TARGET0
   brdf.F0              = lerp( 0.04f, albedo.rgb, metal_rough.x );
   brdf.Occlusion       = 1.0f;
 
-  float3 view_dir      = normalize( camera.Position.xyz - IN.Position.xyz );
+  float3 view_dir      = normalize( g_Camera.Position.xyz - IN.Position.xyz );
 
   float3 point_contrib = CalcPointLightContrib( brdf, IN.Position, view_dir );
   float3 dir_contrib   = CalcDirLightContrib( brdf, IN.Position, view_dir );
@@ -62,8 +60,8 @@ float4 TriangleMaskedPS( PSIn IN ) : SV_TARGET0
       view_dir,
       g_DefaultSampler,
       g_ClampedSampler,
-      !config.RemoveDiffuseContrib,
-      !config.RemoveSpecularContrib );
+      !g_Debug.RemoveDiffuseContrib,
+      !g_Debug.RemoveSpecularContrib );
 #endif
 
   float3 total_contrib = emissive + point_contrib + dir_contrib + ambient_contrib;

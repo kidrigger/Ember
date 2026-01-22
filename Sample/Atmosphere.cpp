@@ -67,7 +67,7 @@ bool Ember::RenderPass::Atmosphere::Create( Atmosphere* out, RenderDevice* rende
   {
     CD3DX12_ROOT_PARAMETER1 root_parameters[3];
     root_parameters[0].InitAsConstantBufferView( 0 );
-    root_parameters[1].InitAsConstants( sizeof( PerFrameConstants ) / 4, 1 );
+    root_parameters[1].InitAsConstantBufferView( 1 );
     root_parameters[2].InitAsConstants( 1, 2 );
 
     CD3DX12_STATIC_SAMPLER_DESC      static_sampler_desc = CD3DX12_STATIC_SAMPLER_DESC{ 0 };
@@ -207,11 +207,11 @@ Ember::RenderPass::Atmosphere::Data Ember::RenderPass::Atmosphere::Execute(
         CommandList*                  cmd        = frame_data.CommandList;
         PIXScopedEvent( cmd->Get(), PIX_COLOR_DEFAULT, "Update Transmittance LUT" );
 
-        FG::Buffer const& params = resources.get<FG::Buffer>( data.AtmosphereParams );
+        auto const& [params_buf] = resources.get<FG::Buffer>( data.AtmosphereParams );
 
         cmd->SetGraphicsRootSignature( self->m_RootSignature.Get() );
         cmd->SetPipelineState( self->m_TransmittanceLUTPipeline.Get() );
-        cmd->SetGraphicsRootConstantBufferView( 0, params.InnerBuffer.GetGPUVirtualAddress() );
+        cmd->SetGraphicsRootConstantBuffer( 0, params_buf );
         cmd->DrawInstanced( 3, 1, 0, 0 );
       } );
 
@@ -247,16 +247,16 @@ Ember::RenderPass::Atmosphere::Data Ember::RenderPass::Atmosphere::Execute(
         CommandList*                  cmd        = frame_data.CommandList;
         PIXScopedEvent( cmd->Get(), PIX_COLOR_DEFAULT, "Update Sky View LUT" );
 
-        FG::Texture const&       transmittance_lut = resources.get<FG::Texture>( data.TransmittanceLUT );
-        FG::Buffer const&        params            = resources.get<FG::Buffer>( data.AtmosphereParams );
+        FG::Texture const& transmittance_lut = resources.get<FG::Texture>( data.TransmittanceLUT );
+        auto const& [params_buf]             = resources.get<FG::Buffer>( data.AtmosphereParams );
 
-        PerFrameConstants const& constants         = blackboard->get<PerFrameConstants>();
+        auto const& [constants_buf]          = blackboard->get<FrameConstants>();
 
         cmd->IASetPrimitiveTopology( D3D_PRIMITIVE_TOPOLOGY_TRIANGLELIST );
         cmd->SetGraphicsRootSignature( self->m_RootSignature.Get() );
         cmd->SetPipelineState( self->m_SkyViewLUTPipeline.Get() );
-        cmd->SetGraphicsRootConstantBufferView( 0, params.InnerBuffer.GetGPUVirtualAddress() );
-        cmd->SetGraphicsRootConstants( 1, constants );
+        cmd->SetGraphicsRootConstantBuffer( 0, params_buf );
+        cmd->SetGraphicsRootConstantBuffer( 1, constants_buf );
         cmd->SetGraphicsRootConstants( 2, transmittance_lut.GetSRVHandle() );
         cmd->DrawInstanced( 3, 1, 0, 0 );
       } );
