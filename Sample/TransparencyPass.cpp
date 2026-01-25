@@ -45,10 +45,11 @@ bool Ember::RenderPass::TransparencyForward::Create(
                                                           D3D12_ROOT_SIGNATURE_FLAG_DENY_DOMAIN_SHADER_ROOT_ACCESS |
                                                           D3D12_ROOT_SIGNATURE_FLAG_DENY_HULL_SHADER_ROOT_ACCESS;
 
-  CD3DX12_ROOT_PARAMETER1 root_parameters[3];
+  CD3DX12_ROOT_PARAMETER1 root_parameters[4];
   root_parameters[0].InitAsConstants( sizeof( DrawList::PerBatch ) / 4, 0 );
   root_parameters[1].InitAsConstantBufferView( 1 );
   root_parameters[2].InitAsConstants( sizeof( Environment::GpuRepr ) / 4, 2 );
+  root_parameters[3].InitAsConstants( sizeof( Proto::ReflectionProbe::Probe ) / 4 + 1, 3 );
 
   CD3DX12_VERSIONED_ROOT_SIGNATURE_DESC root_signature_desc;
   root_signature_desc.Init_1_1(

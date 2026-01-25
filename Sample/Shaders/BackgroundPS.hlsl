@@ -1,7 +1,7 @@
 #include "Bindless.hlsli"
 #include "Colors.hlsli"
 
-cbuffer BackgroundCB : register( b1 )
+cbuffer Skybox : register( b1 )
 {
   ResID g_Skybox;
 }

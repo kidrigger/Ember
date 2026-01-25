@@ -4,7 +4,10 @@
 
 ConstantBuffer<Camera> g_Camera : register( b0 );
 
-ResID                  g_Skybox : register( b0 );
+cbuffer                g_Skybox : register( b1 )
+{
+  ResID g_Skybox;
+}
 
 struct BackgroundOut
 {

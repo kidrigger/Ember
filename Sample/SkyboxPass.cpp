@@ -135,6 +135,7 @@ FrameGraphResource Ember::RenderPass::Skybox::Execute(
 
         cmd->SetGraphicsRootSignature( root_sig.Get() );
         cmd->SetGraphicsRootConstantBuffer( 0, constants_buf );
+        cmd->IASetPrimitiveTopology( D3D_PRIMITIVE_TOPOLOGY_TRIANGLELIST );
 
         if ( use_procedural_atmospheric_sky )
         {
