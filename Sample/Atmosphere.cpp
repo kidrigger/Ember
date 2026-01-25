@@ -46,98 +46,46 @@ bool Ember::RenderPass::Atmosphere::Create( Atmosphere* out, RenderDevice* rende
   } );
   sky_view_lut.SetName( L"Sky View LUT" );
 
-  ComPtr<ID3DBlob> vertex_shader_blob;
-  ERR_FAIL_RET_F( D3DReadFileToBlob( L"ScreenSpaceTriangleVS.cso", &vertex_shader_blob ) );
-  ComPtr<ID3DBlob> transmittance_pixel_shader_blob;
-  ERR_FAIL_RET_F( D3DReadFileToBlob( L"TransmittanceLUTPS.cso", &transmittance_pixel_shader_blob ) );
-  ComPtr<ID3DBlob> sky_view_pixel_shader_blob;
-  ERR_FAIL_RET_F( D3DReadFileToBlob( L"SkyViewLUTPS.cso", &sky_view_pixel_shader_blob ) );
+  D3D12_ROOT_PARAMETER1 root_parameters[] = {
+    RootConstantBuffer{ .Register = 0 },
+    RootConstantBuffer{ .Register = 1 },
+    RootConstants{ .Register = 2, .SizeBytes = sizeof( uint32_t ) },
+  };
 
-  ComPtr<ID3D12Device2>       device                 = render_device->GetDevice();
+  D3D12_STATIC_SAMPLER_DESC static_sampler_desc = CD3DX12_STATIC_SAMPLER_DESC{ 0 };
 
-  D3D_ROOT_SIGNATURE_VERSION  root_signature_version = render_device->FetchHighestRootSignatureVersion();
+  //
+  auto root_signature = render_device->CreateRootSignature( {
+      .RootParameters = root_parameters,
+      .StaticSamplers = { &static_sampler_desc, 1 },
+      .ShaderAccess   = RootSignatureDesc::Access::kVertexPixel,
+      .DebugName      = "Atmosphere Root Signature",
+  } );
+  if ( not root_signature ) return false;
 
-  ComPtr<ID3D12RootSignature> root_signature;
-  ComPtr<ID3D12PipelineState> transmittance_lut_pipeline;
-  ComPtr<ID3D12PipelineState> sky_view_lut_pipeline;
+  auto transmittance_lut_pipeline = render_device->CreateGraphicsPipeline( {
+      .RootSignature    = root_signature.Get(),
+      .RTVFormats       = { &kTransmittanceLUTFormat, 1 },
+      .RasterizerDesc   = Rasterizer{ .FrontFace = Rasterizer::FrontFace::kClockwise },
+      .VertexShaderName = "ScreenSpaceTriangleVS.cso",
+      .PixelShaderName  = "TransmittanceLUTPS.cso",
+      .DebugName        = "Transmittance LUT Pipeline",
+  } );
+  if ( not transmittance_lut_pipeline ) return false;
 
-  ComPtr<ID3D12RootSignature> aerial_perspective_root_signature;
-  ComPtr<ID3D12PipelineState> aerial_perspective_pipeline;
-
-  {
-    CD3DX12_ROOT_PARAMETER1 root_parameters[3];
-    root_parameters[0].InitAsConstantBufferView( 0 );
-    root_parameters[1].InitAsConstantBufferView( 1 );
-    root_parameters[2].InitAsConstants( 1, 2 );
-
-    CD3DX12_STATIC_SAMPLER_DESC      static_sampler_desc = CD3DX12_STATIC_SAMPLER_DESC{ 0 };
-
-    D3D12_ROOT_SIGNATURE_FLAGS const root_signature_flags =
-        D3D12_ROOT_SIGNATURE_FLAG_CBV_SRV_UAV_HEAP_DIRECTLY_INDEXED |
-        D3D12_ROOT_SIGNATURE_FLAG_SAMPLER_HEAP_DIRECTLY_INDEXED |
-        D3D12_ROOT_SIGNATURE_FLAG_DENY_AMPLIFICATION_SHADER_ROOT_ACCESS |
-        D3D12_ROOT_SIGNATURE_FLAG_DENY_MESH_SHADER_ROOT_ACCESS |
-        D3D12_ROOT_SIGNATURE_FLAG_DENY_GEOMETRY_SHADER_ROOT_ACCESS |
-        D3D12_ROOT_SIGNATURE_FLAG_DENY_DOMAIN_SHADER_ROOT_ACCESS |
-        D3D12_ROOT_SIGNATURE_FLAG_DENY_HULL_SHADER_ROOT_ACCESS;
-
-    CD3DX12_VERSIONED_ROOT_SIGNATURE_DESC root_signature_desc;
-    root_signature_desc.Init_1_1(
-        CountOf( root_parameters ), DataOf( root_parameters ), 1, &static_sampler_desc, root_signature_flags );
-
-    ComPtr<ID3DBlob> root_signature_blob;
-    ComPtr<ID3DBlob> error_blob;
-    ERR_FAIL_RET_F( D3DX12SerializeVersionedRootSignature(
-        &root_signature_desc, root_signature_version, root_signature_blob.ReleaseAndGetAddressOf(), &error_blob ) );
-
-    ERR_FAIL_RET_F( device->CreateRootSignature(
-        0,
-        root_signature_blob->GetBufferPointer(),
-        root_signature_blob->GetBufferSize(),
-        IID_PPV_ARGS( &root_signature ) ) );
-
-    D3D12_RT_FORMAT_ARRAY rtv_formats{
-      .RTFormats        = { kTransmittanceLUTFormat },
-      .NumRenderTargets = 1,
-    };
-
-    struct PipelineStream
-    {
-      CD3DX12_PIPELINE_STATE_STREAM_ROOT_SIGNATURE        RootSignature;
-      CD3DX12_PIPELINE_STATE_STREAM_PRIMITIVE_TOPOLOGY    PrimitiveTopologyType;
-      CD3DX12_PIPELINE_STATE_STREAM_VS                    VS;
-      CD3DX12_PIPELINE_STATE_STREAM_PS                    PS;
-      CD3DX12_PIPELINE_STATE_STREAM_RENDER_TARGET_FORMATS RTVFormats;
-    };
-
-    PipelineStream pipeline_stream = {
-      .RootSignature         = root_signature.Get(),
-      .PrimitiveTopologyType = D3D12_PRIMITIVE_TOPOLOGY_TYPE_TRIANGLE,
-      .VS                    = CD3DX12_SHADER_BYTECODE( vertex_shader_blob.Get() ),
-      .PS                    = CD3DX12_SHADER_BYTECODE( transmittance_pixel_shader_blob.Get() ),
-      .RTVFormats            = rtv_formats,
-    };
-
-    D3D12_PIPELINE_STATE_STREAM_DESC const pipeline_state_stream_desc = {
-      .SizeInBytes                   = sizeof pipeline_stream,
-      .pPipelineStateSubobjectStream = &pipeline_stream,
-    };
-
-    ERR_FAIL_RET_F(
-        device->CreatePipelineState( &pipeline_state_stream_desc, IID_PPV_ARGS( &transmittance_lut_pipeline ) ) );
-
-    pipeline_stream.PS         = CD3DX12_SHADER_BYTECODE( sky_view_pixel_shader_blob.Get() );
-
-    rtv_formats.RTFormats[0]   = kSkyViewLUTFormat;
-    pipeline_stream.RTVFormats = rtv_formats;
-
-    ERR_FAIL_RET_F(
-        device->CreatePipelineState( &pipeline_state_stream_desc, IID_PPV_ARGS( &sky_view_lut_pipeline ) ) );
-  }
+  auto sky_view_lut_pipeline = render_device->CreateGraphicsPipeline( {
+      .RootSignature    = root_signature.Get(),
+      .RTVFormats       = { &kSkyViewLUTFormat, 1 },
+      .RasterizerDesc   = Rasterizer{ .FrontFace = Rasterizer::FrontFace::kClockwise },
+      .VertexShaderName = "ScreenSpaceTriangleVS.cso",
+      .PixelShaderName  = "SkyViewLUTPS.cso",
+      .DebugName        = "Sky View LUT Pipeline",
+  } );
+  if ( not sky_view_lut_pipeline ) return false;
 
   std::vector<Buffer> atmosphere_param_buffers;
   wchar_t             buf[64];
-  for ( int i = 0; i < RenderDevice::kNumFrames; ++i )
+  for ( uint32_t i = 0; i < RenderDevice::kNumFrames; ++i )
   {
     Buffer& atmosphere_param_buffer =
         atmosphere_param_buffers.emplace_back( render_device->CreateConstantBuffer( sizeof( Params ) + 4 ) );

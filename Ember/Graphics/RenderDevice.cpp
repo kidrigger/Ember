@@ -32,6 +32,18 @@ Ember::TextureDesc GetBackbufferDesc( DXGI_FORMAT format, uint32_t width, uint32
 }
 } // namespace
 
+D3D_ROOT_SIGNATURE_VERSION Ember::RenderDevice::FetchHighestRootSignatureVersionImpl( ID3D12Device* d3d_device )
+{
+  D3D12_FEATURE_DATA_ROOT_SIGNATURE feature_data;
+  feature_data.HighestVersion = D3D_ROOT_SIGNATURE_VERSION_1_1;
+  if ( FAILED(
+           d3d_device->CheckFeatureSupport( D3D12_FEATURE_ROOT_SIGNATURE, &feature_data, sizeof( feature_data ) ) ) )
+  {
+    feature_data.HighestVersion = D3D_ROOT_SIGNATURE_VERSION_1_0;
+  }
+  return feature_data.HighestVersion;
+}
+
 Ember::RenderDevice::RenderDevice(
     ComPtr<ID3D12Device5>            device,
     ComPtr<D3D12MA::Allocator>       allocator,
@@ -51,6 +63,7 @@ Ember::RenderDevice::RenderDevice(
   , m_Bindless{ std::move( bindless_manager ) }
   , m_BufferManager{ m_Device, m_Allocator, m_Bindless.get() }
   , m_TextureManager{ m_Device, m_Allocator, m_Bindless.get() }
+  , m_PipelineFactory{ m_Device, FetchHighestRootSignatureVersionImpl( m_Device.Get() ) }
   , m_DirectContext{ std::move( direct_context ) }
 {
   auto const always_true_receipt = m_DirectContext.CreateReceipt();
@@ -94,13 +107,7 @@ DXGI_FORMAT Ember::RenderDevice::GetSwapchainFormat() const
 
 D3D_ROOT_SIGNATURE_VERSION Ember::RenderDevice::FetchHighestRootSignatureVersion() const
 {
-  D3D12_FEATURE_DATA_ROOT_SIGNATURE feature_data;
-  feature_data.HighestVersion = D3D_ROOT_SIGNATURE_VERSION_1_1;
-  if ( FAILED( m_Device->CheckFeatureSupport( D3D12_FEATURE_ROOT_SIGNATURE, &feature_data, sizeof( feature_data ) ) ) )
-  {
-    feature_data.HighestVersion = D3D_ROOT_SIGNATURE_VERSION_1_0;
-  }
-  return feature_data.HighestVersion;
+  return FetchHighestRootSignatureVersionImpl( m_Device.Get() );
 }
 
 void Ember::RenderDevice::Create( RenderDevice* render_device, HWND window_handle, bool const use_warp )
@@ -338,6 +345,16 @@ void Ember::RenderDevice::ResizeSwapchain( uint32_t const width, uint32_t const 
           GetBackbufferDesc( m_SwapchainFormat, m_SwapchainWidth, m_SwapchainHeight ) ) );
     }
   }
+}
+
+ComPtr<ID3D12RootSignature> Ember::RenderDevice::CreateRootSignature( RootSignatureDesc const& desc ) const
+{
+  return m_PipelineFactory.CreateRootSignature( desc );
+}
+
+ComPtr<ID3D12PipelineState> Ember::RenderDevice::CreateGraphicsPipeline( GraphicsPipelineDesc const& desc ) const
+{
+  return m_PipelineFactory.CreateGraphicsPipeline( desc );
 }
 
 Ember::Buffer Ember::RenderDevice::CreateVertexBuffer( uint32_t const size, uint32_t const stride )

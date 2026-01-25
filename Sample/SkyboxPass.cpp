@@ -13,87 +13,53 @@
 bool Ember::RenderPass::Skybox::Create(
     Skybox* out, RenderDevice* render_device, DXGI_FORMAT const rt_format, DXGI_FORMAT const depth_format )
 {
-  out->RenderTargetFormat = rt_format;
+  out->RenderTargetFormat                 = rt_format;
 
-  ComPtr<ID3DBlob> bg_vertex_shader_blob;
-  ERR_FAIL_RET_F( D3DReadFileToBlob( L"BackgroundVS.cso", &bg_vertex_shader_blob ) );
-  ComPtr<ID3DBlob> bg_pixel_shader_blob;
-  ERR_FAIL_RET_F( D3DReadFileToBlob( L"BackgroundPS.cso", &bg_pixel_shader_blob ) );
-  ComPtr<ID3DBlob> atmos_bg_pixel_shader_blob;
-  ERR_FAIL_RET_F( D3DReadFileToBlob( L"AtmosphereBackgroundPS.cso", &atmos_bg_pixel_shader_blob ) );
+  D3D12_ROOT_PARAMETER1 root_parameters[] = {
+    RootConstantBuffer{ .Register = 0 },
+    RootConstants{ .Register = 1, .SizeBytes = 1 * 4 },
+  };
 
-  ComPtr<ID3D12Device2>      device                 = render_device->GetDevice();
+  D3D12_STATIC_SAMPLER_DESC   static_sampler_desc[] = { CD3DX12_STATIC_SAMPLER_DESC{ 0 } };
 
-  D3D_ROOT_SIGNATURE_VERSION root_signature_version = render_device->FetchHighestRootSignatureVersion();
-
-  CD3DX12_ROOT_PARAMETER1    root_parameters[2];
-  root_parameters[0].InitAsConstantBufferView( 0 );
-  root_parameters[1].InitAsConstants( 1, 1 );
-
-  CD3DX12_STATIC_SAMPLER_DESC      static_sampler_desc = CD3DX12_STATIC_SAMPLER_DESC{ 0 };
-
-  D3D12_ROOT_SIGNATURE_FLAGS const root_signature_flags =
-      D3D12_ROOT_SIGNATURE_FLAG_CBV_SRV_UAV_HEAP_DIRECTLY_INDEXED |
-      D3D12_ROOT_SIGNATURE_FLAG_SAMPLER_HEAP_DIRECTLY_INDEXED |
-      D3D12_ROOT_SIGNATURE_FLAG_DENY_AMPLIFICATION_SHADER_ROOT_ACCESS |
-      D3D12_ROOT_SIGNATURE_FLAG_DENY_MESH_SHADER_ROOT_ACCESS |
-      D3D12_ROOT_SIGNATURE_FLAG_DENY_GEOMETRY_SHADER_ROOT_ACCESS |
-      D3D12_ROOT_SIGNATURE_FLAG_DENY_DOMAIN_SHADER_ROOT_ACCESS | D3D12_ROOT_SIGNATURE_FLAG_DENY_HULL_SHADER_ROOT_ACCESS;
-
-  CD3DX12_VERSIONED_ROOT_SIGNATURE_DESC root_signature_desc;
-  root_signature_desc.Init_1_1(
-      CountOf( root_parameters ), DataOf( root_parameters ), 1, &static_sampler_desc, root_signature_flags );
-
-  ComPtr<ID3DBlob> root_signature_blob;
-  ComPtr<ID3DBlob> error_blob;
-  ERR_FAIL_RET_F( D3DX12SerializeVersionedRootSignature(
-      &root_signature_desc, root_signature_version, root_signature_blob.ReleaseAndGetAddressOf(), &error_blob ) );
-
-  ERR_FAIL_RET_F( device->CreateRootSignature(
-      0,
-      root_signature_blob->GetBufferPointer(),
-      root_signature_blob->GetBufferSize(),
-      IID_PPV_ARGS( out->RootSignature.ReleaseAndGetAddressOf() ) ) );
+  ComPtr<ID3D12RootSignature> root_signature        = render_device->CreateRootSignature( {
+             .RootParameters = root_parameters,
+             .StaticSamplers = static_sampler_desc,
+             .ShaderAccess   = RootSignatureDesc::Access::kVertexPixel,
+             .DebugName      = "Skybox Root Signature",
+  } );
+  if ( not root_signature ) return false;
 
   CD3DX12_DEPTH_STENCIL_DESC depth_stencil_desc{ D3D12_DEFAULT };
-  depth_stencil_desc.DepthFunc = D3D12_COMPARISON_FUNC_LESS_EQUAL;
+  depth_stencil_desc.DepthFunc                = D3D12_COMPARISON_FUNC_LESS_EQUAL;
 
-  D3D12_RT_FORMAT_ARRAY rtv_formats{
-    .RTFormats        = { rt_format },
-    .NumRenderTargets = 1,
-  };
+  ComPtr<ID3D12PipelineState> skybox_pipeline = render_device->CreateGraphicsPipeline( {
+      .RootSignature    = root_signature.Get(),
+      .RTVFormats       = { &rt_format, 1 },
+      .RasterizerDesc   = Rasterizer{ .FrontFace = Rasterizer::FrontFace::kClockwise },
+      .DepthStencilDesc = depth_stencil_desc,
+      .VertexShaderName = "BackgroundVS.cso",
+      .PixelShaderName  = "BackgroundPS.cso",
+      .DSVFormat        = depth_format,
+      .DebugName        = "Skybox Pipeline",
+  } );
+  if ( not skybox_pipeline ) return false;
 
-  struct PipelineStream
-  {
-    CD3DX12_PIPELINE_STATE_STREAM_ROOT_SIGNATURE        RootSignature;
-    CD3DX12_PIPELINE_STATE_STREAM_PRIMITIVE_TOPOLOGY    PrimitiveTopologyType;
-    CD3DX12_PIPELINE_STATE_STREAM_VS                    VS;
-    CD3DX12_PIPELINE_STATE_STREAM_PS                    PS;
-    CD3DX12_PIPELINE_STATE_STREAM_DEPTH_STENCIL         DepthStencil;
-    CD3DX12_PIPELINE_STATE_STREAM_RENDER_TARGET_FORMATS RTVFormats;
-    CD3DX12_PIPELINE_STATE_STREAM_DEPTH_STENCIL_FORMAT  DSVFormat;
-  };
+  ComPtr<ID3D12PipelineState> atmosphere_pipeline = render_device->CreateGraphicsPipeline( {
+      .RootSignature    = root_signature.Get(),
+      .RTVFormats       = { &rt_format, 1 },
+      .RasterizerDesc   = Rasterizer{ .FrontFace = Rasterizer::FrontFace::kClockwise },
+      .DepthStencilDesc = depth_stencil_desc,
+      .VertexShaderName = "BackgroundVS.cso",
+      .PixelShaderName  = "AtmosphereBackgroundPS.cso",
+      .DSVFormat        = depth_format,
+      .DebugName        = "Atmosphere Background Pipeline",
+  } );
+  if ( not atmosphere_pipeline ) return false;
 
-  PipelineStream pipeline_stream = {
-    .RootSignature         = out->RootSignature.Get(),
-    .PrimitiveTopologyType = D3D12_PRIMITIVE_TOPOLOGY_TYPE_TRIANGLE,
-    .VS                    = CD3DX12_SHADER_BYTECODE( bg_vertex_shader_blob.Get() ),
-    .PS                    = CD3DX12_SHADER_BYTECODE( bg_pixel_shader_blob.Get() ),
-    .DepthStencil          = depth_stencil_desc,
-    .RTVFormats            = rtv_formats,
-    .DSVFormat             = depth_format,
-  };
-
-  D3D12_PIPELINE_STATE_STREAM_DESC const pipeline_state_stream_desc = {
-    .SizeInBytes                   = sizeof pipeline_stream,
-    .pPipelineStateSubobjectStream = &pipeline_stream,
-  };
-  ERR_FAIL_RET_F( device->CreatePipelineState(
-      &pipeline_state_stream_desc, IID_PPV_ARGS( out->SkyboxPipeline.ReleaseAndGetAddressOf() ) ) );
-
-  pipeline_stream.PS = CD3DX12_SHADER_BYTECODE( atmos_bg_pixel_shader_blob.Get() );
-  ERR_FAIL_RET_F( device->CreatePipelineState(
-      &pipeline_state_stream_desc, IID_PPV_ARGS( out->AtmospherePipeline.ReleaseAndGetAddressOf() ) ) );
+  out->RootSignature      = std::move( root_signature );
+  out->SkyboxPipeline     = std::move( skybox_pipeline );
+  out->AtmospherePipeline = std::move( atmosphere_pipeline );
 
   return true;
 }

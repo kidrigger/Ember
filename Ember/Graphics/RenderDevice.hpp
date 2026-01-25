@@ -5,6 +5,7 @@
 #include "CommandList.hpp"
 #include "Context.hpp"
 #include "DeviceHandle.hpp"
+#include "PipelineFactory.hpp"
 #include "Texture.hpp"
 #include "Util/DirectXHeaders.hpp"
 #include "Util/Runtime.hpp"
@@ -37,14 +38,18 @@ private:
   std::unique_ptr<BindlessManager> m_Bindless;
   BufferManager                    m_BufferManager;
   TextureManager                   m_TextureManager;
+  PipelineFactory                  m_PipelineFactory;
 
   // Swapchain images.
   std::vector<Texture> m_Backbuffers; // Must release before texture manager.
   uint32_t             m_CurrentBackbufferIndex{ 0 };
 
   // Commands and Sync
-  Context                       m_DirectContext; // Context depends on device and bindless.
-  std::vector<Context::Receipt> m_FrameReceipts;
+  Context                           m_DirectContext; // Context depends on device and bindless.
+  std::vector<Context::Receipt>     m_FrameReceipts;
+
+
+  static D3D_ROOT_SIGNATURE_VERSION FetchHighestRootSignatureVersionImpl( ID3D12Device* d3d_device );
 
 public:
   RenderDevice() = default;
@@ -69,6 +74,10 @@ public:
   static void                              Create( RenderDevice* render_device, HWND window_handle, bool use_warp );
 
   void                                     ResizeSwapchain( uint32_t width, uint32_t height );
+
+  // Pipeline Management
+  [[nodiscard]] ComPtr<ID3D12RootSignature> CreateRootSignature( RootSignatureDesc const& desc ) const;
+  [[nodiscard]] ComPtr<ID3D12PipelineState> CreateGraphicsPipeline( GraphicsPipelineDesc const& desc ) const;
 
   // Buffer Management
   [[nodiscard]] Buffer  CreateVertexBuffer( uint32_t size, uint32_t stride );

@@ -10,18 +10,7 @@
 
 bool Ember::RenderPass::GBuffer::Create( GBuffer* out, RenderDevice* render_device, DXGI_FORMAT const depth_format )
 {
-  ComPtr<ID3DBlob> amp_shader_blob;
-  ERR_FAIL_RET_F( D3DReadFileToBlob( L"TriangleAS.cso", &amp_shader_blob ) );
-  ComPtr<ID3DBlob> mesh_shader_blob;
-  ERR_FAIL_RET_F( D3DReadFileToBlob( L"TriangleMS.cso", &mesh_shader_blob ) );
-  ComPtr<ID3DBlob> gbuffer_shader_blob;
-  ERR_FAIL_RET_F( D3DReadFileToBlob( L"GBufferPS.cso", &gbuffer_shader_blob ) );
-
-  ComPtr<ID3D12Device2>       device                 = render_device->GetDevice();
-
-  D3D_ROOT_SIGNATURE_VERSION  root_signature_version = render_device->FetchHighestRootSignatureVersion();
-
-  CD3DX12_STATIC_SAMPLER_DESC static_sampler_desc[]  = {
+  D3D12_STATIC_SAMPLER_DESC static_sampler_desc[] = {
     CD3DX12_STATIC_SAMPLER_DESC{ 0 },
     CD3DX12_STATIC_SAMPLER_DESC{ 1,
                                 D3D12_FILTER_ANISOTROPIC, D3D12_TEXTURE_ADDRESS_MODE_CLAMP,
@@ -33,81 +22,39 @@ bool Ember::RenderPass::GBuffer::Create( GBuffer* out, RenderDevice* render_devi
                                 D3D12_COMPARISON_FUNC_LESS_EQUAL, D3D12_STATIC_BORDER_COLOR_OPAQUE_WHITE },
   };
 
-  D3D12_ROOT_SIGNATURE_FLAGS const root_signature_flags = D3D12_ROOT_SIGNATURE_FLAG_CBV_SRV_UAV_HEAP_DIRECTLY_INDEXED |
-                                                          D3D12_ROOT_SIGNATURE_FLAG_SAMPLER_HEAP_DIRECTLY_INDEXED |
-                                                          D3D12_ROOT_SIGNATURE_FLAG_DENY_VERTEX_SHADER_ROOT_ACCESS |
-                                                          D3D12_ROOT_SIGNATURE_FLAG_DENY_GEOMETRY_SHADER_ROOT_ACCESS |
-                                                          D3D12_ROOT_SIGNATURE_FLAG_DENY_DOMAIN_SHADER_ROOT_ACCESS |
-                                                          D3D12_ROOT_SIGNATURE_FLAG_DENY_HULL_SHADER_ROOT_ACCESS;
+  D3D12_ROOT_PARAMETER1 root_parameters[] = {
+    RootConstants{ .Register = 0, .SizeBytes = sizeof( DrawList::PerBatch ) },
+    RootConstantBuffer{ .Register = 1 },
+    RootConstants{ .Register = 2, .SizeBytes = sizeof( Environment::GpuRepr ) },
+  };
 
-  CD3DX12_ROOT_PARAMETER1 root_parameters[3];
-  root_parameters[0].InitAsConstants( sizeof( DrawList::PerBatch ) / 4, 0 );
-  root_parameters[1].InitAsConstantBufferView( 1 );
-  root_parameters[2].InitAsConstants( sizeof( Environment::GpuRepr ) / 4, 2 );
-
-  CD3DX12_VERSIONED_ROOT_SIGNATURE_DESC root_signature_desc;
-  root_signature_desc.Init_1_1(
-      CountOf( root_parameters ),
-      DataOf( root_parameters ),
-      CountOf( static_sampler_desc ),
-      DataOf( static_sampler_desc ),
-      root_signature_flags );
-
-  ComPtr<ID3DBlob> root_signature_blob;
-  ComPtr<ID3DBlob> error_blob;
-  ERR_FAIL_RET_F( D3DX12SerializeVersionedRootSignature(
-      &root_signature_desc, root_signature_version, &root_signature_blob, &error_blob ) );
-
-  ERR_FAIL_RET_F( device->CreateRootSignature(
-      0,
-      root_signature_blob->GetBufferPointer(),
-      root_signature_blob->GetBufferSize(),
-      IID_PPV_ARGS( out->RootSignature.ReleaseAndGetAddressOf() ) ) );
-
-  D3D12_RT_FORMAT_ARRAY gbuffer_rt_formats{};
-  gbuffer_rt_formats.NumRenderTargets = CountOf( kGBufferFormats );
-  memcpy( gbuffer_rt_formats.RTFormats, DataOf( kGBufferFormats ), ByteSizeOf( kGBufferFormats ) );
-
-  CD3DX12_RASTERIZER_DESC2 rasterizer_desc{ D3D12_DEFAULT };
-  rasterizer_desc.FrontCounterClockwise = TRUE;
-  rasterizer_desc.CullMode              = D3D12_CULL_MODE_BACK;
+  ComPtr<ID3D12RootSignature> root_signature = render_device->CreateRootSignature( {
+      .RootParameters = root_parameters,
+      .StaticSamplers = static_sampler_desc,
+      .DebugName      = "GBuffer Root Signature",
+  } );
+  if ( not root_signature ) return false;
 
   CD3DX12_DEPTH_STENCIL_DESC depth_stencil_desc{ D3D12_DEFAULT };
   depth_stencil_desc.DepthFunc      = D3D12_COMPARISON_FUNC_EQUAL;
   depth_stencil_desc.DepthWriteMask = D3D12_DEPTH_WRITE_MASK_ZERO;
 
-  struct MainPipelineStream
-  {
-    CD3DX12_PIPELINE_STATE_STREAM_ROOT_SIGNATURE        RootSignature;
-    CD3DX12_PIPELINE_STATE_STREAM_PRIMITIVE_TOPOLOGY    PrimitiveTopologyType;
-    CD3DX12_PIPELINE_STATE_STREAM_AS                    AS;
-    CD3DX12_PIPELINE_STATE_STREAM_MS                    MS;
-    CD3DX12_PIPELINE_STATE_STREAM_PS                    PS;
-    CD3DX12_PIPELINE_STATE_STREAM_RASTERIZER2           Rasterizer;
-    CD3DX12_PIPELINE_STATE_STREAM_DEPTH_STENCIL         DepthStencil;
-    CD3DX12_PIPELINE_STATE_STREAM_RENDER_TARGET_FORMATS RTVFormats;
-    CD3DX12_PIPELINE_STATE_STREAM_DEPTH_STENCIL_FORMAT  DSVFormat;
-  };
+  std::vector const           gbuffer_formats( kGBufferFormats, kGBufferFormats + kGBufferCount );
 
-  MainPipelineStream pipeline_stream = {
-    .RootSignature         = out->RootSignature.Get(),
-    .PrimitiveTopologyType = D3D12_PRIMITIVE_TOPOLOGY_TYPE_TRIANGLE,
-    .AS                    = CD3DX12_SHADER_BYTECODE( amp_shader_blob.Get() ),
-    .MS                    = CD3DX12_SHADER_BYTECODE( mesh_shader_blob.Get() ),
-    .PS                    = CD3DX12_SHADER_BYTECODE( gbuffer_shader_blob.Get() ),
-    .Rasterizer            = rasterizer_desc,
-    .DepthStencil          = depth_stencil_desc,
-    .RTVFormats            = gbuffer_rt_formats,
-    .DSVFormat             = depth_format,
-  };
+  ComPtr<ID3D12PipelineState> pipeline = render_device->CreateGraphicsPipeline( {
+      .RootSignature    = root_signature.Get(),
+      .RTVFormats       = std::move( gbuffer_formats ),
+      .DepthStencilDesc = depth_stencil_desc,
+      .AmpShaderName    = "TriangleAS.cso",
+      .MeshShaderName   = "TriangleMS.cso",
+      .PixelShaderName  = "GBufferPS.cso",
+      .DSVFormat        = depth_format,
+      .DebugName        = "GBuffer Pipeline",
+  } );
+  if ( not pipeline ) return false;
 
-  D3D12_PIPELINE_STATE_STREAM_DESC const pipeline_state_stream_desc = {
-    .SizeInBytes                   = sizeof pipeline_stream,
-    .pPipelineStateSubobjectStream = &pipeline_stream,
-  };
-
-  ERR_FAIL_RET_F( device->CreatePipelineState(
-      &pipeline_state_stream_desc, IID_PPV_ARGS( out->Pipeline.ReleaseAndGetAddressOf() ) ) );
+  out->RootSignature = std::move( root_signature );
+  out->Pipeline      = std::move( pipeline );
 
   return true;
 }

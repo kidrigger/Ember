@@ -364,6 +364,7 @@
     <ClCompile Include="Graphics\Buffer.cpp" />
     <ClCompile Include="Graphics\CommandList.cpp" />
     <ClCompile Include="Graphics\Context.cpp" />
+    <ClCompile Include="Graphics\PipelineFactory.cpp" />
     <ClCompile Include="Graphics\RenderDevice.cpp" />
     <ClCompile Include="Graphics\RenderTargetManager.cpp" />
     <ClCompile Include="Graphics\ResourceBinder.cpp" />
@@ -381,6 +382,7 @@
     <ClInclude Include="Graphics\CommandList.hpp" />
     <ClInclude Include="Graphics\Context.hpp" />
     <ClInclude Include="Graphics\DeviceHandle.hpp" />
+    <ClInclude Include="Graphics\PipelineFactory.hpp" />
     <ClInclude Include="Graphics\RenderDevice.hpp" />
     <ClInclude Include="Graphics\RenderTargetManager.hpp" />
     <ClInclude Include="Graphics\ResourceBinder.hpp" />
@@ -396,6 +398,7 @@
     <ClInclude Include="Util\RabbitPullingFreeList.hpp" />
     <ClInclude Include="Util\Runtime.hpp" />
     <ClInclude Include="Util\ScopedHandle.hpp" />
+    <ClInclude Include="Util\StringUtil.hpp" />
   </ItemGroup>
   <ItemGroup>
     <None Include="vcpkg.json" />

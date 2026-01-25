@@ -80,88 +80,36 @@ FrameGraphResource Ember::RenderPass::DepthPrePass::operator()(
 bool Ember::RenderPass::DepthPrePass::Create(
     DepthPrePass* out, RenderDevice* render_device, DXGI_FORMAT const depth_format )
 {
-  ComPtr<ID3DBlob> amp_shader;
-  ERR_FAIL_RET_F( D3DReadFileToBlob( L"DepthPrePassAS.cso", &amp_shader ) );
-
-  ComPtr<ID3DBlob> mesh_shader;
-  ERR_FAIL_RET_F( D3DReadFileToBlob( L"DepthPrePassMS.cso", &mesh_shader ) );
-
-  ComPtr<ID3DBlob> opaque_pixel_shader;
-  ERR_FAIL_RET_F( D3DReadFileToBlob( L"EmptyPS.cso", &opaque_pixel_shader ) );
-
-  ComPtr<ID3DBlob> alpha_tested_pixel_shader;
-  ERR_FAIL_RET_F( D3DReadFileToBlob( L"DepthPrePassMaskedPS.cso", &alpha_tested_pixel_shader ) );
-
-  D3D12_ROOT_SIGNATURE_FLAGS const root_signature_flags = D3D12_ROOT_SIGNATURE_FLAG_ALLOW_INPUT_ASSEMBLER_INPUT_LAYOUT |
-                                                          D3D12_ROOT_SIGNATURE_FLAG_CBV_SRV_UAV_HEAP_DIRECTLY_INDEXED |
-                                                          D3D12_ROOT_SIGNATURE_FLAG_SAMPLER_HEAP_DIRECTLY_INDEXED |
-                                                          D3D12_ROOT_SIGNATURE_FLAG_DENY_GEOMETRY_SHADER_ROOT_ACCESS |
-                                                          D3D12_ROOT_SIGNATURE_FLAG_DENY_VERTEX_SHADER_ROOT_ACCESS |
-                                                          D3D12_ROOT_SIGNATURE_FLAG_DENY_DOMAIN_SHADER_ROOT_ACCESS |
-                                                          D3D12_ROOT_SIGNATURE_FLAG_DENY_HULL_SHADER_ROOT_ACCESS;
-
-  CD3DX12_ROOT_PARAMETER1 root_parameter[2];
-  root_parameter[0].InitAsConstants( sizeof( DrawList::PerBatch ) / 4, 0 );
-  root_parameter[1].InitAsConstantBufferView( 1 );
-
-  CD3DX12_STATIC_SAMPLER_DESC           static_sampler_desc{ 0 };
-
-  CD3DX12_VERSIONED_ROOT_SIGNATURE_DESC root_signature_desc;
-  root_signature_desc.Init_1_1(
-      CountOf( root_parameter ), DataOf( root_parameter ), 1, &static_sampler_desc, root_signature_flags );
-
-  D3D_ROOT_SIGNATURE_VERSION root_signature_version = render_device->FetchHighestRootSignatureVersion();
-
-  ComPtr<ID3DBlob>           root_signature_blob;
-  ComPtr<ID3DBlob>           error_blob;
-  ERR_FAIL_RET_F( D3DX12SerializeVersionedRootSignature(
-      &root_signature_desc, root_signature_version, &root_signature_blob, &error_blob ) );
-
-  ComPtr<ID3D12RootSignature> shadow_root_sig;
-  ERR_FAIL_RET_F( render_device->GetDevice()->CreateRootSignature(
-      0,
-      root_signature_blob->GetBufferPointer(),
-      root_signature_blob->GetBufferSize(),
-      IID_PPV_ARGS( &shadow_root_sig ) ) );
-
-  CD3DX12_RASTERIZER_DESC2 rasterizer_desc{ D3D12_DEFAULT };
-  rasterizer_desc.FrontCounterClockwise = TRUE;
-  rasterizer_desc.CullMode              = D3D12_CULL_MODE_BACK;
-
-  struct PipelineStream
-  {
-    CD3DX12_PIPELINE_STATE_STREAM_ROOT_SIGNATURE       RootSignature;
-    CD3DX12_PIPELINE_STATE_STREAM_PRIMITIVE_TOPOLOGY   PrimitiveTopologyType;
-    CD3DX12_PIPELINE_STATE_STREAM_AS                   AS;
-    CD3DX12_PIPELINE_STATE_STREAM_MS                   MS;
-    CD3DX12_PIPELINE_STATE_STREAM_PS                   PS;
-    CD3DX12_PIPELINE_STATE_STREAM_RASTERIZER2          Rasterizer;
-    CD3DX12_PIPELINE_STATE_STREAM_DEPTH_STENCIL_FORMAT DSVFormat;
+  D3D12_ROOT_PARAMETER1 root_parameter[] = {
+    RootConstants{ .Register = 0, .SizeBytes = sizeof( DrawList::PerBatch ) },
+    RootConstantBuffer{ .Register = 1 },
   };
 
-  PipelineStream pipeline_stream{
-    .RootSignature         = shadow_root_sig.Get(),
-    .PrimitiveTopologyType = D3D12_PRIMITIVE_TOPOLOGY_TYPE_TRIANGLE,
-    .AS                    = CD3DX12_SHADER_BYTECODE( amp_shader.Get() ),
-    .MS                    = CD3DX12_SHADER_BYTECODE( mesh_shader.Get() ),
-    .PS                    = CD3DX12_SHADER_BYTECODE( opaque_pixel_shader.Get() ),
-    .Rasterizer            = rasterizer_desc,
-    .DSVFormat             = depth_format,
-  };
+  D3D12_STATIC_SAMPLER_DESC   static_sampler_desc[] = { CD3DX12_STATIC_SAMPLER_DESC{ 0 } };
 
-  D3D12_PIPELINE_STATE_STREAM_DESC desc{
-    .SizeInBytes                   = sizeof( pipeline_stream ),
-    .pPipelineStateSubobjectStream = &pipeline_stream,
-  };
+  ComPtr<ID3D12RootSignature> shadow_root_sig       = render_device->CreateRootSignature( {
+            .RootParameters = root_parameter,
+            .StaticSamplers = static_sampler_desc,
+            .DebugName      = "Depth PrePass",
+  } );
 
-  ComPtr<ID3D12PipelineState> opaque_pipeline;
-  ERR_FAIL_RET_F( render_device->GetDevice()->CreatePipelineState( &desc, IID_PPV_ARGS( &opaque_pipeline ) ) );
-  ERR_FAIL_RET_F( opaque_pipeline->SetName( L"Depth PrePass Opaque Pipeline" ) );
+  auto                        opaque_pipeline       = render_device->CreateGraphicsPipeline( {
+                                   .RootSignature   = shadow_root_sig.Get(),
+                                   .AmpShaderName   = "DepthPrePassAS.cso",
+                                   .MeshShaderName  = "DepthPrePassMS.cso",
+                                   .PixelShaderName = "EmptyPS.cso",
+                                   .DSVFormat       = depth_format,
+                                   .DebugName       = "Depth PrePass Opaque Pipeline",
+  } );
 
-  pipeline_stream.PS = CD3DX12_SHADER_BYTECODE( alpha_tested_pixel_shader.Get() );
-  ComPtr<ID3D12PipelineState> alpha_tested_pipeline;
-  ERR_FAIL_RET_F( render_device->GetDevice()->CreatePipelineState( &desc, IID_PPV_ARGS( &alpha_tested_pipeline ) ) );
-  ERR_FAIL_RET_F( alpha_tested_pipeline->SetName( L"Depth PrePass Alpha Tested Pipeline" ) );
+  auto                        alpha_tested_pipeline = render_device->CreateGraphicsPipeline( {
+                             .RootSignature   = shadow_root_sig.Get(),
+                             .AmpShaderName   = "DepthPrePassAS.cso",
+                             .MeshShaderName  = "DepthPrePassMS.cso",
+                             .PixelShaderName = "DepthPrePassMaskedPS.cso",
+                             .DSVFormat       = depth_format,
+                             .DebugName       = "Depth PrePass Alpha Tested Pipeline",
+  } );
 
   new ( out )
       DepthPrePass{ std::move( shadow_root_sig ), std::move( opaque_pipeline ), std::move( alpha_tested_pipeline ) };

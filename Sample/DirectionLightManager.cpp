@@ -2,6 +2,7 @@
 
 #include <Graphics/RenderDevice.hpp>
 #include <Util/DataUtil.hpp>
+#include <Util/DirectXHeaders.hpp>
 #include <Util/Profiling.hpp>
 #include "Camera.hpp"
 #include "ModelLoader.hpp"
@@ -75,80 +76,25 @@ void Ember::Internal::DirectionLightManager::Create(
         render_device->CreateStorageBuffer( sizeof( DirLightRepr ) * kMaxDirLights, sizeof( DirLightRepr ) ) );
   }
 
-  ComPtr<ID3DBlob> shadow_amp_shader;
-  ERR_ABORT( D3DReadFileToBlob( L"DirShadowAS.cso", &shadow_amp_shader ) );
-
-  ComPtr<ID3DBlob> shadow_mesh_shader;
-  ERR_ABORT( D3DReadFileToBlob( L"DirShadowMS.cso", &shadow_mesh_shader ) );
-
-  ComPtr<ID3DBlob> shadow_pixel_shader;
-  ERR_ABORT( D3DReadFileToBlob( L"EmptyPS.cso", &shadow_pixel_shader ) );
-
-  D3D12_ROOT_SIGNATURE_FLAGS const root_signature_flags = D3D12_ROOT_SIGNATURE_FLAG_CBV_SRV_UAV_HEAP_DIRECTLY_INDEXED |
-                                                          D3D12_ROOT_SIGNATURE_FLAG_SAMPLER_HEAP_DIRECTLY_INDEXED |
-                                                          D3D12_ROOT_SIGNATURE_FLAG_DENY_PIXEL_SHADER_ROOT_ACCESS |
-                                                          D3D12_ROOT_SIGNATURE_FLAG_DENY_VERTEX_SHADER_ROOT_ACCESS |
-                                                          D3D12_ROOT_SIGNATURE_FLAG_DENY_GEOMETRY_SHADER_ROOT_ACCESS |
-                                                          D3D12_ROOT_SIGNATURE_FLAG_DENY_DOMAIN_SHADER_ROOT_ACCESS |
-                                                          D3D12_ROOT_SIGNATURE_FLAG_DENY_HULL_SHADER_ROOT_ACCESS;
-
-  CD3DX12_ROOT_PARAMETER1 root_parameters[4];
-  root_parameters[0].InitAsConstantBufferView( 0 );
-  root_parameters[1].InitAsConstants( sizeof( DrawList::PerBatch ) / 4, 1 );
-  root_parameters[2].InitAsConstants( 1, 2 );
-  root_parameters[3].InitAsConstants( kNumCascades * sizeof( DirectX::XMFLOAT4 ) / 4, 3 );
-
-  CD3DX12_VERSIONED_ROOT_SIGNATURE_DESC root_signature_desc;
-  root_signature_desc.Init_1_1(
-      CountOf( root_parameters ), DataOf( root_parameters ), 0, nullptr, root_signature_flags );
-
-  D3D_ROOT_SIGNATURE_VERSION root_signature_version = render_device->FetchHighestRootSignatureVersion();
-
-  ComPtr<ID3DBlob>           root_signature_blob;
-  ComPtr<ID3DBlob>           error_blob;
-  ERR_ABORT( D3DX12SerializeVersionedRootSignature(
-      &root_signature_desc, root_signature_version, &root_signature_blob, &error_blob ) );
-
-  ComPtr<ID3D12RootSignature> shadow_root_sig;
-  ERR_ABORT( render_device->GetDevice()->CreateRootSignature(
-      0,
-      root_signature_blob->GetBufferPointer(),
-      root_signature_blob->GetBufferSize(),
-      IID_PPV_ARGS( &shadow_root_sig ) ) );
-
-  CD3DX12_RASTERIZER_DESC2 rasterizer_desc{ D3D12_DEFAULT };
-  rasterizer_desc.FrontCounterClockwise = TRUE;
-  rasterizer_desc.CullMode              = D3D12_CULL_MODE_FRONT;
-
-  struct PipelineStream
-  {
-    CD3DX12_PIPELINE_STATE_STREAM_ROOT_SIGNATURE       RootSignature;
-    CD3DX12_PIPELINE_STATE_STREAM_PRIMITIVE_TOPOLOGY   PrimitiveTopologyType;
-    CD3DX12_PIPELINE_STATE_STREAM_AS                   AS;
-    CD3DX12_PIPELINE_STATE_STREAM_MS                   MS;
-    CD3DX12_PIPELINE_STATE_STREAM_PS                   PS;
-    CD3DX12_PIPELINE_STATE_STREAM_RASTERIZER2          Rasterizer;
-    CD3DX12_PIPELINE_STATE_STREAM_DEPTH_STENCIL_FORMAT DSVFormat;
+  D3D12_ROOT_PARAMETER1 root_parameters[] = {
+    RootConstantBuffer{ .Register = 0 },
+    RootConstants{ .Register = 1, .SizeBytes = sizeof( DrawList::PerBatch ) },
+    RootConstants{ .Register = 2, .SizeBytes = sizeof( UINT ) },
+    RootConstants{ .Register = 3, .SizeBytes = kNumCascades * sizeof( DirectX::XMFLOAT4 ) },
   };
 
-  PipelineStream pipeline_stream{
-    .RootSignature         = shadow_root_sig.Get(),
-    .PrimitiveTopologyType = D3D12_PRIMITIVE_TOPOLOGY_TYPE_TRIANGLE,
-    .AS                    = CD3DX12_SHADER_BYTECODE( shadow_amp_shader.Get() ),
-    .MS                    = CD3DX12_SHADER_BYTECODE( shadow_mesh_shader.Get() ),
-    .PS                    = CD3DX12_SHADER_BYTECODE( shadow_pixel_shader.Get() ),
-    .Rasterizer            = rasterizer_desc,
-    .DSVFormat             = DXGI_FORMAT_D16_UNORM,
-  };
+  auto shadow_root_sig = render_device->CreateRootSignature( { root_parameters, {} } );
+  ENSURE( shadow_root_sig );
 
-  D3D12_PIPELINE_STATE_STREAM_DESC desc{
-    .SizeInBytes                   = sizeof( pipeline_stream ),
-    .pPipelineStateSubobjectStream = &pipeline_stream,
-  };
-
-  ComPtr<ID3D12PipelineState> shadow_pipeline;
-  ERR_ABORT( render_device->GetDevice()->CreatePipelineState( &desc, IID_PPV_ARGS( &shadow_pipeline ) ) );
-  ERR_ABORT( shadow_pipeline->SetName( L"Dir Shadow Pipeline" ) );
+  auto shadow_pipeline = render_device->CreateGraphicsPipeline( {
+      .RootSignature   = shadow_root_sig.Get(),
+      .RasterizerDesc  = Rasterizer{ .CullMode = Rasterizer::CullMode::kFront },
+      .AmpShaderName   = "DirShadowAS.cso",
+      .MeshShaderName  = "DirShadowMS.cso",
+      .PixelShaderName = "EmptyPS.cso",
+      .DSVFormat       = DXGI_FORMAT_D16_UNORM,
+      .DebugName       = "Dir Shadow Pipeline",
+  } );
 
   new ( light_manager ) DirectionLightManager{
     render_device, world, std::move( data_buffers ), std::move( shadow_pipeline ), std::move( shadow_root_sig ),
