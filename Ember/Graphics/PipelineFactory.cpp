@@ -47,11 +47,7 @@ Ember::PipelineFactory::PipelineFactory(
 
 ComPtr<ID3D12RootSignature> Ember::PipelineFactory::CreateRootSignature( RootSignatureDesc const& desc ) const
 {
-  D3D12_ROOT_SIGNATURE_FLAGS const root_signature_flags =
-      ( D3D12_ROOT_SIGNATURE_FLAGS )desc.ShaderAccess | D3D12_ROOT_SIGNATURE_FLAG_CBV_SRV_UAV_HEAP_DIRECTLY_INDEXED |
-      D3D12_ROOT_SIGNATURE_FLAG_SAMPLER_HEAP_DIRECTLY_INDEXED |
-      D3D12_ROOT_SIGNATURE_FLAG_DENY_GEOMETRY_SHADER_ROOT_ACCESS |
-      D3D12_ROOT_SIGNATURE_FLAG_DENY_DOMAIN_SHADER_ROOT_ACCESS | D3D12_ROOT_SIGNATURE_FLAG_DENY_HULL_SHADER_ROOT_ACCESS;
+  auto const root_signature_flags = ( D3D12_ROOT_SIGNATURE_FLAGS )desc.ShaderAccess | kDefaultRootSignatureFlags;
 
   CD3DX12_VERSIONED_ROOT_SIGNATURE_DESC root_signature_desc;
   root_signature_desc.Init_1_1(
@@ -212,8 +208,54 @@ ComPtr<ID3D12PipelineState> Ember::PipelineFactory::CreateGraphicsPipeline( Grap
   ComPtr<ID3D12PipelineState> pipeline;
   ERR_FAIL_RET_V( m_D3DDevice->CreatePipelineState( &pipeline_state_stream_desc, IID_PPV_ARGS( &pipeline ) ), {} );
 
-  ToWideChar( wide_string_buf, desc.DebugName );
-  ERR_FAIL_RET_V( pipeline->SetName( wide_string_buf ), nullptr );
+#if defined( _DEBUG )
+  if ( not desc.DebugName.empty() )
+  {
+    ToWideChar( wide_string_buf, desc.DebugName );
+    ERR_FAIL_RET_V( pipeline->SetName( wide_string_buf ), nullptr );
+  }
+#endif
+
+  return pipeline;
+}
+
+struct ComputePipelineStateStream
+{
+  CD3DX12_PIPELINE_STATE_STREAM_ROOT_SIGNATURE RootSignature;
+  CD3DX12_PIPELINE_STATE_STREAM_CS             CS;
+};
+
+ComPtr<ID3D12PipelineState> Ember::PipelineFactory::CreateComputePipeline( ComputePipelineDesc const& desc ) const
+{
+  ASSERT( desc.RootSignature );
+  ASSERT( not desc.ComputeShaderName.empty() );
+
+  wchar_t wide_buf_string[256];
+  ToWideChar( wide_buf_string, desc.ComputeShaderName );
+
+  ComPtr<ID3DBlob> compute_shader_blob;
+  ERR_FAIL_RET_V( D3DReadFileToBlob( wide_buf_string, &compute_shader_blob ), {} );
+
+  ComputePipelineStateStream stream = {
+    .RootSignature = desc.RootSignature,
+    .CS            = CD3DX12_SHADER_BYTECODE{ compute_shader_blob.Get() },
+  };
+
+  D3D12_PIPELINE_STATE_STREAM_DESC const compute_desc = {
+    .SizeInBytes                   = sizeof( stream ),
+    .pPipelineStateSubobjectStream = &stream,
+  };
+
+  ComPtr<ID3D12PipelineState> pipeline;
+  ERR_FAIL_RET_V( m_D3DDevice->CreatePipelineState( &compute_desc, IID_PPV_ARGS( &pipeline ) ), nullptr );
+
+#if defined( _DEBUG )
+  if ( not desc.DebugName.empty() )
+  {
+    ToWideChar( wide_buf_string, desc.DebugName );
+    ERR_FAIL_RET_V( pipeline->SetName( wide_buf_string ), nullptr );
+  }
+#endif
 
   return pipeline;
 }

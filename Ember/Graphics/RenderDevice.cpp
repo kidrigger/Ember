@@ -357,6 +357,11 @@ ComPtr<ID3D12PipelineState> Ember::RenderDevice::CreateGraphicsPipeline( Graphic
   return m_PipelineFactory.CreateGraphicsPipeline( desc );
 }
 
+ComPtr<ID3D12PipelineState> Ember::RenderDevice::CreateComputePipeline( ComputePipelineDesc const& desc ) const
+{
+  return m_PipelineFactory.CreateComputePipeline( desc );
+}
+
 Ember::Buffer Ember::RenderDevice::CreateVertexBuffer( uint32_t const size, uint32_t const stride )
 {
   return m_BufferManager.CreateVertexBuffer( size, stride );

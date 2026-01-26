@@ -64,15 +64,30 @@ struct GraphicsPipelineDesc
   std::string                               DebugName;
 };
 
+struct ComputePipelineDesc
+{
+  ID3D12RootSignature* RootSignature;
+  std::string          ComputeShaderName;
+  std::string          DebugName;
+};
+
 struct RootSignatureDesc
 {
+  // Only contains 'additional flags'.
   enum class Access
   {
     kVertexPixel = D3D12_ROOT_SIGNATURE_FLAG_DENY_AMPLIFICATION_SHADER_ROOT_ACCESS |
                    D3D12_ROOT_SIGNATURE_FLAG_DENY_MESH_SHADER_ROOT_ACCESS,
+
     kAmpMeshPixel = D3D12_ROOT_SIGNATURE_FLAG_DENY_VERTEX_SHADER_ROOT_ACCESS,
+
     kMeshPixel    = D3D12_ROOT_SIGNATURE_FLAG_DENY_VERTEX_SHADER_ROOT_ACCESS |
                  D3D12_ROOT_SIGNATURE_FLAG_DENY_AMPLIFICATION_SHADER_ROOT_ACCESS,
+
+    kCompute = D3D12_ROOT_SIGNATURE_FLAG_DENY_MESH_SHADER_ROOT_ACCESS |
+               D3D12_ROOT_SIGNATURE_FLAG_DENY_VERTEX_SHADER_ROOT_ACCESS |
+               D3D12_ROOT_SIGNATURE_FLAG_DENY_PIXEL_SHADER_ROOT_ACCESS |
+               D3D12_ROOT_SIGNATURE_FLAG_DENY_AMPLIFICATION_SHADER_ROOT_ACCESS,
   };
 
   std::span<D3D12_ROOT_PARAMETER1>     RootParameters;
@@ -95,6 +110,12 @@ public:
 
 class PipelineFactory
 {
+  D3D12_ROOT_SIGNATURE_FLAGS constexpr static kDefaultRootSignatureFlags =
+      D3D12_ROOT_SIGNATURE_FLAG_CBV_SRV_UAV_HEAP_DIRECTLY_INDEXED |
+      D3D12_ROOT_SIGNATURE_FLAG_SAMPLER_HEAP_DIRECTLY_INDEXED |
+      D3D12_ROOT_SIGNATURE_FLAG_DENY_GEOMETRY_SHADER_ROOT_ACCESS |
+      D3D12_ROOT_SIGNATURE_FLAG_DENY_DOMAIN_SHADER_ROOT_ACCESS | D3D12_ROOT_SIGNATURE_FLAG_DENY_HULL_SHADER_ROOT_ACCESS;
+
   ComPtr<ID3D12Device5>      m_D3DDevice;
   D3D_ROOT_SIGNATURE_VERSION m_RootSignatureVersion;
 
@@ -105,6 +126,8 @@ public:
   [[nodiscard]] ComPtr<ID3D12RootSignature> CreateRootSignature( RootSignatureDesc const& desc ) const;
 
   [[nodiscard]] ComPtr<ID3D12PipelineState> CreateGraphicsPipeline( GraphicsPipelineDesc const& desc ) const;
+
+  [[nodiscard]] ComPtr<ID3D12PipelineState> CreateComputePipeline( ComputePipelineDesc const& desc ) const;
 };
 
 } // namespace Ember

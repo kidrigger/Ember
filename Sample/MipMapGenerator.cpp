@@ -18,74 +18,35 @@ Ember::MipMapGenerator::MipMapGenerator(
 
 bool Ember::MipMapGenerator::Create( MipMapGenerator* generator, RenderDevice* render_device )
 {
-  ComPtr<ID3D12Device2> device = render_device->GetDevice();
-
-  ComPtr<ID3DBlob>      mipmap_shader;
-  ERR_ABORT( D3DReadFileToBlob( L"MipMap.cso", &mipmap_shader ) );
-  ComPtr<ID3DBlob> mipmap_cube_shader;
-  ERR_ABORT( D3DReadFileToBlob( L"MipMapCube.cso", &mipmap_cube_shader ) );
-
-  D3D_ROOT_SIGNATURE_VERSION  highest_root_signature_version = render_device->FetchHighestRootSignatureVersion();
-
-  CD3DX12_STATIC_SAMPLER_DESC static_sampler_desc;
-  static_sampler_desc.Init(
-      0,
-      D3D12_FILTER_COMPARISON_MIN_MAG_MIP_LINEAR,
-      D3D12_TEXTURE_ADDRESS_MODE_CLAMP,
-      D3D12_TEXTURE_ADDRESS_MODE_CLAMP,
-      D3D12_TEXTURE_ADDRESS_MODE_CLAMP );
-
-  D3D12_ROOT_SIGNATURE_FLAGS const root_signature_flags =
-      D3D12_ROOT_SIGNATURE_FLAG_ALLOW_INPUT_ASSEMBLER_INPUT_LAYOUT |
-      D3D12_ROOT_SIGNATURE_FLAG_CBV_SRV_UAV_HEAP_DIRECTLY_INDEXED |
-      D3D12_ROOT_SIGNATURE_FLAG_SAMPLER_HEAP_DIRECTLY_INDEXED | D3D12_ROOT_SIGNATURE_FLAG_DENY_MESH_SHADER_ROOT_ACCESS |
-      D3D12_ROOT_SIGNATURE_FLAG_DENY_VERTEX_SHADER_ROOT_ACCESS |
-      D3D12_ROOT_SIGNATURE_FLAG_DENY_PIXEL_SHADER_ROOT_ACCESS |
-      D3D12_ROOT_SIGNATURE_FLAG_DENY_AMPLIFICATION_SHADER_ROOT_ACCESS |
-      D3D12_ROOT_SIGNATURE_FLAG_DENY_GEOMETRY_SHADER_ROOT_ACCESS |
-      D3D12_ROOT_SIGNATURE_FLAG_DENY_DOMAIN_SHADER_ROOT_ACCESS | D3D12_ROOT_SIGNATURE_FLAG_DENY_HULL_SHADER_ROOT_ACCESS;
-
-  CD3DX12_ROOT_PARAMETER1 root_parameters[1];
-  ZeroMemory( root_parameters, sizeof( root_parameters ) );
-  root_parameters[0].InitAsConstants( sizeof( RootSigInfo ) / 4, 0 );
-
-  CD3DX12_VERSIONED_ROOT_SIGNATURE_DESC root_signature_desc;
-  root_signature_desc.Init_1_1(
-      CountOf( root_parameters ), DataOf( root_parameters ), 1, &static_sampler_desc, root_signature_flags );
-
-  ComPtr<ID3DBlob> root_signature_blob;
-  ComPtr<ID3DBlob> error_blob;
-  ERR_ABORT( D3DX12SerializeVersionedRootSignature(
-      &root_signature_desc, highest_root_signature_version, &root_signature_blob, &error_blob ) );
-
-  ComPtr<ID3D12RootSignature> root_signature;
-  ERR_ABORT( device->CreateRootSignature(
-      0,
-      root_signature_blob->GetBufferPointer(),
-      root_signature_blob->GetBufferSize(),
-      IID_PPV_ARGS( &root_signature ) ) );
-
-  struct PipelineStateStream
-  {
-    CD3DX12_PIPELINE_STATE_STREAM_ROOT_SIGNATURE RootSignature;
-    CD3DX12_PIPELINE_STATE_STREAM_CS             CS;
-  };
-  PipelineStateStream pipeline_stream = {
-    .RootSignature = root_signature.Get(),
+  D3D12_STATIC_SAMPLER_DESC static_samplers[] = {
+    CD3DX12_STATIC_SAMPLER_DESC{
+                                0, D3D12_FILTER_COMPARISON_MIN_MAG_MIP_LINEAR,
+                                D3D12_TEXTURE_ADDRESS_MODE_CLAMP, D3D12_TEXTURE_ADDRESS_MODE_CLAMP,
+                                D3D12_TEXTURE_ADDRESS_MODE_CLAMP, },
   };
 
-  D3D12_PIPELINE_STATE_STREAM_DESC const pipeline_state_stream_desc = {
-    .SizeInBytes                   = sizeof pipeline_stream,
-    .pPipelineStateSubobjectStream = &pipeline_stream,
+  D3D12_ROOT_PARAMETER1 root_parameters[] = {
+    RootConstants{ .Register = 0, .SizeBytes = sizeof( RootSigInfo ) },
   };
 
-  pipeline_stream.CS = CD3DX12_SHADER_BYTECODE( mipmap_shader.Get() );
-  ComPtr<ID3D12PipelineState> mipmap_pipeline;
-  ERR_ABORT( device->CreatePipelineState( &pipeline_state_stream_desc, IID_PPV_ARGS( &mipmap_pipeline ) ) );
+  auto root_signature       = render_device->CreateRootSignature( {
+            .RootParameters = root_parameters,
+            .StaticSamplers = static_samplers,
+            .ShaderAccess   = RootSignatureDesc::Access::kCompute,
+            .DebugName      = "Mip Map RootSig",
+  } );
 
-  pipeline_stream.CS = CD3DX12_SHADER_BYTECODE( mipmap_cube_shader.Get() );
-  ComPtr<ID3D12PipelineState> mipmap_cube_pipeline;
-  ERR_ABORT( device->CreatePipelineState( &pipeline_state_stream_desc, IID_PPV_ARGS( &mipmap_cube_pipeline ) ) );
+  auto mipmap_pipeline      = render_device->CreateComputePipeline( {
+           .RootSignature     = root_signature.Get(),
+           .ComputeShaderName = "MipMap.cso",
+           .DebugName         = "Mip Map Pipeline",
+  } );
+
+  auto mipmap_cube_pipeline = render_device->CreateComputePipeline( {
+      .RootSignature     = root_signature.Get(),
+      .ComputeShaderName = "MipMapCube.cso",
+      .DebugName         = "Mip Map Cube Pipeline",
+  } );
 
   new ( generator ) MipMapGenerator{
     render_device,

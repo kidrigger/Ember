@@ -158,104 +158,58 @@ bool Ember::Environment::TryLoadFrom(
       }
     };
 
-    CD3DX12_ROOT_PARAMETER1 root_parameters[1] = {};
-    root_parameters[0].InitAsConstants( 5, 0 );
+    uint32_t constexpr kThreadGroupX    = 16;
+    uint32_t constexpr kThreadGroupY    = 16;
+    uint32_t constexpr kThreadGroupZ    = 1;
 
-    CD3DX12_STATIC_SAMPLER_DESC static_sampler_desc[] = {
+    D3D12_ROOT_PARAMETER1 root_params[] = {
+      RootConstants{ .Register = 0, .SizeBytes = 5 * sizeof( uint32_t ) },
+    };
+
+    D3D12_STATIC_SAMPLER_DESC static_samplers[] = {
       CD3DX12_STATIC_SAMPLER_DESC{ 0 },
     };
 
-    D3D12_ROOT_SIGNATURE_FLAGS const root_signature_flags =
-        D3D12_ROOT_SIGNATURE_FLAG_ALLOW_INPUT_ASSEMBLER_INPUT_LAYOUT |
-        D3D12_ROOT_SIGNATURE_FLAG_CBV_SRV_UAV_HEAP_DIRECTLY_INDEXED |
-        D3D12_ROOT_SIGNATURE_FLAG_SAMPLER_HEAP_DIRECTLY_INDEXED |
-        D3D12_ROOT_SIGNATURE_FLAG_DENY_MESH_SHADER_ROOT_ACCESS |
-        D3D12_ROOT_SIGNATURE_FLAG_DENY_AMPLIFICATION_SHADER_ROOT_ACCESS |
-        D3D12_ROOT_SIGNATURE_FLAG_DENY_GEOMETRY_SHADER_ROOT_ACCESS |
-        D3D12_ROOT_SIGNATURE_FLAG_DENY_DOMAIN_SHADER_ROOT_ACCESS |
-        D3D12_ROOT_SIGNATURE_FLAG_DENY_HULL_SHADER_ROOT_ACCESS |
-        D3D12_ROOT_SIGNATURE_FLAG_DENY_VERTEX_SHADER_ROOT_ACCESS |
-        D3D12_ROOT_SIGNATURE_FLAG_DENY_PIXEL_SHADER_ROOT_ACCESS;
+    auto root_signature = render_device->CreateRootSignature( {
+        .RootParameters = root_params,
+        .StaticSamplers = static_samplers,
+        .ShaderAccess   = RootSignatureDesc::Access::kCompute,
+        .DebugName      = "Environment Root Signature",
+    } );
+    if ( not root_signature ) return false;
 
-    uint32_t constexpr kThreadGroupX = 16;
-    uint32_t constexpr kThreadGroupY = 16;
-    uint32_t constexpr kThreadGroupZ = 1;
+    auto eqrect_to_cube_pipeline = render_device->CreateComputePipeline( {
+        .RootSignature     = root_signature.Get(),
+        .ComputeShaderName = "EqrectToCube.cso",
+        .DebugName         = "Eqrect -> Cube Pipeline",
+    } );
+    if ( not eqrect_to_cube_pipeline ) return false;
 
-    ComPtr<ID3DBlob> eqrect_to_cube_shader;
-    ERR_FAIL_RET_F( D3DReadFileToBlob( L"EqrectToCube.cso", &eqrect_to_cube_shader ) );
+    auto diffuse_irradiance_pipeline = render_device->CreateComputePipeline( {
+        .RootSignature     = root_signature.Get(),
+        .ComputeShaderName = "DiffuseIrradiance.cso",
+        .DebugName         = "Diffuse Irradiance Pipeline",
+    } );
+    if ( not diffuse_irradiance_pipeline ) return false;
 
-    ComPtr<ID3DBlob> diffuse_irradiance_shader;
-    ERR_FAIL_RET_F( D3DReadFileToBlob( L"DiffuseIrradiance.cso", &diffuse_irradiance_shader ) );
+    auto prefilter_pipeline = render_device->CreateComputePipeline( {
+        .RootSignature     = root_signature.Get(),
+        .ComputeShaderName = "Prefilter.cso",
+        .DebugName         = "Prefilter Pipeline",
+    } );
+    if ( not prefilter_pipeline ) return false;
 
-    ComPtr<ID3DBlob> prefilter_shader;
-    ERR_FAIL_RET_F( D3DReadFileToBlob( L"Prefilter.cso", &prefilter_shader ) );
-
-    ComPtr<ID3DBlob> brdf_lut_shader;
-    ERR_FAIL_RET_F( D3DReadFileToBlob( L"BrdfLUT.cso", &brdf_lut_shader ) );
-
-    ComPtr<ID3D12Device2>                 device  = render_device->GetDevice();
-    Context                               context = render_device->CreateContext( D3D12_COMMAND_LIST_TYPE_COMPUTE );
-
-    CD3DX12_VERSIONED_ROOT_SIGNATURE_DESC versioned_root_signature_desc;
-    versioned_root_signature_desc.Init_1_1(
-        CountOf( root_parameters ),
-        DataOf( root_parameters ),
-        CountOf( static_sampler_desc ),
-        DataOf( static_sampler_desc ),
-        root_signature_flags );
-
-    D3D_ROOT_SIGNATURE_VERSION root_signature_version = render_device->FetchHighestRootSignatureVersion();
-
-    ComPtr<ID3DBlob>           root_signature_blob;
-    ComPtr<ID3DBlob>           error_blob;
-    ERR_FAIL_RET_F( D3DX12SerializeVersionedRootSignature(
-        &versioned_root_signature_desc, root_signature_version, &root_signature_blob, &error_blob ) );
-
-    ComPtr<ID3D12RootSignature> root_signature;
-    ERR_FAIL_RET_F( device->CreateRootSignature(
-        0,
-        root_signature_blob->GetBufferPointer(),
-        root_signature_blob->GetBufferSize(),
-        IID_PPV_ARGS( &root_signature ) ) );
-
-    struct EnvPipelineStream
-    {
-      CD3DX12_PIPELINE_STATE_STREAM_ROOT_SIGNATURE RootSignature;
-      CD3DX12_PIPELINE_STATE_STREAM_CS             ComputeShader;
-    };
-
-    EnvPipelineStream pipeline_stream{
-      .RootSignature = root_signature.Get(),
-    };
-
-    D3D12_PIPELINE_STATE_STREAM_DESC desc{
-      .SizeInBytes                   = sizeof pipeline_stream,
-      .pPipelineStateSubobjectStream = &pipeline_stream,
-    };
-
-    pipeline_stream.ComputeShader = CD3DX12_SHADER_BYTECODE( eqrect_to_cube_shader.Get() );
-    ComPtr<ID3D12PipelineState> eqrect_to_cube_pipeline;
-    ERR_FAIL_RET_F( device->CreatePipelineState( &desc, IID_PPV_ARGS( &eqrect_to_cube_pipeline ) ) );
-    ERR_FAIL_RET_F( eqrect_to_cube_pipeline->SetName( L"Eqrect -> Cube Pipeline" ) );
-
-    pipeline_stream.ComputeShader = CD3DX12_SHADER_BYTECODE( diffuse_irradiance_shader.Get() );
-    ComPtr<ID3D12PipelineState> diffuse_irradiance_pipeline;
-    ERR_FAIL_RET_F( device->CreatePipelineState( &desc, IID_PPV_ARGS( &diffuse_irradiance_pipeline ) ) );
-    ERR_FAIL_RET_F( diffuse_irradiance_pipeline->SetName( L"Diffuse Irradiance Pipeline" ) );
-
-    pipeline_stream.ComputeShader = CD3DX12_SHADER_BYTECODE( prefilter_shader.Get() );
-    ComPtr<ID3D12PipelineState> prefilter_pipeline;
-    ERR_FAIL_RET_F( device->CreatePipelineState( &desc, IID_PPV_ARGS( &prefilter_pipeline ) ) );
-    ERR_FAIL_RET_F( prefilter_pipeline->SetName( L"Prefilter Pipeline" ) );
-
-    pipeline_stream.ComputeShader = CD3DX12_SHADER_BYTECODE( brdf_lut_shader.Get() );
-    ComPtr<ID3D12PipelineState> brdf_lut_pipeline;
-    ERR_FAIL_RET_F( device->CreatePipelineState( &desc, IID_PPV_ARGS( &brdf_lut_pipeline ) ) );
-    ERR_FAIL_RET_F( brdf_lut_pipeline->SetName( L"BRDF LUT Pipeline" ) );
+    auto brdf_lut_pipeline = render_device->CreateComputePipeline( {
+        .RootSignature     = root_signature.Get(),
+        .ComputeShaderName = "BrdfLUT.cso",
+        .DebugName         = "BRDF LUT Pipeline",
+    } );
+    if ( not brdf_lut_pipeline ) return false;
 
     D3D12_RESOURCE_DESC prefilter_desc = prefilter.GetTexture()->GetDesc();
     ASSERT( prefilter_desc.MipLevels == kPrefilterMaxLoD + 1 /* Accounting for mip0 */ );
 
+    Context   context    = render_device->CreateContext( D3D12_COMMAND_LIST_TYPE_COMPUTE );
     auto      desc_heaps = render_device->GetBindlessDescriptorHeaps();
 
     EnvParams env_cube_root_constant{

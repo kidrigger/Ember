@@ -78,6 +78,7 @@ public:
   // Pipeline Management
   [[nodiscard]] ComPtr<ID3D12RootSignature> CreateRootSignature( RootSignatureDesc const& desc ) const;
   [[nodiscard]] ComPtr<ID3D12PipelineState> CreateGraphicsPipeline( GraphicsPipelineDesc const& desc ) const;
+  [[nodiscard]] ComPtr<ID3D12PipelineState> CreateComputePipeline( ComputePipelineDesc const& desc ) const;
 
   // Buffer Management
   [[nodiscard]] Buffer  CreateVertexBuffer( uint32_t size, uint32_t stride );
