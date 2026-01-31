@@ -12,7 +12,7 @@
 #include "MipMapGenerator.hpp"
 
 Ember::TextureLoader::UploadBatch::UploadBatch(
-    Context::Receipt receipt, std::pmr::polymorphic_allocator<> const& pool_allocator )
+    Queue::Receipt receipt, std::pmr::polymorphic_allocator<> const& pool_allocator )
   : Barriers{ pool_allocator }, Receipt{ std::move( receipt ) }
 {}
 
@@ -38,14 +38,14 @@ void Ember::TextureLoader::UploadBatch::FlushPendingBarriers( std::vector<D3D12_
 }
 
 Ember::TextureLoader::TextureLoader(
-    RenderDevice*            render_device,
-    MipMapGenerator*         mipmap_generator,
-    std::shared_ptr<Context> copy_context,
-    uint32_t const           upload_frame_count )
+    RenderDevice*          render_device,
+    MipMapGenerator*       mipmap_generator,
+    std::shared_ptr<Queue> copy_context,
+    uint32_t const         upload_frame_count )
   : m_RenderDevice{ render_device }, m_CopyContext{ std::move( copy_context ) }, m_MipMapGenerator{ mipmap_generator }
 {
   m_UploadBatches.reserve( upload_frame_count );
-  Context::Receipt initial = m_CopyContext->CreateReceipt();
+  Queue::Receipt initial = m_CopyContext->CreateReceipt();
   for ( int i = 0; i < ( int )upload_frame_count; ++i )
   {
     m_UploadBatches.emplace_back( initial, &m_InFlightPool );
@@ -54,11 +54,11 @@ Ember::TextureLoader::TextureLoader(
 }
 
 bool Ember::TextureLoader::Create(
-    TextureLoader*           loader,
-    RenderDevice*            render_device,
-    MipMapGenerator*         mipmap_generator,
-    std::shared_ptr<Context> compute_context,
-    uint32_t const           upload_frame_count )
+    TextureLoader*         loader,
+    RenderDevice*          render_device,
+    MipMapGenerator*       mipmap_generator,
+    std::shared_ptr<Queue> compute_context,
+    uint32_t const         upload_frame_count )
 {
   if ( compute_context->GetCommandListType() != D3D12_COMMAND_LIST_TYPE_COMPUTE )
   {
@@ -260,11 +260,11 @@ bool Ember::TextureLoader::TryLoadTextureFromData(
   return TryLoadImpl( texture, id, metadata, scratch_image, color_space_override, final_state );
 }
 
-Ember::Context::Receipt Ember::TextureLoader::EndBatch()
+Ember::Queue::Receipt Ember::TextureLoader::EndBatch()
 {
   m_UploadBatches[m_CurrentUploadBatch].Receipt = m_CopyContext->Submit( std::move( m_CurrentCommandList ) );
 
-  Context::Receipt const batch_receipt          = m_UploadBatches[m_CurrentUploadBatch].Receipt;
+  Queue::Receipt const batch_receipt            = m_UploadBatches[m_CurrentUploadBatch].Receipt;
 
   m_CurrentUploadBatch++;
   m_CurrentUploadBatch %= m_UploadBatches.size();

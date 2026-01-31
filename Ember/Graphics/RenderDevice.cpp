@@ -3,7 +3,7 @@
 #include <span>
 
 #include "BindlessManager.hpp"
-#include "Context.hpp"
+#include "Queue.hpp"
 #include "Util/DataUtil.hpp"
 #include "Util/DirectXHeaders.hpp"
 #include "Util/HelperUtils.hpp"
@@ -52,7 +52,7 @@ Ember::RenderDevice::RenderDevice(
     DXGI_FORMAT const                swapchain_format,
     ComPtr<IDXGISwapChain4>          swapchain,
     std::unique_ptr<BindlessManager> bindless_manager,
-    Context                          direct_context,
+    Queue                            direct_queue,
     bool const                       is_tearing_supported )
   : m_Device{ std::move( device ) }
   , m_Allocator{ std::move( allocator ) }
@@ -64,9 +64,9 @@ Ember::RenderDevice::RenderDevice(
   , m_BufferManager{ m_Device, m_Allocator, m_Bindless.get() }
   , m_TextureManager{ m_Device, m_Allocator, m_Bindless.get() }
   , m_PipelineFactory{ m_Device, FetchHighestRootSignatureVersionImpl( m_Device.Get() ) }
-  , m_DirectContext{ std::move( direct_context ) }
+  , m_DirectQueue{ std::move( direct_queue ) }
 {
-  auto const always_true_receipt = m_DirectContext.CreateReceipt();
+  auto const always_true_receipt = m_DirectQueue.CreateReceipt();
   m_FrameReceipts.resize( kNumFrames, always_true_receipt );
 
   m_Backbuffers.reserve( kNumFrames );
@@ -97,7 +97,7 @@ D3D12MA::Allocator* Ember::RenderDevice::GetAllocator() const noexcept
 
 ID3D12CommandQueue* Ember::RenderDevice::GetDirectQueue() const noexcept
 {
-  return m_DirectContext.GetCommandQueue();
+  return m_DirectQueue.GetCommandQueue();
 }
 
 DXGI_FORMAT Ember::RenderDevice::GetSwapchainFormat() const
@@ -270,9 +270,9 @@ void Ember::RenderDevice::Create( RenderDevice* render_device, HWND window_handl
   auto bindless_manager = std::make_unique_for_overwrite<BindlessManager>();
   BindlessManager::Create( bindless_manager.get(), device, 10'000, 1000 );
 
-  // Context Creation
-  Context direct_context;
-  Context::Create( &direct_context, device, bindless_manager.get(), D3D12_COMMAND_LIST_TYPE_DIRECT );
+  // Queue Creation
+  Queue direct_context;
+  Queue::Create( &direct_context, device, bindless_manager.get(), D3D12_COMMAND_LIST_TYPE_DIRECT );
 
   RECT window_rect;
   ::GetWindowRect( window_handle, &window_rect );
@@ -324,7 +324,7 @@ void Ember::RenderDevice::ResizeSwapchain( uint32_t const width, uint32_t const 
     m_SwapchainWidth  = std::max( 1u, width );
     m_SwapchainHeight = std::max( 1u, height );
 
-    m_DirectContext.WaitIdle();
+    m_DirectQueue.WaitIdle();
 
     m_Backbuffers.clear();
 
@@ -466,26 +466,26 @@ void Ember::RenderDevice::FreeHandle( SamplerHandle const handle ) const
   m_Bindless->Free( handle );
 }
 
-Ember::Context Ember::RenderDevice::CreateContext( D3D12_COMMAND_LIST_TYPE type )
+Ember::Queue Ember::RenderDevice::CreateQueue( D3D12_COMMAND_LIST_TYPE type )
 {
-  Context out_ctx;
-  Context::Create( &out_ctx, m_Device, m_Bindless.get(), type );
+  Queue out_ctx;
+  Queue::Create( &out_ctx, m_Device, m_Bindless.get(), type );
   return out_ctx;
 }
 
-void Ember::RenderDevice::WaitOn( Context::Receipt const receipt ) const
+void Ember::RenderDevice::WaitOn( Queue::Receipt const receipt ) const
 {
-  m_DirectContext.WaitOn( receipt );
+  m_DirectQueue.WaitOn( receipt );
 }
 
-void Ember::RenderDevice::QueueWaitOn( Context::Receipt const receipt ) const
+void Ember::RenderDevice::QueueWaitOn( Queue::Receipt const receipt ) const
 {
-  m_DirectContext.QueueWaitOn( receipt );
+  m_DirectQueue.QueueWaitOn( receipt );
 }
 
 void Ember::RenderDevice::WaitIdle()
 {
-  m_DirectContext.WaitIdle();
+  m_DirectQueue.WaitIdle();
 }
 
 Ember::Texture Ember::RenderDevice::GetCurrentBackbuffer() const noexcept
@@ -495,7 +495,7 @@ Ember::Texture Ember::RenderDevice::GetCurrentBackbuffer() const noexcept
 
 Ember::CommandList Ember::RenderDevice::GetGraphicsCommandList() noexcept
 {
-  return m_DirectContext.GetCommandList();
+  return m_DirectQueue.GetCommandList();
 }
 
 uint32_t Ember::RenderDevice::GetCurrentFrameIndex() const noexcept
@@ -506,7 +506,7 @@ uint32_t Ember::RenderDevice::GetCurrentFrameIndex() const noexcept
 void Ember::RenderDevice::ExecuteCommandList( CommandList&& command_list )
 {
   ZoneScoped;
-  _ = m_DirectContext.Submit( std::move( command_list ) );
+  _ = m_DirectQueue.Submit( std::move( command_list ) );
 }
 
 void Ember::RenderDevice::Present()
@@ -519,14 +519,14 @@ void Ember::RenderDevice::Present()
 
   ERR_ABORT( m_Swapchain->Present( sync_interval, present_flags ) );
 
-  m_FrameReceipts[m_CurrentBackbufferIndex] = m_DirectContext.Signal();
+  m_FrameReceipts[m_CurrentBackbufferIndex] = m_DirectQueue.Signal();
 
   {
     ZoneScopedNC( "Wait For Next Frame", tracy::Color::Gray );
     // At the end of the queue, we wait for the next frame.
     m_CurrentBackbufferIndex = m_Swapchain->GetCurrentBackBufferIndex();
 
-    m_DirectContext.WaitOn( m_FrameReceipts[m_CurrentBackbufferIndex] );
+    m_DirectQueue.WaitOn( m_FrameReceipts[m_CurrentBackbufferIndex] );
   }
 }
 

@@ -51,7 +51,7 @@
     <ClCompile Include="Graphics\BindlessManager.cpp">
       <Filter>Source Files\Graphics</Filter>
     </ClCompile>
-    <ClCompile Include="Graphics\Context.cpp">
+    <ClCompile Include="Graphics\Queue.cpp">
       <Filter>Source Files\Graphics</Filter>
     </ClCompile>
     <ClCompile Include="Graphics\Buffer.cpp">
@@ -119,7 +119,7 @@
     <ClInclude Include="Graphics\Buffer.hpp">
       <Filter>Header Files\Graphics</Filter>
     </ClInclude>
-    <ClInclude Include="Graphics\Context.hpp">
+    <ClInclude Include="Graphics\Queue.hpp">
       <Filter>Header Files\Graphics</Filter>
     </ClInclude>
     <ClInclude Include="Graphics\Texture.hpp">

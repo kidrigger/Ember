@@ -10,7 +10,7 @@
 namespace Ember
 {
 
-class Context
+class Queue
 {
 public:
   class Receipt
@@ -54,7 +54,7 @@ private:
   uint64_t                   m_FenceValue{ 0 };
   D3D12_COMMAND_LIST_TYPE    m_CommandListType{ D3D12_COMMAND_LIST_TYPE_DIRECT };
 
-  Context(
+  Queue(
       ComPtr<ID3D12Device2>      device,
       BindlessManager*           bindless,
       ComPtr<ID3D12CommandQueue> command_queue,
@@ -65,7 +65,7 @@ private:
   void ClearCompletedBinders() const;
 
 public:
-  Context() = default;
+  Queue() = default;
 
   [[nodiscard]] ID3D12CommandQueue*     GetCommandQueue() const;
   [[nodiscard]] bool                    IsFenceComplete( uint64_t fence_value ) const;
@@ -82,13 +82,13 @@ public:
   void                                  WaitIdle();
 
   static void                           Create(
-                                Context* context, ComPtr<ID3D12Device2> device, BindlessManager* bindless, D3D12_COMMAND_LIST_TYPE type );
+                                Queue* context, ComPtr<ID3D12Device2> device, BindlessManager* bindless, D3D12_COMMAND_LIST_TYPE type );
 
-  Context( Context const& other )                = delete;
-  Context( Context&& other ) noexcept            = default;
-  Context& operator=( Context const& other )     = delete;
-  Context& operator=( Context&& other ) noexcept = default;
-  ~Context();
+  Queue( Queue const& other )                = delete;
+  Queue( Queue&& other ) noexcept            = default;
+  Queue& operator=( Queue const& other )     = delete;
+  Queue& operator=( Queue&& other ) noexcept = default;
+  ~Queue();
 };
 
 } // namespace Ember

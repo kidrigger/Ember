@@ -16,47 +16,16 @@ class ScopedHandlePair
 
 public:
   ScopedHandlePair() = default;
-  ScopedHandlePair( BindlessManager* bindless, SRVHandle srv, UAVHandle uav = {} )
-    : m_Bindless{ bindless }, m_SRV{ srv }, m_UAV{ uav }
-  {}
+  ScopedHandlePair( BindlessManager* bindless, SRVHandle srv, UAVHandle uav = {} );
 
-  SRVHandle GetSRV() const noexcept
-  {
-    return m_SRV;
-  }
+  [[nodiscard]] SRVHandle GetSRV() const noexcept;
+  [[nodiscard]] UAVHandle GetUAV() const noexcept;
 
-  UAVHandle GetUAV() const noexcept
-  {
-    return m_UAV;
-  }
-
-  ~ScopedHandlePair()
-  {
-    if ( not m_Bindless ) return;
-    m_Bindless->Free( m_SRV );
-    m_Bindless->Free( m_UAV );
-  }
-
+  ScopedHandlePair( ScopedHandlePair&& other ) noexcept;
+  ScopedHandlePair& operator=( ScopedHandlePair&& other ) noexcept;
   ScopedHandlePair( ScopedHandlePair const& other )            = delete;
   ScopedHandlePair& operator=( ScopedHandlePair const& other ) = delete;
-  ScopedHandlePair( ScopedHandlePair&& other ) noexcept
-    : m_Bindless{ other.m_Bindless }, m_SRV{ other.m_SRV }, m_UAV{ other.m_UAV }
-  {
-    other.m_Bindless = nullptr;
-    other.m_SRV      = {};
-    other.m_UAV      = {};
-  }
-
-  ScopedHandlePair& operator=( ScopedHandlePair&& other ) noexcept
-  {
-    if ( this == &other ) return *this;
-
-    std::swap( m_Bindless, other.m_Bindless );
-    std::swap( m_SRV, other.m_SRV );
-    std::swap( m_UAV, other.m_UAV );
-
-    return *this;
-  }
+  ~ScopedHandlePair();
 };
 
 

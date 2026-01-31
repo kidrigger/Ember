@@ -704,12 +704,12 @@ Ember::MaterialImpl* Ember::ModelLoader::GetDefaultMaterial( LoadingContext* con
 }
 
 Ember::ModelLoader::ModelLoader(
-    RenderDevice*            render_device,
-    World*                   world,
-    std::shared_ptr<Context> compute_context,
-    TextureLoader*           texture_loader,
-    MaterialManager*         material_manager,
-    GeometryManager*         geometry_manager )
+    RenderDevice*          render_device,
+    World*                 world,
+    std::shared_ptr<Queue> compute_context,
+    TextureLoader*         texture_loader,
+    MaterialManager*       material_manager,
+    GeometryManager*       geometry_manager )
   : m_RenderDevice{ render_device }
   , m_World{ world }
   , m_ComputeContext{ std::move( compute_context ) }

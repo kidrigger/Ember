@@ -3,9 +3,9 @@
 #include "BindlessManager.hpp"
 #include "Buffer.hpp"
 #include "CommandList.hpp"
-#include "Context.hpp"
 #include "DeviceHandle.hpp"
 #include "PipelineFactory.hpp"
+#include "Queue.hpp"
 #include "Texture.hpp"
 #include "Util/DirectXHeaders.hpp"
 #include "Util/Runtime.hpp"
@@ -45,8 +45,8 @@ private:
   uint32_t             m_CurrentBackbufferIndex{ 0 };
 
   // Commands and Sync
-  Context                           m_DirectContext; // Context depends on device and bindless.
-  std::vector<Context::Receipt>     m_FrameReceipts;
+  Queue                             m_DirectQueue; // Queue depends on device and bindless.
+  std::vector<Queue::Receipt>       m_FrameReceipts;
 
 
   static D3D_ROOT_SIGNATURE_VERSION FetchHighestRootSignatureVersionImpl( ID3D12Device* d3d_device );
@@ -61,7 +61,7 @@ public:
       DXGI_FORMAT                      swapchain_format,
       ComPtr<IDXGISwapChain4>          swapchain,
       std::unique_ptr<BindlessManager> bindless_manager,
-      Context                          direct_context,
+      Queue                            direct_queue,
       bool                             is_tearing_supported );
 
   [[nodiscard]] ID3D12Device5*             GetDevice() const noexcept;
@@ -111,10 +111,10 @@ public:
   void                                               FreeHandle( SamplerHandle handle ) const;
 
   // Wait until the all queues have finished all commands.
-  Context CreateContext( D3D12_COMMAND_LIST_TYPE type );
-  void    WaitOn( Context::Receipt receipt ) const;
-  void    QueueWaitOn( Context::Receipt receipt ) const;
-  void    WaitIdle();
+  void  WaitIdle();
+  void  WaitOn( Queue::Receipt receipt ) const;
+  void  QueueWaitOn( Queue::Receipt receipt ) const;
+  Queue CreateQueue( D3D12_COMMAND_LIST_TYPE type );
 
   // Per Frame getters.
   [[nodiscard]] Texture     GetCurrentBackbuffer() const noexcept;

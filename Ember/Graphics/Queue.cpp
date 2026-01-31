@@ -1,51 +1,51 @@
-#include "Context.hpp"
+#include "Queue.hpp"
 
 #include "RenderTargetManager.hpp"
 #include "Util/HelperUtils.hpp"
 
-Ember::Context::Receipt::Receipt( ID3D12Fence* fence, uint64_t const value ) : m_Fence{ fence }, m_FenceValue{ value }
+Ember::Queue::Receipt::Receipt( ID3D12Fence* fence, uint64_t const value ) : m_Fence{ fence }, m_FenceValue{ value }
 {}
 
-bool Ember::Context::Receipt::IsValid() const
+bool Ember::Queue::Receipt::IsValid() const
 {
   return m_Fence;
 }
 
-bool Ember::Context::Receipt::IsComplete() const
+bool Ember::Queue::Receipt::IsComplete() const
 {
   ASSERT( m_Fence );
   return m_Fence->GetCompletedValue() >= m_FenceValue;
 }
 
-ID3D12Fence* Ember::Context::Receipt::GetFence() const
+ID3D12Fence* Ember::Queue::Receipt::GetFence() const
 {
   ASSERT( m_Fence );
   return m_Fence;
 }
 
-uint64_t Ember::Context::Receipt::GetFenceValue() const
+uint64_t Ember::Queue::Receipt::GetFenceValue() const
 {
   ASSERT( m_Fence );
   return m_FenceValue;
 }
 
-Ember::Context::Context(
+Ember::Queue::Queue(
     ComPtr<ID3D12Device2>         device,
     BindlessManager*              bindless,
     ComPtr<ID3D12CommandQueue>    command_queue,
     ComPtr<ID3D12Fence>           fence,
     ScopedHandle                  fence_event,
     D3D12_COMMAND_LIST_TYPE const command_list_type )
-  : m_Device{ std::move( device ) }
-  , m_Bindless{ bindless }
+  : m_PoolAllocator{ std::make_unique<std::pmr::unsynchronized_pool_resource>() }
+  , m_Device{ std::move( device ) }
   , m_CommandQueue{ std::move( command_queue ) }
   , m_Fence{ std::move( fence ) }
+  , m_Bindless{ bindless }
   , m_FenceEvent{ std::move( fence_event ) }
   , m_CommandListType{ command_list_type }
-  , m_PoolAllocator{ std::make_unique<std::pmr::unsynchronized_pool_resource>() }
 {}
 
-void Ember::Context::ClearCompletedBinders() const
+void Ember::Queue::ClearCompletedBinders() const
 {
   auto const current_value = m_Fence->GetCompletedValue();
   for ( auto& bind : m_CommandAllocators )
@@ -56,22 +56,22 @@ void Ember::Context::ClearCompletedBinders() const
   }
 }
 
-ID3D12CommandQueue* Ember::Context::GetCommandQueue() const
+ID3D12CommandQueue* Ember::Queue::GetCommandQueue() const
 {
   return m_CommandQueue.Get();
 }
 
-bool Ember::Context::IsFenceComplete( uint64_t const fence_value ) const
+bool Ember::Queue::IsFenceComplete( uint64_t const fence_value ) const
 {
   return m_Fence->GetCompletedValue() >= fence_value;
 }
 
-Ember::Context::Receipt Ember::Context::CreateReceipt( uint64_t value ) const
+Ember::Queue::Receipt Ember::Queue::CreateReceipt( uint64_t value ) const
 {
   return { m_Fence.Get(), value };
 }
 
-Ember::CommandList Ember::Context::GetCommandList()
+Ember::CommandList Ember::Queue::GetCommandList()
 {
   std::unique_ptr<ResourceBinder>      binder;
   ComPtr<ID3D12CommandAllocator>       command_allocator;
@@ -120,12 +120,12 @@ Ember::CommandList Ember::Context::GetCommandList()
   };
 }
 
-[[nodiscard]] D3D12_COMMAND_LIST_TYPE Ember::Context::GetCommandListType() const noexcept
+[[nodiscard]] D3D12_COMMAND_LIST_TYPE Ember::Queue::GetCommandListType() const noexcept
 {
   return m_CommandListType;
 }
 
-Ember::Context::Receipt Ember::Context::Submit( CommandList&& command_list )
+Ember::Queue::Receipt Ember::Queue::Submit( CommandList&& command_list )
 {
   ERR_ABORT( command_list.Close() );
   ID3D12CommandList* p_command_list = command_list.Get();
@@ -142,7 +142,7 @@ Ember::Context::Receipt Ember::Context::Submit( CommandList&& command_list )
   return { m_Fence.Get(), signal_value };
 }
 
-Ember::Context::Receipt Ember::Context::Signal()
+Ember::Queue::Receipt Ember::Queue::Signal()
 {
   auto const wait_on_fence_value = ++m_FenceValue;
 
@@ -152,7 +152,7 @@ Ember::Context::Receipt Ember::Context::Signal()
   return Receipt{ m_Fence.Get(), wait_on_fence_value };
 }
 
-void Ember::Context::WaitOn( Receipt const& receipt ) const
+void Ember::Queue::WaitOn( Receipt const& receipt ) const
 {
   if ( not receipt.IsValid() or receipt.IsComplete() )
   {
@@ -169,20 +169,20 @@ void Ember::Context::WaitOn( Receipt const& receipt ) const
   ClearCompletedBinders();
 }
 
-void Ember::Context::QueueWaitOn( Receipt const receipt ) const
+void Ember::Queue::QueueWaitOn( Receipt const receipt ) const
 {
   if ( receipt.IsComplete() ) return;
 
   ERR_ABORT( m_CommandQueue->Wait( receipt.GetFence(), receipt.GetFenceValue() ) );
 }
 
-void Ember::Context::WaitIdle()
+void Ember::Queue::WaitIdle()
 {
   WaitOn( Signal() );
 }
 
-void Ember::Context::Create(
-    Context* context, ComPtr<ID3D12Device2> device, BindlessManager* bindless, D3D12_COMMAND_LIST_TYPE const type )
+void Ember::Queue::Create(
+    Queue* context, ComPtr<ID3D12Device2> device, BindlessManager* bindless, D3D12_COMMAND_LIST_TYPE const type )
 {
   D3D12_COMMAND_QUEUE_DESC const desc = {
     .Type     = type,
@@ -202,12 +202,12 @@ void Ember::Context::Create(
     ASSERT_M( fence_event, "Failed to create fence event" );
   }
 
-  new ( context ) Context{
+  new ( context ) Queue{
     std::move( device ), bindless, std::move( command_queue ), std::move( fence ), fence_event, type,
   };
 }
 
-Ember::Context::~Context()
+Ember::Queue::~Queue()
 {
   if ( m_CommandQueue ) WaitIdle();
 }

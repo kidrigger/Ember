@@ -5,7 +5,6 @@
 #include <Util/HelperUtils.hpp>
 #include "TextureLoader.hpp"
 
-
 Ember::Environment::Environment( Texture skybox, Texture diffuse_irradiance, Texture prefilter, Texture brdf_lut )
   : m_Skybox{ std::move( skybox ) }
   , m_DiffuseIrradiance{ std::move( diffuse_irradiance ) }
@@ -209,7 +208,7 @@ bool Ember::Environment::TryLoadFrom(
     D3D12_RESOURCE_DESC prefilter_desc = prefilter.GetTexture()->GetDesc();
     ASSERT( prefilter_desc.MipLevels == kPrefilterMaxLoD + 1 /* Accounting for mip0 */ );
 
-    Context   context    = render_device->CreateContext( D3D12_COMMAND_LIST_TYPE_COMPUTE );
+    Queue     queue      = render_device->CreateQueue( D3D12_COMMAND_LIST_TYPE_COMPUTE );
     auto      desc_heaps = render_device->GetBindlessDescriptorHeaps();
 
     EnvParams env_cube_root_constant{
@@ -238,7 +237,7 @@ bool Ember::Environment::TryLoadFrom(
       .Height        = kBrdfLutSize,
     };
 
-    auto command_list = context.GetCommandList();
+    auto command_list = queue.GetCommandList();
 
     command_list.SetDescriptorHeaps( desc_heaps );
     command_list.SetComputeRootSignature( root_signature.Get() );
@@ -289,8 +288,8 @@ bool Ember::Environment::TryLoadFrom(
         .Y = kBrdfLutSize / kThreadGroupY,
     } );
 
-    Context::Receipt receipt = context.Submit( std::move( command_list ) );
-    context.WaitOn( receipt );
+    Queue::Receipt receipt = queue.Submit( std::move( command_list ) );
+    queue.WaitOn( receipt );
   }
 
   new ( env ) Environment{

@@ -6,7 +6,7 @@
 #include <unordered_map>
 
 #include <Graphics/CommandList.hpp>
-#include <Graphics/Context.hpp>
+#include <Graphics/Queue.hpp>
 #include <Graphics/Texture.hpp>
 
 #include "MipMapGenerator.hpp"
@@ -27,11 +27,11 @@ class TextureLoader
   struct UploadBatch
   {
     using BarrierList = std::pmr::deque<std::pair<Texture, D3D12_RESOURCE_STATES>>;
-    BarrierList      Barriers;
-    Context::Receipt Receipt;
+    BarrierList    Barriers;
+    Queue::Receipt Receipt;
 
     UploadBatch() = default;
-    explicit UploadBatch( Context::Receipt receipt, std::pmr::polymorphic_allocator<> const& pool_allocator );
+    explicit UploadBatch( Queue::Receipt receipt, std::pmr::polymorphic_allocator<> const& pool_allocator );
     void PushTextureStateChange( Texture dest, D3D12_RESOURCE_STATES const final_state );
     void FlushPendingBarriers( std::vector<D3D12_RESOURCE_BARRIER>* barriers );
   };
@@ -47,7 +47,7 @@ class TextureLoader
 
   // Upload
   std::pmr::unsynchronized_pool_resource m_InFlightPool;
-  std::shared_ptr<Context>               m_CopyContext;
+  std::shared_ptr<Queue>                 m_CopyContext;
   std::vector<UploadBatch>               m_UploadBatches;
   uint32_t                               m_CurrentUploadBatch{ 0 };
   CommandList                            m_CurrentCommandList;
@@ -69,17 +69,17 @@ public:
   TextureLoader() = default;
 
   TextureLoader(
-      RenderDevice*            render_device,
-      MipMapGenerator*         mipmap_generator,
-      std::shared_ptr<Context> copy_context,
-      uint32_t                 upload_frame_count );
+      RenderDevice*          render_device,
+      MipMapGenerator*       mipmap_generator,
+      std::shared_ptr<Queue> copy_context,
+      uint32_t               upload_frame_count );
 
   static bool Create(
-      TextureLoader*           loader,
-      RenderDevice*            render_device,
-      MipMapGenerator*         mipmap_generator,
-      std::shared_ptr<Context> compute_context,
-      uint32_t                 upload_frame_count );
+      TextureLoader*         loader,
+      RenderDevice*          render_device,
+      MipMapGenerator*       mipmap_generator,
+      std::shared_ptr<Queue> compute_context,
+      uint32_t               upload_frame_count );
 
   [[nodiscard]] MipMapGenerator* GetMipMapper() const;
 
@@ -98,10 +98,10 @@ public:
       ColorSpaceOverride color_space_override = ColorSpaceOverride::kNone,
       D3D12_RESOURCE_STATES final_state       = D3D12_RESOURCE_STATE_PIXEL_SHADER_RESOURCE );
 
-  Context::Receipt EndBatch();
+  Queue::Receipt EndBatch();
 
-  void             Update();
-  void             FlushBarriers( CommandList* command_list );
+  void           Update();
+  void           FlushBarriers( CommandList* command_list );
 };
 
 } // namespace Ember

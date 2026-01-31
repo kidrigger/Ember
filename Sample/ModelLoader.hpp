@@ -105,14 +105,14 @@ class ModelLoader
     CommandList                                    CommandList;
   };
 
-  RenderDevice*            m_RenderDevice;
-  World*                   m_World;
-  std::shared_ptr<Context> m_ComputeContext;
-  TextureLoader*           m_TextureLoader;
-  MaterialManager*         m_MaterialManager;
-  GeometryManager*         m_GeometryManager;
+  RenderDevice*          m_RenderDevice;
+  World*                 m_World;
+  std::shared_ptr<Queue> m_ComputeContext;
+  TextureLoader*         m_TextureLoader;
+  MaterialManager*       m_MaterialManager;
+  GeometryManager*       m_GeometryManager;
 
-  void                     ProcessNode( LoadingContext* context, flecs::entity parent, cgltf_node const& node ) const;
+  void                   ProcessNode( LoadingContext* context, flecs::entity parent, cgltf_node const& node ) const;
   void ProcessPrimitive( LoadingContext* context, flecs::entity owning, cgltf_primitive const& primitive ) const;
   void ProcessMesh( LoadingContext* context, flecs::entity owning, cgltf_mesh const& mesh ) const;
   bool TryLoadTexture( Texture* texture, cgltf_image const& image, ColorSpaceOverride color_space_override ) const;
@@ -140,12 +140,12 @@ public:
   std::expected<flecs::entity, Error> TryLoadModel( char const* filename );
 
   ModelLoader(
-      RenderDevice*            render_device,
-      World*                   world,
-      std::shared_ptr<Context> compute_context,
-      TextureLoader*           texture_loader,
-      MaterialManager*         material_manager,
-      GeometryManager*         geometry_manager );
+      RenderDevice*          render_device,
+      World*                 world,
+      std::shared_ptr<Queue> compute_context,
+      TextureLoader*         texture_loader,
+      MaterialManager*       material_manager,
+      GeometryManager*       geometry_manager );
 };
 
 } // namespace Ember

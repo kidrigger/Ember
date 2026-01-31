@@ -229,10 +229,9 @@ void Ember::BasicApp::Create( BasicApp* app, HINSTANCE const instance_handle )
   auto light_manager = std::make_unique_for_overwrite<LightManager>();
   LightManager::Create( light_manager.get(), render_device.get(), world.get(), RenderDevice::kNumFrames );
 
-  auto async_compute_context =
-      std::make_shared<Context>( render_device->CreateContext( D3D12_COMMAND_LIST_TYPE_COMPUTE ) );
+  auto async_compute_context = std::make_shared<Queue>( render_device->CreateQueue( D3D12_COMMAND_LIST_TYPE_COMPUTE ) );
 
-  auto mip_map_gen = std::make_unique_for_overwrite<MipMapGenerator>();
+  auto mip_map_gen           = std::make_unique_for_overwrite<MipMapGenerator>();
   ENSURE( MipMapGenerator::Create( mip_map_gen.get(), render_device.get() ) );
 
   auto texture_loader = std::make_unique_for_overwrite<TextureLoader>();

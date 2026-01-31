@@ -8,7 +8,7 @@
 
 HRESULT Ember::CommandList::Reset( ComPtr<ID3D12CommandAllocator> allocator )
 {
-  auto hresult = m_CommandList->Reset( allocator.Get(), nullptr );
+  auto const hresult = m_CommandList->Reset( allocator.Get(), nullptr );
   if ( FAILED( hresult ) ) return hresult;
 
   m_CommandAllocator = std::move( allocator );
@@ -95,7 +95,7 @@ void Ember::CommandList::SetGraphicsRootSignature( ID3D12RootSignature* root_sig
   m_CommandList->SetGraphicsRootSignature( root_signature );
 }
 
-void Ember::CommandList::IASetPrimitiveTopology( D3D12_PRIMITIVE_TOPOLOGY topology ) const
+void Ember::CommandList::IASetPrimitiveTopology( D3D12_PRIMITIVE_TOPOLOGY const topology ) const
 {
   m_CommandList->IASetPrimitiveTopology( topology );
 }
