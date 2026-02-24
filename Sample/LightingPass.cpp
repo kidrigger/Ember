@@ -266,7 +266,7 @@ FrameGraphResource Ember::RenderPass::SpotLightDeferred::Execute(
         cmd->SetGraphicsRootSignature( root_sig.Get() );
         cmd->SetPipelineState( pipeline.Get() );
         cmd->SetGraphicsRootConstants( 0, gbuffer_handles );
-        cmd->SetGraphicsRootConstants( 1, constants_buf );
+        cmd->SetGraphicsRootConstantBuffer( 1, constants_buf );
         cmd->SetGraphicsRootConstants( 2, env );
         cmd->DispatchMesh( { .X = ( spot_light_count + 31 ) / 32 } );
       } );

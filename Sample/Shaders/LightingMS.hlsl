@@ -2,8 +2,8 @@
 
 const static float3 kPosition[] = {
   float3( -1.0f, -1.0f, 0.0f ),
-  float3( -1.0f, 3.0f, 0.0f ),
   float3( 3.0f, -1.0f, 0.0f ),
+  float3( -1.0f, 3.0f, 0.0f ),
 };
 
 struct MSOut
