@@ -592,9 +592,6 @@
     <FxCompile Include="Shaders\LightingPS.hlsl">
       <Filter>Shaders\Deferred</Filter>
     </FxCompile>
-    <FxCompile Include="Shaders\LightingMS.hlsl">
-      <Filter>Shaders\Deferred</Filter>
-    </FxCompile>
     <FxCompile Include="Shaders\AtmosphereBackgroundPS.hlsl">
       <Filter>Shaders\Background</Filter>
     </FxCompile>

@@ -890,13 +890,6 @@
       <ShaderType Condition="'$(Configuration)|$(Platform)'=='ReleaseWithRdoc|x64'">Pixel</ShaderType>
       <ShaderType Condition="'$(Configuration)|$(Platform)'=='Release|x64'">Pixel</ShaderType>
     </FxCompile>
-    <FxCompile Include="Shaders\LightingMS.hlsl">
-      <ShaderType Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">Mesh</ShaderType>
-      <ShaderType Condition="'$(Configuration)|$(Platform)'=='RenderDoc_Compat|x64'">Mesh</ShaderType>
-      <ShaderType Condition="'$(Configuration)|$(Platform)'=='ReleaseWithDebug|x64'">Mesh</ShaderType>
-      <ShaderType Condition="'$(Configuration)|$(Platform)'=='ReleaseWithRdoc|x64'">Mesh</ShaderType>
-      <ShaderType Condition="'$(Configuration)|$(Platform)'=='Release|x64'">Mesh</ShaderType>
-    </FxCompile>
     <FxCompile Include="Shaders\LightingPS.hlsl">
       <ShaderType Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">Pixel</ShaderType>
       <ShaderType Condition="'$(Configuration)|$(Platform)'=='RenderDoc_Compat|x64'">Pixel</ShaderType>

@@ -1,8 +1,8 @@
 #include "Utility.hlsli"
 
 const static float2 kPosition[] = {
-  float2( 3.0f, -1.0f ),
   float2( -1.0f, -1.0f ),
+  float2( 3.0f, -1.0f ),
   float2( -1.0f, 3.0f ),
 };
 

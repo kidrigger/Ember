@@ -66,7 +66,6 @@ bool Ember::RenderPass::Atmosphere::Create( Atmosphere* out, RenderDevice* rende
   auto transmittance_lut_pipeline = render_device->CreateGraphicsPipeline( {
       .RootSignature    = root_signature.Get(),
       .RTVFormats       = { &kTransmittanceLUTFormat, 1 },
-      .RasterizerDesc   = Rasterizer{ .FrontFace = Rasterizer::FrontFace::kClockwise },
       .VertexShaderName = "ScreenSpaceTriangleVS.cso",
       .PixelShaderName  = "TransmittanceLUTPS.cso",
       .DebugName        = "Transmittance LUT Pipeline",
@@ -76,7 +75,6 @@ bool Ember::RenderPass::Atmosphere::Create( Atmosphere* out, RenderDevice* rende
   auto sky_view_lut_pipeline = render_device->CreateGraphicsPipeline( {
       .RootSignature    = root_signature.Get(),
       .RTVFormats       = { &kSkyViewLUTFormat, 1 },
-      .RasterizerDesc   = Rasterizer{ .FrontFace = Rasterizer::FrontFace::kClockwise },
       .VertexShaderName = "ScreenSpaceTriangleVS.cso",
       .PixelShaderName  = "SkyViewLUTPS.cso",
       .DebugName        = "Sky View LUT Pipeline",

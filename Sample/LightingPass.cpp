@@ -328,12 +328,12 @@ bool Ember::RenderPass::ScreenSpaceLightDeferred::Create(
   };
 
   ComPtr<ID3D12PipelineState> pipeline = render_device->CreateGraphicsPipeline( {
-      .RootSignature   = root_signature.Get(),
-      .RTVFormats      = { &rt_format, 1 },
-      .BlendDesc       = blend_desc,
-      .MeshShaderName  = "LightingMS.cso",
-      .PixelShaderName = "LightingPS.cso",
-      .DebugName       = "Screen Space Light Deferred Pipeline",
+      .RootSignature    = root_signature.Get(),
+      .RTVFormats       = { &rt_format, 1 },
+      .BlendDesc        = blend_desc,
+      .VertexShaderName = "ScreenSpaceTriangleVS.cso",
+      .PixelShaderName  = "LightingPS.cso",
+      .DebugName        = "Screen Space Light Deferred Pipeline",
   } );
   if ( not pipeline ) return false;
 
@@ -385,7 +385,7 @@ FrameGraphResource Ember::RenderPass::ScreenSpaceLightDeferred::Execute(
         cmd->SetGraphicsRootConstants( 0, gbuffer_handles );
         cmd->SetGraphicsRootConstantBuffer( 1, constants_buf );
         cmd->SetGraphicsRootConstants( 2, env );
-        cmd->DispatchMesh( {} );
+        cmd->DrawInstanced( 3, 1, 0, 0 );
       } );
 
   return result.RenderTarget;

@@ -71,13 +71,20 @@ float3 CalcPointLightContrib( in BRDFCookTorranceGGX brdf, float4 ws_position, f
   return point_contrib;
 }
 
-float4 LightingPS( float2 tex_coord : TEXCOORD ) : SV_TARGET
+struct PSIn
+{
+  float4 Position : SV_POSITION;
+  float2 TexCoord : TEXCOORD;
+};
+
+float4 LightingPS( PSIn IN ) : SV_TARGET
 {
   Texture2D<float4> position_tex = ResourceDescriptorHeap[g_Position];
   Texture2D<float4> albedo_tex   = ResourceDescriptorHeap[g_Albedo];
   Texture2D<float2> normal_tex   = ResourceDescriptorHeap[g_Normal];
   Texture2D<float4> orm_tex      = ResourceDescriptorHeap[g_ORM];
   Texture2D<float4> emissive_tex = ResourceDescriptorHeap[g_Emissive];
+  float2            tex_coord    = IN.TexCoord;
 
 #ifndef STRIP_DEBUG_CONFIG
   switch ( g_Debug.VisualizationMode )
