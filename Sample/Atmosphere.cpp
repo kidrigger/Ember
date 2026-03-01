@@ -175,7 +175,7 @@ Ember::RenderPass::Atmosphere::Data Ember::RenderPass::Atmosphere::Execute(
                 .Usage     = TextureUsage::kRenderTarget,
                 .InitState = D3D12_RESOURCE_STATE_PIXEL_SHADER_RESOURCE,
             } );
-        data.TransmittanceLUT = builder.read( transmittance.TransmittanceLUT, FG::ShaderResource{} );
+        data.TransmittanceLUT = builder.read( transmittance.TransmittanceLUT, FG::ShaderRead{} );
 
         data.AtmosphereParams = builder.read( param_buffer );
         data.SkyViewLUT       = builder.write(

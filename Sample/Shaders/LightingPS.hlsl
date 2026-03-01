@@ -14,6 +14,7 @@ cbuffer GBufferIn : register( b0 )
   ResID g_Normal;
   ResID g_ORM;
   ResID g_Emissive;
+  ResID g_AO;
 };
 
 cbuffer FrameConstants : register( b1 )
@@ -84,6 +85,7 @@ float4 LightingPS( PSIn IN ) : SV_TARGET
   Texture2D<float2> normal_tex   = ResourceDescriptorHeap[g_Normal];
   Texture2D<float4> orm_tex      = ResourceDescriptorHeap[g_ORM];
   Texture2D<float4> emissive_tex = ResourceDescriptorHeap[g_Emissive];
+  Texture2D<float>  ao_tex       = ResourceDescriptorHeap[g_AO];
   float2            tex_coord    = IN.TexCoord;
 
 #ifndef STRIP_DEBUG_CONFIG
@@ -96,15 +98,17 @@ float4 LightingPS( PSIn IN ) : SV_TARGET
     case kWorldPosition:
       return float4( position_tex.Sample( g_PointSampler, tex_coord ).rgb, 1.0f );
     case kAlbedo:
-      return float4( albedo_tex.Sample( g_PointSampler, tex_coord ).rgb, 1.0f );
+      return float4( albedo_tex.Sample( g_DefaultSampler, tex_coord ).rgb, 1.0f );
     case kNormal:
-      return float4( OctahedralDecode( normal_tex.Sample( g_PointSampler, tex_coord ) ), 1.0f );
+      return 0.5f * float4( OctahedralDecode( normal_tex.Sample( g_PointSampler, tex_coord ) ), 1.0f ) + 0.5f;
     case kORM:
       return float4( orm_tex.Sample( g_PointSampler, tex_coord ).rgb, 1.0f );
     case kEmissive:
       return float4( emissive_tex.Sample( g_PointSampler, tex_coord ).rgb, 1.0f );
     case kLightingOnly:
       break;
+    case kAO:
+      return IsValidHandle( g_AO ) ? float4( ao_tex.Sample( g_DefaultSampler, tex_coord ).rrr, 1.0f ) : 1.0f.xxxx;
   }
 #endif
 
@@ -116,6 +120,7 @@ float4 LightingPS( PSIn IN ) : SV_TARGET
   float3 normal       = OctahedralDecode( normal_tex.Sample( g_PointSampler, tex_coord ) );
   float3 orm          = orm_tex.Sample( g_PointSampler, tex_coord ).xyz;
   float3 emissive     = emissive_tex.Sample( g_PointSampler, tex_coord ).rgb * pos_emission.w;
+  float  ao           = IsValidHandle( g_AO ) ? ao_tex.Sample( g_PointSampler, tex_coord ).r : 1.0f;
 
 #ifndef STRIP_DEBUG_CONFIG
   if ( g_Debug.VisualizationMode == kLightingOnly )
@@ -129,7 +134,7 @@ float4 LightingPS( PSIn IN ) : SV_TARGET
   brdf.Normal        = normal;
   brdf.Metallic      = orm.z;
   brdf.Roughness     = orm.y;
-  brdf.Occlusion     = orm.x;
+  brdf.Occlusion     = orm.x * ao;
   brdf.F0            = lerp( 0.04f, albedo.rgb, orm.z );
 
   float3 view_dir    = normalize( g_Camera.Position.xyz - position.xyz );

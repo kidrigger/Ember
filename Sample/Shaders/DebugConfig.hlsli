@@ -13,6 +13,7 @@ enum VisMode
   kORM           = 5,
   kEmissive      = 6,
   kLightingOnly  = 7,
+  kAO            = 8,
 };
 
 struct DebugConfig

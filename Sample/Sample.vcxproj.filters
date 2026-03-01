@@ -115,6 +115,9 @@
     <Filter Include="Shaders\PBR">
       <UniqueIdentifier>{449d3437-1bc7-4a22-b2c2-c9b2872d4e1e}</UniqueIdentifier>
     </Filter>
+    <Filter Include="Shaders\AO">
+      <UniqueIdentifier>{09f91507-4f6c-402a-a7e7-fc96f0b69d1f}</UniqueIdentifier>
+    </Filter>
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="Main.cpp">
@@ -219,6 +222,12 @@
     <ClCompile Include="Input.cpp">
       <Filter>Source Files\Util</Filter>
     </ClCompile>
+    <ClCompile Include="SSAOPass.cpp">
+      <Filter>Source Files\Passes</Filter>
+    </ClCompile>
+    <ClCompile Include="SSAOBlurPass.cpp">
+      <Filter>Source Files\Passes</Filter>
+    </ClCompile>
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="BasicApp.hpp">
@@ -322,6 +331,12 @@
     </ClInclude>
     <ClInclude Include="Input.hpp">
       <Filter>Header Files\Util</Filter>
+    </ClInclude>
+    <ClInclude Include="SSAOPass.hpp">
+      <Filter>Header Files\Passes</Filter>
+    </ClInclude>
+    <ClInclude Include="SSAOBlurPass.hpp">
+      <Filter>Header Files\Passes</Filter>
     </ClInclude>
   </ItemGroup>
   <ItemGroup>
@@ -609,6 +624,12 @@
     </FxCompile>
     <FxCompile Include="Shaders\ScreenSpaceTriangleVS.hlsl">
       <Filter>Shaders\Common</Filter>
+    </FxCompile>
+    <FxCompile Include="Shaders\ScreenSpaceAmbientOcclusionCS.hlsl">
+      <Filter>Shaders\AO</Filter>
+    </FxCompile>
+    <FxCompile Include="Shaders\SSAOBlurCS.hlsl">
+      <Filter>Shaders\AO</Filter>
     </FxCompile>
   </ItemGroup>
 </Project>

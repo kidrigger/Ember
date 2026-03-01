@@ -12,6 +12,8 @@
 #include "LightingPass.hpp"
 #include "ReflectionProbe.hpp"
 #include "RenderPassCommon.hpp"
+#include "SSAOBlurPass.hpp"
+#include "SSAOPass.hpp"
 #include "Scene.hpp"
 #include "SkyboxPass.hpp"
 #include "TexturePool.hpp"
@@ -59,10 +61,12 @@ class BasicApp final : public IApp
   RenderPass::OpaqueForward m_RenderOpaqueMeshes;
 
   // Deferred Only
-  RenderPass::GBuffer                  m_UpdateGBuffer;
-  RenderPass::OmniLightDeferred        m_RenderOmniLights;
-  RenderPass::SpotLightDeferred        m_RenderSpotLights;
-  RenderPass::ScreenSpaceLightDeferred m_RenderScreenSpaceLighting;
+  RenderPass::GBuffer                         m_UpdateGBuffer;
+  RenderPass::OmniLightDeferred               m_RenderOmniLights;
+  RenderPass::SpotLightDeferred               m_RenderSpotLights;
+  RenderPass::ScreenSpaceLightDeferred        m_RenderScreenSpaceLighting;
+  RenderPass::ScreenSpaceAmbientOcclusion     m_RenderSSAO;
+  RenderPass::ScreenSpaceAmbientOcclusionBlur m_RenderSSAOBlur;
 
   // Forward + Deferred
   RenderPass::MaskedForward       m_RenderMaskedMeshes;

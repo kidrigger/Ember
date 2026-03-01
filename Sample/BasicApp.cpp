@@ -49,6 +49,7 @@ struct alignas( 16 ) DebugConfigGpuRepr
     kORM           = 5,
     kEmissive      = 6,
     kLightingOnly  = 7,
+    kAO            = 8,
   };
 
   enum SkyMode : uint32_t
@@ -71,12 +72,13 @@ struct alignas( 16 ) DebugConfigGpuRepr
 } g_Debug;
 
 bool                  g_OutputFrameGraph        = false;
-bool                  g_UseDeferredRendering    = false;
+bool                  g_UseDeferredRendering    = true;
 bool                  g_Raytracing              = false;
 bool                  g_UseProbes               = false;
+bool                  g_SSAO                    = true;
 
 constexpr char const* kVisualizationModeNames[] = {
-  "Render", "Meshlet", "World Position", "Albedo", "Normal", "ORM", "Emissive", "Lighting Only",
+  "Render", "Meshlet", "World Position", "Albedo", "Normal", "ORM", "Emissive", "Lighting Only", "Ambient Occlusion",
 };
 constexpr char const* kSkyModeNames[] = { "None", "Skybox", "Atmosphere" };
 
@@ -108,7 +110,7 @@ void Ember::BasicApp::InitImGui( HWND const window_handle, RenderDevice* render_
   style.ScaleAllSizes( main_scale ); // Bake a fixed style scale. (until we have a solution for dynamic style scaling,
                                      // changing this requires resetting Style + calling this again)
 
-  // Setup Platform/Renderer backendss
+  // Setup Platform/Renderer backends
   ImGui_ImplWin32_Init( window_handle );
 
   ImGui_ImplDX12_InitInfo init_info = {};
@@ -288,6 +290,8 @@ void Ember::BasicApp::SetupRenderPasses()
       &m_RenderSpotLights, m_RenderDevice.get(), DirectX::MakeSRGB( swapchain_format ), kDepthFormat ) );
   ENSURE( RenderPass::ScreenSpaceLightDeferred::Create(
       &m_RenderScreenSpaceLighting, m_RenderDevice.get(), DirectX::MakeSRGB( swapchain_format ) ) );
+  ENSURE( RenderPass::ScreenSpaceAmbientOcclusion::Create( &m_RenderSSAO, m_RenderDevice.get() ) );
+  ENSURE( RenderPass::ScreenSpaceAmbientOcclusionBlur::Create( &m_RenderSSAOBlur, m_RenderDevice.get() ) );
 
   ENSURE( RenderPass::MaskedForward::Create(
       &m_RenderMaskedMeshes, m_RenderDevice.get(), DirectX::MakeSRGB( swapchain_format ), kDepthFormat ) );
@@ -545,6 +549,7 @@ void Ember::BasicApp::Update()
 
         ImGui::Checkbox( "Enable Raytracing", &g_Raytracing );
         ImGui::Checkbox( "Enable Probes", &g_UseProbes );
+        ImGui::Checkbox( "Enable AO", &g_SSAO );
       }
       ImGui::End();
     }
@@ -793,13 +798,16 @@ void Ember::BasicApp::Render()
           : m_RenderOpaqueMeshes.Execute( &frame_graph, m_FGBlackboard, depth_buffer );
 
   auto const gbuffer         = m_UpdateGBuffer( &frame_graph, m_FGBlackboard, depth_buffer );
+  auto const ssao_pass       = m_RenderSSAO( &frame_graph, m_FGBlackboard, gbuffer, depth_buffer );
+  auto const ssao_blur_pass  = m_RenderSSAOBlur( &frame_graph, m_FGBlackboard, ssao_pass );
   auto const omni_pass_rt    = m_RenderOmniLights( &frame_graph, m_FGBlackboard, gbuffer );
   auto const spot_pass_rt    = m_RenderSpotLights( &frame_graph, m_FGBlackboard, gbuffer, omni_pass_rt );
-  auto const opaque_pass_dfr = m_RenderScreenSpaceLighting( &frame_graph, m_FGBlackboard, gbuffer, spot_pass_rt );
+  auto const opaque_pass_dfr = m_RenderScreenSpaceLighting(
+      &frame_graph, m_FGBlackboard, gbuffer, spot_pass_rt, g_SSAO ? ssao_blur_pass : FrameGraphResource{} );
 
-  auto const opaque_pass     = RenderPass::RenderDepthData{
-        .RenderTarget = g_UseDeferredRendering ? opaque_pass_dfr : opaque_pass_fwd,
-        .DepthStencil = depth_buffer,
+  auto const opaque_pass = RenderPass::RenderDepthData{
+    .RenderTarget = g_UseDeferredRendering ? opaque_pass_dfr : opaque_pass_fwd,
+    .DepthStencil = depth_buffer,
   };
 
   auto const alpha_tested      = m_RenderMaskedMeshes( &frame_graph, m_FGBlackboard, opaque_pass );

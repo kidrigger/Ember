@@ -213,7 +213,7 @@ void AllocateBufferImpl(
   ERR_ABORT( allocator->CreateResource(
       &allocation_desc, &buffer_desc, init_state, nullptr, allocation, IID_PPV_ARGS( resource ) ) );
 #else
-  auto heap_properties = CD3DX12_HEAP_PROPERTIES{ heap_type };
+  auto const heap_properties = CD3DX12_HEAP_PROPERTIES{ heap_type };
   ERR_ABORT( device->CreateCommittedResource(
       &heap_properties,
       D3D12_HEAP_FLAG_ALLOW_ALL_BUFFERS_AND_TEXTURES,

@@ -46,18 +46,20 @@ public:
   void SetComputeRootSignature( ID3D12RootSignature* root_signature ) const;
   void SetPipelineState( ID3D12PipelineState* pipeline_state ) const;
   void Dispatch( ThreadGroupCount tgc ) const;
-  void SetComputeRootConstants( uint32_t root_parameter_index, auto const& value, uint32_t byte_offset = 0 ) const
+  void SetComputeRootConstants( uint32_t const root_parameter_index, auto const& value, uint32_t byte_offset = 0 ) const
   { // TODO: Move to autocasting process.
     ASSERT( byte_offset % 4 == 0 );
     m_CommandList->SetComputeRoot32BitConstants( root_parameter_index, sizeof( value ) / 4, &value, byte_offset / 4 );
   }
+  void SetComputeRootConstantBuffer( uint32_t root_parameter_index, Buffer const& buffer ) const;
 
   auto Bind( BindableStructure auto const& bindable_structure ) const
   {
     return bindable_structure.Bind( m_Binder.get() );
   }
 
-  void BindComputeResources( uint32_t root_parameter_index, BindableStructure auto const& bindable_structure ) const
+  void BindComputeResources(
+      uint32_t const root_parameter_index, BindableStructure auto const& bindable_structure ) const
   {
     auto data = bindable_structure.Bind( m_Binder.get() );
     m_CommandList->SetComputeRoot32BitConstants( root_parameter_index, sizeof( data ) / 4, &data, 0 );
@@ -74,7 +76,7 @@ public:
   void SetGraphicsRootConstantBuffer( uint32_t root_parameter_index, Buffer const& buffer ) const;
   void SetGraphicsRootConstant( uint32_t root_parameter_index, uint32_t value, uint32_t index_offset = 0 ) const;
   void SetGraphicsRootConstants(
-      uint32_t root_parameter_index, std::ranges::range auto const& value, uint32_t byte_offset = 0 ) const
+      uint32_t const root_parameter_index, std::ranges::range auto const& value, uint32_t byte_offset = 0 ) const
   {
     // TODO: Move to autocasting process.
     ASSERT( byte_offset % 4 == 0 );

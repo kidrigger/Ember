@@ -83,6 +83,7 @@ struct MergeData
   std::array<FrameGraphResource, GBuffer::kGBufferCount> GBuffer;
   FrameGraphResource                                     RenderTarget;
   FrameGraphResource                                     DepthStencil;
+  FrameGraphResource                                     SSAO;
 };
 } // namespace Ember::RenderPass
 
@@ -101,7 +102,7 @@ FrameGraphResource Ember::RenderPass::OmniLightDeferred::Execute(
       {
         for ( uint32_t i = 0; i < GBuffer::kGBufferCount; i++ )
         {
-          data.GBuffer[i] = builder.read( gbuffer.GBuffer[i], FG::ShaderResource{} );
+          data.GBuffer[i] = builder.read( gbuffer.GBuffer[i], FG::ShaderRead{} );
         }
 
         auto const&              backbuffer_info = bb.get<FG::BackbufferInfo>();
@@ -244,7 +245,7 @@ FrameGraphResource Ember::RenderPass::SpotLightDeferred::Execute(
       {
         for ( uint32_t i = 0; i < GBuffer::kGBufferCount; i++ )
         {
-          data.GBuffer[i] = builder.read( gbuffer.GBuffer[i], FG::ShaderResource{} );
+          data.GBuffer[i] = builder.read( gbuffer.GBuffer[i], FG::ShaderRead{} );
         }
         data.RenderTarget = builder.write( render_target, FG::Attachment{ .Index = 0, .ForceSrgb = true } );
         data.DepthStencil = builder.read( gbuffer.DepthStencil, FG::DepthStencilRead{} );
@@ -347,7 +348,8 @@ FrameGraphResource Ember::RenderPass::ScreenSpaceLightDeferred::Execute(
     FrameGraph*                 frame_graph,
     FrameGraphBlackboard const& bb,
     GBuffer::Data const&        gbuffer,
-    FrameGraphResource const    render_target ) const
+    FrameGraphResource const    render_target,
+    FrameGraphResource const    ssao ) const
 {
   auto const& root_sig        = RootSignature;
   auto const& pipeline        = Pipeline;
@@ -360,9 +362,11 @@ FrameGraphResource Ember::RenderPass::ScreenSpaceLightDeferred::Execute(
       {
         for ( uint32_t i = 0; i < GBuffer::kGBufferCount; i++ )
         {
-          data.GBuffer[i] = builder.read( gbuffer.GBuffer[i], FG::ShaderResource{} );
+          data.GBuffer[i] = builder.read( gbuffer.GBuffer[i], FG::ShaderRead{} );
         }
         data.DepthStencil = builder.read( gbuffer.DepthStencil, FG::DepthStencilRead{} );
+
+        if ( ssao.valid() ) data.SSAO = builder.read( ssao, FG::ShaderRead{} );
 
         data.RenderTarget = builder.write( render_target, FG::Attachment{ .Index = 0, .ForceSrgb = true } );
       },
@@ -374,11 +378,13 @@ FrameGraphResource Ember::RenderPass::ScreenSpaceLightDeferred::Execute(
         CommandList*                  cmd        = frame_data.CommandList;
         PIXScopedEvent( cmd->Get(), PIX_COLOR_DEFAULT, "Screen Space Light Pass" );
 
-        SRVHandle gbuffer_handles[GBuffer::kGBufferCount];
+        SRVHandle gbuffer_handles[GBuffer::kGBufferCount + 1];
         for ( uint32_t i = 0; i < GBuffer::kGBufferCount; i++ )
         {
           gbuffer_handles[i] = resources.get<FG::Texture>( data.GBuffer[i] ).GetSRVHandle();
         }
+        gbuffer_handles[GBuffer::kGBufferCount] =
+            data.SSAO.valid() ? resources.get<FG::Texture>( data.SSAO ).GetSRVHandle() : SRVHandle{};
 
         cmd->SetGraphicsRootSignature( root_sig.Get() );
         cmd->SetPipelineState( pipeline.Get() );
@@ -395,7 +401,8 @@ FrameGraphResource Ember::RenderPass::ScreenSpaceLightDeferred::operator()(
     FrameGraph*                 frame_graph,
     FrameGraphBlackboard const& bb,
     GBuffer::Data const&        gbuffer,
-    FrameGraphResource const    render_target ) const
+    FrameGraphResource const    render_target,
+    FrameGraphResource const    ssao ) const
 {
-  return Execute( frame_graph, bb, gbuffer, render_target );
+  return Execute( frame_graph, bb, gbuffer, render_target, ssao );
 }

@@ -160,7 +160,7 @@ FrameGraphResource Ember::RenderPass::OpaqueForward::Execute(
             } );
         builder.read( depth, FG::DepthStencilRead{} );
 
-        builder.read( probe_tex, FG::ShaderResource{} );
+        builder.read( probe_tex, FG::ShaderRead{} );
       },
       [=]( FrameGraphResource const&, FrameGraphPassResources& res, FG::Context const* context )
       {

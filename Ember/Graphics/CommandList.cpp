@@ -79,6 +79,11 @@ void Ember::CommandList::Dispatch( ThreadGroupCount tgc ) const
   m_CommandList->Dispatch( tgc.X, tgc.Y, tgc.Z );
 }
 
+void Ember::CommandList::SetComputeRootConstantBuffer( uint32_t const root_parameter_index, Buffer const& buffer ) const
+{
+  m_CommandList->SetComputeRootConstantBufferView( root_parameter_index, buffer.GetGPUVirtualAddress() );
+}
+
 void Ember::CommandList::ResourceBarrier( D3D12_RESOURCE_BARRIER const& barrier ) const
 {
   m_CommandList->ResourceBarrier( 1u, &barrier );

@@ -266,15 +266,15 @@ Ember::FG::DepthStencilRead Ember::FG::DepthStencilRead::Decode( uint32_t const 
   };
 }
 
-Ember::FG::ShaderResource::operator uint32_t() const
+Ember::FG::ShaderRead::operator uint32_t() const
 {
   return ShiftingEncoder{}.Push( Type, 2 ).Push( PixelShaderUse, 1 );
 }
 
-Ember::FG::ShaderResource Ember::FG::ShaderResource::Decode( uint32_t const flag )
+Ember::FG::ShaderRead Ember::FG::ShaderRead::Decode( uint32_t const flag )
 {
   ShiftingDecoder decoder{ flag };
-  return ShaderResource{
+  return ShaderRead{
     .Type           = decoder.Pop<ReadType>( 2 ),
     .PixelShaderUse = decoder.Pop<bool>( 1 ),
   };
@@ -323,6 +323,19 @@ Ember::FG::DepthStencil Ember::FG::DepthStencil::Decode( uint32_t const flag )
   };
 }
 
+Ember::FG::ShaderWrite::operator uint32_t() const
+{
+  return ShiftingEncoder{}.Push( Type, 2 );
+}
+
+Ember::FG::ShaderWrite Ember::FG::ShaderWrite::Decode( uint32_t const flag )
+{
+  ShiftingDecoder decoder{ flag };
+  return ShaderWrite{
+    .Type = decoder.Pop<WriteType>( 2 ),
+  };
+}
+
 Ember::FG::CopyDst::operator uint32_t() const
 {
   return ShiftingEncoder{}.Push( Type, 2 );
@@ -341,7 +354,7 @@ Ember::FG::Read Ember::FG::DecodeReadFlags( uint32_t const v )
     case ReadType::kDSV:
       return DepthStencilRead::Decode( v );
     case ReadType::kSRV:
-      return ShaderResource::Decode( v );
+      return ShaderRead::Decode( v );
     case ReadType::kCBV:
       UNREACHABLE; // Not supported
     case ReadType::kCopy:
@@ -358,6 +371,8 @@ Ember::FG::Write Ember::FG::DecodeWriteFlags( uint32_t const v )
       return Attachment::Decode( v );
     case WriteType::kDSV:
       return DepthStencil::Decode( v );
+    case WriteType::kUAV:
+      return ShaderWrite::Decode( v );
     case WriteType::kCopy:
       return CopyDst::Decode( v );
   }
@@ -431,7 +446,7 @@ void Ember::FG::Texture::preRead( Desc const& desc, uint32_t const flags, void* 
     break;
     case ReadType::kSRV:
     {
-      auto const srv            = std::get<ShaderResource>( decoded );
+      auto const srv            = std::get<ShaderRead>( decoded );
       auto const required_state = srv.PixelShaderUse ? D3D12_RESOURCE_STATE_PIXEL_SHADER_RESOURCE
                                                      : D3D12_RESOURCE_STATE_NON_PIXEL_SHADER_RESOURCE;
 
@@ -494,6 +509,16 @@ void Ember::FG::Texture::preWrite( [[maybe_unused]] Desc const& desc, uint32_t c
         SetCurrentState( D3D12_RESOURCE_STATE_DEPTH_WRITE );
       }
       ctx->SetDepthTarget( *this, desc, depth_stencil.LoadOp );
+    }
+    break;
+    case WriteType::kUAV:
+    {
+      if ( current_state != D3D12_RESOURCE_STATE_UNORDERED_ACCESS )
+      {
+        ctx->PushBarrier( CD3DX12_RESOURCE_BARRIER::Transition(
+            GetTexture(), current_state, D3D12_RESOURCE_STATE_UNORDERED_ACCESS ) );
+        SetCurrentState( D3D12_RESOURCE_STATE_UNORDERED_ACCESS );
+      }
     }
     break;
     case WriteType::kCopy:

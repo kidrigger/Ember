@@ -35,6 +35,8 @@ float4 TriangleMaskedPS( PSIn IN ) : SV_TARGET0
     case kLightingOnly:
       albedo.xyz = 0.5f;
       break;
+    case kAO:
+      return 1.0f;
   }
 #endif
 

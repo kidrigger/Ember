@@ -56,13 +56,15 @@ struct ScreenSpaceLightDeferred
       FrameGraph*                 frame_graph,
       FrameGraphBlackboard const& bb,
       GBuffer::Data const&        gbuffer,
-      FrameGraphResource          render_target ) const;
+      FrameGraphResource          render_target,
+      FrameGraphResource          ssao ) const;
 
   FrameGraphResource operator()(
       FrameGraph*                 frame_graph,
       FrameGraphBlackboard const& bb,
       GBuffer::Data const&        gbuffer,
-      FrameGraphResource          render_target ) const;
+      FrameGraphResource          render_target,
+      FrameGraphResource          ssao ) const;
 };
 
 } // namespace Ember::RenderPass

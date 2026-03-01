@@ -36,6 +36,7 @@ enum class WriteType
 {
   kRTV,
   kDSV,
+  kUAV,
   kCopy,
 };
 
@@ -47,13 +48,13 @@ struct DepthStencilRead
   static DepthStencilRead Decode( uint32_t flag );
 };
 
-struct ShaderResource
+struct ShaderRead
 {
   ReadType Type           = ReadType::kSRV; // 2 bits
   bool     PixelShaderUse = true;           // 1 bit
 
   operator uint32_t() const;
-  static ShaderResource Decode( uint32_t flag );
+  static ShaderRead Decode( uint32_t flag );
 };
 
 struct CopySrc
@@ -91,6 +92,14 @@ struct DepthStencil
   static DepthStencil Decode( uint32_t flag );
 };
 
+struct ShaderWrite
+{
+  WriteType Type = WriteType::kUAV; // 2 bits
+
+  operator uint32_t() const;
+  static ShaderWrite Decode( uint32_t flag );
+};
+
 struct CopyDst
 {
   WriteType Type = WriteType::kCopy; // 2 bits
@@ -99,10 +108,10 @@ struct CopyDst
   static CopyDst Decode( uint32_t flag );
 };
 
-using Read = std::variant<DepthStencilRead, ShaderResource, std::monostate, CopySrc>;
+using Read = std::variant<DepthStencilRead, ShaderRead, std::monostate, CopySrc>;
 Read DecodeReadFlags( uint32_t v );
 
-using Write = std::variant<Attachment, DepthStencil, CopyDst>;
+using Write = std::variant<Attachment, DepthStencil, ShaderWrite, CopyDst>;
 Write DecodeWriteFlags( uint32_t v );
 
 class Texture : public Ember::Texture
