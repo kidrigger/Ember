@@ -343,9 +343,6 @@
     <None Include="..\.clang-format">
       <Filter>Resource Files\Config</Filter>
     </None>
-    <None Include="..\vcpkg.json">
-      <Filter>Resource Files\Config</Filter>
-    </None>
     <None Include="..\.gitignore">
       <Filter>Resource Files\Config</Filter>
     </None>
@@ -423,6 +420,9 @@
     </None>
     <None Include="Shaders\PBR.hlsli">
       <Filter>Shaders\PBR</Filter>
+    </None>
+    <None Include="vcpkg.json">
+      <Filter>Resource Files\Config</Filter>
     </None>
   </ItemGroup>
   <ItemGroup>

@@ -4,21 +4,7 @@
     "directx-headers",
     "d3d12-memory-allocator",
     "directxtex",
-    "cgltf",
     "tracy",
-    "flecs",
-    "mikktspace",
-    "meshoptimizer",
-    {
-      "name": "imgui",
-      "features": [
-        "dx12-binding",
-        "win32-binding",
-        "docking-experimental"
-      ]
-    },
-    "winpixevent",
-    "nlohmann-json",
-    "imguizmo"
+    "winpixevent"
   ]
 }

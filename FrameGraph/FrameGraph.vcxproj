@@ -67,6 +67,7 @@
     <None Include="fg\ResourceEntry.inl" />
     <None Include="LICENSE" />
     <None Include="README.md" />
+    <None Include="vcpkg.json" />
   </ItemGroup>
   <PropertyGroup Label="Globals">
     <VCProjectVersion>17.0</VCProjectVersion>

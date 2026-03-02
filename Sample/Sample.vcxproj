@@ -475,7 +475,6 @@
   <ItemGroup>
     <None Include="..\.clang-format" />
     <None Include="..\.gitignore" />
-    <None Include="..\vcpkg.json" />
     <CopyFileToFolders Include="Assets\Box.glb">
       <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">false</ExcludedFromBuild>
       <DeploymentContent Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">true</DeploymentContent>
@@ -756,6 +755,7 @@
     <None Include="Shaders\Triangle.hlsli" />
     <None Include="Shaders\TrianglePSCommon.hlsli" />
     <None Include="Shaders\Utility.hlsli" />
+    <None Include="vcpkg.json" />
   </ItemGroup>
   <ItemGroup>
     <CopyFileToFolders Include="Assets\container2.png">

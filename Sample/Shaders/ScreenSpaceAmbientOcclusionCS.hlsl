@@ -22,10 +22,10 @@ SamplerState g_DefaultSampler : register( s0 );
 NUM_THREADS( 8, 8, 1 )
 void ScreenSpaceAmbientOcclusionCS( uint3 local_id : SV_GroupThreadID, uint3 dispatch_thread_id : SV_DispatchThreadID )
 {
-  Texture2D<float>   depth_tex    = ResourceDescriptorHeap[g_Depth];
-  ByteAddressBuffer  kernel       = ResourceDescriptorHeap[g_Kernel];
-  ByteAddressBuffer  random_dirs  = ResourceDescriptorHeap[g_RandomDirs];
-  RWTexture2D<float> out_tex      = ResourceDescriptorHeap[g_OutTexture];
+  Texture2D<float>   depth_tex   = ResourceDescriptorHeap[g_Depth];
+  ByteAddressBuffer  kernel      = ResourceDescriptorHeap[g_Kernel];
+  ByteAddressBuffer  random_dirs = ResourceDescriptorHeap[g_RandomDirs];
+  RWTexture2D<float> out_tex     = ResourceDescriptorHeap[g_OutTexture];
 
   float              width, height;
   out_tex.GetDimensions( width, height );
