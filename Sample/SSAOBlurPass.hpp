@@ -22,10 +22,16 @@ struct ScreenSpaceAmbientOcclusionBlur
   static bool                 Create( ScreenSpaceAmbientOcclusionBlur* out, RenderDevice* render_device );
 
   FrameGraphResource          Execute(
-               FrameGraph* frame_graph, FrameGraphBlackboard const& bb, FrameGraphResource ssao_texture ) const;
+               FrameGraph*                 frame_graph,
+               FrameGraphBlackboard const& bb,
+               FrameGraphResource          ssao_texture,
+               FrameGraphResource          depth_texture ) const;
 
   FrameGraphResource operator()(
-      FrameGraph* frame_graph, FrameGraphBlackboard const& bb, FrameGraphResource ssao_texture ) const;
+      FrameGraph*                 frame_graph,
+      FrameGraphBlackboard const& bb,
+      FrameGraphResource          ssao_texture,
+      FrameGraphResource          depth_texture ) const;
 };
 
 } // namespace Ember::RenderPass

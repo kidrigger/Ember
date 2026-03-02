@@ -12,8 +12,6 @@ namespace
 
 struct SSAOData
 {
-  FrameGraphResource Position;
-  FrameGraphResource Normal;
   FrameGraphResource Depth;
   FrameGraphResource Kernel;
   FrameGraphResource Rotation;
@@ -22,8 +20,6 @@ struct SSAOData
 
 struct PassHandles
 {
-  Ember::SRVHandle Position;
-  Ember::SRVHandle Normal;
   Ember::SRVHandle Depth;
   Ember::SRVHandle Kernel;
   Ember::SRVHandle Rotation;
@@ -36,14 +32,12 @@ bool Ember::RenderPass::ScreenSpaceAmbientOcclusion::Create(
     ScreenSpaceAmbientOcclusion* out, RenderDevice* render_device )
 {
   D3D12_STATIC_SAMPLER_DESC static_sampler_desc[] = {
-    CD3DX12_STATIC_SAMPLER_DESC{ 0,
-                                D3D12_FILTER_MIN_MAG_MIP_POINT, D3D12_TEXTURE_ADDRESS_MODE_CLAMP,
-                                D3D12_TEXTURE_ADDRESS_MODE_CLAMP, D3D12_TEXTURE_ADDRESS_MODE_CLAMP },
+    CD3DX12_STATIC_SAMPLER_DESC{ 0 },
   };
 
   D3D12_ROOT_PARAMETER1 root_parameters[] = {
-    RootConstants{ .Register = 0, .SizeBytes = sizeof( PassHandles ) }, // Position + Normal SRV handles
-    RootConstantBuffer{ .Register = 1 }, // Frame constants (camera matrices, etc.)
+    RootConstants{ .Register = 0, .SizeBytes = sizeof( PassHandles ) },
+    RootConstantBuffer{ .Register = 1 },
   };
 
   ComPtr<ID3D12RootSignature> root_signature = render_device->CreateRootSignature( {
@@ -119,10 +113,7 @@ bool Ember::RenderPass::ScreenSpaceAmbientOcclusion::Create(
 }
 
 FrameGraphResource Ember::RenderPass::ScreenSpaceAmbientOcclusion::Execute(
-    FrameGraph*                 frame_graph,
-    FrameGraphBlackboard const& bb,
-    GBuffer::Data const&        gbuffer,
-    FrameGraphResource const    depth_buffer ) const
+    FrameGraph* frame_graph, FrameGraphBlackboard const& bb, FrameGraphResource const depth_buffer ) const
 {
   auto const& root_sig            = RootSignature;
   auto const& pipeline            = Pipeline;
@@ -139,8 +130,6 @@ FrameGraphResource Ember::RenderPass::ScreenSpaceAmbientOcclusion::Execute(
       "SSAO Pass",
       [&]( FrameGraph::Builder& builder, SSAOData& data )
       {
-        data.Position                          = builder.read( gbuffer.GBuffer[GBuffer::kPosition], FG::ShaderRead{} );
-        data.Normal                            = builder.read( gbuffer.GBuffer[GBuffer::kNormal], FG::ShaderRead{} );
         data.Depth                             = builder.read( depth_buffer, FG::ShaderRead{} );
 
         data.Kernel                            = builder.read( kernel_res, FG::ShaderRead{} );
@@ -168,8 +157,6 @@ FrameGraphResource Ember::RenderPass::ScreenSpaceAmbientOcclusion::Execute(
         PIXScopedEvent( cmd->Get(), PIX_COLOR_DEFAULT, "SSAO Pass" );
 
         PassHandles const pass_handles = {
-          resources.get<FG::Texture>( data.Position ).GetSRVHandle(),
-          resources.get<FG::Texture>( data.Normal ).GetSRVHandle(),
           resources.get<FG::Texture>( data.Depth ).GetSRVHandle(),
           resources.get<FG::Buffer>( data.Kernel ).InnerBuffer.GetSRVHandle(),
           resources.get<FG::Buffer>( data.Rotation ).InnerBuffer.GetSRVHandle(),
@@ -187,10 +174,7 @@ FrameGraphResource Ember::RenderPass::ScreenSpaceAmbientOcclusion::Execute(
 }
 
 FrameGraphResource Ember::RenderPass::ScreenSpaceAmbientOcclusion::operator()(
-    FrameGraph*                 frame_graph,
-    FrameGraphBlackboard const& bb,
-    GBuffer::Data const&        gbuffer,
-    FrameGraphResource const    depth_buffer ) const
+    FrameGraph* frame_graph, FrameGraphBlackboard const& bb, FrameGraphResource const depth_buffer ) const
 {
-  return Execute( frame_graph, bb, gbuffer, depth_buffer );
+  return Execute( frame_graph, bb, depth_buffer );
 }

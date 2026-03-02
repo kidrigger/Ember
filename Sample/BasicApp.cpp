@@ -799,8 +799,8 @@ void Ember::BasicApp::Render()
           : m_RenderOpaqueMeshes.Execute( &frame_graph, m_FGBlackboard, depth_buffer );
 
   auto const gbuffer         = m_UpdateGBuffer( &frame_graph, m_FGBlackboard, depth_buffer );
-  auto const ssao_pass       = m_RenderSSAO( &frame_graph, m_FGBlackboard, gbuffer, depth_buffer );
-  auto const ssao_blur_pass  = m_RenderSSAOBlur( &frame_graph, m_FGBlackboard, ssao_pass );
+  auto const ssao_pass       = m_RenderSSAO( &frame_graph, m_FGBlackboard, depth_buffer );
+  auto const ssao_blur_pass  = m_RenderSSAOBlur( &frame_graph, m_FGBlackboard, ssao_pass, depth_buffer );
   auto const omni_pass_rt    = m_RenderOmniLights( &frame_graph, m_FGBlackboard, gbuffer );
   auto const spot_pass_rt    = m_RenderSpotLights( &frame_graph, m_FGBlackboard, gbuffer, omni_pass_rt );
   auto const opaque_pass_dfr = m_RenderScreenSpaceLighting(

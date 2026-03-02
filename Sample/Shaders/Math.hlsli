@@ -91,4 +91,48 @@ void DistanceToSphereFromInsidePolar(
   distance    = -b + delta;
 }
 
+
+float ManhattenDistance( float3 x, float3 y )
+{
+  return abs( x.x - y.x ) + abs( x.y - y.y ) + abs( x.z - y.z );
+}
+
+float3 DepthToViewPos( in float4x4 inv_proj, in Texture2D<float> depth_tex, float2 uv, in SamplerState samp )
+{
+  float  depth          = depth_tex.SampleLevel( samp, uv, 0 );
+  float4 position_view  = mul( inv_proj, float4( uv.x * 2.0f - 1.0f, 1.0f - uv.y * 2.0f, depth, 1.0f ) );
+  position_view.xyz    /= position_view.w;
+  return position_view.xyz;
+}
+
+float3 DepthToNormal( in float4x4 inv_proj, in Texture2D<float> depth_tex, float2 uv, in SamplerState samp )
+{
+  float width, height;
+  depth_tex.GetDimensions( width, height );
+  float2 xoffset = float2( 1.0f / width, 0.0f );
+  float2 yoffset = float2( 0.0f, 1.0f / height );
+
+  float3 p0      = DepthToViewPos( inv_proj, depth_tex, uv, samp );
+  float3 pr      = DepthToViewPos( inv_proj, depth_tex, uv + xoffset, samp );
+  float3 pu      = DepthToViewPos( inv_proj, depth_tex, uv + yoffset, samp );
+  float3 pl      = DepthToViewPos( inv_proj, depth_tex, uv - xoffset, samp );
+  float3 pd      = DepthToViewPos( inv_proj, depth_tex, uv - yoffset, samp );
+
+  // Right sets bit 0, Up sets bit 1. Pick the two depths closest to center.
+  int choice = ( ManhattenDistance( pr, p0 ) < ManhattenDistance( pl, p0 ) ? 1 : 0 ) +
+               ( ManhattenDistance( pu, p0 ) < ManhattenDistance( pd, p0 ) ? 2 : 0 );
+
+  float3 normal;
+  if ( choice == 0 )      // left, down
+    normal = cross( pl - p0, pd - p0 );
+  else if ( choice == 1 ) // right, down
+    normal = cross( pd - p0, pr - p0 );
+  else if ( choice == 2 ) // left, up
+    normal = cross( pu - p0, pl - p0 );
+  else                    // choice == 3 // right, up
+    normal = cross( pr - p0, pu - p0 );
+
+  return -normalize( normal );
+}
+
 #endif
