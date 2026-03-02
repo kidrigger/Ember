@@ -1,5 +1,7 @@
 #include "SpotLightManager.hpp"
 
+#include <format>
+
 #include "Camera.hpp"
 
 #include <Util/DataUtil.hpp>
@@ -29,8 +31,9 @@ Ember::SRVHandle Ember::Internal::SpotLightManager::AllocateSpotShadow()
         .InitState = D3D12_RESOURCE_STATE_PIXEL_SHADER_RESOURCE,
     } ) );
 
-    wchar_t buf[32];
-    swprintf_s( buf, L"Spot Shadow Map %u", m_AllocatedShadows );
+    wchar_t    buf[32];
+    auto const res = std::format_to_n( buf, CountOf( buf ), L"Spot Shadow Map {}", m_AllocatedShadows );
+    ASSERT( res.size < CountOf( buf ) );
     m_ActiveShadows.back().SetName( buf );
   }
 

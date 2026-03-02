@@ -1,6 +1,7 @@
 #include "DrawList.hpp"
 
 #include <Util/DataUtil.hpp>
+#include <format>
 #include "Material.hpp"
 #include "MaterialManager.hpp"
 #include "Scene.hpp"
@@ -187,8 +188,9 @@ Ember::DrawList::Batches Ember::DrawList::PrepareFrameWithRaytracing( CommandLis
   if ( desc_buf->GetSize() < rt_instances_size )
   {
     *desc_buf = m_RenderDevice->CreateStorageBuffer( rt_instances_size, StrideOf( m_RaytracingInstances ) );
-    wchar_t name[32];
-    swprintf_s( name, 32, L"TLAS Instance Desc Buffer %d", frame_idx );
+    wchar_t    name[32];
+    auto const res = std::format_to_n( name, CountOf( name ), L"TLAS Instance Desc Buffer {}", frame_idx );
+    ASSERT( res.size < CountOf( name ) );
     desc_buf->SetName( name );
   }
   desc_buf->Write( 0, rt_instances_size, DataOf( m_RaytracingInstances ) );
@@ -225,8 +227,9 @@ Ember::DrawList::Batches Ember::DrawList::PrepareFrameWithRaytracing( CommandLis
   if ( scratch_buf->GetSize() < prebuild.ScratchDataSizeInBytes )
   {
     *scratch_buf = m_RenderDevice->CreateRawStorageBuffer( prebuild.ScratchDataSizeInBytes );
-    wchar_t name[32];
-    swprintf_s( name, 32, L"TLAS Scratch Buffer %d", frame_idx );
+    wchar_t    name[32];
+    auto const res = std::format_to_n( name, CountOf( name ), L"TLAS Scratch Buffer {}", frame_idx );
+    ASSERT( res.size < CountOf( name ) );
     scratch_buf->SetName( name );
   }
 
@@ -234,8 +237,9 @@ Ember::DrawList::Batches Ember::DrawList::PrepareFrameWithRaytracing( CommandLis
   if ( tlas_buf->GetSize() < prebuild.ResultDataMaxSizeInBytes )
   {
     *tlas_buf = m_RenderDevice->CreateASBuffer( prebuild.ResultDataMaxSizeInBytes );
-    wchar_t name[32];
-    swprintf_s( name, 32, L"TLAS %d", frame_idx );
+    wchar_t    name[32];
+    auto const res = std::format_to_n( name, CountOf( name ), L"TLAS {}", frame_idx );
+    ASSERT( res.size < CountOf( name ) );
     tlas_buf->SetName( name );
   }
 

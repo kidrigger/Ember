@@ -1,6 +1,7 @@
 #include "BasicApp.hpp"
 
 #include <cstdint>
+#include <format>
 #include <fstream>
 #include <unordered_set>
 #include <utility>
@@ -918,6 +919,8 @@ void Ember::BasicApp::Resize()
 
   m_Camera->SetAspectRatio( ( float )m_WindowWidth / ( float )m_WindowHeight );
 
-  swprintf_s( m_SprintfBuffer, L"Ember %ux%u", m_WindowWidth, m_WindowHeight );
+  auto const res =
+      std::format_to_n( m_SprintfBuffer, CountOf( m_SprintfBuffer ), L"Ember {}x{}", m_WindowWidth, m_WindowHeight );
+  ASSERT( res.size < CountOf( m_SprintfBuffer ) );
   SetWindowText( m_WindowHandle, m_SprintfBuffer );
 }

@@ -1,6 +1,7 @@
 #include "Scene.hpp"
 
 #include <algorithm>
+#include <format>
 #include <imgui.h>
 
 #include <Util/DataUtil.hpp>
@@ -228,7 +229,8 @@ Ember::World::World()
               {
                 AnimationPlayer* player = ( AnimationPlayer* )elem;
                 char             buf[256];
-                sprintf_s( buf, "%s", player->CurrentAnimationName );
+                auto const       res = std::format_to_n( buf, CountOf( buf ), "{}", player->CurrentAnimationName );
+                ASSERT( res.size < CountOf( buf ) );
                 if ( ImGui::InputText(
                          label ? label : "Value", buf, sizeof( buf ), ImGuiInputTextFlags_EnterReturnsTrue ) )
                 {

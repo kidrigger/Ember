@@ -1,6 +1,7 @@
 #include "SceneTree.hpp"
 
 #include <Util/DataUtil.hpp>
+#include <format>
 #include <imgui.h>
 
 bool Ember::SceneTree::HasChildren( flecs::entity const e )
@@ -12,13 +13,16 @@ bool Ember::SceneTree::HasChildren( flecs::entity const e )
 
 char const* Ember::SceneTree::GetEntityName( flecs::entity e )
 {
+  ZeroMemory( DataOf( m_NameBuffer ), ByteSizeOf( m_NameBuffer ) );
   if ( e.name().size() > 0 )
   {
-    _ = sprintf_s( m_NameBuffer, "%s", e.name().c_str() );
+    auto const res = std::format_to_n( m_NameBuffer, CountOf( m_NameBuffer ), "{}", e.name().c_str() );
+    ASSERT( res.size < CountOf( m_NameBuffer ) );
   }
   else
   {
-    _ = sprintf_s( m_NameBuffer, "Entity %llu", e.id() );
+    auto const res = std::format_to_n( m_NameBuffer, CountOf( m_NameBuffer ), "Entity {}", e.id() );
+    ASSERT( res.size < CountOf( m_NameBuffer ) );
   }
 
   return m_NameBuffer;

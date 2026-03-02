@@ -2,6 +2,7 @@
 
 #include <Util/DataUtil.hpp>
 #include <Util/Profiling.hpp>
+#include <format>
 #include "Camera.hpp"
 #include "ModelLoader.hpp"
 
@@ -91,8 +92,9 @@ Ember::SRVHandle Ember::Internal::OmniLightManager::AllocateOmniShadow()
         .InitState = D3D12_RESOURCE_STATE_PIXEL_SHADER_RESOURCE,
     } ) );
 
-    wchar_t buf[32];
-    swprintf_s( buf, L"Omni Shadow Map %u", m_AllocatedShadows );
+    wchar_t    buf[32];
+    auto const res = std::format_to_n( buf, CountOf( buf ), L"Omni Shadow Map {}", m_AllocatedShadows );
+    ASSERT( res.size < CountOf( buf ) );
     m_ActiveShadows.back().SetName( buf );
   }
 

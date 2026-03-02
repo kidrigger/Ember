@@ -160,8 +160,9 @@ bool Ember::TextureLoader::TryLoadImpl(
 
   m_CurrentCommandList.Track( staging_res );
 
-  wchar_t staging_name[512];
-  swprintf_s( staging_name, L"Staging: %s", wide_id );
+  wchar_t    staging_name[512];
+  auto const res = std::format_to_n( staging_name, CountOf( staging_name ), L"Staging: {}", wide_id );
+  ASSERT( res.size < CountOf( staging_name ) );
   ERR_FAIL_RET_V( staging_res->SetName( staging_name ), false );
 
   auto lock_guard = std::lock_guard( m_LoadLock );

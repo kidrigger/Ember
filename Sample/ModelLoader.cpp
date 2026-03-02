@@ -3,6 +3,7 @@
 #include <Graphics/RenderDevice.hpp>
 #include <Util/DataUtil.hpp>
 #include <Util/HelperUtils.hpp>
+#include <format>
 #include "BasicApp.hpp"
 #include "Material.hpp"
 #include "MaterialManager.hpp"
@@ -1075,8 +1076,9 @@ std::expected<flecs::entity, Ember::ModelLoader::Error> Ember::ModelLoader::TryL
 
   if ( result != cgltf_result_success )
   {
-    char buf[512];
-    sprintf_s( buf, "%s failed to load", filename );
+    char       buf[512];
+    auto const res = std::format_to_n( buf, CountOf( buf ), "{} failed to load", filename );
+    ASSERT( res.size < CountOf( buf ) );
     OutputDebugStringA( buf );
     cgltf_free( gltf_model );
 
@@ -1087,8 +1089,9 @@ std::expected<flecs::entity, Ember::ModelLoader::Error> Ember::ModelLoader::TryL
 
   if ( result != cgltf_result_success )
   {
-    char buf[512];
-    sprintf_s( buf, "%s is invalid", filename );
+    char       buf[512];
+    auto const res = std::format_to_n( buf, CountOf( buf ), "{} is invalid", filename );
+    ASSERT( res.size < CountOf( buf ) );
     OutputDebugStringA( buf );
     cgltf_free( gltf_model );
 
@@ -1099,8 +1102,9 @@ std::expected<flecs::entity, Ember::ModelLoader::Error> Ember::ModelLoader::TryL
 
   if ( result != cgltf_result_success )
   {
-    char buf[512];
-    sprintf_s( buf, "%s buffers failed to load.", filename );
+    char       buf[512];
+    auto const res = std::format_to_n( buf, CountOf( buf ), "{} buffers failed to load.", filename );
+    ASSERT( res.size < CountOf( buf ) );
     OutputDebugStringA( buf );
     cgltf_free( gltf_model );
 

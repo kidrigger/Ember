@@ -1,5 +1,6 @@
 #include "Inspector.hpp"
 
+#include <format>
 #include <imgui.h>
 
 #include <Util/HelperUtils.hpp>
@@ -206,7 +207,9 @@ void Ember::Inspector::SerializeStruct( flecs::meta::op_t* ops, void* ptr )
   if ( ops->name )
   {
     char buf[128];
-    _ = sprintf_s( buf, "%s", ops->name );
+    ZeroMemory( DataOf( buf ), ByteSizeOf( buf ) );
+    auto const res = std::format_to_n( buf, CountOf( buf ), "{}", ops->name );
+    ASSERT( res.size < CountOf( buf ) );
 
     if ( ImGui::TreeNode( buf ) )
     {
@@ -289,13 +292,16 @@ void Ember::Inspector::SerializeOps( flecs::meta::op_t* ops, int32_t op_count, v
     // Get pointer for current field
     void* ptr = ECS_OFFSET( base, op->offset );
 
+    ZeroMemory( DataOf( label ), ByteSizeOf( label ) );
     if ( op->name )
     {
-      _ = sprintf_s( label, "%s", op->name );
+      auto const res = std::format_to_n( label, CountOf( label ), "{}", op->name );
+      ASSERT( res.size < CountOf( label ) );
     }
     else
     {
-      _ = sprintf_s( label, "##%p", op );
+      auto const res = std::format_to_n( label, CountOf( label ), "##{:p}", ( void* )op );
+      ASSERT( res.size < CountOf( label ) );
     }
 
     switch ( op->kind )
