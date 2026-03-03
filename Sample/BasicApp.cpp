@@ -272,39 +272,7 @@ Ember::BasicApp::~BasicApp() // NOLINT(modernize-use-equals-default)
 
 void Ember::BasicApp::SetupRenderPasses()
 {
-  auto const swapchain_format = m_RenderDevice->GetSwapchainFormat();
-
-  ENSURE( RenderPass::DepthPrePass::Create( &m_DrawPrePass, m_RenderDevice.get(), kDepthFormat ) );
-  ENSURE( RenderPass::OpaqueForward::Create(
-      &m_RenderOpaqueMeshes,
-      {
-          .RenderDevice          = m_RenderDevice.get(),
-          .RenderTargetFormat    = DirectX::MakeSRGB( swapchain_format ),
-          .DepthStencilFormat    = kDepthFormat,
-          .DependsOnDepthPrePass = true,
-      } ) );
-
-  ENSURE( RenderPass::GBuffer::Create( &m_UpdateGBuffer, m_RenderDevice.get(), kDepthFormat ) );
-  ENSURE( RenderPass::OmniLightDeferred::Create(
-      &m_RenderOmniLights, m_RenderDevice.get(), DirectX::MakeSRGB( swapchain_format ), kDepthFormat ) );
-  ENSURE( RenderPass::SpotLightDeferred::Create(
-      &m_RenderSpotLights, m_RenderDevice.get(), DirectX::MakeSRGB( swapchain_format ), kDepthFormat ) );
-  ENSURE( RenderPass::ScreenSpaceLightDeferred::Create(
-      &m_RenderScreenSpaceLighting, m_RenderDevice.get(), DirectX::MakeSRGB( swapchain_format ) ) );
-  ENSURE( RenderPass::ScreenSpaceAmbientOcclusion::Create( &m_RenderSSAO, m_RenderDevice.get() ) );
-  ENSURE( RenderPass::ScreenSpaceAmbientOcclusionBlur::Create( &m_RenderSSAOBlur, m_RenderDevice.get() ) );
-
-  ENSURE( RenderPass::MaskedForward::Create(
-      &m_RenderMaskedMeshes, m_RenderDevice.get(), DirectX::MakeSRGB( swapchain_format ), kDepthFormat ) );
-  ENSURE( RenderPass::TransparencyForward::Create(
-      &m_RenderTransparentMeshes, m_RenderDevice.get(), DirectX::MakeSRGB( swapchain_format ), kDepthFormat ) );
-  ENSURE( RenderPass::Skybox::Create(
-      &m_RenderBackground, m_RenderDevice.get(), DirectX::MakeSRGB( swapchain_format ), kDepthFormat ) );
-
-  ENSURE( RenderPass::Atmosphere::Create( &m_UpdateAtmosphericSky, m_RenderDevice.get() ) );
-
-  ENSURE( Proto::ReflectionProbe::Create(
-      &m_Probe, m_RenderDevice.get(), m_MipMapGenerator.get(), { 0.0f, 4.0f, 0.0f }, 15.0f ) );
+  ENSURE( RenderPipeline::Create( &m_RenderPipeline, m_RenderDevice.get(), m_MipMapGenerator.get(), kDepthFormat ) );
 }
 
 void Ember::BasicApp::LoadContent()
@@ -696,13 +664,13 @@ void Ember::BasicApp::Update()
       } );
 
   uint32_t light_index = 0;
-  m_UpdateAtmosphericSky.ResetSun();
+  m_SunLightIndex      = UINT32_MAX;
   m_World->GetECS().each(
       [&]( flecs::entity const e, DirectionalLight const& )
       {
         if ( e.has<Sun>() )
         {
-          m_UpdateAtmosphericSky.SetSun( light_index );
+          m_SunLightIndex = light_index;
         }
         light_index++;
       } );
@@ -788,36 +756,18 @@ void Ember::BasicApp::Render()
   m_FGBlackboard.get<FrameConstants>()        = { m_FrameConstantBuffers[frame_idx] };
   m_FGBlackboard.get<Environment::GpuRepr>()  = m_Environment->Repr();
 
-  auto const               atmosphere         = m_UpdateAtmosphericSky( &frame_graph, &m_FGBlackboard, frame_idx );
-  auto const               probe              = m_Probe( &frame_graph, m_FGBlackboard );
+  m_RenderPipeline.SetSunIndex( m_SunLightIndex );
 
-  auto const               depth_buffer       = m_DrawPrePass( &frame_graph, m_FGBlackboard );
-
-  FrameGraphResource const opaque_pass_fwd =
-      g_UseProbes
-          ? m_RenderOpaqueMeshes.Execute( &frame_graph, m_FGBlackboard, { depth_buffer, probe, m_Probe.ProbeInfo } )
-          : m_RenderOpaqueMeshes.Execute( &frame_graph, m_FGBlackboard, depth_buffer );
-
-  auto const gbuffer         = m_UpdateGBuffer( &frame_graph, m_FGBlackboard, depth_buffer );
-  auto const ssao_pass       = m_RenderSSAO( &frame_graph, m_FGBlackboard, depth_buffer );
-  auto const ssao_blur_pass  = m_RenderSSAOBlur( &frame_graph, m_FGBlackboard, ssao_pass, depth_buffer );
-  auto const omni_pass_rt    = m_RenderOmniLights( &frame_graph, m_FGBlackboard, gbuffer );
-  auto const spot_pass_rt    = m_RenderSpotLights( &frame_graph, m_FGBlackboard, gbuffer, omni_pass_rt );
-  auto const opaque_pass_dfr = m_RenderScreenSpaceLighting(
-      &frame_graph, m_FGBlackboard, gbuffer, spot_pass_rt, g_SSAO ? ssao_blur_pass : FrameGraphResource{} );
-
-  auto const opaque_pass = RenderPass::RenderDepthData{
-    .RenderTarget = g_UseDeferredRendering ? opaque_pass_dfr : opaque_pass_fwd,
-    .DepthStencil = depth_buffer,
-  };
-
-  auto const alpha_tested      = m_RenderMaskedMeshes( &frame_graph, m_FGBlackboard, opaque_pass );
-  auto const transparency_pass = m_RenderTransparentMeshes( &frame_graph, m_FGBlackboard, alpha_tested );
-
-  m_RenderBackground.UseProceduralAtmosphericSky = g_Debug.SkyMode == DebugConfigGpuRepr::kAtmosphere;
-  auto const skybox_pass = m_RenderBackground( &frame_graph, m_FGBlackboard, transparency_pass, atmosphere.SkyViewLUT );
-
-  auto const final_output = g_Debug.SkyMode == DebugConfigGpuRepr::kNone ? transparency_pass.RenderTarget : skybox_pass;
+  FrameGraphResource const final_output = m_RenderPipeline.Execute(
+      &frame_graph,
+      &m_FGBlackboard,
+      frame_idx,
+      {
+          .UseDeferredRendering       = g_UseDeferredRendering,
+          .UseProbes                  = g_UseProbes,
+          .UseSSAO                    = g_SSAO,
+          .UseProceduralAtmosphericSky = g_Debug.SkyMode == DebugConfigGpuRepr::kAtmosphere,
+      } );
 
   auto const imgui_out    = frame_graph.addCallbackPass(
       "ImGUI",

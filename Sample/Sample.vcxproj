@@ -404,6 +404,7 @@
     <ClCompile Include="PickingGizmo.cpp" />
     <ClCompile Include="ReflectionProbe.cpp" />
     <ClCompile Include="Render\DrawList.cpp" />
+    <ClCompile Include="Render\RenderPipeline.cpp" />
     <ClCompile Include="SceneTree.cpp" />
     <ClCompile Include="SSAOBlurPass.cpp" />
     <ClCompile Include="SSAOPass.cpp" />
@@ -442,6 +443,7 @@
     <ClInclude Include="PickingGizmo.hpp" />
     <ClInclude Include="ReflectionProbe.hpp" />
     <ClInclude Include="Render\DrawList.hpp" />
+    <ClInclude Include="Render\RenderPipeline.hpp" />
     <ClInclude Include="SceneTree.hpp" />
     <ClInclude Include="SSAOBlurPass.hpp" />
     <ClInclude Include="SSAOPass.hpp" />
@@ -1088,3 +1090,4 @@
   <ImportGroup Label="ExtensionTargets">
   </ImportGroup>
 </Project>
+

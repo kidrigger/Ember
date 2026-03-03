@@ -2,22 +2,12 @@
 
 #include <Graphics/RenderDevice.hpp>
 #include <Util/DirectXHeaders.hpp>
-#include "Atmosphere.hpp"
-#include "DepthPrePass.hpp"
 #include "Environment.hpp"
-#include "ForwardPass.hpp"
 #include "FrameGraphHelper.hpp"
-#include "GBufferPass.hpp"
 #include "IApp.hpp"
-#include "LightingPass.hpp"
-#include "ReflectionProbe.hpp"
-#include "RenderPassCommon.hpp"
-#include "SSAOBlurPass.hpp"
-#include "SSAOPass.hpp"
+#include "Render/RenderPipeline.hpp"
 #include "Scene.hpp"
-#include "SkyboxPass.hpp"
 #include "TexturePool.hpp"
-#include "TransparencyPass.hpp"
 #include "fg/Blackboard.hpp"
 
 namespace Ember
@@ -26,6 +16,7 @@ class LightManager;
 class ModelLoader;
 class PerfCounter;
 class RenderDevice;
+class MipMapGenerator;
 class TextureLoader;
 class Camera;
 
@@ -48,36 +39,13 @@ class BasicApp final : public IApp
   wchar_t                          m_SprintfBuffer[1024]{};
 
   // Specifics
-  FG::Context          m_FGContext;
-  TexturePool          m_TransientTextures;
-  Buffer               m_FrameConstantBuffers[RenderDevice::kNumFrames];
-  FrameGraphBlackboard m_FGBlackboard;
+  FG::Context                      m_FGContext;
+  TexturePool                      m_TransientTextures;
+  Buffer                           m_FrameConstantBuffers[RenderDevice::kNumFrames];
+  FrameGraphBlackboard             m_FGBlackboard;
 
-  // ==== Raster Pipeline ====
-  //
-  RenderPass::DepthPrePass m_DrawPrePass;
-
-  // Forward Only
-  RenderPass::OpaqueForward m_RenderOpaqueMeshes;
-
-  // Deferred Only
-  RenderPass::GBuffer                         m_UpdateGBuffer;
-  RenderPass::OmniLightDeferred               m_RenderOmniLights;
-  RenderPass::SpotLightDeferred               m_RenderSpotLights;
-  RenderPass::ScreenSpaceLightDeferred        m_RenderScreenSpaceLighting;
-  RenderPass::ScreenSpaceAmbientOcclusion     m_RenderSSAO;
-  RenderPass::ScreenSpaceAmbientOcclusionBlur m_RenderSSAOBlur;
-
-  // Forward + Deferred
-  RenderPass::MaskedForward       m_RenderMaskedMeshes;
-  RenderPass::TransparencyForward m_RenderTransparentMeshes;
-
-  // Environment
-  RenderPass::Atmosphere m_UpdateAtmosphericSky;
-  RenderPass::Skybox     m_RenderBackground;
-  Proto::ReflectionProbe m_Probe;
-
-  // ==========================
+  RenderPipeline                   m_RenderPipeline;
+  uint32_t                         m_SunLightIndex{ UINT32_MAX };
 
   std::unique_ptr<Camera>          m_Camera;
   DirectX::XMUINT2                 m_PrevMouse{};

@@ -228,6 +228,9 @@
     <ClCompile Include="SSAOBlurPass.cpp">
       <Filter>Source Files\Passes</Filter>
     </ClCompile>
+    <ClCompile Include="Render\RenderPipeline.cpp">
+      <Filter>Source Files\Render</Filter>
+    </ClCompile>
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="BasicApp.hpp">
@@ -337,6 +340,9 @@
     </ClInclude>
     <ClInclude Include="SSAOBlurPass.hpp">
       <Filter>Header Files\Passes</Filter>
+    </ClInclude>
+    <ClInclude Include="Render\RenderPipeline.hpp">
+      <Filter>Header Files\Render</Filter>
     </ClInclude>
   </ItemGroup>
   <ItemGroup>
