@@ -18,7 +18,7 @@ public:
   uint32_t constexpr static kPrefilterMaxLoD   = 5;
   uint32_t constexpr static kBrdfLUTSize       = 512;
 
-  struct GpuRepr
+  struct alignas( 16 ) GpuRepr
   {
     SRVHandle Skybox;
     SRVHandle DiffuseIrradiance;
@@ -39,6 +39,7 @@ public:
     ComPtr<ID3D12PipelineState> EqRectToCubePipeline;
     ComPtr<ID3D12PipelineState> DiffuseIrradiance;
     ComPtr<ID3D12PipelineState> Prefilter;
+    ComPtr<ID3D12PipelineState> BrdfLUT;
   };
 
   struct LoadFromFile

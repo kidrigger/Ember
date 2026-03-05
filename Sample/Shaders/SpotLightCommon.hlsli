@@ -3,6 +3,7 @@
 
 #include "Camera.hlsli"
 #include "DebugConfig.hlsli"
+#include "Environment.hlsli"
 #include "LightData.hlsli"
 
 struct SpotLightPayload
@@ -10,10 +11,11 @@ struct SpotLightPayload
   uint LightID[32];
 };
 
-cbuffer BindlessIndex : register( b1 )
+cbuffer FrameConstants : register( b1 )
 {
   Camera      g_Camera;
   LightInfo   g_Lights;
+  Environment g_Env;
   DebugConfig g_Debug;
 }
 

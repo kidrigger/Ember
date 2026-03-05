@@ -52,6 +52,7 @@ private:
 
   RenderPass::Atmosphere                      m_UpdateAtmosphericSky;
   RenderPass::Skybox                          m_RenderBackground;
+  RenderPass::AtmosphereSkybox                m_RenderAtmosphereBackground;
   Proto::ReflectionProbe                      m_Probe;
 
 public:
@@ -71,6 +72,7 @@ public:
       RenderPass::TransparencyForward             render_transparent_meshes,
       RenderPass::Atmosphere                      update_atmospheric_sky,
       RenderPass::Skybox                          render_background,
+      RenderPass::AtmosphereSkybox                render_atmos_background,
       Proto::ReflectionProbe                      probe );
 
   static bool Create(

@@ -37,10 +37,11 @@ struct PSIn
 
 ConstantBuffer<DrawBatch> g_DrawBatch : register( b0, space0 );
 
-cbuffer                   BindlessIndex : register( b1, space0 )
+cbuffer                   FrameConstants : register( b1, space0 )
 {
   Camera      g_Camera;
   LightInfo   g_Lights;
+  Environment g_Env;
   DebugConfig g_Debug;
 }
 

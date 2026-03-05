@@ -31,26 +31,26 @@ public:
   struct Params
   {
     /* rayleigh */
-    DirectX::XMFLOAT3 ScatterCoeffRayleigh{ 5.802e-6f, 13.558e-6f, 33.1e-6f }; // 12
-    float             DensityFactorRayleigh{ 8000.0f };                        // 16
+    DirectX::XMFLOAT3 ScatterCoeffRayleigh  = { 5.802e-6f, 13.558e-6f, 33.1e-6f }; // 12
+    float             DensityFactorRayleigh = 8000.0f;                             // 16
 
     /* ozone */
-    DirectX::XMFLOAT3 AbsorptionCoeffOzone{ 0.65e-6f, 1.881e-6f, 0.085e-6f }; // 28
-    float             OzoneHeight{ 25000.0f };                                // 32
-    float             OzoneWidth{ 30000.0f };                                 // 36
+    DirectX::XMFLOAT3 AbsorptionCoeffOzone = { 0.65e-6f, 1.881e-6f, 0.085e-6f }; // 28
+    float             OzoneHeight          = 25000.0f;                           // 32
+    float             OzoneWidth           = 30000.0f;                           // 36
 
     /* mei */
-    float ScatterCoeffMei{ 3.996e-6f };  // 40
-    float AbsorptionCoeffMei{ 4.4e-6f }; // 44
-    float DensityFactorMei{ 1200.0f };   // 48
+    float ScatterCoeffMei    = 3.996e-6f; // 40
+    float AbsorptionCoeffMei = 4.4e-6f;   // 44
+    float DensityFactorMei   = 1200.0f;   // 48
 
-    float AsymmetryMei{ 0.8f };          // 52
+    float AsymmetryMei       = 0.8f;      // 52
 
     /* sampling */
-    int      DepthSamples{ 400 }; // 56
-    int      ViewSamples{ 300 };  // 60
+    int      DepthSamples = 400; // 56
+    int      ViewSamples  = 300; // 60
 
-    uint32_t Padding{ 0 };        // 64
+    uint32_t Padding      = 0;   // 64
   };
 
 private:
@@ -68,7 +68,7 @@ private:
   std::vector<Buffer>         m_AtmosphereParamBuffers;
 
   Params                      m_AtmosphereParams;
-  uint32_t                    m_Sun{ 0xFFFFFFFF };
+  uint32_t                    m_Sun = 0xFFFFFFFF;
   uint8_t                     m_LUTUpdatePendingFrames;
 
 public:

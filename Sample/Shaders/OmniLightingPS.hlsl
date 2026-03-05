@@ -15,17 +15,13 @@ cbuffer GBufferIn : register( b0 )
   ResID g_Emissive;
 };
 
-cbuffer BindlessIndex : register( b1 )
+cbuffer FrameConstants : register( b1 )
 {
   Camera      g_Camera;
   LightInfo   g_Lights;
+  Environment g_Env;
   DebugConfig g_Debug;
 }
-
-cbuffer EnvBuf : register( b2 )
-{
-  Environment g_Env;
-};
 
 SamplerState           g_DefaultSampler : register( s0 );
 SamplerState           g_ClampedSampler : register( s1 );

@@ -1,12 +1,16 @@
 #include "Bindless.hlsli"
 #include "Camera.hlsli"
+#include "DebugConfig.hlsli"
+#include "Environment.hlsli"
+#include "LightData.hlsli"
 #include "Utility.hlsli"
 
-ConstantBuffer<Camera> g_Camera : register( b0 );
-
-cbuffer                g_Skybox : register( b1 )
+cbuffer FrameConstants : register( b0 )
 {
-  ResID g_Skybox;
+  Camera      g_Camera;
+  LightInfo   g_Lights;
+  Environment g_Env;
+  DebugConfig g_Debug;
 }
 
 struct BackgroundOut

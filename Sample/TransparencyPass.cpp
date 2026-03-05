@@ -30,8 +30,7 @@ bool Ember::RenderPass::TransparencyForward::Create(
   D3D12_ROOT_PARAMETER1 root_parameters[] = {
     RootConstants{ .Register = 0, .SizeBytes = sizeof( DrawList::PerBatch ) },
     RootConstantBuffer{ .Register = 1 },
-    RootConstants{ .Register = 2, .SizeBytes = sizeof( Environment::GpuRepr ) },
-    RootConstants{ .Register = 3, .SizeBytes = sizeof( Proto::ReflectionProbe::Probe ) + 4 },
+    RootConstants{ .Register = 2, .SizeBytes = sizeof( Proto::ReflectionProbe::Probe ) + 4 },
   };
 
   ComPtr<ID3D12RootSignature> root_signature = render_device->CreateRootSignature( {
@@ -80,8 +79,7 @@ Ember::RenderPass::RenderDepthData Ember::RenderPass::TransparencyForward::Execu
   auto const& root_signature  = RootSignature;
 
   auto const& [constants_buf] = bb.get<FrameConstants>();
-  auto const& env             = bb.get<Environment::GpuRepr>();
-  auto const  batch           = bb.get<DrawList::Batches>().Transparent();
+  auto const batch            = bb.get<DrawList::Batches>().Transparent();
 
   return frame_graph->addCallbackPass(
       "Transparency Pass",
@@ -103,8 +101,7 @@ Ember::RenderPass::RenderDepthData Ember::RenderPass::TransparencyForward::Execu
         cmd->SetPipelineState( pipeline.Get() );
         cmd->SetGraphicsRootConstants( 0, batch );
         cmd->SetGraphicsRootConstantBuffer( 1, constants_buf );
-        cmd->SetGraphicsRootConstants( 2, env );
-        cmd->SetGraphicsRootConstants( 3, ( UINT )SRVHandle{}, 16 );
+        cmd->SetGraphicsRootConstants( 2, ( UINT )SRVHandle{}, 16 );
         cmd->DispatchMesh( { .X = batch.CommandsCount } );
       } );
 }
@@ -135,8 +132,7 @@ bool Ember::RenderPass::MaskedForward::Create(
   D3D12_ROOT_PARAMETER1 root_parameters[] = {
     RootConstants{ .Register = 0, .SizeBytes = sizeof( DrawList::PerBatch ) },
     RootConstantBuffer{ .Register = 1 },
-    RootConstants{ .Register = 2, .SizeBytes = sizeof( Environment::GpuRepr ) },
-    RootConstants{ .Register = 3, .SizeBytes = sizeof( Proto::ReflectionProbe::Probe ) + 4 },
+    RootConstants{ .Register = 2, .SizeBytes = sizeof( Proto::ReflectionProbe::Probe ) + 4 },
   };
 
   ComPtr<ID3D12RootSignature> root_signature = render_device->CreateRootSignature( {
@@ -175,7 +171,6 @@ Ember::RenderPass::RenderDepthData Ember::RenderPass::MaskedForward::Execute(
   auto const pipeline         = Pipeline;
 
   auto const& [constants_buf] = bb.get<FrameConstants>();
-  auto const& env             = bb.get<Environment::GpuRepr>();
   auto const& draw_list       = bb.get<DrawList::Batches>();
   auto const  batch           = draw_list.Masked();
 
@@ -199,8 +194,7 @@ Ember::RenderPass::RenderDepthData Ember::RenderPass::MaskedForward::Execute(
         cmd->SetPipelineState( pipeline.Get() );
         cmd->SetGraphicsRootConstants( 0, batch );
         cmd->SetGraphicsRootConstantBuffer( 1, constants_buf );
-        cmd->SetGraphicsRootConstants( 2, env );
-        cmd->SetGraphicsRootConstants( 3, ( UINT )SRVHandle{}, 16 );
+        cmd->SetGraphicsRootConstants( 2, ( UINT )SRVHandle{}, 16 );
         cmd->DispatchMesh( { .X = batch.CommandsCount } );
       } );
 }

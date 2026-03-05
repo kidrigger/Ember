@@ -1,15 +1,17 @@
 #include "Bindless.hlsli"
 #include "Camera.hlsli"
 #include "DebugConfig.hlsli"
+#include "Environment.hlsli"
 #include "LightData.hlsli"
 #include "Math.hlsli"
 #include "OmniLightCommon.hlsli"
 #include "Utility.hlsli"
 
-cbuffer BindlessIndex : register( b1 )
+cbuffer FrameConstants : register( b1 )
 {
   Camera      g_Camera;
   LightInfo   g_Lights;
+  Environment g_Env;
   DebugConfig g_Debug;
 }
 

@@ -177,11 +177,16 @@ bool CreatePipelines( Environment::Pipelines* out, RenderDevice* render_device )
   } );
   if ( not prefilter_pipeline ) return false;
 
+  auto brdf_lut_pipeline = render_device->CreateComputePipeline( {
+      .RootSignature     = root_signature.Get(),
+      .ComputeShaderName = "BrdfLUT.cso",
+      .DebugName         = "BRDF LUT Pipeline",
+  } );
+  if ( not brdf_lut_pipeline ) return false;
+
   new ( out ) Environment::Pipelines{
-    std::move( root_signature ),
-    std::move( eqrect_to_cube_pipeline ),
-    std::move( diffuse_irradiance_pipeline ),
-    std::move( prefilter_pipeline ),
+    std::move( root_signature ),     std::move( eqrect_to_cube_pipeline ), std::move( diffuse_irradiance_pipeline ),
+    std::move( prefilter_pipeline ), std::move( brdf_lut_pipeline ),
   };
 
   return true;
@@ -245,7 +250,7 @@ bool GeneratePrefilter( Texture* prefilter, EnvContext const& context, Texture c
     .Roughness     = 0.0f,
   };
 
-  ASSERT( prefilter->GetTexture()->GetDesc().MipLevels == kPrefilterMaxLoD + 1 /* Accounting for mip0 */ );
+  ASSERT( prefilter->GetDesc().MipLevels == Environment::kPrefilterMaxLoD + 1 /* Accounting for mip0 */ );
 
   context.CommandList->SetComputeRootSignature( context.Pipelines->RootSignature.Get() );
   context.CommandList->SetPipelineState( context.Pipelines->Prefilter.Get() );
@@ -284,20 +289,13 @@ bool GenerateBrdfLUT( Texture* brdf_lut, EnvContext const& context )
   } );
   brdf_lut->SetName( L"BRDF LUT" );
 
-  auto brdf_lut_pipeline = context.RenderDevice->CreateComputePipeline( {
-      .RootSignature     = context.Pipelines->RootSignature.Get(),
-      .ComputeShaderName = "BrdfLUT.cso",
-      .DebugName         = "BRDF LUT Pipeline",
-  } );
-  if ( not brdf_lut_pipeline ) return false;
-
   BrdfLUTParams const brdf_lut_constant{
     .OutputTexture = *brdf_lut,
     .Width         = Environment::kBrdfLUTSize,
     .Height        = Environment::kBrdfLUTSize,
   };
 
-  context.CommandList->SetPipelineState( brdf_lut_pipeline.Get() );
+  context.CommandList->SetPipelineState( context.Pipelines->BrdfLUT.Get() );
   context.CommandList->BindComputeResources( 0, brdf_lut_constant );
   context.CommandList->Dispatch( {
       .X = Environment::kBrdfLUTSize / kThreadGroupX,

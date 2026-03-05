@@ -25,7 +25,6 @@ bool Ember::RenderPass::GBuffer::Create( GBuffer* out, RenderDevice* render_devi
   D3D12_ROOT_PARAMETER1 root_parameters[] = {
     RootConstants{ .Register = 0, .SizeBytes = sizeof( DrawList::PerBatch ) },
     RootConstantBuffer{ .Register = 1 },
-    RootConstants{ .Register = 2, .SizeBytes = sizeof( Environment::GpuRepr ) },
   };
 
   ComPtr<ID3D12RootSignature> root_signature = render_device->CreateRootSignature( {
@@ -99,7 +98,6 @@ Ember::RenderPass::GBuffer::Data Ember::RenderPass::GBuffer::Execute(
         PIXScopedEvent( cmd->Get(), PIX_COLOR_DEFAULT, "GBuffer Pass" );
 
         auto const& [constants_buf] = bb->get<FrameConstants>();
-        auto const& env             = bb->get<Environment::GpuRepr>();
         auto const& draw_list       = bb->get<DrawList::Batches>();
 
         auto const  batch           = draw_list.Opaque();
@@ -108,7 +106,6 @@ Ember::RenderPass::GBuffer::Data Ember::RenderPass::GBuffer::Execute(
         cmd->SetPipelineState( self->Pipeline.Get() );
         cmd->SetGraphicsRootConstants( 0, batch );
         cmd->SetGraphicsRootConstantBuffer( 1, constants_buf );
-        cmd->SetGraphicsRootConstants( 2, env );
         cmd->DispatchMesh( { .X = batch.CommandsCount } );
       } );
 }

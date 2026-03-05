@@ -13,16 +13,15 @@ const static float        kNearPlane = 0.01f;
 
 ConstantBuffer<DrawBatch> g_DrawBatch : register( b0 );
 
-cbuffer                   BindlessIndex : register( b1 )
+cbuffer                   FrameConstants : register( b1 )
 {
   Camera      g_Camera;
   LightInfo   g_Lights;
+  Environment g_Env;
   DebugConfig g_Debug;
 }
 
-ConstantBuffer<Environment> g_Env : register( b2 );
-
-cbuffer                     QuickTransforms : register( b3 )
+cbuffer QuickTransforms : register( b2 )
 {
   float4 g_ProbeInfo;
 }

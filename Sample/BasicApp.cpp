@@ -83,6 +83,14 @@ constexpr char const* kVisualizationModeNames[] = {
 };
 constexpr char const* kSkyModeNames[] = { "None", "Skybox", "Atmosphere" };
 
+struct FrameConstantData
+{
+  Ember::Camera::GpuRepr       Camera;
+  Ember::LightManager::GpuRepr LightInfo;
+  Ember::Environment::GpuRepr  Environment;
+  DebugConfigGpuRepr           DebugConfig;
+};
+
 } // namespace
 
 struct RotatingModel
@@ -185,7 +193,6 @@ Ember::BasicApp::BasicApp(
 
   m_FGBlackboard.add<FrameConstants>();
   m_FGBlackboard.add<LightManager::GpuRepr>();
-  m_FGBlackboard.add<Environment::GpuRepr>();
   m_FGBlackboard.add<FG::BackbufferInfo>(
       m_RenderDevice->GetSwapchainFormat(), kDepthFormat, m_WindowWidth, m_WindowHeight );
   m_FGBlackboard.add<DrawList::Batches>();
@@ -282,8 +289,7 @@ void Ember::BasicApp::LoadContent()
   // Setup Camera
   for ( auto& buf : m_FrameConstantBuffers )
   {
-    buf = m_RenderDevice->CreateConstantBuffer(
-        sizeof( Camera::GpuRepr ) + sizeof( LightManager::GpuRepr ) + sizeof( DebugConfigGpuRepr ) );
+    buf = m_RenderDevice->CreateConstantBuffer( sizeof( FrameConstantData ) );
   }
 
   m_Camera->SetHorizontalFoV( DirectX::XMConvertToRadians( 70.0f ) );
@@ -556,7 +562,6 @@ void Ember::BasicApp::Update()
   picking_gizmo.Draw( *m_Camera, scene_tree.GetSelected() );
   Inspector::Draw( &m_World->GetECS(), scene_tree.GetSelected() );
 
-
   // Rendering
   ImGui::Render();
 
@@ -699,28 +704,20 @@ void Ember::BasicApp::Render()
       .CommandList = &command_list,
   } );
 
-  std::vector<byte> scratch;
   {
     Buffer* const_buffer = &m_FrameConstantBuffers[frame_idx];
 
     m_TransientTextures.Update();
     m_Camera->Update();
-    LightManager::GpuRepr light_info = m_LightManager->PrepareFrame( *m_Camera, frame_idx );
 
-    scratch.resize( const_buffer->GetSize() );
+    FrameConstantData fcd = {
+      .Camera      = m_Camera->GetGpuRepr(),
+      .LightInfo   = m_LightManager->PrepareFrame( *m_Camera, frame_idx ),
+      .Environment = m_Environment->Repr(),
+      .DebugConfig = g_Debug,
+    };
 
-    byte* ptr = scratch.data();
-
-    memcpy( ptr, &m_Camera->GetGpuRepr(), sizeof( Camera::GpuRepr ) );
-    ptr += sizeof( Camera::GpuRepr );
-
-    memcpy( ptr, &light_info, sizeof( LightManager::GpuRepr ) );
-    ptr += sizeof( LightManager::GpuRepr );
-
-    memcpy( ptr, &g_Debug, sizeof( DebugConfigGpuRepr ) );
-
-    const_buffer->Write( 0, ByteSizeOf( scratch ), DataOf( scratch ) );
-    scratch.clear();
+    const_buffer->Write( 0, sizeof( fcd ), &fcd );
   }
 
   FrameGraph frame_graph;
@@ -757,7 +754,6 @@ void Ember::BasicApp::Render()
   m_FGBlackboard.get<LightManager::GpuRepr>() = m_LightManager->GetGpuRepr();
   m_FGBlackboard.get<DrawList::Batches>()     = draw_list_info;
   m_FGBlackboard.get<FrameConstants>()        = { m_FrameConstantBuffers[frame_idx] };
-  m_FGBlackboard.get<Environment::GpuRepr>()  = m_Environment->Repr();
 
   m_RenderPipeline.SetSunIndex( m_SunLightIndex );
 

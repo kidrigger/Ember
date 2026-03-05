@@ -4,6 +4,7 @@
 #include "Bindless.hlsli"
 #include "Camera.hlsli"
 #include "DebugConfig.hlsli"
+#include "Environment.hlsli"
 #include "Geometry.hlsli"
 #include "LightData.hlsli"
 
@@ -11,6 +12,7 @@ cbuffer FrameConstants : register( b0 )
 {
   Camera      g_Camera;
   LightInfo   g_Lights;
+  Environment g_Env;
   DebugConfig g_Debug;
 }
 

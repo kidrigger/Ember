@@ -31,8 +31,7 @@ bool Ember::RenderPass::OpaqueForward::Create( OpaqueForward* out, Desc const& d
   D3D12_ROOT_PARAMETER1 root_parameters[] = {
     RootConstants{ .Register = 0, .SizeBytes = sizeof( DrawList::PerBatch ) },
     RootConstantBuffer{ .Register = 1 },
-    RootConstants{ .Register = 2, .SizeBytes = sizeof( Environment::GpuRepr ) },
-    RootConstants{ .Register = 3, .SizeBytes = sizeof( Proto::ReflectionProbe::Probe ) + 4 },
+    RootConstants{ .Register = 2, .SizeBytes = sizeof( Proto::ReflectionProbe::Probe ) + 4 },
   };
 
   ComPtr<ID3D12RootSignature> root_signature =
@@ -76,7 +75,6 @@ FrameGraphResource Ember::RenderPass::OpaqueForward::Execute(
   auto const pipeline         = Pipeline;
 
   auto const& [constants_buf] = bb.get<FrameConstants>();
-  auto const& env             = bb.get<Environment::GpuRepr>();
   auto const& draw_list       = bb.get<DrawList::Batches>();
 
   return frame_graph->addCallbackPass(
@@ -118,8 +116,7 @@ FrameGraphResource Ember::RenderPass::OpaqueForward::Execute(
         cmd->SetPipelineState( pipeline.Get() );
         cmd->SetGraphicsRootConstants( 0, draw_batch );
         cmd->SetGraphicsRootConstantBuffer( 1, constants_buf );
-        cmd->SetGraphicsRootConstants( 2, env );
-        cmd->SetGraphicsRootConstants( 3, ( UINT )SRVHandle{}, 16 );
+        cmd->SetGraphicsRootConstants( 2, ( UINT )SRVHandle{}, 16 );
         cmd->DispatchMesh( { .X = draw_batch.CommandsCount } );
       } );
 }
@@ -132,7 +129,6 @@ FrameGraphResource Ember::RenderPass::OpaqueForward::Execute(
   auto [depth, probe_tex, probe_info] = in;
 
   auto const& [constants_buf]         = bb.get<FrameConstants>();
-  auto const& env                     = bb.get<Environment::GpuRepr>();
   auto const& draw_batch              = bb.get<DrawList::Batches>().Opaque();
 
   return frame_graph->addCallbackPass(
@@ -176,9 +172,8 @@ FrameGraphResource Ember::RenderPass::OpaqueForward::Execute(
         cmd->SetPipelineState( pipeline.Get() );
         cmd->SetGraphicsRootConstants( 0, draw_batch );
         cmd->SetGraphicsRootConstantBuffer( 1, constants_buf );
-        cmd->SetGraphicsRootConstants( 2, env );
-        cmd->SetGraphicsRootConstants( 3, probe_info );
-        cmd->SetGraphicsRootConstants( 3, ( UINT )probe_texture->GetSRVHandle(), sizeof( probe_info ) );
+        cmd->SetGraphicsRootConstants( 2, probe_info );
+        cmd->SetGraphicsRootConstants( 2, ( UINT )probe_texture->GetSRVHandle(), sizeof( probe_info ) );
         cmd->DispatchMesh( { .X = draw_batch.CommandsCount } );
       } );
 }

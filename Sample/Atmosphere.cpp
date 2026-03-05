@@ -195,10 +195,10 @@ Ember::RenderPass::Atmosphere::Data Ember::RenderPass::Atmosphere::Execute(
         CommandList*                  cmd        = frame_data.CommandList;
         PIXScopedEvent( cmd->Get(), PIX_COLOR_DEFAULT, "Update Sky View LUT" );
 
-        FG::Texture const& transmittance_lut = resources.get<FG::Texture>( data.TransmittanceLUT );
-        auto const& [params_buf]             = resources.get<FG::Buffer>( data.AtmosphereParams );
+        auto const& transmittance_lut = resources.get<FG::Texture>( data.TransmittanceLUT );
+        auto const& [params_buf]      = resources.get<FG::Buffer>( data.AtmosphereParams );
 
-        auto const& [constants_buf]          = blackboard->get<FrameConstants>();
+        auto const& [constants_buf]   = blackboard->get<FrameConstants>();
 
         cmd->IASetPrimitiveTopology( D3D_PRIMITIVE_TOPOLOGY_TRIANGLELIST );
         cmd->SetGraphicsRootSignature( self->m_RootSignature.Get() );

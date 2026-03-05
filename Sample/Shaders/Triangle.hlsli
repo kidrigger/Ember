@@ -48,17 +48,16 @@ struct PSIn
 
 ConstantBuffer<DrawBatch> g_DrawBatch : register( b0, space0 );
 
-cbuffer                   BindlessIndex : register( b1, space0 )
+cbuffer                   FrameConstants : register( b1, space0 )
 {
   Camera      g_Camera;
   LightInfo   g_Lights;
+  Environment g_Env;
   DebugConfig g_Debug;
 }
 
-ConstantBuffer<Environment> g_Env : register( b2, space0 );
-
-SamplerState                g_DefaultSampler : register( s0, space0 );
-SamplerState                g_ClampedSampler : register( s1, space0 );
-SamplerComparisonState      g_ShadowSampler : register( s2, space0 );
+SamplerState           g_DefaultSampler : register( s0, space0 );
+SamplerState           g_ClampedSampler : register( s1, space0 );
+SamplerComparisonState g_ShadowSampler : register( s2, space0 );
 
 #endif

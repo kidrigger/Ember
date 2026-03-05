@@ -2,6 +2,7 @@
 #include "Bindless.hlsli"
 #include "Camera.hlsli"
 #include "DebugConfig.hlsli"
+#include "Environment.hlsli"
 #include "LightData.hlsli"
 
 cbuffer AtmosphereAndSun : register( b0 )
@@ -10,10 +11,11 @@ cbuffer AtmosphereAndSun : register( b0 )
   uint       g_SunIndex;
 }
 
-cbuffer BindlessIndex : register( b1 )
+cbuffer FrameConstants : register( b1 )
 {
   Camera      g_Camera;
   LightInfo   g_Lights;
+  Environment g_Env;
   DebugConfig g_Debug;
 }
 

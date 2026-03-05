@@ -42,8 +42,7 @@ bool Ember::Proto::ReflectionProbe::Create(
   D3D12_ROOT_PARAMETER1 root_parameters[] = {
     RootConstants{ .Register = 0, .SizeBytes = sizeof( DrawList::PerBatch ) },
     RootConstantBuffer{ .Register = 1 },
-    RootConstants{ .Register = 2, .SizeBytes = sizeof( Environment::GpuRepr ) },
-    RootConstants{ .Register = 3, .SizeBytes = sizeof( Probe ) },
+    RootConstants{ .Register = 2, .SizeBytes = sizeof( Probe ) },
   };
 
   ComPtr<ID3D12RootSignature> root_signature = render_device->CreateRootSignature( {
@@ -83,7 +82,6 @@ FrameGraphResource Ember::Proto::ReflectionProbe::Execute(
     FrameGraph* frame_graph, FrameGraphBlackboard const& blackboard ) const
 {
   auto const& [constants_buf] = blackboard.get<FrameConstants>();
-  auto const& env             = blackboard.get<Environment::GpuRepr>();
   auto const& batch           = blackboard.get<DrawList::Batches>().Opaque();
   auto const  root_sig        = m_RootSignature;
   auto const  pipeline        = m_Pipeline;
@@ -136,8 +134,7 @@ FrameGraphResource Ember::Proto::ReflectionProbe::Execute(
         cmd->SetPipelineState( pipeline.Get() );
         cmd->SetGraphicsRootConstants( 0, batch );
         cmd->SetGraphicsRootConstantBuffer( 1, constants_buf );
-        cmd->SetGraphicsRootConstants( 2, env );
-        cmd->SetGraphicsRootConstants( 3, probe_info );
+        cmd->SetGraphicsRootConstants( 2, probe_info );
         cmd->DispatchMesh( { .X = batch.CommandsCount } );
       } );
 

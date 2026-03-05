@@ -21,6 +21,7 @@ Ember::RenderPipeline::RenderPipeline(
     RenderPass::TransparencyForward             render_transparent_meshes,
     RenderPass::Atmosphere                      update_atmospheric_sky,
     RenderPass::Skybox                          render_background,
+    RenderPass::AtmosphereSkybox                render_atmos_background,
     Proto::ReflectionProbe                      probe )
   : m_DepthFormat{ depth_format }
   , m_DrawPrePass{ std::move( draw_pre_pass ) }
@@ -35,6 +36,7 @@ Ember::RenderPipeline::RenderPipeline(
   , m_RenderTransparentMeshes{ std::move( render_transparent_meshes ) }
   , m_UpdateAtmosphericSky{ std::move( update_atmospheric_sky ) }
   , m_RenderBackground{ std::move( render_background ) }
+  , m_RenderAtmosphereBackground{ std::move( render_atmos_background ) }
   , m_Probe{ std::move( probe ) }
 {}
 
@@ -61,6 +63,7 @@ bool Ember::RenderPipeline::Create(
 
   RenderPass::Atmosphere                      update_atmospheric_sky;
   RenderPass::Skybox                          render_background;
+  RenderPass::AtmosphereSkybox                render_atmosphere_background;
   Proto::ReflectionProbe                      probe;
 
   ENSURE( RenderPass::DepthPrePass::Create( &draw_pre_pass, render_device, depth_format ) );
@@ -89,6 +92,8 @@ bool Ember::RenderPipeline::Create(
       &render_transparent_meshes, render_device, DirectX::MakeSRGB( swapchain_format ), depth_format ) );
   ENSURE( RenderPass::Skybox::Create(
       &render_background, render_device, DirectX::MakeSRGB( swapchain_format ), depth_format ) );
+  ENSURE( RenderPass::AtmosphereSkybox::Create(
+      &render_atmosphere_background, render_device, DirectX::MakeSRGB( swapchain_format ), depth_format ) );
 
   ENSURE( RenderPass::Atmosphere::Create( &update_atmospheric_sky, render_device ) );
 
@@ -108,6 +113,7 @@ bool Ember::RenderPipeline::Create(
     std::move( render_transparent_meshes ),
     std::move( update_atmospheric_sky ),
     std::move( render_background ),
+    std::move( render_atmosphere_background ),
     std::move( probe ),
   };
   out->m_DepthFormat = depth_format;
@@ -147,11 +153,13 @@ FrameGraphResource Ember::RenderPipeline::Execute(
     .DepthStencil = depth_buffer,
   };
 
-  auto const alpha_tested                        = m_RenderMaskedMeshes( frame_graph, *blackboard, opaque_pass );
-  auto const transparency_pass                   = m_RenderTransparentMeshes( frame_graph, *blackboard, alpha_tested );
+  auto const alpha_tested      = m_RenderMaskedMeshes( frame_graph, *blackboard, opaque_pass );
+  auto const transparency_pass = m_RenderTransparentMeshes( frame_graph, *blackboard, alpha_tested );
 
-  m_RenderBackground.UseProceduralAtmosphericSky = settings.UseProceduralAtmosphericSky;
-  auto const skybox_pass = m_RenderBackground( frame_graph, *blackboard, transparency_pass, atmosphere.SkyViewLUT );
+  auto const skybox_pass =
+      settings.UseProceduralAtmosphericSky
+          ? m_RenderAtmosphereBackground( frame_graph, *blackboard, transparency_pass, atmosphere.SkyViewLUT )
+          : m_RenderBackground( frame_graph, *blackboard, transparency_pass );
 
-  return settings.UseProceduralAtmosphericSky ? skybox_pass : transparency_pass.RenderTarget;
+  return skybox_pass;
 }

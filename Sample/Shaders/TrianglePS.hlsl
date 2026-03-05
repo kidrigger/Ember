@@ -3,7 +3,7 @@
 
 #define RT_MAX_ROUGHNESS 0.2f
 
-cbuffer Probe : register( b3 )
+cbuffer Probe : register( b2 )
 {
   float4 g_ProbeInfo;
   ResID  g_ProbeTex;

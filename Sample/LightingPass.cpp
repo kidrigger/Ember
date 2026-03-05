@@ -27,7 +27,6 @@ bool Ember::RenderPass::OmniLightDeferred::Create(
   D3D12_ROOT_PARAMETER1 root_parameters[] = {
     RootConstants{ .Register = 0, .SizeBytes = 7 * 4 },
     RootConstantBuffer{ .Register = 1 },
-    RootConstants{ .Register = 2, .SizeBytes = sizeof( Environment::GpuRepr ) },
   };
 
   ComPtr<ID3D12RootSignature> root_signature = render_device->CreateRootSignature( {
@@ -92,7 +91,6 @@ FrameGraphResource Ember::RenderPass::OmniLightDeferred::Execute(
 {
   auto const omni_light_count = bb.get<LightManager::GpuRepr>().OmniLightInfo.TotalLightCount;
   auto const& [constants_buf] = bb.get<FrameConstants>();
-  auto const&      env        = bb.get<Environment::GpuRepr>();
   auto const&      root_sig   = RootSignature;
   auto const       pipeline   = Pipeline;
 
@@ -144,7 +142,6 @@ FrameGraphResource Ember::RenderPass::OmniLightDeferred::Execute(
         cmd->SetPipelineState( pipeline.Get() );
         cmd->SetGraphicsRootConstants( 0, gbuffer_handles );
         cmd->SetGraphicsRootConstantBuffer( 1, constants_buf );
-        cmd->SetGraphicsRootConstants( 2, env );
         cmd->DispatchMesh( { .X = ( omni_light_count + 31 ) / 32 } );
       } );
   return result.RenderTarget;
@@ -177,7 +174,6 @@ bool Ember::RenderPass::SpotLightDeferred::Create(
   D3D12_ROOT_PARAMETER1 root_parameters[] = {
     RootConstants{ .Register = 0, .SizeBytes = 7 * 4 },
     RootConstantBuffer{ .Register = 1 },
-    RootConstants{ .Register = 2, .SizeBytes = sizeof( Environment::GpuRepr ) },
   };
 
   ComPtr<ID3D12RootSignature> root_signature = render_device->CreateRootSignature( {
@@ -237,7 +233,6 @@ FrameGraphResource Ember::RenderPass::SpotLightDeferred::Execute(
   auto const& pipeline         = Pipeline;
 
   auto const& [constants_buf]  = bb.get<FrameConstants>();
-  auto const&      env         = bb.get<Environment::GpuRepr>();
 
   MergeData const& result      = frame_graph->addCallbackPass(
       "SpotLight Pass",
@@ -268,7 +263,6 @@ FrameGraphResource Ember::RenderPass::SpotLightDeferred::Execute(
         cmd->SetPipelineState( pipeline.Get() );
         cmd->SetGraphicsRootConstants( 0, gbuffer_handles );
         cmd->SetGraphicsRootConstantBuffer( 1, constants_buf );
-        cmd->SetGraphicsRootConstants( 2, env );
         cmd->DispatchMesh( { .X = ( spot_light_count + 31 ) / 32 } );
       } );
   return result.RenderTarget;
@@ -304,7 +298,6 @@ bool Ember::RenderPass::ScreenSpaceLightDeferred::Create(
   D3D12_ROOT_PARAMETER1 root_parameters[] = {
     RootConstants{ .Register = 0, .SizeBytes = 7 * 4 },
     RootConstantBuffer{ .Register = 1 },
-    RootConstants{ .Register = 2, .SizeBytes = sizeof( Environment::GpuRepr ) },
   };
 
   ComPtr<ID3D12RootSignature> root_signature = render_device->CreateRootSignature( {
@@ -354,7 +347,6 @@ FrameGraphResource Ember::RenderPass::ScreenSpaceLightDeferred::Execute(
   auto const& root_sig        = RootSignature;
   auto const& pipeline        = Pipeline;
   auto const& [constants_buf] = bb.get<FrameConstants>();
-  auto const&      env        = bb.get<Environment::GpuRepr>();
 
   MergeData const& result     = frame_graph->addCallbackPass(
       "Screen Space Light Pass",
@@ -390,7 +382,6 @@ FrameGraphResource Ember::RenderPass::ScreenSpaceLightDeferred::Execute(
         cmd->SetPipelineState( pipeline.Get() );
         cmd->SetGraphicsRootConstants( 0, gbuffer_handles );
         cmd->SetGraphicsRootConstantBuffer( 1, constants_buf );
-        cmd->SetGraphicsRootConstants( 2, env );
         cmd->DrawInstanced( 3, 1, 0, 0 );
       } );
 

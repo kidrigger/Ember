@@ -16,11 +16,6 @@ cbuffer GBufferIn : register( b0 )
   ResID g_Emissive;
 };
 
-cbuffer EnvBuf : register( b2 )
-{
-  Environment g_Env;
-};
-
 SamplerState           g_DefaultSampler : register( s0 );
 SamplerState           g_ClampedSampler : register( s1 );
 SamplerComparisonState g_ShadowSampler : register( s2 );
