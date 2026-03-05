@@ -97,26 +97,25 @@ struct EnvContext
   Environment::Pipelines const* Pipelines;
 };
 
-bool GenerateSkybox(
-    Texture* skybox, EnvContext const& context, MipMapGenerator const* mipmapper, Texture const& environment )
+Texture GenerateSkybox( EnvContext const& context, MipMapGenerator const* mipmapper, Texture const& environment )
 {
   uint32_t constexpr kThreadGroupX = 16;
   uint32_t constexpr kThreadGroupY = 16;
   uint32_t constexpr kThreadGroupZ = 1;
 
   // Generate skybox.
-  *skybox = context.RenderDevice->CreateTextureCube( {
+  auto skybox = context.RenderDevice->CreateTextureCube( {
       .Format    = DXGI_FORMAT_R11G11B10_FLOAT,
       .Side      = Environment::kEnvCubeSide,
       .Usage     = TextureUsage::kReadWrite,
       .MipLevels = MipLevels::kAuto,
       .InitState = D3D12_RESOURCE_STATE_UNORDERED_ACCESS,
   } );
-  skybox->SetName( L"Skybox" );
+  skybox.SetName( L"Skybox" );
 
   EnvParams const env_cube_root_constant{
     .InputTexture  = environment,
-    .OutputTexture = *skybox,
+    .OutputTexture = skybox,
     .CubeSide      = Environment::kEnvCubeSide,
   };
 
@@ -129,13 +128,13 @@ bool GenerateSkybox(
       .Z = 6 / kThreadGroupZ,
   } );
 
-  context.CommandList->ResourceBarrier( CD3DX12_RESOURCE_BARRIER::UAV( skybox->GetTexture() ) );
+  context.CommandList->ResourceBarrier( CD3DX12_RESOURCE_BARRIER::UAV( skybox.GetTexture() ) );
 
-  if ( not mipmapper->TryGenerateMipMapCube( context.CommandList, skybox ) ) return false;
+  ENSURE( not mipmapper->TryGenerateMipMapCube( context.CommandList, &skybox ) );
 
-  context.CommandList->ResourceBarrier( CD3DX12_RESOURCE_BARRIER::UAV( skybox->GetTexture() ) );
+  context.CommandList->ResourceBarrier( CD3DX12_RESOURCE_BARRIER::UAV( skybox.GetTexture() ) );
 
-  return true;
+  return skybox;
 };
 
 bool CreatePipelines( Environment::Pipelines* out, RenderDevice* render_device )
@@ -192,25 +191,25 @@ bool CreatePipelines( Environment::Pipelines* out, RenderDevice* render_device )
   return true;
 };
 
-bool GenerateDiffuseIrradiance( Texture* diffuse_irradiance, EnvContext const& context, Texture const& skybox )
+Texture GenerateDiffuseIrradiance( EnvContext const& context, Texture const& skybox )
 {
   uint32_t constexpr kThreadGroupX = 16;
   uint32_t constexpr kThreadGroupY = 16;
   uint32_t constexpr kThreadGroupZ = 1;
 
   // Create texture
-  *diffuse_irradiance = context.RenderDevice->CreateTextureCube( {
+  auto diffuse_irradiance = context.RenderDevice->CreateTextureCube( {
       .Format    = DXGI_FORMAT_R11G11B10_FLOAT,
       .Side      = Environment::kDiffuseCubeSide,
       .Usage     = TextureUsage::kReadWrite,
       .MipLevels = MipLevels::kBase,
       .InitState = D3D12_RESOURCE_STATE_UNORDERED_ACCESS,
   } );
-  diffuse_irradiance->SetName( L"Diffuse Irradiance Map" );
+  diffuse_irradiance.SetName( L"Diffuse Irradiance Map" );
 
   EnvParams const diffuse_irradiance_root_constant{
     .InputTexture  = skybox,
-    .OutputTexture = *diffuse_irradiance,
+    .OutputTexture = diffuse_irradiance,
     .CubeSide      = Environment::kDiffuseCubeSide,
   };
 
@@ -223,34 +222,34 @@ bool GenerateDiffuseIrradiance( Texture* diffuse_irradiance, EnvContext const& c
       .Z = 6 / kThreadGroupZ,
   } );
 
-  return true;
+  return diffuse_irradiance;
 };
 
-bool GeneratePrefilter( Texture* prefilter, EnvContext const& context, Texture const& skybox )
+Texture GeneratePrefilter( EnvContext const& context, Texture const& skybox )
 {
   size_t constexpr static kThreadGroupX = 16;
   size_t constexpr static kThreadGroupY = 16;
   size_t constexpr static kThreadGroupZ = 1;
 
   // Create texture
-  *prefilter = context.RenderDevice->CreateTextureCube( {
+  auto prefilter = context.RenderDevice->CreateTextureCube( {
       .Format    = DXGI_FORMAT_R11G11B10_FLOAT,
       .Side      = Environment::kPrefilterCubeSide,
       .Usage     = TextureUsage::kReadWrite,
       .MipLevels = Environment::kPrefilterMaxLoD + 1, // accounting for mip0
       .InitState = D3D12_RESOURCE_STATE_UNORDERED_ACCESS,
   } );
-  prefilter->SetName( L"Prefiltered Cube" );
+  prefilter.SetName( L"Prefiltered Cube" );
 
   PrefilterParams prefilter_constant{
     .Skybox        = skybox,
     .SkyboxSide    = Environment::kEnvCubeSide,
-    .OutputTexture = *prefilter,
+    .OutputTexture = prefilter,
     .OutputSide    = Environment::kPrefilterCubeSide,
     .Roughness     = 0.0f,
   };
 
-  ASSERT( prefilter->GetDesc().MipLevels == Environment::kPrefilterMaxLoD + 1 /* Accounting for mip0 */ );
+  ASSERT( prefilter.GetDesc().MipLevels == Environment::kPrefilterMaxLoD + 1 /* Accounting for mip0 */ );
 
   context.CommandList->SetComputeRootSignature( context.Pipelines->RootSignature.Get() );
   context.CommandList->SetPipelineState( context.Pipelines->Prefilter.Get() );
@@ -270,16 +269,16 @@ bool GeneratePrefilter( Texture* prefilter, EnvContext const& context, Texture c
     prefilter_constant.OutputSide = std::max<uint32_t>( prefilter_constant.OutputSide / 2, 1 );
   }
 
-  return true;
+  return prefilter;
 }
 
-bool GenerateBrdfLUT( Texture* brdf_lut, EnvContext const& context )
+Texture GenerateBrdfLUT( EnvContext const& context )
 {
   size_t constexpr static kThreadGroupX = 16;
   size_t constexpr static kThreadGroupY = 16;
 
   // Create BRDF LUT texture.
-  *brdf_lut = context.RenderDevice->CreateTexture2D( {
+  auto brdf_lut = context.RenderDevice->CreateTexture2D( {
       .Format    = DXGI_FORMAT_R16G16_FLOAT,
       .Width     = Environment::kBrdfLUTSize,
       .Height    = Environment::kBrdfLUTSize,
@@ -287,10 +286,10 @@ bool GenerateBrdfLUT( Texture* brdf_lut, EnvContext const& context )
       .MipLevels = MipLevels::kBase,
       .InitState = D3D12_RESOURCE_STATE_UNORDERED_ACCESS,
   } );
-  brdf_lut->SetName( L"BRDF LUT" );
+  brdf_lut.SetName( L"BRDF LUT" );
 
   BrdfLUTParams const brdf_lut_constant{
-    .OutputTexture = *brdf_lut,
+    .OutputTexture = brdf_lut,
     .Width         = Environment::kBrdfLUTSize,
     .Height        = Environment::kBrdfLUTSize,
   };
@@ -302,25 +301,17 @@ bool GenerateBrdfLUT( Texture* brdf_lut, EnvContext const& context )
       .Y = Environment::kBrdfLUTSize / kThreadGroupY,
   } );
 
-  return true;
+  return brdf_lut;
 }
 
-bool CreateIBLEnvironment( Environment::IBLEnvironment* ibl, EnvContext const& context, Texture skybox )
+Environment::IBLEnvironment CreateIBLEnvironment( EnvContext const& context, Texture skybox )
 {
-  Texture diffuse_irradiance;
-  if ( not GenerateDiffuseIrradiance( &diffuse_irradiance, context, skybox ) ) return false;
-
-  Texture prefilter;
-  if ( not GeneratePrefilter( &prefilter, context, skybox ) ) return false;
-
-  new ( ibl ) Environment::IBLEnvironment{
+  return {
     std::move( skybox ),
-    std::move( diffuse_irradiance ),
-    std::move( prefilter ),
+    GenerateDiffuseIrradiance( context, skybox ),
+    GeneratePrefilter( context, skybox ),
   };
-
-  return true;
-};
+}
 } // namespace
 } // namespace Ember
 
@@ -372,15 +363,11 @@ bool Ember::Environment::TryLoadFromEqRect( Environment* env, LoadFromEqRect con
     .Pipelines    = &pipelines,
   };
 
-  Texture        skybox;
-  IBLEnvironment ibl;
-  Texture        brdf_lut;
+  Texture        skybox   = GenerateSkybox( context, mip_mapper, environment );
+  Texture        brdf_lut = GenerateBrdfLUT( context );
+  IBLEnvironment ibl      = CreateIBLEnvironment( context, skybox );
 
-  if ( not GenerateSkybox( &skybox, context, mip_mapper, environment ) ) return false;
-  if ( not CreateIBLEnvironment( &ibl, context, std::move( skybox ) ) ) return false;
-  if ( not GenerateBrdfLUT( &brdf_lut, context ) ) return false;
-
-  Queue::Receipt receipt = queue.Submit( std::move( command_list ) );
+  Queue::Receipt receipt  = queue.Submit( std::move( command_list ) );
   queue.WaitOn( receipt );
 
   new ( env ) Environment{
@@ -408,14 +395,11 @@ bool Ember::Environment::TryLoadFromCube( Environment* env, LoadFromCube const& 
     .Pipelines    = &pipelines,
   };
 
-  Texture        skybox = args.CubeTexture;
-  IBLEnvironment ibl;
-  Texture        brdf_lut;
+  Texture        skybox   = args.CubeTexture;
+  Texture        brdf_lut = GenerateBrdfLUT( context );
+  IBLEnvironment ibl      = CreateIBLEnvironment( context, skybox );
 
-  if ( not CreateIBLEnvironment( &ibl, context, std::move( skybox ) ) ) return false;
-  if ( not GenerateBrdfLUT( &brdf_lut, context ) ) return false;
-
-  Queue::Receipt receipt = queue.Submit( std::move( command_list ) );
+  Queue::Receipt receipt  = queue.Submit( std::move( command_list ) );
   queue.WaitOn( receipt );
 
   new ( env ) Environment{
