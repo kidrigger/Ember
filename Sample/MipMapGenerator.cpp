@@ -159,9 +159,6 @@ bool Ember::MipMapGenerator::TryGenerateMipMaps( CommandList* command_list, Text
 
   command_list->ResourceBarrier( pre_compute_barrier );
 
-  auto bindless_desc_heaps = m_RenderDevice->GetBindlessDescriptorHeaps();
-
-  command_list->SetDescriptorHeaps( bindless_desc_heaps );
   command_list->SetPipelineState( m_Pipeline.Get() );
   command_list->SetComputeRootSignature( m_RootSignature.Get() );
 
@@ -310,11 +307,8 @@ bool Ember::MipMapGenerator::TryGenerateMipMapCube( CommandList* command_list, T
 
   command_list->ResourceBarrier( pre_compute_barrier );
 
-  auto bindless_desc_heaps = m_RenderDevice->GetBindlessDescriptorHeaps();
-
   command_list->SetPipelineState( m_CubePipeline.Get() );
   command_list->SetComputeRootSignature( m_RootSignature.Get() );
-  command_list->SetDescriptorHeaps( bindless_desc_heaps );
 
   RootSigInfo mip_map_info;
   mip_map_info.Src       = mip_src_handle;

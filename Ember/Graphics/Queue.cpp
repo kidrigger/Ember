@@ -112,6 +112,9 @@ Ember::CommandList Ember::Queue::GetCommandList()
     m_RenderTargetManagers.pop();
   }
 
+  auto desc_heaps = m_Bindless->GetBindlessDescriptorHeaps();
+  command_list->SetDescriptorHeaps( CountOf( desc_heaps ), DataOf( desc_heaps ) );
+
   return CommandList{
     std::move( command_list ),
     std::move( command_allocator ),

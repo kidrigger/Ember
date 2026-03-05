@@ -406,8 +406,13 @@ void Ember::BasicApp::LoadContent()
           .set_name( "AlphaBlendTest" )
           .set<Translation>( { 5.0f, 2.0f, 7.0f } );
 
-  constexpr char const* kEnvMapFile = "OvercastSoil.hdr";
-  ENSURE( Environment::TryLoadFrom( m_Environment.get(), m_RenderDevice.get(), m_TextureLoader.get(), kEnvMapFile ) );
+  ENSURE( Environment::TryLoadFromFile(
+      m_Environment.get(),
+      {
+          .RenderDevice  = m_RenderDevice.get(),
+          .TextureLoader = m_TextureLoader.get(),
+          .FileName      = "OvercastSoil.hdr",
+      } ) );
 
   SetupRenderPasses();
 
@@ -739,8 +744,6 @@ void Ember::BasicApp::Render()
 
   m_TextureLoader->FlushBarriers( &command_list );
 
-  command_list.SetDescriptorHeaps( m_RenderDevice->GetBindlessDescriptorHeaps() );
-
   DrawList::Batches const draw_list_info = g_Raytracing
                                                ? m_DrawList.PrepareFrameWithRaytracing( &command_list, frame_idx )
                                                : m_DrawList.PrepareFrame( frame_idx );
@@ -763,13 +766,13 @@ void Ember::BasicApp::Render()
       &m_FGBlackboard,
       frame_idx,
       {
-          .UseDeferredRendering       = g_UseDeferredRendering,
-          .UseProbes                  = g_UseProbes,
-          .UseSSAO                    = g_SSAO,
+          .UseDeferredRendering        = g_UseDeferredRendering,
+          .UseProbes                   = g_UseProbes,
+          .UseSSAO                     = g_SSAO,
           .UseProceduralAtmosphericSky = g_Debug.SkyMode == DebugConfigGpuRepr::kAtmosphere,
       } );
 
-  auto const imgui_out    = frame_graph.addCallbackPass(
+  auto const imgui_out = frame_graph.addCallbackPass(
       "ImGUI",
       [&]( FrameGraph::Builder& builder, FrameGraphResource& rt )
       { rt = builder.write( final_output, FG::Attachment{ .Index = 0 } ); },

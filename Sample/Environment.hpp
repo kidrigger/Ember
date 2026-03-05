@@ -5,12 +5,19 @@
 
 namespace Ember
 {
+class MipMapGenerator;
 
 class TextureLoader;
 
 class Environment
 {
 public:
+  uint32_t constexpr static kEnvCubeSide       = 512;
+  uint32_t constexpr static kDiffuseCubeSide   = 256;
+  uint32_t constexpr static kPrefilterCubeSide = 512;
+  uint32_t constexpr static kPrefilterMaxLoD   = 5;
+  uint32_t constexpr static kBrdfLUTSize       = 512;
+
   struct GpuRepr
   {
     SRVHandle Skybox;
@@ -19,23 +26,58 @@ public:
     SRVHandle BrdfLUT;
   };
 
+  struct IBLEnvironment
+  {
+    Texture Skybox;
+    Texture DiffuseIrradiance;
+    Texture Prefilter;
+  };
+
+  struct Pipelines
+  {
+    ComPtr<ID3D12RootSignature> RootSignature;
+    ComPtr<ID3D12PipelineState> EqRectToCubePipeline;
+    ComPtr<ID3D12PipelineState> DiffuseIrradiance;
+    ComPtr<ID3D12PipelineState> Prefilter;
+  };
+
+  struct LoadFromFile
+  {
+    RenderDevice*  RenderDevice;
+    TextureLoader* TextureLoader;
+    char const*    FileName;
+  };
+
+  struct LoadFromEqRect
+  {
+    RenderDevice*    RenderDevice;
+    MipMapGenerator* MipMapper;
+    Texture          EqrectTexture;
+  };
+
+  struct LoadFromCube
+  {
+    RenderDevice* RenderDevice;
+    Texture       CubeTexture;
+  };
+
 private:
-  Texture m_Skybox;
-  Texture m_DiffuseIrradiance;
-  Texture m_Prefilter;
-  Texture m_BrdfLUT;
-  GpuRepr m_Repr;
+  IBLEnvironment m_FallbackIBL;
+  Pipelines      m_Pipelines;
+  Texture        m_BrdfLUT;
+  GpuRepr        m_Repr;
 
 public:
   Environment() = default;
 
-  Environment( Texture skybox, Texture diffuse_irradiance, Texture prefilter, Texture brdf_lut );
+  Environment( IBLEnvironment ibl, Pipelines pipelines, Texture brdf_lut );
 
   [[nodiscard]] GpuRepr const& Repr() const;
 
   //
-  static bool TryLoadFrom(
-      Environment* env, RenderDevice* render_device, TextureLoader* texture_loader, char const* env_map_file );
+  static bool TryLoadFromFile( Environment* env, LoadFromFile const& args );
+  static bool TryLoadFromEqRect( Environment* env, LoadFromEqRect const& args );
+  static bool TryLoadFromCube( Environment* env, LoadFromCube const& args );
 };
 
 } // namespace Ember
