@@ -20,14 +20,15 @@ namespace
 Ember::TextureDesc GetBackbufferDesc( DXGI_FORMAT format, uint32_t width, uint32_t height )
 {
   return {
-    .Format    = format,
-    .Width     = width,
-    .Height    = height,
-    .MipLevels = Ember::MipLevels::kBase,
-    .ArraySize = 1,
-    .Usage     = Ember::TextureUsage::kRenderTarget,
-    .Dim       = Ember::TextureDim::k2D,
-    .InitState = D3D12_RESOURCE_STATE_PRESENT,
+    .Format      = format,
+    .Width       = width,
+    .Height      = height,
+    .MipLevels   = Ember::MipLevels::kBase,
+    .ArraySize   = 1,
+    .Type        = Ember::TextureType::kRenderTarget,
+    .IsReadWrite = false,
+    .Dim         = Ember::TextureDim::k2D,
+    .InitState   = D3D12_RESOURCE_STATE_PRESENT,
   };
 }
 } // namespace

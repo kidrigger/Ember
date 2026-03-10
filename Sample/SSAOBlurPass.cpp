@@ -82,12 +82,12 @@ FrameGraphResource Ember::RenderPass::ScreenSpaceAmbientOcclusionBlur::Execute(
         FrameGraphResource const blurred_target = builder.create<FG::Texture>(
             "SSAO Blurred",
             {
-                 .Format    = DXGI_FORMAT_R8_UNORM,
-                 .Width     = width,
-                 .Height    = height,
-                 .MipLevels = MipLevels::kBase,
-                 .Usage     = TextureUsage::kReadWrite,
-                 .InitState = D3D12_RESOURCE_STATE_UNORDERED_ACCESS,
+                 .Format      = DXGI_FORMAT_R8_UNORM,
+                 .Width       = width,
+                 .Height      = height,
+                 .MipLevels   = MipLevels::kBase,
+                 .Type        = TextureType::kSampled,
+                 .IsReadWrite = true,
             } );
 
         data.OutputTexture = builder.write( blurred_target, FG::ShaderWrite{} );

@@ -105,11 +105,12 @@ Texture GenerateSkybox( EnvContext const& context, MipMapGenerator const* mipmap
 
   // Generate skybox.
   auto skybox = context.RenderDevice->CreateTextureCube( {
-      .Format    = DXGI_FORMAT_R11G11B10_FLOAT,
-      .Side      = Environment::kEnvCubeSide,
-      .Usage     = TextureUsage::kReadWrite,
-      .MipLevels = MipLevels::kAuto,
-      .InitState = D3D12_RESOURCE_STATE_UNORDERED_ACCESS,
+      .Format      = DXGI_FORMAT_R11G11B10_FLOAT,
+      .Side        = Environment::kEnvCubeSide,
+      .Type        = TextureType::kSampled,
+      .IsReadWrite = true,
+      .MipLevels   = MipLevels::kAuto,
+      .InitState   = D3D12_RESOURCE_STATE_UNORDERED_ACCESS,
   } );
   skybox.SetName( L"Skybox" );
 
@@ -199,11 +200,12 @@ Texture GenerateDiffuseIrradiance( EnvContext const& context, Texture const& sky
 
   // Create texture
   auto diffuse_irradiance = context.RenderDevice->CreateTextureCube( {
-      .Format    = DXGI_FORMAT_R11G11B10_FLOAT,
-      .Side      = Environment::kDiffuseCubeSide,
-      .Usage     = TextureUsage::kReadWrite,
-      .MipLevels = MipLevels::kBase,
-      .InitState = D3D12_RESOURCE_STATE_UNORDERED_ACCESS,
+      .Format      = DXGI_FORMAT_R11G11B10_FLOAT,
+      .Side        = Environment::kDiffuseCubeSide,
+      .Type        = TextureType::kSampled,
+      .IsReadWrite = true,
+      .MipLevels   = MipLevels::kBase,
+      .InitState   = D3D12_RESOURCE_STATE_UNORDERED_ACCESS,
   } );
   diffuse_irradiance.SetName( L"Diffuse Irradiance Map" );
 
@@ -233,11 +235,12 @@ Texture GeneratePrefilter( EnvContext const& context, Texture const& skybox )
 
   // Create texture
   auto prefilter = context.RenderDevice->CreateTextureCube( {
-      .Format    = DXGI_FORMAT_R11G11B10_FLOAT,
-      .Side      = Environment::kPrefilterCubeSide,
-      .Usage     = TextureUsage::kReadWrite,
-      .MipLevels = Environment::kPrefilterMaxLoD + 1, // accounting for mip0
-      .InitState = D3D12_RESOURCE_STATE_UNORDERED_ACCESS,
+      .Format      = DXGI_FORMAT_R11G11B10_FLOAT,
+      .Side        = Environment::kPrefilterCubeSide,
+      .Type        = TextureType::kSampled,
+      .IsReadWrite = true,
+      .MipLevels   = Environment::kPrefilterMaxLoD + 1, // accounting for mip0
+      .InitState   = D3D12_RESOURCE_STATE_UNORDERED_ACCESS,
   } );
   prefilter.SetName( L"Prefiltered Cube" );
 
@@ -279,12 +282,13 @@ Texture GenerateBrdfLUT( EnvContext const& context )
 
   // Create BRDF LUT texture.
   auto brdf_lut = context.RenderDevice->CreateTexture2D( {
-      .Format    = DXGI_FORMAT_R16G16_FLOAT,
-      .Width     = Environment::kBrdfLUTSize,
-      .Height    = Environment::kBrdfLUTSize,
-      .Usage     = TextureUsage::kReadWrite,
-      .MipLevels = MipLevels::kBase,
-      .InitState = D3D12_RESOURCE_STATE_UNORDERED_ACCESS,
+      .Format      = DXGI_FORMAT_R16G16_FLOAT,
+      .Width       = Environment::kBrdfLUTSize,
+      .Height      = Environment::kBrdfLUTSize,
+      .Type        = TextureType::kSampled,
+      .IsReadWrite = true,
+      .MipLevels   = MipLevels::kBase,
+      .InitState   = D3D12_RESOURCE_STATE_UNORDERED_ACCESS,
   } );
   brdf_lut.SetName( L"BRDF LUT" );
 

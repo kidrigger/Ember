@@ -33,7 +33,7 @@ FrameGraphResource Ember::RenderPass::DepthPrePass::Execute(
                    .Width     = backbuffer_info.Width,
                    .Height    = backbuffer_info.Height,
                    .MipLevels = MipLevels::kBase,
-                   .Usage     = TextureUsage::kDepthStencil,
+                   .Type      = TextureType::kDepthStencil,
                    .InitState = D3D12_RESOURCE_STATE_DEPTH_WRITE,
             } );
 

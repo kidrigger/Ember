@@ -26,7 +26,7 @@ Ember::SRVHandle Ember::Internal::SpotLightManager::AllocateSpotShadow()
         .Format    = DXGI_FORMAT_D16_UNORM,
         .Width     = kSpotShadowResolution,
         .Height    = kSpotShadowResolution,
-        .Usage     = TextureUsage::kDepthStencil,
+        .Type      = TextureType::kDepthStencil,
         .MipLevels = 1,
         .InitState = D3D12_RESOURCE_STATE_PIXEL_SHADER_RESOURCE,
     } ) );

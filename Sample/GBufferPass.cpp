@@ -71,7 +71,7 @@ Ember::RenderPass::GBuffer::Data Ember::RenderPass::GBuffer::Execute(
           .Width     = backbuffer_info.Width,
           .Height    = backbuffer_info.Height,
           .MipLevels = MipLevels::kBase,
-          .Usage     = TextureUsage::kRenderTarget,
+          .Type      = TextureType::kRenderTarget,
           .InitState = D3D12_RESOURCE_STATE_RENDER_TARGET,
         };
 

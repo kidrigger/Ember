@@ -432,7 +432,7 @@ void Ember::FG::Texture::preRead( Desc const& desc, uint32_t const flags, void* 
   {
     case ReadType::kDSV:
     {
-      ASSERT( desc.Usage == TextureUsage::kDepthStencil );
+      ASSERT( desc.Type == TextureType::kDepthStencil );
       [[maybe_unused]] auto const depth_stencil = std::get<DepthStencilRead>( decoded );
 
       if ( current_state != D3D12_RESOURCE_STATE_DEPTH_READ )
@@ -485,7 +485,7 @@ void Ember::FG::Texture::preWrite( [[maybe_unused]] Desc const& desc, uint32_t c
   {
     case WriteType::kRTV:
     {
-      ASSERT( desc.Usage == TextureUsage::kRenderTarget );
+      ASSERT( desc.Type == TextureType::kRenderTarget );
       auto const attachment = std::get<Attachment>( decoded );
 
       if ( current_state != D3D12_RESOURCE_STATE_RENDER_TARGET )
@@ -499,7 +499,7 @@ void Ember::FG::Texture::preWrite( [[maybe_unused]] Desc const& desc, uint32_t c
     break;
     case WriteType::kDSV:
     {
-      ASSERT( desc.Usage == TextureUsage::kDepthStencil );
+      ASSERT( desc.Type == TextureType::kDepthStencil );
       auto const depth_stencil = std::get<DepthStencil>( decoded );
 
       if ( current_state != D3D12_RESOURCE_STATE_DEPTH_WRITE )

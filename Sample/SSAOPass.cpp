@@ -138,12 +138,13 @@ FrameGraphResource Ember::RenderPass::ScreenSpaceAmbientOcclusion::Execute(
         FrameGraphResource const render_target = builder.create<FG::Texture>(
             "SSAO Render Target",
             {
-                         .Format    = DXGI_FORMAT_R16_UNORM,
-                         .Width     = width,
-                         .Height    = height,
-                         .MipLevels = MipLevels::kBase,
-                         .Usage     = TextureUsage::kReadWrite,
-                         .InitState = D3D12_RESOURCE_STATE_UNORDERED_ACCESS,
+                         .Format      = DXGI_FORMAT_R16_UNORM,
+                         .Width       = width,
+                         .Height      = height,
+                         .MipLevels   = MipLevels::kBase,
+                         .Type        = TextureType::kSampled,
+                         .IsReadWrite = true,
+                         .InitState   = D3D12_RESOURCE_STATE_UNORDERED_ACCESS,
             } );
 
         data.OutTexture = builder.write( render_target, FG::ShaderWrite{} );

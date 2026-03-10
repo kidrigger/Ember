@@ -14,10 +14,9 @@
 namespace Ember
 {
 
-enum class TextureUsage : uint8_t
+enum class TextureType : uint8_t
 {
-  kReadonly,
-  kReadWrite,
+  kSampled,
   kDepthStencil,
   kRenderTarget,
 };
@@ -48,11 +47,12 @@ struct TextureDesc
   DXGI_FORMAT                          Format;
   uint32_t                             Width;
   uint32_t                             Height;
-  MipLevels                            MipLevels = MipLevels::kAuto;
-  uint16_t                             ArraySize = 1;
-  TextureUsage                         Usage     = TextureUsage::kReadonly;
-  TextureDim                           Dim       = TextureDim::k2D;
-  std::optional<D3D12_RESOURCE_STATES> InitState = std::nullopt;
+  MipLevels                            MipLevels   = MipLevels::kAuto;
+  uint16_t                             ArraySize   = 1;
+  TextureType                          Type        = TextureType::kSampled;
+  bool                                 IsReadWrite = false;
+  TextureDim                           Dim         = TextureDim::k2D;
+  std::optional<D3D12_RESOURCE_STATES> InitState   = std::nullopt;
 
   HashFnv1A                            Hash() const;
 };
@@ -98,7 +98,7 @@ struct TextureImpl
 class Texture
 {
 public:
-  using Type = TextureUsage;
+  using Type = TextureType;
   using Dim  = TextureDim;
   using Desc = TextureDesc;
 
@@ -129,10 +129,11 @@ struct Tex2DDesc
   DXGI_FORMAT                          Format;
   uint32_t                             Width;
   uint32_t                             Height;
-  TextureUsage                         Usage     = TextureUsage::kReadonly;
-  MipLevels                            MipLevels = MipLevels::kAuto;
-  uint16_t                             ArraySize = 1;
-  std::optional<D3D12_RESOURCE_STATES> InitState = std::nullopt;
+  TextureType                          Type        = TextureType::kSampled;
+  bool                                 IsReadWrite = false;
+  MipLevels                            MipLevels   = MipLevels::kAuto;
+  uint16_t                             ArraySize   = 1;
+  std::optional<D3D12_RESOURCE_STATES> InitState   = std::nullopt;
 
   // Conversion
   explicit operator TextureDesc() const;
@@ -142,9 +143,10 @@ struct TexCubeDesc
 {
   DXGI_FORMAT                          Format;
   uint32_t                             Side;
-  TextureUsage                         Usage     = TextureUsage::kReadonly;
-  MipLevels                            MipLevels = MipLevels::kAuto;
-  std::optional<D3D12_RESOURCE_STATES> InitState = std::nullopt;
+  TextureType                          Type        = TextureType::kSampled;
+  bool                                 IsReadWrite = false;
+  MipLevels                            MipLevels   = MipLevels::kAuto;
+  std::optional<D3D12_RESOURCE_STATES> InitState   = std::nullopt;
 
   // Conversion
   explicit operator TextureDesc() const;

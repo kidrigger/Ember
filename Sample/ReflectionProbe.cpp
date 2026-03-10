@@ -99,7 +99,7 @@ FrameGraphResource Ember::Proto::ReflectionProbe::Execute(
                            .Height    = kSide,
                            .MipLevels = MipLevels::kAuto,
                            .ArraySize = 1,
-                           .Usage     = TextureUsage::kRenderTarget,
+                           .Type      = TextureType::kRenderTarget,
                            .Dim       = TextureDim::kCube,
                            .InitState = D3D12_RESOURCE_STATE_RENDER_TARGET,
             } );
@@ -111,7 +111,7 @@ FrameGraphResource Ember::Proto::ReflectionProbe::Execute(
                            .Height    = kSide,
                            .MipLevels = MipLevels::kAuto,
                            .ArraySize = 1,
-                           .Usage     = TextureUsage::kDepthStencil,
+                           .Type      = TextureType::kDepthStencil,
                            .Dim       = TextureDim::kCube,
                            .InitState = D3D12_RESOURCE_STATE_DEPTH_WRITE,
             } );

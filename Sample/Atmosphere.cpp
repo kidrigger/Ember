@@ -31,7 +31,7 @@ bool Ember::RenderPass::Atmosphere::Create( Atmosphere* out, RenderDevice* rende
       .Format    = kTransmittanceLUTFormat,
       .Width     = kTransmittanceLUTSize.x,
       .Height    = kTransmittanceLUTSize.y,
-      .Usage     = TextureUsage::kRenderTarget,
+      .Type      = TextureType::kRenderTarget,
       .MipLevels = MipLevels::kBase,
       .InitState = D3D12_RESOURCE_STATE_PIXEL_SHADER_RESOURCE,
   } );
@@ -41,7 +41,7 @@ bool Ember::RenderPass::Atmosphere::Create( Atmosphere* out, RenderDevice* rende
       .Format    = DXGI_FORMAT_R16G16B16A16_FLOAT,
       .Width     = kSkyViewLUTSize.x,
       .Height    = kSkyViewLUTSize.y,
-      .Usage     = TextureUsage::kRenderTarget,
+      .Type      = TextureType::kRenderTarget,
       .MipLevels = MipLevels::kBase,
       .InitState = D3D12_RESOURCE_STATE_PIXEL_SHADER_RESOURCE,
   } );
@@ -117,7 +117,7 @@ Ember::RenderPass::Atmosphere::Data Ember::RenderPass::Atmosphere::Execute(
           .Width     = kTransmittanceLUTSize.x,
           .Height    = kTransmittanceLUTSize.y,
           .MipLevels = MipLevels::kBase,
-          .Usage     = TextureUsage::kRenderTarget,
+          .Type      = TextureType::kRenderTarget,
           .InitState = D3D12_RESOURCE_STATE_PIXEL_SHADER_RESOURCE,
       },
       FG::Texture{ m_TransmittanceLUT } );
@@ -174,7 +174,7 @@ Ember::RenderPass::Atmosphere::Data Ember::RenderPass::Atmosphere::Execute(
                 .Width     = kSkyViewLUTSize.x,
                 .Height    = kSkyViewLUTSize.y,
                 .MipLevels = MipLevels::kBase,
-                .Usage     = TextureUsage::kRenderTarget,
+                .Type      = TextureType::kRenderTarget,
                 .InitState = D3D12_RESOURCE_STATE_PIXEL_SHADER_RESOURCE,
             } );
         data.TransmittanceLUT = builder.read( transmittance.TransmittanceLUT, FG::ShaderRead{} );

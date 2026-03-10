@@ -6,8 +6,9 @@
 
 Ember::HashFnv1A Ember::TextureDesc::Hash() const
 {
-  return HashFnv1A{ Format } << Width << Height << MipLevels << ArraySize << ( uint32_t )Usage << ( uint32_t )Dim
-                             << InitState.has_value() << InitState.value_or( D3D12_RESOURCE_STATE_COMMON );
+  return HashFnv1A{ Format } << Width << Height << MipLevels << ArraySize << ( uint32_t )Type << ( uint32_t )IsReadWrite
+                             << ( uint32_t )Dim << InitState.has_value()
+                             << InitState.value_or( D3D12_RESOURCE_STATE_COMMON );
 }
 
 Ember::Sampler::SamplerInfoImpl::SamplerInfoImpl( BindlessManager* const bindless, SamplerHandle handle )
@@ -52,20 +53,18 @@ Ember::SamplerHandle Ember::Sampler::GetSamplerHandle() const
 namespace
 {
 
-D3D12_RESOURCE_STATES DefaultInitStateFor( Ember::TextureUsage const usage )
+D3D12_RESOURCE_STATES DefaultInitStateFor( Ember::TextureType const type )
 {
-  switch ( usage )
+  switch ( type )
   {
-    case Ember::TextureUsage::kReadonly:
-      [[fallthrough]];
-    case Ember::TextureUsage::kReadWrite:
+    case Ember::TextureType::kSampled:
       return D3D12_RESOURCE_STATE_COMMON;
-    case Ember::TextureUsage::kDepthStencil:
+    case Ember::TextureType::kDepthStencil:
       return D3D12_RESOURCE_STATE_DEPTH_WRITE;
-    case Ember::TextureUsage::kRenderTarget:
+    case Ember::TextureType::kRenderTarget:
       return D3D12_RESOURCE_STATE_RENDER_TARGET;
     default:
-      UNIMPLEMENTED_M( "Unknown TextureUsage" );
+      UNIMPLEMENTED_M( "Unknown TextureType" );
   }
 }
 } // namespace
@@ -73,28 +72,30 @@ D3D12_RESOURCE_STATES DefaultInitStateFor( Ember::TextureUsage const usage )
 Ember::Tex2DDesc::operator Ember::TextureDesc() const
 {
   return TextureDesc{
-    .Format    = Format,
-    .Width     = Width,
-    .Height    = Height,
-    .MipLevels = MipLevels,
-    .ArraySize = ArraySize,
-    .Usage     = Usage,
-    .Dim       = TextureDim::k2D,
-    .InitState = InitState.value_or( DefaultInitStateFor( Usage ) ),
+    .Format      = Format,
+    .Width       = Width,
+    .Height      = Height,
+    .MipLevels   = MipLevels,
+    .ArraySize   = ArraySize,
+    .Type        = Type,
+    .IsReadWrite = IsReadWrite,
+    .Dim         = TextureDim::k2D,
+    .InitState   = InitState.value_or( DefaultInitStateFor( Type ) ),
   };
 }
 
 Ember::TexCubeDesc::operator Ember::TextureDesc() const
 {
   return TextureDesc{
-    .Format    = Format,
-    .Width     = Side,
-    .Height    = Side,
-    .MipLevels = MipLevels,
-    .ArraySize = 1,
-    .Usage     = Usage,
-    .Dim       = TextureDim::kCube,
-    .InitState = InitState.value_or( DefaultInitStateFor( Usage ) ),
+    .Format      = Format,
+    .Width       = Side,
+    .Height      = Side,
+    .MipLevels   = MipLevels,
+    .ArraySize   = 1,
+    .Type        = Type,
+    .IsReadWrite = IsReadWrite,
+    .Dim         = TextureDim::kCube,
+    .InitState   = InitState.value_or( DefaultInitStateFor( Type ) ),
   };
 }
 
@@ -133,7 +134,7 @@ Ember::SRVHandle Ember::Texture::GetSRVHandle() const
 
 Ember::UAVHandle Ember::Texture::GetUAVHandle() const
 {
-  ASSERT( m_Impl->Desc.Usage == Texture::Type::kReadWrite );
+  ASSERT( m_Impl->Desc.IsReadWrite );
   auto uav = m_Impl->Handles.GetUAV();
   ASSERT( uav );
   return uav;
@@ -220,38 +221,37 @@ std::shared_ptr<Ember::TextureImpl> Ember::TextureManager::CreateTextureImpl( Te
   CD3DX12_RESOURCE_DESC       resource_desc =
       CD3DX12_RESOURCE_DESC::Tex2D( desc.Format, desc.Width, desc.Height, actual_array_size, desc.MipLevels );
 
-  switch ( desc.Usage )
+  if ( desc.IsReadWrite )
   {
-    case TextureUsage::kReadonly:
+    resource_desc.Flags |= D3D12_RESOURCE_FLAG_ALLOW_UNORDERED_ACCESS;
+  }
+  switch ( desc.Type )
+  {
+    case TextureType::kSampled:
       break;
-    case TextureUsage::kReadWrite:
-      resource_desc.Flags |= D3D12_RESOURCE_FLAG_ALLOW_UNORDERED_ACCESS;
-      break;
-    case TextureUsage::kDepthStencil:
+    case TextureType::kDepthStencil:
       resource_desc.Flags |= D3D12_RESOURCE_FLAG_ALLOW_DEPTH_STENCIL;
       break;
-    case TextureUsage::kRenderTarget:
+    case TextureType::kRenderTarget:
       resource_desc.Flags |= D3D12_RESOURCE_FLAG_ALLOW_RENDER_TARGET;
       break;
     default:
-      UNIMPLEMENTED_M( "Unknown TextureUsage" );
+      UNIMPLEMENTED_M( "Unknown TextureType" );
   }
 
   //
   std::optional<D3D12_CLEAR_VALUE> clear_value;
-  switch ( desc.Usage )
+  switch ( desc.Type )
   {
-    case TextureUsage::kReadonly:
+    case TextureType::kSampled:
       break;
-    case TextureUsage::kReadWrite:
-      break;
-    case TextureUsage::kDepthStencil:
+    case TextureType::kDepthStencil:
       clear_value = {
         .Format       = desc.Format,
         .DepthStencil = { .Depth = 1.0f, .Stencil = 0 },
       };
       break;
-    case TextureUsage::kRenderTarget:
+    case TextureType::kRenderTarget:
       clear_value = {
         .Format = desc.Format,
         .Color  = { 0.0f, 0.0f, 0.0f, 0.0f },
@@ -259,7 +259,7 @@ std::shared_ptr<Ember::TextureImpl> Ember::TextureManager::CreateTextureImpl( Te
       break;
   }
 
-  auto current_state = desc.InitState.value_or( DefaultInitStateFor( desc.Usage ) );
+  auto current_state = desc.InitState.value_or( DefaultInitStateFor( desc.Type ) );
 
   CreateResourceImpl(
       &texture, &allocation, resource_desc, clear_value ? &clear_value.value() : nullptr, current_state );
@@ -282,7 +282,7 @@ std::shared_ptr<Ember::TextureImpl> Ember::TextureManager::CreateTextureImpl( Te
   SRVHandle srv_handle = m_Bindless->CreateDescriptorHandle( texture.Get(), srv_desc );
 
   UAVHandle uav_handle = {};
-  if ( desc.Usage == TextureUsage::kReadWrite )
+  if ( desc.IsReadWrite )
   {
     auto const uav_format = DirectX::MakeLinear( desc.Format );
     auto const uav_desc   = actual_array_size > 1
@@ -317,7 +317,7 @@ Ember::Texture Ember::TextureManager::CreateTexture( TextureDesc const& desc )
 
 Ember::Texture Ember::TextureManager::ImportTexture( ComPtr<ID3D12Resource> resource, TextureDesc const& desc )
 {
-  ASSERT_M( desc.Usage == TextureUsage::kRenderTarget, "Import Texture is specifically for Backbuffer." );
+  ASSERT_M( desc.Type == TextureType::kRenderTarget, "Import Texture is specifically for Backbuffer." );
   return Texture{
     std::allocate_shared<TextureImpl>(
         GetAllocator(), std::move( resource ), nullptr, desc.InitState.value(), ScopedHandlePair{}, desc ),
