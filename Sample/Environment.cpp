@@ -130,7 +130,7 @@ Texture GenerateSkybox( EnvContext const& context, MipMapGenerator const* mipmap
 
   context.CommandList->ResourceBarrier( CD3DX12_RESOURCE_BARRIER::UAV( skybox.GetTexture() ) );
 
-  ENSURE( not mipmapper->TryGenerateMipMapCube( context.CommandList, &skybox ) );
+  ENSURE( mipmapper->TryGenerateMipMapCube( context.CommandList, &skybox ) );
 
   context.CommandList->ResourceBarrier( CD3DX12_RESOURCE_BARRIER::UAV( skybox.GetTexture() ) );
 
@@ -294,6 +294,7 @@ Texture GenerateBrdfLUT( EnvContext const& context )
     .Height        = Environment::kBrdfLUTSize,
   };
 
+  context.CommandList->SetComputeRootSignature( context.Pipelines->RootSignature.Get() );
   context.CommandList->SetPipelineState( context.Pipelines->BrdfLUT.Get() );
   context.CommandList->BindComputeResources( 0, brdf_lut_constant );
   context.CommandList->Dispatch( {
@@ -307,7 +308,7 @@ Texture GenerateBrdfLUT( EnvContext const& context )
 Environment::IBLEnvironment CreateIBLEnvironment( EnvContext const& context, Texture skybox )
 {
   return {
-    std::move( skybox ),
+    skybox,
     GenerateDiffuseIrradiance( context, skybox ),
     GeneratePrefilter( context, skybox ),
   };

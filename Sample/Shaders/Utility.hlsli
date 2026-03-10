@@ -44,4 +44,16 @@ float3 GetCubeDir( float2 face_xy, uint layer, float texel_size )
   }
 }
 
+uint3 LoadBytes3( in ByteAddressBuffer buffer, uint byte_offset )
+{
+  uint  buf_offset = ( byte_offset & ~3 );
+  uint  sub_offset = ( byte_offset & 3 );
+  uint2 value      = buffer.Load2( buf_offset );
+
+  return uint3(
+      value[sub_offset >> 2] >> ( ( sub_offset & 0x3 ) * 8 ) & 0xFF,
+      value[( sub_offset + 1 ) >> 2] >> ( ( ( sub_offset + 1 ) & 0x3 ) * 8 ) & 0xFF,
+      value[( sub_offset + 2 ) >> 2] >> ( ( ( sub_offset + 2 ) & 0x3 ) * 8 ) & 0xFF );
+}
+
 #endif

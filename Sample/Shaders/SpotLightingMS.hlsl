@@ -12,14 +12,6 @@ struct MSIn
   uint3 LocalID : SV_GroupThreadID;
 };
 
-uint3 GetBytes( uint2 value, uint sub_offset )
-{
-  return uint3(
-      value[sub_offset >> 2] >> ( ( sub_offset % 4 ) * 8 ) & 0xFF,
-      value[( sub_offset + 1 ) >> 2] >> ( ( ( sub_offset + 1 ) % 4 ) * 8 ) & 0xFF,
-      value[( sub_offset + 2 ) >> 2] >> ( ( ( sub_offset + 2 ) % 4 ) * 8 ) & 0xFF );
-}
-
 static const float2 kVertices[] = {
   float2( -1.0f, -1.0f ),
   float2( 1.0f, -1.0f ),

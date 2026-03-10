@@ -13,14 +13,6 @@ struct MSIn
   uint3 LocalID : SV_GroupThreadID;
 };
 
-uint3 GetBytes( uint2 value, uint sub_offset )
-{
-  return uint3(
-      value[sub_offset >> 2] >> ( ( sub_offset % 4 ) * 8 ) & 0xFF,
-      value[( sub_offset + 1 ) >> 2] >> ( ( ( sub_offset + 1 ) % 4 ) * 8 ) & 0xFF,
-      value[( sub_offset + 2 ) >> 2] >> ( ( ( sub_offset + 2 ) % 4 ) * 8 ) & 0xFF );
-}
-
 OUTPUT_TOPOLOGY( "triangle" )
 NUM_THREADS( GROUP_SIZE, 1, 1 )
 void DirShadowMS(
@@ -69,14 +61,8 @@ void DirShadowMS(
 
   for ( int i = IN.LocalID.x; i < meshlet.TriangleCount; i += GROUP_SIZE )
   {
-    uint  offset               = meshlet.TriangleOffset + i * 3;
-    uint  buf_offset           = ( offset & ~3 );
-    uint  sub_offset           = ( offset & 3 );
-    uint2 data                 = ugb.Load2( buf_offset );
-
     rt_array_idx[i].RTArrayIdx = view_idx;
 
-    // TODO: Increase gap to reduce LGSB stalls
-    tris[i] = GetBytes( data, sub_offset );
+    tris[i]                    = LoadBytes3( ugb, meshlet.TriangleOffset + i * 3 );
   }
 }

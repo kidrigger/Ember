@@ -268,6 +268,7 @@ bool Ember::MipMapGenerator::TryGenerateMipMapCube( CommandList* command_list, T
 #endif
 
   ERR_FAIL_RET_V( uav_capable->SetName( L"UAV Alias" ), false );
+  if ( texture_resource_state != D3D12_RESOURCE_STATE_COPY_SOURCE )
   {
     CD3DX12_RESOURCE_BARRIER const transition =
         CD3DX12_RESOURCE_BARRIER::Transition( resource, texture_resource_state, D3D12_RESOURCE_STATE_COPY_SOURCE );

@@ -766,6 +766,7 @@ void Ember::BasicApp::Render()
           .UseProbes                   = g_UseProbes,
           .UseSSAO                     = g_SSAO,
           .UseProceduralAtmosphericSky = g_Debug.SkyMode == DebugConfigGpuRepr::kAtmosphere,
+          .UseSkybox                   = g_Debug.SkyMode != DebugConfigGpuRepr::kNone,
       } );
 
   auto const imgui_out = frame_graph.addCallbackPass(

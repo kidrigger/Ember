@@ -31,6 +31,7 @@ public:
     bool UseProbes;
     bool UseSSAO;
     bool UseProceduralAtmosphericSky;
+    bool UseSkybox;
   };
 
 private:

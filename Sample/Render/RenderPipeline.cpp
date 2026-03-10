@@ -161,5 +161,5 @@ FrameGraphResource Ember::RenderPipeline::Execute(
           ? m_RenderAtmosphereBackground( frame_graph, *blackboard, transparency_pass, atmosphere.SkyViewLUT )
           : m_RenderBackground( frame_graph, *blackboard, transparency_pass );
 
-  return skybox_pass;
+  return settings.UseSkybox ? skybox_pass : transparency_pass.RenderTarget;
 }
