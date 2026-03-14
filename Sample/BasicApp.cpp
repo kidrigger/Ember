@@ -11,6 +11,7 @@
 #include <Util/HelperUtils.hpp>
 #include <Util/PerfCounter.hpp>
 #include <Util/Profiling.hpp>
+#include <Util/StringUtil.hpp>
 #include "Atmosphere.hpp"
 #include "Camera.hpp"
 #include "Environment.hpp"
@@ -869,8 +870,5 @@ void Ember::BasicApp::Resize()
 
   m_Camera->SetAspectRatio( ( float )m_WindowWidth / ( float )m_WindowHeight );
 
-  auto const res =
-      std::format_to_n( m_SprintfBuffer, CountOf( m_SprintfBuffer ), L"Ember {}x{}", m_WindowWidth, m_WindowHeight );
-  ASSERT( res.size < CountOf( m_SprintfBuffer ) );
-  SetWindowText( m_WindowHandle, m_SprintfBuffer );
+  SetWindowText( m_WindowHandle, FormatTo( m_SprintfBuffer, L"Ember {}x{}", m_WindowWidth, m_WindowHeight ) );
 }

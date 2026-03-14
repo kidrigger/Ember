@@ -11,6 +11,8 @@
 
 #include <meshoptimizer.h>
 
+#include <Util/StringUtil.hpp>
+
 namespace
 {
 struct PackedData
@@ -35,10 +37,8 @@ Ember::SRVHandle Ember::Internal::DirectionLightManager::AllocateShadow()
         .InitState = D3D12_RESOURCE_STATE_PIXEL_SHADER_RESOURCE,
     } ) );
 
-    wchar_t    buf[32];
-    auto const res = std::format_to_n( buf, CountOf( buf ), L"Dir Shadow Map {}", m_AllocatedShadows );
-    ASSERT( res.size < CountOf( buf ) );
-    m_ActiveShadows.back().SetName( buf );
+    wchar_t buf[32];
+    m_ActiveShadows.back().SetName( FormatTo( buf, L"Dir Shadow Map {}", m_AllocatedShadows ) );
   }
 
   return m_ActiveShadows[m_AllocatedShadows++].GetSRVHandle();

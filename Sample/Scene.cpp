@@ -6,6 +6,7 @@
 
 #include <Util/DataUtil.hpp>
 #include <Util/Profiling.hpp>
+#include <Util/StringUtil.hpp>
 #include "Inspector.hpp"
 #include "Material.hpp"
 
@@ -229,8 +230,7 @@ Ember::World::World()
               {
                 AnimationPlayer* player = ( AnimationPlayer* )elem;
                 char             buf[256];
-                auto const       res = std::format_to_n( buf, CountOf( buf ), "{}", player->CurrentAnimationName );
-                ASSERT( res.size < CountOf( buf ) );
+                FormatTo( buf, "{}", player->CurrentAnimationName );
                 if ( ImGui::InputText(
                          label ? label : "Value", buf, sizeof( buf ), ImGuiInputTextFlags_EnterReturnsTrue ) )
                 {

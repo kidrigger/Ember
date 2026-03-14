@@ -1,9 +1,9 @@
 #include "Inspector.hpp"
 
-#include <format>
 #include <imgui.h>
 
 #include <Util/HelperUtils.hpp>
+#include <Util/StringUtil.hpp>
 
 void Ember::InspectorView::Draw( char const* label, void* data ) const
 {
@@ -207,11 +207,7 @@ void Ember::Inspector::SerializeStruct( flecs::meta::op_t* ops, void* ptr )
   if ( ops->name )
   {
     char buf[128];
-    ZeroMemory( DataOf( buf ), ByteSizeOf( buf ) );
-    auto const res = std::format_to_n( buf, CountOf( buf ), "{}", ops->name );
-    ASSERT( res.size < CountOf( buf ) );
-
-    if ( ImGui::TreeNode( buf ) )
+    if ( ImGui::TreeNode( FormatTo( buf, "{}", ops->name ) ) )
     {
       SerializeScope( ops, ptr );
 
@@ -292,16 +288,13 @@ void Ember::Inspector::SerializeOps( flecs::meta::op_t* ops, int32_t op_count, v
     // Get pointer for current field
     void* ptr = ECS_OFFSET( base, op->offset );
 
-    ZeroMemory( DataOf( label ), ByteSizeOf( label ) );
     if ( op->name )
     {
-      auto const res = std::format_to_n( label, CountOf( label ), "{}", op->name );
-      ASSERT( res.size < CountOf( label ) );
+      FormatTo( label, "{}", op->name );
     }
     else
     {
-      auto const res = std::format_to_n( label, CountOf( label ), "##{:p}", ( void* )op );
-      ASSERT( res.size < CountOf( label ) );
+      FormatTo( label, "##{:p}", ( void* )op );
     }
 
     switch ( op->kind )

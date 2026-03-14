@@ -4,6 +4,7 @@
 #include <Util/DataUtil.hpp>
 #include <Util/HelperUtils.hpp>
 #include <Util/Profiling.hpp>
+#include <Util/StringUtil.hpp>
 #include <format>
 #include "FrameGraphHelper.hpp"
 #include "fg/Blackboard.hpp"
@@ -88,9 +89,7 @@ bool Ember::RenderPass::Atmosphere::Create( Atmosphere* out, RenderDevice* rende
   {
     Buffer& atmosphere_param_buffer =
         atmosphere_param_buffers.emplace_back( render_device->CreateConstantBuffer( sizeof( Params ) + 4 ) );
-    auto const res = std::format_to_n( buf, CountOf( buf ), L"Atmosphere Parameter CB {}", i );
-    ASSERT( res.size < CountOf( buf ) );
-    atmosphere_param_buffer.SetName( buf );
+    atmosphere_param_buffer.SetName( FormatTo( buf, L"Atmosphere Parameter CB {}", i ) );
   }
 
   new ( out ) Atmosphere{

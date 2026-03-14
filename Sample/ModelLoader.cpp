@@ -3,6 +3,7 @@
 #include <Graphics/RenderDevice.hpp>
 #include <Util/DataUtil.hpp>
 #include <Util/HelperUtils.hpp>
+#include <Util/StringUtil.hpp>
 #include <format>
 #include "BasicApp.hpp"
 #include "Material.hpp"
@@ -1076,10 +1077,8 @@ std::expected<flecs::entity, Ember::ModelLoader::Error> Ember::ModelLoader::TryL
 
   if ( result != cgltf_result_success )
   {
-    char       buf[512];
-    auto const res = std::format_to_n( buf, CountOf( buf ), "{} failed to load", filename );
-    ASSERT( res.size < CountOf( buf ) );
-    OutputDebugStringA( buf );
+    char buf[512];
+    OutputDebugStringA( FormatTo( buf, "{} failed to load", filename ) );
     cgltf_free( gltf_model );
 
     return std::unexpected{ Error::kCannotOpenFile };
@@ -1089,10 +1088,8 @@ std::expected<flecs::entity, Ember::ModelLoader::Error> Ember::ModelLoader::TryL
 
   if ( result != cgltf_result_success )
   {
-    char       buf[512];
-    auto const res = std::format_to_n( buf, CountOf( buf ), "{} is invalid", filename );
-    ASSERT( res.size < CountOf( buf ) );
-    OutputDebugStringA( buf );
+    char buf[512];
+    OutputDebugStringA( FormatTo( buf, "{} is invalid", filename ) );
     cgltf_free( gltf_model );
 
     return std::unexpected{ Error::kInvalidFile };
@@ -1102,10 +1099,8 @@ std::expected<flecs::entity, Ember::ModelLoader::Error> Ember::ModelLoader::TryL
 
   if ( result != cgltf_result_success )
   {
-    char       buf[512];
-    auto const res = std::format_to_n( buf, CountOf( buf ), "{} buffers failed to load.", filename );
-    ASSERT( res.size < CountOf( buf ) );
-    OutputDebugStringA( buf );
+    char buf[512];
+    OutputDebugStringA( FormatTo( buf, "{} buffers failed to load.", filename ) );
     cgltf_free( gltf_model );
 
     return std::unexpected{ Error::kCannotLoadMemory };

@@ -8,7 +8,7 @@
 #include <Util/DirectXHeaders.hpp>
 #include <Util/HelperUtils.hpp>
 #include <Util/Profiling.hpp>
-
+#include <Util/StringUtil.hpp>
 #include "MipMapGenerator.hpp"
 
 Ember::TextureLoader::UploadBatch::UploadBatch(
@@ -160,9 +160,8 @@ bool Ember::TextureLoader::TryLoadImpl(
 
   m_CurrentCommandList.Track( staging_res );
 
-  wchar_t    staging_name[512];
-  auto const res = std::format_to_n( staging_name, CountOf( staging_name ), L"Staging: {}", wide_id );
-  ASSERT( res.size < CountOf( staging_name ) );
+  wchar_t staging_name[512];
+  FormatTo( staging_name, L"Staging: {}", wide_id );
   ERR_FAIL_RET_V( staging_res->SetName( staging_name ), false );
 
   auto lock_guard = std::lock_guard( m_LoadLock );
