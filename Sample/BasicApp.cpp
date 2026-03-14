@@ -62,7 +62,7 @@ struct alignas( 16 ) DebugConfigGpuRepr
   };
 
   uint32_t ShowDebugUI                  = true;
-  uint32_t ShowWireframe                = false;
+  uint32_t UseProbes                    = false;
   VisMode  VisualizationMode            = kRender;
 
   SkyMode  SkyMode                      = kAtmosphere;
@@ -78,6 +78,7 @@ bool                  g_UseDeferredRendering    = true;
 bool                  g_Raytracing              = false;
 bool                  g_UseProbes               = false;
 bool                  g_SSAO                    = true;
+bool                  g_BakeRequested           = false;
 
 constexpr char const* kVisualizationModeNames[] = {
   "Render", "Meshlet", "World Position", "Albedo", "Normal", "ORM", "Emissive", "Lighting Only", "Ambient Occlusion",
@@ -280,7 +281,7 @@ Ember::BasicApp::~BasicApp() // NOLINT(modernize-use-equals-default)
 
 void Ember::BasicApp::SetupRenderPasses()
 {
-  ENSURE( RenderPipeline::Create( &m_RenderPipeline, m_RenderDevice.get(), m_MipMapGenerator.get(), kDepthFormat ) );
+  ENSURE( RenderPipeline::Create( &m_RenderPipeline, m_RenderDevice.get(), kDepthFormat ) );
 }
 
 void Ember::BasicApp::LoadContent()
@@ -413,10 +414,33 @@ void Ember::BasicApp::LoadContent()
           .set_name( "AlphaBlendTest" )
           .set<Translation>( { 5.0f, 2.0f, 7.0f } );
 
+  auto probes =
+      m_World->GetECS().entity( "Reflection Probes" ).child_of( m_SceneRoot ).insert( []( WorldTransform& ) {} );
+
+  for ( int i = -10; i <= 10; i += 5 )
+  {
+    for ( int j = 0; j <= 10; j += 5 )
+    {
+      for ( int k = -4; k <= 4; k += 4 )
+      {
+        m_World->GetECS()
+            .entity( std::format( "ReflProbe_{}_{}_{}", i, j, k ).c_str() )
+            .child_of( probes )
+            .insert(
+                [&]( Translation& translation, ReflectionProbe& rp )
+                {
+                  translation = { ( float )i, ( float )j, ( float )k };
+                  rp          = { 15.0f };
+                } );
+      }
+    }
+  }
+
   ENSURE( Environment::TryLoadFromFile(
       m_Environment.get(),
       {
           .RenderDevice  = m_RenderDevice.get(),
+          .World         = m_World.get(),
           .TextureLoader = m_TextureLoader.get(),
           .FileName      = "OvercastSoil.hdr",
       } ) );
@@ -500,9 +524,6 @@ void Ember::BasicApp::Update()
       ImGui::Begin( "Debug" );
       {
         bool scratch;
-        scratch = ( bool )g_Debug.ShowWireframe;
-        ImGui::Checkbox( "Show Wireframe", &scratch );
-        g_Debug.ShowWireframe = ( uint32_t )scratch;
 
         ImGui::Combo(
             "Show Light Only",
@@ -526,11 +547,16 @@ void Ember::BasicApp::Update()
         g_Debug.DisableMeshletFrustumCulling = ( uint32_t )scratch;
 
         ImGui::Checkbox( "Use Deferred Rendering", &g_UseDeferredRendering );
-        g_OutputFrameGraph = ImGui::Button( "Output FrameGraph" );
+
+        scratch = ( bool )g_Debug.UseProbes;
+        ImGui::Checkbox( "Enable Probes", &scratch );
+        g_Debug.UseProbes = ( uint32_t )scratch;
 
         ImGui::Checkbox( "Enable Raytracing", &g_Raytracing );
-        ImGui::Checkbox( "Enable Probes", &g_UseProbes );
         ImGui::Checkbox( "Enable AO", &g_SSAO );
+
+        g_BakeRequested    = ImGui::Button( "Bake Probes" );
+        g_OutputFrameGraph = ImGui::Button( "Output FrameGraph" );
       }
       ImGui::End();
     }
@@ -757,6 +783,12 @@ void Ember::BasicApp::Render()
   m_FGBlackboard.get<FrameConstants>()        = { m_FrameConstantBuffers[frame_idx] };
 
   m_RenderPipeline.SetSunIndex( m_SunLightIndex );
+
+  if ( g_BakeRequested )
+  {
+    m_Environment->Bake( &command_list, m_MipMapGenerator.get(), m_FGBlackboard );
+    g_BakeRequested = false;
+  }
 
   FrameGraphResource const final_output = m_RenderPipeline.Execute(
       &frame_graph,

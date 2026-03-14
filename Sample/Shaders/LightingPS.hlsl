@@ -49,25 +49,6 @@ float3                 CalcDirLightContrib( in BRDFCookTorranceGGX brdf, float4 
   return dir_contrib;
 }
 
-float3 CalcPointLightContrib( in BRDFCookTorranceGGX brdf, float4 ws_position, float3 view_dir )
-{
-  StructuredBuffer<PointLight> point_lights  = ResourceDescriptorHeap[g_Lights.PointLights];
-
-  float3                       point_contrib = 0.0f;
-  int                          light_idx     = 0;
-  for ( ; light_idx < g_Lights.ShadowPointLightCount; light_idx++ )
-  {
-    point_contrib += CalcShadowingLightContrib( point_lights[light_idx], brdf, ws_position, view_dir, g_ShadowSampler );
-  }
-
-  for ( ; light_idx < g_Lights.PointLightCount; light_idx++ )
-  {
-    point_contrib += CalcLightContrib( point_lights[light_idx], brdf, ws_position, view_dir );
-  }
-
-  return point_contrib;
-}
-
 struct PSIn
 {
   float4 Position : SV_POSITION;
@@ -140,14 +121,30 @@ float4 LightingPS( PSIn IN ) : SV_TARGET
 #ifdef STRIP_DEBUG_CONFIG
   float3 ambient_contrib = GetAmbientInfluence( brdf, view_dir, g_DefaultSampler, g_ClampedSampler );
 #else
-  float3 ambient_contrib = GetAmbientInfluence(
-      g_Env,
-      brdf,
-      view_dir,
-      g_DefaultSampler,
-      g_ClampedSampler,
-      !g_Debug.RemoveDiffuseContrib,
-      !g_Debug.RemoveSpecularContrib );
+  float3 ambient_contrib;
+  if ( g_Debug.ShowWireframe )
+  {
+    ambient_contrib = GetAmbientProbeInfluence(
+        g_Env,
+        brdf,
+        position.xyz,
+        view_dir,
+        g_DefaultSampler,
+        g_ClampedSampler,
+        !g_Debug.RemoveDiffuseContrib,
+        !g_Debug.RemoveSpecularContrib );
+  }
+  else
+  {
+    ambient_contrib = GetAmbientInfluence(
+        g_Env,
+        brdf,
+        view_dir,
+        g_DefaultSampler,
+        g_ClampedSampler,
+        !g_Debug.RemoveDiffuseContrib,
+        !g_Debug.RemoveSpecularContrib );
+  }
 #endif
 
   float3 total_contrib = emissive + dir_contrib + ambient_contrib;

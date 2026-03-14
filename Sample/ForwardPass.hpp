@@ -38,16 +38,8 @@ struct OpaqueForward
     bool          DependsOnDepthPrePass = false;
   };
 
-  struct Input
-  {
-    FrameGraphResource            Depth;
-    FrameGraphResource            ProbeTex;
-    Proto::ReflectionProbe::Probe ProbeInfo;
-  };
-
   static bool        Create( OpaqueForward* out, Desc const& desc );
   FrameGraphResource Execute( FrameGraph* frame_graph, FrameGraphBlackboard const& bb, FrameGraphResource depth ) const;
-  FrameGraphResource Execute( FrameGraph* frame_graph, FrameGraphBlackboard const& bb, Input in ) const;
 
   FrameGraphResource operator()(
       FrameGraph* frame_graph, FrameGraphBlackboard const& bb, FrameGraphResource depth ) const;

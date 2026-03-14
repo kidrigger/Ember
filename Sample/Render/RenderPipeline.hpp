@@ -54,7 +54,6 @@ private:
   RenderPass::Atmosphere                      m_UpdateAtmosphericSky;
   RenderPass::Skybox                          m_RenderBackground;
   RenderPass::AtmosphereSkybox                m_RenderAtmosphereBackground;
-  Proto::ReflectionProbe                      m_Probe;
 
 public:
   RenderPipeline() = default;
@@ -73,11 +72,9 @@ public:
       RenderPass::TransparencyForward             render_transparent_meshes,
       RenderPass::Atmosphere                      update_atmospheric_sky,
       RenderPass::Skybox                          render_background,
-      RenderPass::AtmosphereSkybox                render_atmos_background,
-      Proto::ReflectionProbe                      probe );
+      RenderPass::AtmosphereSkybox                render_atmos_background );
 
-  static bool Create(
-      RenderPipeline* out, RenderDevice* render_device, MipMapGenerator* mip_map_generator, DXGI_FORMAT depth_format );
+  static bool        Create( RenderPipeline* out, RenderDevice* render_device, DXGI_FORMAT depth_format );
   void               SetSunIndex( uint32_t sun_light_index );
 
   FrameGraphResource Execute(

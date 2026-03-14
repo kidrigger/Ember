@@ -190,6 +190,91 @@ float3 GetAmbientInfluence(
   return ( diffuse_part * diffuse + specular ) * brdf.Occlusion;
 }
 
+float3 GetAmbientProbeInfluence(
+    in Environment         env,
+    in BRDFCookTorranceGGX brdf,
+    float3                 position,
+    float3                 view_dir,
+    SamplerState           default_sampler,
+    SamplerState           clamped_lut_sampler,
+    bool                   use_diffuse,
+    bool                   use_spec )
+{
+
+  ReflectionProbe probe;
+  if ( !env.QueryProbe( probe, position ) )
+  {
+    return GetAmbientInfluence( env, brdf, view_dir, default_sampler, clamped_lut_sampler, use_diffuse, use_spec );
+  }
+
+  float cosine_factor =
+      max( dot( brdf.Normal, view_dir ), 0.0f ); // Normal instead of Halfway since there's no halfway in ambient.
+
+  float3 f_0             = 0.04f;
+  f_0                    = lerp( f_0, brdf.Albedo, brdf.Metallic );
+  float3 specular_part   = FresnelSchlickRoughness( cosine_factor, f_0, brdf.Roughness );
+  float3 diffuse_part    = 1.0f - specular_part;
+
+  diffuse_part          *= 1.0f - brdf.Metallic; // Metals don't have diffuse/refractions.
+
+  float3 reflection_dir  = reflect( -view_dir, brdf.Normal );
+
+  float3 specular        = 0.0f.xxx;
+  float3 diffuse         = 0.0f.xxx;
+
+  if ( use_spec )
+  {
+    float  n_dot_v           = max( dot( brdf.Normal, view_dir ), 0.0f );
+    float3 prefiltered_color = probe.SamplePrefiltered( reflection_dir, position, brdf.Roughness, default_sampler ).rgb;
+    float2 env_brdf          = env.SampleBrdfLut( n_dot_v, brdf.Roughness, clamped_lut_sampler );
+    specular                 = prefiltered_color * ( specular_part * env_brdf.x + env_brdf.y );
+  }
+  if ( use_diffuse )
+  {
+    diffuse = brdf.Albedo * env.SampleIrradiance( brdf.Normal, default_sampler );
+  }
+
+  return ( diffuse_part * diffuse + specular ) * brdf.Occlusion;
+}
+
+float3 GetAmbientProbeInfluence(
+    in Environment         env,
+    in BRDFCookTorranceGGX brdf,
+    float3                 position,
+    float3                 view_dir,
+    SamplerState           default_sampler,
+    SamplerState           clamped_lut_sampler )
+{
+  ReflectionProbe probe;
+  if ( !env.QueryProbe( probe, position ) )
+  {
+    return GetAmbientInfluence( env, brdf, view_dir, default_sampler, clamped_lut_sampler );
+  }
+
+  float cosine_factor =
+      max( dot( brdf.Normal, view_dir ), 0.0f ); // Normal instead of Halfway since there's no halfway in ambient.
+
+  float3 f_0                = 0.04f;
+  f_0                       = lerp( f_0, brdf.Albedo, brdf.Metallic );
+  float3 specular_part      = FresnelSchlickRoughness( cosine_factor, f_0, brdf.Roughness );
+  float3 diffuse_part       = 1.0f - specular_part;
+
+  diffuse_part             *= 1.0f - brdf.Metallic; // Metals don't have diffuse/refractions.
+
+  float3 reflection_dir     = reflect( -view_dir, brdf.Normal );
+
+  float3 specular           = 0.0f.xxx;
+  float3 diffuse            = 0.0f.xxx;
+
+  float  n_dot_v            = max( dot( brdf.Normal, view_dir ), 0.0f );
+  float3 prefiltered_color  = probe.SamplePrefiltered( reflection_dir, position, brdf.Roughness, default_sampler ).rgb;
+  float2 env_brdf           = env.SampleBrdfLut( n_dot_v, brdf.Roughness, clamped_lut_sampler );
+  specular                  = prefiltered_color * ( specular_part * env_brdf.x + env_brdf.y );
+  diffuse                   = brdf.Albedo * env.SampleIrradiance( brdf.Normal, default_sampler );
+
+  return ( diffuse_part * diffuse + specular ) * brdf.Occlusion;
+}
+
 template <typename TBrdf>
 float3 CalcShadowingLightContrib(
     in DirLight dir_light, in TBrdf brdf, float4 ws_position, float3 view_dir, SamplerComparisonState shadow_sampler )

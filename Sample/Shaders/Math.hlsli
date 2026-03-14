@@ -135,4 +135,45 @@ float3 DepthToNormal( in float4x4 inv_proj, in Texture2D<float> depth_tex, float
   return -normalize( normal );
 }
 
+float3 Barycentric( float3 a, float3 b, float3 c, float3 p )
+{
+  float3 v0    = b - a;
+  float3 v1    = c - a;
+  float3 v2    = p - a;
+  float  d00   = dot( v0, v0 );
+  float  d01   = dot( v0, v1 );
+  float  d11   = dot( v1, v1 );
+  float  d20   = dot( v2, v0 );
+  float  d21   = dot( v2, v1 );
+  float  denom = d00 * d11 - d01 * d01;
+  float  v     = ( d11 * d20 - d01 * d21 ) / denom;
+  float  w     = ( d00 * d21 - d01 * d20 ) / denom;
+  float  u     = 1.0f - v - w;
+  return float3( u, v, w );
+}
+
+float ScalarTripleProduct( float3 a, float3 b, float3 c )
+{
+  return dot( a, cross( b, c ) );
+}
+
+float4 Barycentric( float3 a, float3 b, float3 c, float3 d, float3 p )
+{
+  float3 vap = p - a;
+  float3 vbp = p - b;
+
+  float3 vab = b - a;
+  float3 vac = c - a;
+  float3 vad = d - a;
+
+  float3 vbc = c - b;
+  float3 vbd = d - b;
+  float  va6 = ScalarTripleProduct( vbp, vbd, vbc );
+  float  vb6 = ScalarTripleProduct( vap, vac, vad );
+  float  vc6 = ScalarTripleProduct( vap, vad, vab );
+  float  vd6 = ScalarTripleProduct( vap, vab, vac );
+  float  v6  = 1 / ScalarTripleProduct( vab, vac, vad );
+  return float4( va6 * v6, vb6 * v6, vc6 * v6, vd6 * v6 );
+}
+
 #endif

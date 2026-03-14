@@ -434,6 +434,7 @@
     <ClCompile Include="Scene.cpp" />
     <ClCompile Include="SpotLightManager.cpp" />
     <ClCompile Include="TextureLoader.cpp" />
+    <ClCompile Include="Util\SpatialHashMap.cpp" />
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="Atmosphere.hpp" />
@@ -473,6 +474,7 @@
     <ClInclude Include="Scene.hpp" />
     <ClInclude Include="SpotLightManager.hpp" />
     <ClInclude Include="TextureLoader.hpp" />
+    <ClInclude Include="Util\SpatialHashMap.hpp" />
   </ItemGroup>
   <ItemGroup>
     <None Include="..\.clang-format" />
@@ -752,6 +754,7 @@
     <None Include="Shaders\PBR.hlsli" />
     <None Include="Shaders\Quantization.hlsli" />
     <None Include="Shaders\ReflectionProbe.hlsli" />
+    <None Include="Shaders\SpatialHashMap.hlsli" />
     <None Include="Shaders\SpotLightCommon.hlsli" />
     <None Include="Shaders\SpotShadow.hlsli" />
     <None Include="Shaders\Triangle.hlsli" />

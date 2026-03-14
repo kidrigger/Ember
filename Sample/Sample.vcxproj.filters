@@ -231,6 +231,9 @@
     <ClCompile Include="Render\RenderPipeline.cpp">
       <Filter>Source Files\Render</Filter>
     </ClCompile>
+    <ClCompile Include="Util\SpatialHashMap.cpp">
+      <Filter>Source Files\Util</Filter>
+    </ClCompile>
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="BasicApp.hpp">
@@ -344,6 +347,9 @@
     <ClInclude Include="Render\RenderPipeline.hpp">
       <Filter>Header Files\Render</Filter>
     </ClInclude>
+    <ClInclude Include="Util\SpatialHashMap.hpp">
+      <Filter>Header Files\Util</Filter>
+    </ClInclude>
   </ItemGroup>
   <ItemGroup>
     <None Include="..\.clang-format">
@@ -429,6 +435,9 @@
     </None>
     <None Include="vcpkg.json">
       <Filter>Resource Files\Config</Filter>
+    </None>
+    <None Include="Shaders\SpatialHashMap.hlsli">
+      <Filter>Shaders\Util</Filter>
     </None>
   </ItemGroup>
   <ItemGroup>

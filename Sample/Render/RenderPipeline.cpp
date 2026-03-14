@@ -21,8 +21,7 @@ Ember::RenderPipeline::RenderPipeline(
     RenderPass::TransparencyForward             render_transparent_meshes,
     RenderPass::Atmosphere                      update_atmospheric_sky,
     RenderPass::Skybox                          render_background,
-    RenderPass::AtmosphereSkybox                render_atmos_background,
-    Proto::ReflectionProbe                      probe )
+    RenderPass::AtmosphereSkybox                render_atmos_background )
   : m_DepthFormat{ depth_format }
   , m_DrawPrePass{ std::move( draw_pre_pass ) }
   , m_RenderOpaqueMeshes{ std::move( render_opaque_meshes ) }
@@ -37,14 +36,9 @@ Ember::RenderPipeline::RenderPipeline(
   , m_UpdateAtmosphericSky{ std::move( update_atmospheric_sky ) }
   , m_RenderBackground{ std::move( render_background ) }
   , m_RenderAtmosphereBackground{ std::move( render_atmos_background ) }
-  , m_Probe{ std::move( probe ) }
 {}
 
-bool Ember::RenderPipeline::Create(
-    RenderPipeline*   out,
-    RenderDevice*     render_device,
-    MipMapGenerator*  mip_map_generator,
-    DXGI_FORMAT const depth_format )
+bool Ember::RenderPipeline::Create( RenderPipeline* out, RenderDevice* render_device, DXGI_FORMAT const depth_format )
 {
   auto const                                  swapchain_format = render_device->GetSwapchainFormat();
 
@@ -64,7 +58,6 @@ bool Ember::RenderPipeline::Create(
   RenderPass::Atmosphere                      update_atmospheric_sky;
   RenderPass::Skybox                          render_background;
   RenderPass::AtmosphereSkybox                render_atmosphere_background;
-  Proto::ReflectionProbe                      probe;
 
   ENSURE( RenderPass::DepthPrePass::Create( &draw_pre_pass, render_device, depth_format ) );
   ENSURE( RenderPass::OpaqueForward::Create(
@@ -97,8 +90,6 @@ bool Ember::RenderPipeline::Create(
 
   ENSURE( RenderPass::Atmosphere::Create( &update_atmospheric_sky, render_device ) );
 
-  ENSURE( Proto::ReflectionProbe::Create( &probe, render_device, mip_map_generator, { 0.0f, 4.0f, 0.0f }, 15.0f ) );
-
   new ( out ) RenderPipeline{
     depth_format,
     std::move( draw_pre_pass ),
@@ -114,7 +105,6 @@ bool Ember::RenderPipeline::Create(
     std::move( update_atmospheric_sky ),
     std::move( render_background ),
     std::move( render_atmosphere_background ),
-    std::move( probe ),
   };
   out->m_DepthFormat = depth_format;
 
@@ -131,18 +121,15 @@ FrameGraphResource Ember::RenderPipeline::Execute(
 {
   m_UpdateAtmosphericSky.SetSun( m_SunLightIndex );
 
-  auto const               atmosphere   = m_UpdateAtmosphericSky( frame_graph, blackboard, frame_idx );
-  auto const               probe        = m_Probe( frame_graph, *blackboard );
-  auto const               depth_buffer = m_DrawPrePass( frame_graph, *blackboard );
+  auto const atmosphere      = m_UpdateAtmosphericSky( frame_graph, blackboard, frame_idx );
+  auto const depth_buffer    = m_DrawPrePass( frame_graph, *blackboard );
 
-  FrameGraphResource const opaque_pass_fwd =
-      settings.UseProbes
-          ? m_RenderOpaqueMeshes.Execute( frame_graph, *blackboard, { depth_buffer, probe, m_Probe.ProbeInfo } )
-          : m_RenderOpaqueMeshes.Execute( frame_graph, *blackboard, depth_buffer );
-
-  auto const gbuffer         = m_UpdateGBuffer( frame_graph, *blackboard, depth_buffer );
   auto const ssao_pass       = m_RenderSSAO( frame_graph, *blackboard, depth_buffer );
   auto const ssao_blur_pass  = m_RenderSSAOBlur( frame_graph, *blackboard, ssao_pass, depth_buffer );
+
+  auto const opaque_pass_fwd = m_RenderOpaqueMeshes( frame_graph, *blackboard, depth_buffer );
+
+  auto const gbuffer         = m_UpdateGBuffer( frame_graph, *blackboard, depth_buffer );
   auto const omni_pass_rt    = m_RenderOmniLights( frame_graph, *blackboard, gbuffer );
   auto const spot_pass_rt    = m_RenderSpotLights( frame_graph, *blackboard, gbuffer, omni_pass_rt );
   auto const opaque_pass_dfr = m_RenderScreenSpaceLighting(

@@ -29,6 +29,11 @@ constexpr size_t operator""_GiB( size_t const gibs )
   return gibs * ( 1 << 30 );
 }
 
+constexpr bool IsPowerOfTwo( std::integral auto const value )
+{
+  return ( value > 0 ) and ( ( value & ( value - 1 ) ) == 0 );
+}
+
 template <typename T, typename TFrom>
 T CheckedCast( TFrom&& value )
   requires std::is_arithmetic_v<std::remove_cvref_t<T>> and std::is_arithmetic_v<std::remove_cvref_t<TFrom>>

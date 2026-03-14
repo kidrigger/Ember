@@ -31,7 +31,6 @@ bool Ember::RenderPass::OpaqueForward::Create( OpaqueForward* out, Desc const& d
   D3D12_ROOT_PARAMETER1 root_parameters[] = {
     RootConstants{ .Register = 0, .SizeBytes = sizeof( DrawList::PerBatch ) },
     RootConstantBuffer{ .Register = 1 },
-    RootConstants{ .Register = 2, .SizeBytes = sizeof( Proto::ReflectionProbe::Probe ) + 4 },
   };
 
   ComPtr<ID3D12RootSignature> root_signature =
@@ -116,64 +115,6 @@ FrameGraphResource Ember::RenderPass::OpaqueForward::Execute(
         cmd->SetPipelineState( pipeline.Get() );
         cmd->SetGraphicsRootConstants( 0, draw_batch );
         cmd->SetGraphicsRootConstantBuffer( 1, constants_buf );
-        cmd->SetGraphicsRootConstants( 2, ( UINT )SRVHandle{}, 16 );
-        cmd->DispatchMesh( { .X = draw_batch.CommandsCount } );
-      } );
-}
-
-FrameGraphResource Ember::RenderPass::OpaqueForward::Execute(
-    FrameGraph* frame_graph, FrameGraphBlackboard const& bb, Input in ) const
-{
-  auto const root_sig                 = RootSignature;
-  auto const pipeline                 = Pipeline;
-  auto [depth, probe_tex, probe_info] = in;
-
-  auto const& [constants_buf]         = bb.get<FrameConstants>();
-  auto const& draw_batch              = bb.get<DrawList::Batches>().Opaque();
-
-  return frame_graph->addCallbackPass(
-      "Opaque Forward",
-      [&]( FrameGraph::Builder& builder, FrameGraphResource& data )
-      {
-        auto const&              backbuffer_info = bb.get<FG::BackbufferInfo>();
-        FrameGraphResource const render_target   = builder.create<FG::Texture>(
-            "Main Render Target",
-            {
-                  .Format    = backbuffer_info.SwapchainFormat,
-                  .Width     = backbuffer_info.Width,
-                  .Height    = backbuffer_info.Height,
-                  .MipLevels = MipLevels::kBase,
-                  .Type      = TextureType::kRenderTarget,
-                  .InitState = D3D12_RESOURCE_STATE_RENDER_TARGET,
-            } );
-
-        data = builder.write(
-            render_target,
-            FG::Attachment{
-                .Index     = 0,
-                .ForceSrgb = true,
-                .LoadOp    = FG::LoadOperation::kClear,
-            } );
-        builder.read( depth, FG::DepthStencilRead{} );
-
-        builder.read( probe_tex, FG::ShaderRead{} );
-      },
-      [=]( FrameGraphResource const&, FrameGraphPassResources& res, FG::Context const* context )
-      {
-        ZoneScopedN( "Opaque Forward" );
-
-        FG::Context::FrameData const& frame_data = context->GetFrameData();
-        CommandList const*            cmd        = frame_data.CommandList;
-        PIXScopedEvent( cmd->Get(), PIX_COLOR_DEFAULT, "Opaque Forward" );
-
-        FG::Texture* probe_texture = &res.get<FG::Texture>( probe_tex );
-
-        cmd->SetGraphicsRootSignature( root_sig.Get() );
-        cmd->SetPipelineState( pipeline.Get() );
-        cmd->SetGraphicsRootConstants( 0, draw_batch );
-        cmd->SetGraphicsRootConstantBuffer( 1, constants_buf );
-        cmd->SetGraphicsRootConstants( 2, probe_info );
-        cmd->SetGraphicsRootConstants( 2, ( UINT )probe_texture->GetSRVHandle(), sizeof( probe_info ) );
         cmd->DispatchMesh( { .X = draw_batch.CommandsCount } );
       } );
 }

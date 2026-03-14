@@ -3,12 +3,26 @@
 #include <Graphics/RenderDevice.hpp>
 #include <Util/DataUtil.hpp>
 #include <Util/HelperUtils.hpp>
+#include <Util/Profiling.hpp>
+#include <Util/StringUtil.hpp>
+#include <fg/Blackboard.hpp>
+#include <format>
+#include "ReflectionProbe.hpp"
+#include "Render/DrawList.hpp"
+#include "RenderPassCommon.hpp"
+#include "Scene.hpp"
 #include "TextureLoader.hpp"
 
 namespace Ember
 {
 namespace
 {
+struct ProbeInfo
+{
+  DirectX::XMFLOAT3 Position;
+  float             CaptureRadius;
+};
+
 struct EnvParams
 {
   struct BoundDataType
@@ -120,7 +134,7 @@ Texture GenerateSkybox( EnvContext const& context, MipMapGenerator const* mipmap
     .CubeSide      = Environment::kEnvCubeSide,
   };
 
-  context.CommandList->SetComputeRootSignature( context.Pipelines->RootSignature.Get() );
+  context.CommandList->SetComputeRootSignature( context.Pipelines->IBLRootSignature.Get() );
   context.CommandList->SetPipelineState( context.Pipelines->EqRectToCubePipeline.Get() );
   context.CommandList->BindComputeResources( 0, env_cube_root_constant );
   context.CommandList->Dispatch( {
@@ -140,53 +154,101 @@ Texture GenerateSkybox( EnvContext const& context, MipMapGenerator const* mipmap
 
 bool CreatePipelines( Environment::Pipelines* out, RenderDevice* render_device )
 {
-  D3D12_ROOT_PARAMETER1 root_params[] = {
+  // IBL related constructions
+  D3D12_ROOT_PARAMETER1 ibl_root_params[] = {
     RootConstants{ .Register = 0, .SizeBytes = 5 * sizeof( uint32_t ) },
   };
 
-  D3D12_STATIC_SAMPLER_DESC static_samplers[] = {
+  D3D12_STATIC_SAMPLER_DESC ibl_static_samplers[] = {
     CD3DX12_STATIC_SAMPLER_DESC{ 0 },
   };
 
-  auto root_signature = render_device->CreateRootSignature( {
-      .RootParameters = root_params,
-      .StaticSamplers = static_samplers,
+  auto ibl_root_signature = render_device->CreateRootSignature( {
+      .RootParameters = ibl_root_params,
+      .StaticSamplers = ibl_static_samplers,
       .ShaderAccess   = RootSignatureDesc::Access::kCompute,
       .DebugName      = "Environment Root Signature",
   } );
-  if ( not root_signature ) return false;
+  if ( not ibl_root_signature ) return false;
 
   auto eqrect_to_cube_pipeline = render_device->CreateComputePipeline( {
-      .RootSignature     = root_signature.Get(),
+      .RootSignature     = ibl_root_signature.Get(),
       .ComputeShaderName = "EqrectToCube.cso",
       .DebugName         = "Eqrect -> Cube Pipeline",
   } );
   if ( not eqrect_to_cube_pipeline ) return false;
 
   auto diffuse_irradiance_pipeline = render_device->CreateComputePipeline( {
-      .RootSignature     = root_signature.Get(),
+      .RootSignature     = ibl_root_signature.Get(),
       .ComputeShaderName = "DiffuseIrradiance.cso",
       .DebugName         = "Diffuse Irradiance Pipeline",
   } );
   if ( not diffuse_irradiance_pipeline ) return false;
 
   auto prefilter_pipeline = render_device->CreateComputePipeline( {
-      .RootSignature     = root_signature.Get(),
+      .RootSignature     = ibl_root_signature.Get(),
       .ComputeShaderName = "Prefilter.cso",
       .DebugName         = "Prefilter Pipeline",
   } );
   if ( not prefilter_pipeline ) return false;
 
   auto brdf_lut_pipeline = render_device->CreateComputePipeline( {
-      .RootSignature     = root_signature.Get(),
+      .RootSignature     = ibl_root_signature.Get(),
       .ComputeShaderName = "BrdfLUT.cso",
       .DebugName         = "BRDF LUT Pipeline",
   } );
   if ( not brdf_lut_pipeline ) return false;
 
+  //
+  D3D12_STATIC_SAMPLER_DESC probe_static_sampler_desc[] = {
+    CD3DX12_STATIC_SAMPLER_DESC{ 0 },
+    CD3DX12_STATIC_SAMPLER_DESC{ 1,
+                                D3D12_FILTER_ANISOTROPIC, D3D12_TEXTURE_ADDRESS_MODE_CLAMP,
+                                D3D12_TEXTURE_ADDRESS_MODE_CLAMP, D3D12_TEXTURE_ADDRESS_MODE_CLAMP },
+    CD3DX12_STATIC_SAMPLER_DESC{ 2,
+                                D3D12_FILTER_COMPARISON_MIN_MAG_LINEAR_MIP_POINT, D3D12_TEXTURE_ADDRESS_MODE_BORDER,
+                                D3D12_TEXTURE_ADDRESS_MODE_BORDER, D3D12_TEXTURE_ADDRESS_MODE_BORDER,
+                                0, 16,
+                                D3D12_COMPARISON_FUNC_LESS_EQUAL, D3D12_STATIC_BORDER_COLOR_OPAQUE_WHITE },
+  };
+
+  D3D12_ROOT_PARAMETER1 probe_root_parameters[] = {
+    RootConstants{ .Register = 0, .SizeBytes = sizeof( DrawList::PerBatch ) },
+    RootConstantBuffer{ .Register = 1 },
+    RootConstants{ .Register = 2, .SizeBytes = sizeof( ProbeInfo ) },
+  };
+
+  ComPtr<ID3D12RootSignature> probe_root_signature = render_device->CreateRootSignature( {
+      .RootParameters = probe_root_parameters,
+      .StaticSamplers = probe_static_sampler_desc,
+      .DebugName      = "Reflection Probe Root Signature",
+  } );
+  if ( not probe_root_signature ) return false;
+
+  CD3DX12_DEPTH_STENCIL_DESC depth_stencil_desc{ D3D12_DEFAULT };
+  depth_stencil_desc.DepthFunc               = D3D12_COMPARISON_FUNC_LESS;
+
+  ComPtr<ID3D12PipelineState> probe_pipeline = render_device->CreateGraphicsPipeline( {
+      .RootSignature    = probe_root_signature.Get(),
+      .RTVFormats       = { &Environment::kProbeRenderTargetFormat, 1 },
+      .RasterizerDesc   = Rasterizer{ .FrontFace = Rasterizer::FrontFace::kClockwise },
+      .DepthStencilDesc = depth_stencil_desc,
+      .AmpShaderName    = "ReflectionProbeAS.cso",
+      .MeshShaderName   = "ReflectionProbeMS.cso",
+      .PixelShaderName  = "ReflectionProbePS.cso",
+      .DSVFormat        = Environment::kProbeDepthFormat,
+      .DebugName        = "Reflection Probe Pipeline",
+  } );
+  if ( not probe_pipeline ) return false;
+
   new ( out ) Environment::Pipelines{
-    std::move( root_signature ),     std::move( eqrect_to_cube_pipeline ), std::move( diffuse_irradiance_pipeline ),
-    std::move( prefilter_pipeline ), std::move( brdf_lut_pipeline ),
+    .IBLRootSignature     = std::move( ibl_root_signature ),
+    .EqRectToCubePipeline = std::move( eqrect_to_cube_pipeline ),
+    .DiffuseIrradiance    = std::move( diffuse_irradiance_pipeline ),
+    .Prefilter            = std::move( prefilter_pipeline ),
+    .BrdfLUT              = std::move( brdf_lut_pipeline ),
+    .ProbeRootSignature   = std::move( probe_root_signature ),
+    .ProbePipeline        = std::move( probe_pipeline ),
   };
 
   return true;
@@ -215,7 +277,7 @@ Texture GenerateDiffuseIrradiance( EnvContext const& context, Texture const& sky
     .CubeSide      = Environment::kDiffuseCubeSide,
   };
 
-  context.CommandList->SetComputeRootSignature( context.Pipelines->RootSignature.Get() );
+  context.CommandList->SetComputeRootSignature( context.Pipelines->IBLRootSignature.Get() );
   context.CommandList->SetPipelineState( context.Pipelines->DiffuseIrradiance.Get() );
   context.CommandList->BindComputeResources( 0, diffuse_irradiance_root_constant );
   context.CommandList->Dispatch( {
@@ -254,7 +316,7 @@ Texture GeneratePrefilter( EnvContext const& context, Texture const& skybox )
 
   ASSERT( prefilter.GetDesc().MipLevels == Environment::kPrefilterMaxLoD + 1 /* Accounting for mip0 */ );
 
-  context.CommandList->SetComputeRootSignature( context.Pipelines->RootSignature.Get() );
+  context.CommandList->SetComputeRootSignature( context.Pipelines->IBLRootSignature.Get() );
   context.CommandList->SetPipelineState( context.Pipelines->Prefilter.Get() );
 
   for ( uint32_t i = 0; i <= Environment::kPrefilterMaxLoD; i++ )
@@ -298,7 +360,7 @@ Texture GenerateBrdfLUT( EnvContext const& context )
     .Height        = Environment::kBrdfLUTSize,
   };
 
-  context.CommandList->SetComputeRootSignature( context.Pipelines->RootSignature.Get() );
+  context.CommandList->SetComputeRootSignature( context.Pipelines->IBLRootSignature.Get() );
   context.CommandList->SetPipelineState( context.Pipelines->BrdfLUT.Get() );
   context.CommandList->BindComputeResources( 0, brdf_lut_constant );
   context.CommandList->Dispatch( {
@@ -320,21 +382,288 @@ Environment::IBLEnvironment CreateIBLEnvironment( EnvContext const& context, Tex
 } // namespace
 } // namespace Ember
 
-Ember::Environment::Environment( IBLEnvironment ibl, Pipelines pipelines, Texture brdf_lut )
-  : m_FallbackIBL{ std::move( ibl ) }
+Ember::Environment::Environment(
+    RenderDevice* render_device, World* world, IBLEnvironment ibl, Pipelines pipelines, Texture brdf_lut )
+  : m_RenderDevice{ render_device }
+  , m_World{ world }
+  , m_FallbackIBL{ std::move( ibl ) }
   , m_Pipelines{ std::move( pipelines ) }
   , m_BrdfLUT{ std::move( brdf_lut ) }
   , m_Repr{
-    .Skybox            = m_FallbackIBL.Skybox.GetSRVHandle(),
-    .DiffuseIrradiance = m_FallbackIBL.DiffuseIrradiance.GetSRVHandle(),
-    .Prefilter         = m_FallbackIBL.Prefilter.GetSRVHandle(),
-    .BrdfLUT           = m_BrdfLUT.GetSRVHandle(),
+    .Skybox                = m_FallbackIBL.Skybox.GetSRVHandle(),
+    .DiffuseIrradiance     = m_FallbackIBL.DiffuseIrradiance.GetSRVHandle(),
+    .Prefilter             = m_FallbackIBL.Prefilter.GetSRVHandle(),
+    .BrdfLUT               = m_BrdfLUT.GetSRVHandle(),
+    .ReflectionProbes      = {},
+    .CellProbeMap          = {},
+    .CellProbeMapSlotCount = 0,
+    .CellSize              = 1.0f,
   }
-{}
+{
+  _ = world->GetECS().component<ReflectionProbe>().member<float>( "radius", 0, offsetof( ReflectionProbe, Radius ) );
+}
 
 Ember::Environment::GpuRepr const& Ember::Environment::Repr() const
 {
   return m_Repr;
+}
+
+bool Ember::Environment::Bake(
+    CommandList* command_list, MipMapGenerator* mipmapper, FrameGraphBlackboard const& blackboard )
+{
+  if ( not m_RenderDevice ) return false;
+
+  m_ReflectionProbeTextures.clear();
+
+  DirectX::BoundingBox   total_bb;
+
+  std::vector<ProbeInfo> probe_infos;
+  m_World->GetECS().each(
+      [&]( ReflectionProbe const& probe, WorldTransform const& world_transform )
+      {
+        auto const position = world_transform.GetTranslation();
+        probe_infos.push_back( {
+            .Position      = position,
+            .CaptureRadius = probe.Radius,
+        } );
+
+        DirectX::BoundingBox bb;
+        DirectX::BoundingBox::CreateFromSphere( bb, { position, probe.Radius } );
+        DirectX::BoundingBox::CreateMerged( total_bb, total_bb, bb );
+      } );
+
+  if ( probe_infos.empty() ) return true;
+
+  DirectX::XMFLOAT3 min_lattice, max_lattice;
+  DirectX::XMStoreFloat3(
+      &min_lattice,
+      DirectX::XMVectorFloor( DirectX::XMVectorSubtract(
+          DirectX::XMLoadFloat3( &total_bb.Center ), DirectX::XMLoadFloat3( &total_bb.Extents ) ) ) );
+  DirectX::XMStoreFloat3(
+      &max_lattice,
+      DirectX::XMVectorCeiling( DirectX::XMVectorAdd(
+          DirectX::XMLoadFloat3( &total_bb.Center ), DirectX::XMLoadFloat3( &total_bb.Extents ) ) ) );
+
+  SpatialHashMap probe_hashmap{ 1.0f, 1024 };
+
+  // TODO: Replace this with some BVH if this becomes a bottleneck.
+  for ( int z = ( int )min_lattice.z; z < ( int )max_lattice.z; z++ )
+  {
+    for ( int y = ( int )min_lattice.y; y < ( int )max_lattice.y; y++ )
+    {
+      for ( int x = ( int )min_lattice.x; x < ( int )max_lattice.x; x++ )
+      {
+        DirectX::XMFLOAT3 position = { ( float )x + 0.5f, ( float )y + 0.5f, ( float )z + 0.5f };
+
+        if ( probe_hashmap.Contains( position ) ) continue;
+
+        float    min_dist = std::numeric_limits<float>::infinity();
+        uint32_t min_idx  = UINT32_MAX;
+
+        for ( uint32_t i = 0; i < probe_infos.size(); i++ )
+        {
+          auto const& probe_info = probe_infos[i];
+          if ( probe_info.CaptureRadius <= 0.0f ) continue;
+
+          auto const dist = DirectX::XMVectorGetX( DirectX::XMVector3LengthSq( DirectX::XMVectorSubtract(
+              DirectX::XMLoadFloat3( &probe_info.Position ), DirectX::XMLoadFloat3( &position ) ) ) );
+          if ( dist > probe_info.CaptureRadius * probe_info.CaptureRadius ) continue;
+
+          if ( dist < min_dist )
+          {
+            min_dist = dist;
+            min_idx  = i;
+          }
+        }
+
+        probe_hashmap.Put( position, min_idx );
+      }
+    }
+  }
+
+  auto const spatial_hashmap_control     = probe_hashmap.GetControlStore();
+  auto const spatial_hashmap_indirection = probe_hashmap.GetIndirectionStore();
+
+  auto const total_size = ByteSizeOf( spatial_hashmap_control ) + ByteSizeOf( spatial_hashmap_indirection );
+  if ( m_CellProbeMapBuffer.GetSize() < total_size or m_CellProbeMapBuffer.GetSize() > 2 * total_size )
+  {
+    m_CellProbeMapBuffer = m_RenderDevice->CreateRawStorageBuffer( total_size );
+    m_CellProbeMapBuffer.SetName( L"Probe Index Buffer" );
+  }
+
+  // Write
+  {
+    size_t size = ByteSizeOf( spatial_hashmap_control );
+    m_CellProbeMapBuffer.Write( 0, size, DataOf( spatial_hashmap_control ) );
+
+    m_CellProbeMapBuffer.Write(
+        size, ByteSizeOf( spatial_hashmap_indirection ), DataOf( spatial_hashmap_indirection ) );
+  }
+
+  if ( probe_infos.empty() ) return true;
+
+  Texture depth_tex = m_RenderDevice->CreateTextureCube( {
+      .Format    = kProbeDepthFormat,
+      .Side      = kEnvCubeSide,
+      .Type      = TextureType::kDepthStencil,
+      .MipLevels = MipLevels::kBase,
+      .InitState = D3D12_RESOURCE_STATE_DEPTH_WRITE,
+  } );
+
+  wchar_t name_buf[32];
+
+  auto    probe_skyboxes =
+      std::views::repeat(
+          TexCubeDesc{
+              .Format      = kProbeRenderTargetFormat,
+              .Side        = kEnvCubeSide,
+              .Type        = TextureType::kRenderTarget,
+              .IsReadWrite = true,
+              .MipLevels   = MipLevels::kAuto,
+              .InitState   = D3D12_RESOURCE_STATE_COPY_DEST,
+          },
+          probe_infos.size() ) |
+      std::views::transform( [&]( auto const& desc ) { return m_RenderDevice->CreateTextureCube( desc ); } ) |
+      std::ranges::to<std::vector>();
+
+  auto fallback_skybox_state = m_FallbackIBL.Skybox.GetCurrentState();
+  command_list->ResourceBarrier( CD3DX12_RESOURCE_BARRIER::Transition(
+      m_FallbackIBL.Skybox.GetTexture(), fallback_skybox_state, D3D12_RESOURCE_STATE_COPY_SOURCE ) );
+  m_FallbackIBL.Skybox.SetCurrentState( D3D12_RESOURCE_STATE_COPY_SOURCE );
+
+  {
+    // TODO: This will be super expensive without some 'serious' culling.
+    ZoneScopedN( "Reflection Probe Capture" );
+    PIXScopedEvent( command_list->Get(), PIX_COLOR_DEFAULT, "Reflection Probe Capture" );
+
+    // Copy Skybox to each probe skybox before rendering over them.
+    for ( int i = 0; auto& skybox : probe_skyboxes )
+    {
+      skybox.SetName( FormatTo( name_buf, L"Probe Skybox {}", i++ ) );
+
+      command_list->CopyResource( skybox.GetTexture(), m_FallbackIBL.Skybox.GetTexture() );
+    }
+
+    command_list->ResourceBarrier( CD3DX12_RESOURCE_BARRIER::Transition(
+        m_FallbackIBL.Skybox.GetTexture(), m_FallbackIBL.Skybox.GetCurrentState(), fallback_skybox_state ) );
+    m_FallbackIBL.Skybox.SetCurrentState( fallback_skybox_state );
+
+    std::vector<D3D12_RESOURCE_BARRIER> barriers( probe_skyboxes.size() );
+
+    for ( int i = 0; auto& skybox : probe_skyboxes )
+    {
+      barriers[i] = CD3DX12_RESOURCE_BARRIER::Transition(
+          skybox.GetTexture(), skybox.GetCurrentState(), D3D12_RESOURCE_STATE_RENDER_TARGET );
+      skybox.SetCurrentState( D3D12_RESOURCE_STATE_RENDER_TARGET );
+
+      i++;
+    }
+    command_list->ResourceBarrier( barriers );
+
+    auto const& [constants_buf] = blackboard.get<FrameConstants>();
+    auto const& batch           = blackboard.get<DrawList::Batches>().Opaque();
+
+    command_list->Track( depth_tex.GetTexture() );
+
+    for ( int i = 0; i < probe_skyboxes.size(); i++ )
+    {
+      ProbeInfo const& probe_info = probe_infos[i];
+      Texture const&   skybox     = probe_skyboxes[i];
+
+      command_list->Track( skybox.GetTexture() );
+      command_list->ClearDepthStencilView( depth_tex.GetTexture(), D3D12_CLEAR_FLAG_DEPTH, 1.0f, 0 );
+      command_list->OMSetRenderTargets( 1, &skybox, &depth_tex );
+
+      command_list->SetGraphicsRootSignature( m_Pipelines.ProbeRootSignature.Get() );
+      command_list->SetPipelineState( m_Pipelines.ProbePipeline.Get() );
+      command_list->RSSetScissorViewport( kEnvCubeSide, kEnvCubeSide );
+      command_list->SetGraphicsRootConstants( 0, batch );
+      command_list->SetGraphicsRootConstantBuffer( 1, constants_buf );
+      command_list->SetGraphicsRootConstants( 2, probe_info );
+      command_list->DispatchMesh( { .X = batch.CommandsCount } );
+    }
+
+    // Transition everything to D3D12_RESOURCE_STATE_COPY_DEST all at once.
+    // This way we group the transitions and MipMap will skip the transitions.
+    for ( int i = 0; auto& skybox : probe_skyboxes )
+    {
+      barriers[i] = CD3DX12_RESOURCE_BARRIER::Transition(
+          skybox.GetTexture(), skybox.GetCurrentState(), D3D12_RESOURCE_STATE_COPY_DEST );
+      skybox.SetCurrentState( D3D12_RESOURCE_STATE_COPY_DEST );
+
+      i++;
+    }
+    command_list->ResourceBarrier( barriers );
+
+    for ( auto& skybox : probe_skyboxes )
+    {
+      if ( not mipmapper->TryGenerateMipMapCube( command_list, &skybox ) ) return false;
+    }
+
+    // Batch transforms to
+    for ( int i = 0; auto& skybox : probe_skyboxes )
+    {
+      barriers[i] = CD3DX12_RESOURCE_BARRIER::Transition(
+          skybox.GetTexture(), skybox.GetCurrentState(), D3D12_RESOURCE_STATE_UNORDERED_ACCESS );
+      skybox.SetCurrentState( D3D12_RESOURCE_STATE_UNORDERED_ACCESS );
+
+      i++;
+    }
+    command_list->ResourceBarrier( barriers );
+  }
+
+  EnvContext const context = {
+    .RenderDevice = m_RenderDevice,
+    .CommandList  = command_list,
+    .Pipelines    = &m_Pipelines,
+  };
+
+  {
+    // TODO: This will be super expensive without some 'serious' culling.
+    ZoneScopedN( "Generate IBL Maps" );
+    PIXScopedEvent( command_list->Get(), PIX_COLOR_DEFAULT, "Generate IBL Maps" );
+
+    m_ReflectionProbeTextures = probe_skyboxes | std::views::enumerate |
+                                std::views::transform(
+                                    [&]( std::pair<size_t, Texture> const& skybox )
+                                    {
+                                      auto prefilter = GeneratePrefilter( context, skybox.second );
+                                      prefilter.SetName( FormatTo( name_buf, L"Probe Prefilter {}", skybox.first ) );
+                                      return prefilter;
+                                    } ) |
+                                std::ranges::to<std::vector>();
+  }
+
+  std::vector<ReflectionProbeRepr> probe_reprs;
+  probe_reprs.reserve( m_ReflectionProbeTextures.size() );
+
+  for ( int i = 0; i < m_ReflectionProbeTextures.size(); i++ )
+  {
+    auto const& [position, radius] = probe_infos[i];
+    probe_reprs.push_back( {
+        .Position  = { position.x, position.y, position.z },
+        .Radius    = radius,
+        .Prefilter = m_ReflectionProbeTextures[i].GetSRVHandle(),
+    } );
+  }
+
+  // Commit to GPU
+  uint64_t const req_buffer_size = ByteSizeOf( probe_reprs );
+  if ( auto const current_buffer_size = m_ReflectionProbeBuffer.GetSize();
+       req_buffer_size > current_buffer_size or req_buffer_size < ( current_buffer_size / 2 ) ) // Arb but feels right.
+  {
+    m_ReflectionProbeBuffer =
+        m_RenderDevice->CreateStorageBuffer( ( uint32_t )req_buffer_size, StrideOf( probe_reprs ) );
+    m_ReflectionProbeBuffer.SetName( L"IBL Probe Data" );
+  }
+  m_ReflectionProbeBuffer.Write( 0, req_buffer_size, DataOf( probe_reprs ) );
+
+  m_Repr.ReflectionProbes      = m_ReflectionProbeBuffer.GetSRVHandle();
+  m_Repr.CellProbeMap          = m_CellProbeMapBuffer.GetSRVHandle();
+  m_Repr.CellProbeMapSlotCount = ( uint32_t )probe_hashmap.GetSlotCount();
+  m_Repr.CellSize              = probe_hashmap.GetCellSize();
+
+  return true;
 }
 
 bool Ember::Environment::TryLoadFromFile( Environment* env, LoadFromFile const& args )
@@ -347,12 +676,14 @@ bool Ember::Environment::TryLoadFromFile( Environment* env, LoadFromFile const& 
   if ( not texture_loader->TryLoadTexture( &environment, env_map_file ) ) return false;
   render_device->WaitOn( texture_loader->EndBatch() );
 
-  return TryLoadFromEqRect( env, { render_device, texture_loader->GetMipMapper(), std::move( environment ) } );
+  return TryLoadFromEqRect(
+      env, { render_device, args.World, texture_loader->GetMipMapper(), std::move( environment ) } );
 }
 
 bool Ember::Environment::TryLoadFromEqRect( Environment* env, LoadFromEqRect const& args )
 {
   RenderDevice*    render_device = args.RenderDevice;
+  World*           world         = args.World;
   MipMapGenerator* mip_mapper    = args.MipMapper;
   Texture const&   environment   = args.EqrectTexture;
 
@@ -376,9 +707,7 @@ bool Ember::Environment::TryLoadFromEqRect( Environment* env, LoadFromEqRect con
   queue.WaitOn( receipt );
 
   new ( env ) Environment{
-    std::move( ibl ),
-    std::move( pipelines ),
-    std::move( brdf_lut ),
+    render_device, world, std::move( ibl ), std::move( pipelines ), std::move( brdf_lut ),
   };
 
   return true;
@@ -387,6 +716,7 @@ bool Ember::Environment::TryLoadFromEqRect( Environment* env, LoadFromEqRect con
 bool Ember::Environment::TryLoadFromCube( Environment* env, LoadFromCube const& args )
 {
   RenderDevice* render_device = args.RenderDevice;
+  World*        world         = args.World;
 
   Queue         queue         = render_device->CreateQueue( D3D12_COMMAND_LIST_TYPE_COMPUTE );
   auto          command_list  = queue.GetCommandList();
@@ -408,9 +738,7 @@ bool Ember::Environment::TryLoadFromCube( Environment* env, LoadFromCube const& 
   queue.WaitOn( receipt );
 
   new ( env ) Environment{
-    std::move( ibl ),
-    std::move( pipelines ),
-    std::move( brdf_lut ),
+    render_device, world, std::move( ibl ), std::move( pipelines ), std::move( brdf_lut ),
   };
 
   return true;

@@ -56,14 +56,30 @@ float4 TriangleMaskedPS( PSIn IN ) : SV_TARGET0
 #ifdef STRIP_DEBUG_CONFIG
   float3 ambient_contrib = GetAmbientInfluence( g_Env, brdf, view_dir, g_DefaultSampler, g_ClampedSampler );
 #else
-  float3 ambient_contrib = GetAmbientInfluence(
-      g_Env,
-      brdf,
-      view_dir,
-      g_DefaultSampler,
-      g_ClampedSampler,
-      !g_Debug.RemoveDiffuseContrib,
-      !g_Debug.RemoveSpecularContrib );
+  float3 ambient_contrib = 0.0f;
+  if ( g_Debug.ShowWireframe )
+  {
+    ambient_contrib = GetAmbientProbeInfluence(
+        g_Env,
+        brdf,
+        IN.Position.xyz,
+        view_dir,
+        g_DefaultSampler,
+        g_ClampedSampler,
+        !g_Debug.RemoveDiffuseContrib,
+        !g_Debug.RemoveSpecularContrib );
+  }
+  else
+  {
+    ambient_contrib = GetAmbientInfluence(
+        g_Env,
+        brdf,
+        view_dir,
+        g_DefaultSampler,
+        g_ClampedSampler,
+        !g_Debug.RemoveDiffuseContrib,
+        !g_Debug.RemoveSpecularContrib );
+  }
 #endif
 
   float3 total_contrib = emissive + point_contrib + dir_contrib + ambient_contrib;

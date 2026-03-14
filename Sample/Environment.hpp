@@ -1,22 +1,36 @@
 #pragma once
+#include <vector>
+
 #include <Graphics/DeviceHandle.hpp>
 #include <Graphics/RenderDevice.hpp>
 #include <Graphics/Texture.hpp>
+#include <Util/Float16.hpp>
+
+#include "Util/SpatialHashMap.hpp"
+#include "fg/Blackboard.hpp"
 
 namespace Ember
 {
 class MipMapGenerator;
-
 class TextureLoader;
+class World;
+
+struct ReflectionProbe
+{
+  float Radius{ 1.0f };
+};
 
 class Environment
 {
 public:
-  uint32_t constexpr static kEnvCubeSide       = 512;
-  uint32_t constexpr static kDiffuseCubeSide   = 256;
-  uint32_t constexpr static kPrefilterCubeSide = 512;
-  uint32_t constexpr static kPrefilterMaxLoD   = 5;
-  uint32_t constexpr static kBrdfLUTSize       = 512;
+  constexpr static uint32_t    kEnvCubeSide             = 128;
+  constexpr static uint32_t    kDiffuseCubeSide         = 32;
+  constexpr static uint32_t    kPrefilterCubeSide       = 64;
+  constexpr static uint32_t    kPrefilterMaxLoD         = 5;
+  constexpr static uint32_t    kBrdfLUTSize             = 256;
+
+  constexpr static DXGI_FORMAT kProbeRenderTargetFormat = DXGI_FORMAT_R11G11B10_FLOAT;
+  constexpr static DXGI_FORMAT kProbeDepthFormat        = DXGI_FORMAT_D16_UNORM;
 
   struct alignas( 16 ) GpuRepr
   {
@@ -24,6 +38,17 @@ public:
     SRVHandle DiffuseIrradiance;
     SRVHandle Prefilter;
     SRVHandle BrdfLUT;
+    SRVHandle ReflectionProbes;
+    SRVHandle CellProbeMap;
+    uint32_t  CellProbeMapSlotCount;
+    float     CellSize;
+  };
+
+  struct ReflectionProbeRepr
+  {
+    Float16   Position[3];
+    Float16   Radius;
+    SRVHandle Prefilter;
   };
 
   struct IBLEnvironment
@@ -35,16 +60,22 @@ public:
 
   struct Pipelines
   {
-    ComPtr<ID3D12RootSignature> RootSignature;
+    // IBL Specific
+    ComPtr<ID3D12RootSignature> IBLRootSignature;
     ComPtr<ID3D12PipelineState> EqRectToCubePipeline;
     ComPtr<ID3D12PipelineState> DiffuseIrradiance;
     ComPtr<ID3D12PipelineState> Prefilter;
     ComPtr<ID3D12PipelineState> BrdfLUT;
+
+    // Probe Capture
+    ComPtr<ID3D12RootSignature> ProbeRootSignature;
+    ComPtr<ID3D12PipelineState> ProbePipeline;
   };
 
   struct LoadFromFile
   {
     RenderDevice*  RenderDevice;
+    World*         World;
     TextureLoader* TextureLoader;
     char const*    FileName;
   };
@@ -52,6 +83,7 @@ public:
   struct LoadFromEqRect
   {
     RenderDevice*    RenderDevice;
+    World*           World;
     MipMapGenerator* MipMapper;
     Texture          EqrectTexture;
   };
@@ -59,21 +91,29 @@ public:
   struct LoadFromCube
   {
     RenderDevice* RenderDevice;
+    World*        World;
     Texture       CubeTexture;
   };
 
 private:
-  IBLEnvironment m_FallbackIBL;
-  Pipelines      m_Pipelines;
-  Texture        m_BrdfLUT;
-  GpuRepr        m_Repr;
+  RenderDevice*        m_RenderDevice{ nullptr };
+  World*               m_World{ nullptr };
+  IBLEnvironment       m_FallbackIBL;
+  std::vector<Texture> m_ReflectionProbeTextures;
+  Buffer               m_ReflectionProbeBuffer;
+  Buffer               m_CellProbeMapBuffer;
+  Pipelines            m_Pipelines;
+  Texture              m_BrdfLUT;
+  GpuRepr              m_Repr;
 
 public:
   Environment() = default;
 
-  Environment( IBLEnvironment ibl, Pipelines pipelines, Texture brdf_lut );
+  Environment( RenderDevice* render_device, World* world, IBLEnvironment ibl, Pipelines pipelines, Texture brdf_lut );
 
   [[nodiscard]] GpuRepr const& Repr() const;
+
+  bool Bake( CommandList* command_list, MipMapGenerator* mipmapper, FrameGraphBlackboard const& blackboard );
 
   //
   static bool TryLoadFromFile( Environment* env, LoadFromFile const& args );
