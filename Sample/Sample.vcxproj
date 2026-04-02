@@ -402,7 +402,6 @@
     <ClCompile Include="Inspector.cpp" />
     <ClCompile Include="MipMapGenerator.cpp" />
     <ClCompile Include="PickingGizmo.cpp" />
-    <ClCompile Include="ReflectionProbe.cpp" />
     <ClCompile Include="Render\DrawList.cpp" />
     <ClCompile Include="Render\RenderPipeline.cpp" />
     <ClCompile Include="SceneTree.cpp" />
@@ -442,7 +441,6 @@
     <ClInclude Include="Inspector.hpp" />
     <ClInclude Include="MipMapGenerator.hpp" />
     <ClInclude Include="PickingGizmo.hpp" />
-    <ClInclude Include="ReflectionProbe.hpp" />
     <ClInclude Include="Render\DrawList.hpp" />
     <ClInclude Include="Render\RenderPipeline.hpp" />
     <ClInclude Include="SceneTree.hpp" />

@@ -6,7 +6,6 @@
 #include <Util/Profiling.hpp>
 #include "Environment.hpp"
 #include "FrameGraphHelper.hpp"
-#include "ReflectionProbe.hpp"
 #include "RenderPassCommon.hpp"
 #include "Scene.hpp"
 #include "fg/Blackboard.hpp"

@@ -7,7 +7,6 @@
 #include <Util/StringUtil.hpp>
 #include <fg/Blackboard.hpp>
 #include <format>
-#include "ReflectionProbe.hpp"
 #include "Render/DrawList.hpp"
 #include "RenderPassCommon.hpp"
 #include "Scene.hpp"

@@ -4,7 +4,6 @@
 #include <Util/DirectXHeaders.hpp>
 #include <Util/Runtime.hpp>
 #include "LightManager.hpp"
-#include "ReflectionProbe.hpp"
 #include "fg/FrameGraphResource.hpp"
 
 

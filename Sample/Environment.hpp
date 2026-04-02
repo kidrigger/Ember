@@ -32,7 +32,7 @@ public:
   constexpr static DXGI_FORMAT kProbeRenderTargetFormat = DXGI_FORMAT_R11G11B10_FLOAT;
   constexpr static DXGI_FORMAT kProbeDepthFormat        = DXGI_FORMAT_D16_UNORM;
 
-  struct alignas( 16 ) GpuRepr
+  struct GpuRepr
   {
     SRVHandle Skybox;
     SRVHandle DiffuseIrradiance;
@@ -43,6 +43,7 @@ public:
     uint32_t  CellProbeMapSlotCount;
     float     CellSize;
   };
+  static_assert( sizeof( GpuRepr ) % 16 == 0 );
 
   struct ReflectionProbeRepr
   {

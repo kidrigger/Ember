@@ -7,7 +7,6 @@
 #include "ForwardPass.hpp"
 #include "GBufferPass.hpp"
 #include "LightingPass.hpp"
-#include "ReflectionProbe.hpp"
 #include "SSAOBlurPass.hpp"
 #include "SSAOPass.hpp"
 #include "SkyboxPass.hpp"

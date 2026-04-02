@@ -137,7 +137,6 @@ bool Ember::SpatialHashMap::PutCell( DirectX::XMINT3 cell, uint32_t index )
       m_TableData.ProbeSeqLen[slot] = probe_seq_iter;
 
       m_Size++;
-
       return true;
     }
 
