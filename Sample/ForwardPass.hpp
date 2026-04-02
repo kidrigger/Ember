@@ -38,10 +38,17 @@ struct OpaqueForward
   };
 
   static bool        Create( OpaqueForward* out, Desc const& desc );
-  FrameGraphResource Execute( FrameGraph* frame_graph, FrameGraphBlackboard const& bb, FrameGraphResource depth ) const;
+  FrameGraphResource Execute(
+      FrameGraph*                 frame_graph,
+      FrameGraphBlackboard const& bb,
+      FrameGraphResource          depth,
+      FrameGraphResource          ssao ) const;
 
   FrameGraphResource operator()(
-      FrameGraph* frame_graph, FrameGraphBlackboard const& bb, FrameGraphResource depth ) const;
+      FrameGraph*                 frame_graph,
+      FrameGraphBlackboard const& bb,
+      FrameGraphResource          depth,
+      FrameGraphResource          ssao ) const;
 };
 
 } // namespace Ember::RenderPass

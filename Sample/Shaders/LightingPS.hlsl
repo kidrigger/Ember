@@ -22,6 +22,8 @@ cbuffer FrameConstants : register( b1 )
   Camera      g_Camera;
   LightInfo   g_Lights;
   Environment g_Env;
+  float2      g_RTSize;
+  float2      g_Padding;
   DebugConfig g_Debug;
 }
 
@@ -97,7 +99,7 @@ float4 LightingPS( PSIn IN ) : SV_TARGET
   float3 normal       = OctahedralDecode( normal_tex.Sample( g_PointSampler, tex_coord ) );
   float3 orm          = orm_tex.Sample( g_PointSampler, tex_coord ).xyz;
   float3 emissive     = emissive_tex.Sample( g_PointSampler, tex_coord ).rgb * pos_emission.w;
-  float  ao           = IsValidHandle( g_AO ) ? ao_tex.Sample( g_PointSampler, tex_coord ).r : 1.0f;
+  float  ao           = IsValidHandle( g_AO ) ? ao_tex.Sample( g_DefaultSampler, tex_coord ).r : 1.0f;
 
 #ifndef STRIP_DEBUG_CONFIG
   if ( g_Debug.VisualizationMode == kLightingOnly )

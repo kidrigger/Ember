@@ -126,22 +126,23 @@ FrameGraphResource Ember::RenderPipeline::Execute(
 
   auto const ssao_pass       = m_RenderSSAO( frame_graph, *blackboard, depth_buffer );
   auto const ssao_blur_pass  = m_RenderSSAOBlur( frame_graph, *blackboard, ssao_pass, depth_buffer );
+  auto const ssao_resource   = settings.UseSSAO ? ssao_blur_pass : FrameGraphResource{};
 
-  auto const opaque_pass_fwd = m_RenderOpaqueMeshes( frame_graph, *blackboard, depth_buffer );
+  auto const opaque_pass_fwd = m_RenderOpaqueMeshes( frame_graph, *blackboard, depth_buffer, ssao_resource );
 
   auto const gbuffer         = m_UpdateGBuffer( frame_graph, *blackboard, depth_buffer );
-  auto const omni_pass_rt    = m_RenderOmniLights( frame_graph, *blackboard, gbuffer );
-  auto const spot_pass_rt    = m_RenderSpotLights( frame_graph, *blackboard, gbuffer, omni_pass_rt );
-  auto const opaque_pass_dfr = m_RenderScreenSpaceLighting(
-      frame_graph, *blackboard, gbuffer, spot_pass_rt, settings.UseSSAO ? ssao_blur_pass : FrameGraphResource{} );
+  auto const omni_pass_rt    = m_RenderOmniLights( frame_graph, *blackboard, gbuffer, ssao_resource );
+  auto const spot_pass_rt    = m_RenderSpotLights( frame_graph, *blackboard, gbuffer, omni_pass_rt, ssao_resource );
+  auto const opaque_pass_dfr =
+      m_RenderScreenSpaceLighting( frame_graph, *blackboard, gbuffer, spot_pass_rt, ssao_resource );
 
   auto const opaque_pass = RenderPass::RenderDepthData{
     .RenderTarget = settings.UseDeferredRendering ? opaque_pass_dfr : opaque_pass_fwd,
     .DepthStencil = depth_buffer,
   };
 
-  auto const alpha_tested      = m_RenderMaskedMeshes( frame_graph, *blackboard, opaque_pass );
-  auto const transparency_pass = m_RenderTransparentMeshes( frame_graph, *blackboard, alpha_tested );
+  auto const alpha_tested      = m_RenderMaskedMeshes( frame_graph, *blackboard, opaque_pass, ssao_resource );
+  auto const transparency_pass = m_RenderTransparentMeshes( frame_graph, *blackboard, alpha_tested, ssao_resource );
 
   auto const skybox_pass =
       settings.UseProceduralAtmosphericSky

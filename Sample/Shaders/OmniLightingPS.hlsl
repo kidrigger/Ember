@@ -13,6 +13,7 @@ cbuffer GBufferIn : register( b0 )
   ResID g_Normal;
   ResID g_ORM;
   ResID g_Emissive;
+  ResID g_AO;
 };
 
 cbuffer FrameConstants : register( b1 )
@@ -20,6 +21,8 @@ cbuffer FrameConstants : register( b1 )
   Camera      g_Camera;
   LightInfo   g_Lights;
   Environment g_Env;
+  float2      g_RTSize;
+  float2      g_Padding;
   DebugConfig g_Debug;
 }
 
@@ -43,6 +46,7 @@ float4                 OmniLightingPS( float4 screen_pos : SV_POSITION, uint lig
   Texture2D<float2> normal_tex   = ResourceDescriptorHeap[g_Normal];
   Texture2D<float4> orm_tex      = ResourceDescriptorHeap[g_ORM];
   Texture2D<float4> emissive_tex = ResourceDescriptorHeap[g_Emissive];
+  Texture2D<float>  ao_tex       = ResourceDescriptorHeap[g_AO];
 
   // w channel of position texture is used for emissive strength
   float4 pos_emission = position_tex.Sample( g_PointSampler, tex_coord );
@@ -52,6 +56,7 @@ float4                 OmniLightingPS( float4 screen_pos : SV_POSITION, uint lig
   float3 normal       = OctahedralDecode( normal_tex.Sample( g_PointSampler, tex_coord ) );
   float3 orm          = orm_tex.Sample( g_PointSampler, tex_coord ).xyz;
   float3 emissive     = emissive_tex.Sample( g_PointSampler, tex_coord ).rgb * pos_emission.w;
+  float  ao           = IsValidHandle( g_AO ) ? ao_tex.Sample( g_DefaultSampler, tex_coord ).r : 1.0f;
 
 #ifndef STRIP_DEBUG_CONFIG
   if ( g_Debug.VisualizationMode == kLightingOnly )
@@ -65,7 +70,7 @@ float4                 OmniLightingPS( float4 screen_pos : SV_POSITION, uint lig
   brdf.Normal     = normal;
   brdf.Metallic   = orm.z;
   brdf.Roughness  = orm.y;
-  brdf.Occlusion  = orm.x;
+  brdf.Occlusion  = orm.x * ao;
   brdf.F0         = lerp( 0.04f, albedo.rgb, orm.z );
 
   float3 view_dir = normalize( g_Camera.Position.xyz - position.xyz );

@@ -14,6 +14,13 @@ float4 TriangleMaskedPS( PSIn IN ) : SV_TARGET0
   float3 normal      = mat.GetNormal( IN.Normal, IN.Tangent, IN.Position.xyz, IN.TexCoord, g_DefaultSampler );
   float2 metal_rough = mat.GetMetalRough( IN.TexCoord, g_DefaultSampler );
   float3 emissive    = mat.GetEmissive( IN.TexCoord, g_DefaultSampler );
+  float  ao          = 1.0f;
+  if ( IsValidHandle( g_AO ) )
+  {
+    Texture2D<float> ao_tex    = ResourceDescriptorHeap[g_AO];
+    float2           screen_uv = IN.ScreenPosition.xy / g_RTSize;
+    ao                         = ao_tex.Sample( g_ClampedSampler, screen_uv ).r;
+  }
 
 #ifndef STRIP_DEBUG_CONFIG
   switch ( g_Debug.VisualizationMode )
@@ -36,7 +43,7 @@ float4 TriangleMaskedPS( PSIn IN ) : SV_TARGET0
       albedo.xyz = 0.5f;
       break;
     case kAO:
-      return 1.0f;
+      return ao.xxxx;
   }
 #endif
 
@@ -46,7 +53,7 @@ float4 TriangleMaskedPS( PSIn IN ) : SV_TARGET0
   brdf.Normal          = normal.xyz;
   brdf.Roughness       = metal_rough.g;
   brdf.F0              = lerp( 0.04f, albedo.rgb, metal_rough.x );
-  brdf.Occlusion       = 1.0f;
+  brdf.Occlusion       = ao;
 
   float3 view_dir      = normalize( g_Camera.Position.xyz - IN.Position.xyz );
 

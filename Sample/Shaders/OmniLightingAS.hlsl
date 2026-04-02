@@ -12,6 +12,8 @@ cbuffer FrameConstants : register( b1 )
   Camera      g_Camera;
   LightInfo   g_Lights;
   Environment g_Env;
+  float2      g_RTSize;
+  float2      g_Padding;
   DebugConfig g_Debug;
 }
 

@@ -30,6 +30,7 @@ bool Ember::RenderPass::OpaqueForward::Create( OpaqueForward* out, Desc const& d
   D3D12_ROOT_PARAMETER1 root_parameters[] = {
     RootConstants{ .Register = 0, .SizeBytes = sizeof( DrawList::PerBatch ) },
     RootConstantBuffer{ .Register = 1 },
+    RootConstants{ .Register = 2, .SizeBytes = sizeof( SRVHandle ) },
   };
 
   ComPtr<ID3D12RootSignature> root_signature =
@@ -67,7 +68,10 @@ bool Ember::RenderPass::OpaqueForward::Create( OpaqueForward* out, Desc const& d
 }
 
 FrameGraphResource Ember::RenderPass::OpaqueForward::Execute(
-    FrameGraph* frame_graph, FrameGraphBlackboard const& bb, FrameGraphResource const depth ) const
+    FrameGraph*                 frame_graph,
+    FrameGraphBlackboard const& bb,
+    FrameGraphResource const    depth,
+    FrameGraphResource const    ssao ) const
 {
   auto const root_sig         = RootSignature;
   auto const pipeline         = Pipeline;
@@ -99,8 +103,9 @@ FrameGraphResource Ember::RenderPass::OpaqueForward::Execute(
                 .LoadOp    = FG::LoadOperation::kClear,
             } );
         builder.read( depth, FG::DepthStencilRead{} );
+        if ( ssao.valid() ) builder.read( ssao, FG::ShaderRead{} );
       },
-      [=]( FrameGraphResource const&, FrameGraphPassResources&, FG::Context const* context )
+      [=]( FrameGraphResource const&, FrameGraphPassResources& resources, FG::Context const* context )
       {
         ZoneScopedN( "Opaque Forward" );
 
@@ -108,18 +113,23 @@ FrameGraphResource Ember::RenderPass::OpaqueForward::Execute(
         CommandList*                  cmd        = frame_data.CommandList;
         PIXScopedEvent( cmd->Get(), PIX_COLOR_DEFAULT, "Opaque Forward" );
 
-        auto const draw_batch = draw_list.Opaque();
+        auto const draw_batch  = draw_list.Opaque();
+        auto const ssao_handle = ssao.valid() ? resources.get<FG::Texture>( ssao ).GetSRVHandle() : SRVHandle{};
 
         cmd->SetGraphicsRootSignature( root_sig.Get() );
         cmd->SetPipelineState( pipeline.Get() );
         cmd->SetGraphicsRootConstants( 0, draw_batch );
         cmd->SetGraphicsRootConstantBuffer( 1, constants_buf );
+        cmd->SetGraphicsRootConstants( 2, ssao_handle );
         cmd->DispatchMesh( { .X = draw_batch.CommandsCount } );
       } );
 }
 
 FrameGraphResource Ember::RenderPass::OpaqueForward::operator()(
-    FrameGraph* frame_graph, FrameGraphBlackboard const& bb, FrameGraphResource const depth ) const
+    FrameGraph*                 frame_graph,
+    FrameGraphBlackboard const& bb,
+    FrameGraphResource const    depth,
+    FrameGraphResource const    ssao ) const
 {
-  return Execute( frame_graph, bb, depth );
+  return Execute( frame_graph, bb, depth, ssao );
 }

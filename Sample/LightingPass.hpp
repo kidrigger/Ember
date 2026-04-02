@@ -16,10 +16,16 @@ struct OmniLightDeferred
                       OmniLightDeferred* out, RenderDevice* render_device, DXGI_FORMAT rt_format, DXGI_FORMAT depth_format );
 
   FrameGraphResource Execute(
-      FrameGraph* frame_graph, FrameGraphBlackboard const& bb, GBuffer::Data const& gbuffer ) const;
+      FrameGraph*                 frame_graph,
+      FrameGraphBlackboard const& bb,
+      GBuffer::Data const&        gbuffer,
+      FrameGraphResource          ssao ) const;
 
   FrameGraphResource operator()(
-      FrameGraph* frame_graph, FrameGraphBlackboard const& bb, GBuffer::Data const& gbuffer ) const;
+      FrameGraph*                 frame_graph,
+      FrameGraphBlackboard const& bb,
+      GBuffer::Data const&        gbuffer,
+      FrameGraphResource          ssao ) const;
 };
 
 struct SpotLightDeferred
@@ -35,13 +41,15 @@ struct SpotLightDeferred
       FrameGraph*                 frame_graph,
       FrameGraphBlackboard const& bb,
       GBuffer::Data const&        gbuffer,
-      FrameGraphResource          render_target ) const;
+      FrameGraphResource          render_target,
+      FrameGraphResource          ssao ) const;
 
   FrameGraphResource operator()(
       FrameGraph*                 frame_graph,
       FrameGraphBlackboard const& bb,
       GBuffer::Data const&        gbuffer,
-      FrameGraphResource          render_target ) const;
+      FrameGraphResource          render_target,
+      FrameGraphResource          ssao ) const;
 };
 
 struct ScreenSpaceLightDeferred

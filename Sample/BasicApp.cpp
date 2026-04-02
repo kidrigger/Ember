@@ -90,6 +90,8 @@ struct FrameConstantData
   Ember::Camera::GpuRepr       Camera;
   Ember::LightManager::GpuRepr LightInfo;
   Ember::Environment::GpuRepr  Environment;
+  DirectX::XMFLOAT2            RenderTargetSize;
+  DirectX::XMFLOAT2            Padding;
   DebugConfigGpuRepr           DebugConfig;
 };
 
@@ -738,10 +740,11 @@ void Ember::BasicApp::Render()
     m_Camera->Update();
 
     FrameConstantData fcd = {
-      .Camera      = m_Camera->GetGpuRepr(),
-      .LightInfo   = m_LightManager->PrepareFrame( *m_Camera, frame_idx ),
-      .Environment = m_Environment->Repr(),
-      .DebugConfig = g_Debug,
+      .Camera           = m_Camera->GetGpuRepr(),
+      .LightInfo        = m_LightManager->PrepareFrame( *m_Camera, frame_idx ),
+      .Environment      = m_Environment->Repr(),
+      .RenderTargetSize = { ( float )m_WindowWidth, ( float )m_WindowHeight },
+      .DebugConfig      = g_Debug,
     };
 
     const_buffer->Write( 0, sizeof( fcd ), &fcd );

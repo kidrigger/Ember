@@ -53,7 +53,14 @@ cbuffer                   FrameConstants : register( b1, space0 )
   Camera      g_Camera;
   LightInfo   g_Lights;
   Environment g_Env;
+  float2      g_RTSize;
+  float2      g_Padding;
   DebugConfig g_Debug;
+}
+
+cbuffer SSAOIn : register( b2, space0 )
+{
+  ResID g_AO;
 }
 
 SamplerState           g_DefaultSampler : register( s0, space0 );

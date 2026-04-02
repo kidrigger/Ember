@@ -22,10 +22,16 @@ struct TransparencyForward
                       TransparencyForward* out, RenderDevice* render_device, DXGI_FORMAT rt_format, DXGI_FORMAT depth_format );
 
   RenderDepthData Execute(
-      FrameGraph* frame_graph, FrameGraphBlackboard const& bb, RenderDepthData const& render_depth ) const;
+      FrameGraph*                 frame_graph,
+      FrameGraphBlackboard const& bb,
+      RenderDepthData const&      render_depth,
+      FrameGraphResource          ssao ) const;
 
   RenderDepthData operator()(
-      FrameGraph* frame_graph, FrameGraphBlackboard const& bb, RenderDepthData const& render_depth ) const;
+      FrameGraph*                 frame_graph,
+      FrameGraphBlackboard const& bb,
+      RenderDepthData const&      render_depth,
+      FrameGraphResource          ssao ) const;
 };
 
 struct MaskedForward
@@ -38,10 +44,16 @@ struct MaskedForward
                       MaskedForward* out, RenderDevice* render_device, DXGI_FORMAT rt_format, DXGI_FORMAT depth_format );
 
   RenderDepthData Execute(
-      FrameGraph* frame_graph, FrameGraphBlackboard const& bb, RenderDepthData const& render_depth ) const;
+      FrameGraph*                 frame_graph,
+      FrameGraphBlackboard const& bb,
+      RenderDepthData const&      render_depth,
+      FrameGraphResource          ssao ) const;
 
   RenderDepthData operator()(
-      FrameGraph* frame_graph, FrameGraphBlackboard const& bb, RenderDepthData const& render_depth ) const;
+      FrameGraph*                 frame_graph,
+      FrameGraphBlackboard const& bb,
+      RenderDepthData const&      render_depth,
+      FrameGraphResource          ssao ) const;
 };
 
 } // namespace Ember::RenderPass

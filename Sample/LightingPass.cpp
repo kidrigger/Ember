@@ -87,7 +87,10 @@ struct MergeData
 } // namespace Ember::RenderPass
 
 FrameGraphResource Ember::RenderPass::OmniLightDeferred::Execute(
-    FrameGraph* frame_graph, FrameGraphBlackboard const& bb, GBuffer::Data const& gbuffer ) const
+    FrameGraph*                 frame_graph,
+    FrameGraphBlackboard const& bb,
+    GBuffer::Data const&        gbuffer,
+    FrameGraphResource const    ssao ) const
 {
   auto const omni_light_count = bb.get<LightManager::GpuRepr>().OmniLightInfo.TotalLightCount;
   auto const& [constants_buf] = bb.get<FrameConstants>();
@@ -123,6 +126,7 @@ FrameGraphResource Ember::RenderPass::OmniLightDeferred::Execute(
                     .LoadOp    = FG::LoadOperation::kClear,
             } );
         data.DepthStencil = builder.read( gbuffer.DepthStencil, FG::DepthStencilRead{} );
+        if ( ssao.valid() ) data.SSAO = builder.read( ssao, FG::ShaderRead{} );
       },
       [=]( MergeData const& data, FrameGraphPassResources& resources, FG::Context const* context )
       {
@@ -132,11 +136,13 @@ FrameGraphResource Ember::RenderPass::OmniLightDeferred::Execute(
         CommandList*                  cmd        = frame_data.CommandList;
         PIXScopedEvent( cmd->Get(), PIX_COLOR_DEFAULT, "OmniLight Pass" );
 
-        SRVHandle gbuffer_handles[GBuffer::kGBufferCount];
+        SRVHandle gbuffer_handles[GBuffer::kGBufferCount + 1];
         for ( uint32_t i = 0; i < GBuffer::kGBufferCount; i++ )
         {
           gbuffer_handles[i] = resources.get<FG::Texture>( data.GBuffer[i] ).GetSRVHandle();
         }
+        gbuffer_handles[GBuffer::kGBufferCount] =
+            data.SSAO.valid() ? resources.get<FG::Texture>( data.SSAO ).GetSRVHandle() : SRVHandle{};
 
         cmd->SetGraphicsRootSignature( root_sig.Get() );
         cmd->SetPipelineState( pipeline.Get() );
@@ -148,9 +154,12 @@ FrameGraphResource Ember::RenderPass::OmniLightDeferred::Execute(
 }
 
 FrameGraphResource Ember::RenderPass::OmniLightDeferred::operator()(
-    FrameGraph* frame_graph, FrameGraphBlackboard const& bb, GBuffer::Data const& gbuffer ) const
+    FrameGraph*                 frame_graph,
+    FrameGraphBlackboard const& bb,
+    GBuffer::Data const&        gbuffer,
+    FrameGraphResource const    ssao ) const
 {
-  return Execute( frame_graph, bb, gbuffer );
+  return Execute( frame_graph, bb, gbuffer, ssao );
 }
 
 bool Ember::RenderPass::SpotLightDeferred::Create(
@@ -226,7 +235,8 @@ FrameGraphResource Ember::RenderPass::SpotLightDeferred::Execute(
     FrameGraph*                 frame_graph,
     FrameGraphBlackboard const& bb,
     GBuffer::Data const&        gbuffer,
-    FrameGraphResource const    render_target ) const
+    FrameGraphResource const    render_target,
+    FrameGraphResource const    ssao ) const
 {
   auto const  spot_light_count = bb.get<LightManager::GpuRepr>().SpotLightInfo.TotalLightCount;
   auto const& root_sig         = RootSignature;
@@ -244,6 +254,7 @@ FrameGraphResource Ember::RenderPass::SpotLightDeferred::Execute(
         }
         data.RenderTarget = builder.write( render_target, FG::Attachment{ .Index = 0, .ForceSrgb = true } );
         data.DepthStencil = builder.read( gbuffer.DepthStencil, FG::DepthStencilRead{} );
+        if ( ssao.valid() ) data.SSAO = builder.read( ssao, FG::ShaderRead{} );
       },
       [=]( MergeData const& data, FrameGraphPassResources& resources, FG::Context const* context )
       {
@@ -253,11 +264,13 @@ FrameGraphResource Ember::RenderPass::SpotLightDeferred::Execute(
         CommandList*                  cmd        = frame_data.CommandList;
         PIXScopedEvent( cmd->Get(), PIX_COLOR_DEFAULT, "SpotLight Pass" );
 
-        SRVHandle gbuffer_handles[GBuffer::kGBufferCount];
+        SRVHandle gbuffer_handles[GBuffer::kGBufferCount + 1];
         for ( uint32_t i = 0; i < GBuffer::kGBufferCount; i++ )
         {
           gbuffer_handles[i] = resources.get<FG::Texture>( data.GBuffer[i] ).GetSRVHandle();
         }
+        gbuffer_handles[GBuffer::kGBufferCount] =
+            data.SSAO.valid() ? resources.get<FG::Texture>( data.SSAO ).GetSRVHandle() : SRVHandle{};
 
         cmd->SetGraphicsRootSignature( root_sig.Get() );
         cmd->SetPipelineState( pipeline.Get() );
@@ -272,9 +285,10 @@ FrameGraphResource Ember::RenderPass::SpotLightDeferred::operator()(
     FrameGraph*                 frame_graph,
     FrameGraphBlackboard const& bb,
     GBuffer::Data const&        gbuffer,
-    FrameGraphResource const    render_target ) const
+    FrameGraphResource const    render_target,
+    FrameGraphResource const    ssao ) const
 {
-  return Execute( frame_graph, bb, gbuffer, render_target );
+  return Execute( frame_graph, bb, gbuffer, render_target, ssao );
 }
 
 bool Ember::RenderPass::ScreenSpaceLightDeferred::Create(

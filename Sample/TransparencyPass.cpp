@@ -30,6 +30,7 @@ bool Ember::RenderPass::TransparencyForward::Create(
   D3D12_ROOT_PARAMETER1 root_parameters[] = {
     RootConstants{ .Register = 0, .SizeBytes = sizeof( DrawList::PerBatch ) },
     RootConstantBuffer{ .Register = 1 },
+    RootConstants{ .Register = 2, .SizeBytes = sizeof( SRVHandle ) },
   };
 
   ComPtr<ID3D12RootSignature> root_signature = render_device->CreateRootSignature( {
@@ -72,7 +73,10 @@ bool Ember::RenderPass::TransparencyForward::Create(
 }
 
 Ember::RenderPass::RenderDepthData Ember::RenderPass::TransparencyForward::Execute(
-    FrameGraph* frame_graph, FrameGraphBlackboard const& bb, RenderDepthData const& render_depth ) const
+    FrameGraph*                 frame_graph,
+    FrameGraphBlackboard const& bb,
+    RenderDepthData const&      render_depth,
+    FrameGraphResource const    ssao ) const
 {
   auto const& pipeline        = Pipeline;
   auto const& root_signature  = RootSignature;
@@ -86,8 +90,9 @@ Ember::RenderPass::RenderDepthData Ember::RenderPass::TransparencyForward::Execu
       {
         data.RenderTarget = builder.write( render_depth.RenderTarget, FG::Attachment{ .Index = 0, .ForceSrgb = true } );
         data.DepthStencil = builder.write( render_depth.DepthStencil, FG::DepthStencil{} );
+        if ( ssao.valid() ) builder.read( ssao, FG::ShaderRead{} );
       },
-      [=]( RenderDepthData const&, FrameGraphPassResources&, FG::Context* context )
+      [=]( RenderDepthData const&, FrameGraphPassResources& resources, FG::Context* context )
       {
         ZoneScopedN( "Transparency Pass" );
 
@@ -95,19 +100,25 @@ Ember::RenderPass::RenderDepthData Ember::RenderPass::TransparencyForward::Execu
         CommandList*                  cmd        = frame_data.CommandList;
         PIXScopedEvent( cmd->Get(), PIX_COLOR_DEFAULT, "Transparency Pass" );
 
+        auto const ssao_handle = ssao.valid() ? resources.get<FG::Texture>( ssao ).GetSRVHandle() : SRVHandle{};
+
         cmd->SetGraphicsRootSignature( root_signature.Get() );
         // TODO: Sort transparent objects back to front
         cmd->SetPipelineState( pipeline.Get() );
         cmd->SetGraphicsRootConstants( 0, batch );
         cmd->SetGraphicsRootConstantBuffer( 1, constants_buf );
+        cmd->SetGraphicsRootConstants( 2, ssao_handle );
         cmd->DispatchMesh( { .X = batch.CommandsCount } );
       } );
 }
 
 Ember::RenderPass::RenderDepthData Ember::RenderPass::TransparencyForward::operator()(
-    FrameGraph* frame_graph, FrameGraphBlackboard const& bb, RenderDepthData const& render_depth ) const
+    FrameGraph*                 frame_graph,
+    FrameGraphBlackboard const& bb,
+    RenderDepthData const&      render_depth,
+    FrameGraphResource const    ssao ) const
 {
-  return Execute( frame_graph, bb, render_depth );
+  return Execute( frame_graph, bb, render_depth, ssao );
 }
 
 bool Ember::RenderPass::MaskedForward::Create(
@@ -130,6 +141,7 @@ bool Ember::RenderPass::MaskedForward::Create(
   D3D12_ROOT_PARAMETER1 root_parameters[] = {
     RootConstants{ .Register = 0, .SizeBytes = sizeof( DrawList::PerBatch ) },
     RootConstantBuffer{ .Register = 1 },
+    RootConstants{ .Register = 2, .SizeBytes = sizeof( SRVHandle ) },
   };
 
   ComPtr<ID3D12RootSignature> root_signature = render_device->CreateRootSignature( {
@@ -162,7 +174,10 @@ bool Ember::RenderPass::MaskedForward::Create(
 }
 
 Ember::RenderPass::RenderDepthData Ember::RenderPass::MaskedForward::Execute(
-    FrameGraph* frame_graph, FrameGraphBlackboard const& bb, RenderDepthData const& render_depth_data ) const
+    FrameGraph*                 frame_graph,
+    FrameGraphBlackboard const& bb,
+    RenderDepthData const&      render_depth_data,
+    FrameGraphResource const    ssao ) const
 {
   auto const root_sig         = RootSignature;
   auto const pipeline         = Pipeline;
@@ -178,8 +193,9 @@ Ember::RenderPass::RenderDepthData Ember::RenderPass::MaskedForward::Execute(
         data.RenderTarget =
             builder.write( render_depth_data.RenderTarget, FG::Attachment{ .Index = 0, .ForceSrgb = true } );
         data.DepthStencil = builder.write( render_depth_data.DepthStencil, FG::DepthStencil{} );
+        if ( ssao.valid() ) builder.read( ssao, FG::ShaderRead{} );
       },
-      [=]( RenderDepthData const&, FrameGraphPassResources&, FG::Context const* context )
+      [=]( RenderDepthData const&, FrameGraphPassResources& resources, FG::Context const* context )
       {
         ZoneScopedN( "Alpha Tested Pass" );
 
@@ -187,16 +203,22 @@ Ember::RenderPass::RenderDepthData Ember::RenderPass::MaskedForward::Execute(
         CommandList*                  cmd        = frame_data.CommandList;
         PIXScopedEvent( cmd->Get(), PIX_COLOR_DEFAULT, "Alpha Tested Pass" );
 
+        auto const ssao_handle = ssao.valid() ? resources.get<FG::Texture>( ssao ).GetSRVHandle() : SRVHandle{};
+
         cmd->SetGraphicsRootSignature( root_sig.Get() );
         cmd->SetPipelineState( pipeline.Get() );
         cmd->SetGraphicsRootConstants( 0, batch );
         cmd->SetGraphicsRootConstantBuffer( 1, constants_buf );
+        cmd->SetGraphicsRootConstants( 2, ssao_handle );
         cmd->DispatchMesh( { .X = batch.CommandsCount } );
       } );
 }
 
 Ember::RenderPass::RenderDepthData Ember::RenderPass::MaskedForward::operator()(
-    FrameGraph* frame_graph, FrameGraphBlackboard const& bb, RenderDepthData const& render_depth ) const
+    FrameGraph*                 frame_graph,
+    FrameGraphBlackboard const& bb,
+    RenderDepthData const&      render_depth,
+    FrameGraphResource const    ssao ) const
 {
-  return Execute( frame_graph, bb, render_depth );
+  return Execute( frame_graph, bb, render_depth, ssao );
 }
